@@ -2,7 +2,7 @@
 
 A Next.js-based real-time dashboard for monitoring fleet events via SignalR, part of the ReportMate ecosystem.
 
-## ✨ Features
+## Features
 
 - **Real-time Event Streaming** via SignalR with automatic reconnection
 - **Professional Dashboard UI** inspired by MunkiReport's event module
@@ -14,7 +14,7 @@ A Next.js-based real-time dashboard for monitoring fleet events via SignalR, par
 - **Dark Theme** optimized for monitoring environments
 - **Modular Architecture** with plugin system for extensibility
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -60,7 +60,7 @@ pnpm build
 pnpm start
 ```
 
-## 📱 Dashboard Features
+## Dashboard Features
 
 ### Main Dashboard (`/dashboard`)
 - Real-time event monitoring
@@ -80,7 +80,7 @@ pnpm start
 - Module configuration
 - Community module discovery
 
-## 🧪 Testing & Demo
+## Testing & Demo
 
 ### Demo Data Generation
 
@@ -113,7 +113,7 @@ curl -X POST https://reportmate-api.azurewebsites.net/api/ingest \
   }'
 ```
 
-## 🐳 Docker Support
+## Docker Support
 
 ### Development
 
@@ -130,7 +130,7 @@ The Dockerfile is optimized for production deployment with:
 - Environment variable injection
 - Health checks
 
-## 🏗️ Architecture
+## Architecture
 
 - **Framework**: Next.js 15 with App Router
 - **Styling**: Tailwind CSS 4.x
@@ -139,7 +139,7 @@ The Dockerfile is optimized for production deployment with:
 - **Package Manager**: pnpm
 - **Deployment**: Docker + Azure Container Apps
 
-## 🔧 Configuration
+## Configuration
 
 ### Environment Variables
 
@@ -163,7 +163,7 @@ const nextConfig = {
 }
 ```
 
-## 📦 Module System
+## Module System
 
 The dashboard supports a modular plugin architecture:
 
@@ -174,7 +174,7 @@ The dashboard supports a modular plugin architecture:
 
 See the [Module Development Guide](docs/modules.md) for creating custom modules.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
@@ -182,17 +182,17 @@ See the [Module Development Guide](docs/modules.md) for creating custom modules.
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🔗 Related Projects
+## Related Projects
 
 - [ReportMate Infrastructure](https://github.com/reportmate/reportmate-infra-azure) - Azure infrastructure and backend
 - [ReportMate Windows Client](https://github.com/reportmate/reportmate-client-win) - Windows data collection client
 - [ReportMate Modules](https://github.com/reportmate) - Official and community modules
 
-## 💬 Support
+## Support
 
 - [Documentation](https://docs.reportmate.io)
 - [Issues](https://github.com/reportmate/reportmate-app-web/issues)

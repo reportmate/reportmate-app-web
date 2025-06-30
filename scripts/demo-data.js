@@ -97,8 +97,8 @@ async function sendEvent(event) {
 }
 
 async function generateDemoData(count = 15, interval = 3000) {
-  console.log(`\n🚀 Generating ${count} demo events with ${interval}ms intervals...`);
-  console.log('📊 Dashboard: http://localhost:3000/dashboard\n');
+  console.log(`\nGenerating ${count} demo events with ${interval}ms intervals...`);
+  console.log('Dashboard: http://localhost:3000/dashboard\n');
   console.log('Features demonstrated:');
   console.log('  ✓ Auto dark mode (follows system preference)');
   console.log('  ✓ Live event streaming and polling fallback');
@@ -117,9 +117,9 @@ async function generateDemoData(count = 15, interval = 3000) {
     }
   }
   
-  console.log('\n✅ Demo data generation complete!');
-  console.log('💡 Try switching your system dark/light mode to see auto theme switching');
-  console.log('🔄 Events will auto-refresh - no manual refresh needed');
+  console.log('\nDemo data generation complete!');
+  console.log('Try switching your system dark/light mode to see auto theme switching');
+  console.log('Events will auto-refresh - no manual refresh needed');
 }
 
 // Main execution
