@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import ErrorBoundary from "../../src/components/ErrorBoundary"
 import { SuccessStatsWidget, WarningStatsWidget, ErrorStatsWidget, DevicesStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
@@ -41,12 +42,14 @@ export default function DashboardPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   // Fetch devices data (same as original dashboard)
   useEffect(() => {
     const fetchDevices = async () => {
       try {
+        setError(null)
         const response = await fetch('/api/device')
         if (response.ok) {
           const data = await response.json()
@@ -71,6 +74,7 @@ export default function DashboardPage() {
         }
       } catch (error) {
         console.error('Failed to fetch devices:', error)
+        setError(`Failed to load devices: ${error instanceof Error ? error.message : 'Unknown error'}`)
       } finally {
         setDevicesLoading(false)
       }
@@ -154,39 +158,51 @@ export default function DashboardPage() {
           {/* Column A (67% width) - 3 Stats Cards + Events Table */}
           <div className="lg:col-span-2 space-y-8">
             {/* Stats Cards - 3 widgets in a row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <SuccessStatsWidget events={events} />
-              <WarningStatsWidget events={events} />
-              <ErrorStatsWidget events={events} />
-            </div>
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <SuccessStatsWidget events={events} />
+                <WarningStatsWidget events={events} />
+                <ErrorStatsWidget events={events} />
+              </div>
+            </ErrorBoundary>
 
             {/* Events Table */}
-            <RecentEventsWidget
-              events={events}
-              connectionStatus={connectionStatus}
-              lastUpdateTime={lastUpdateTime}
-              mounted={mounted}
-              deviceNameMap={deviceNameMap}
-            />
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
+              <RecentEventsWidget
+                events={events}
+                connectionStatus={connectionStatus}
+                lastUpdateTime={lastUpdateTime}
+                mounted={mounted}
+                deviceNameMap={deviceNameMap}
+              />
+            </ErrorBoundary>
           </div>
 
           {/* Column B (33% width) - Total Devices Widget + New Clients Table */}
           <div className="lg:col-span-1 space-y-8">
             {/* Total Devices Widget */}
-            <DevicesStatsWidget devices={devices} />
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices stats</div>}>
+              <DevicesStatsWidget devices={devices} />
+            </ErrorBoundary>
 
             {/* New Clients Table */}
-            <NewClientsWidget devices={devices} loading={devicesLoading} />
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
+              <NewClientsWidget devices={devices} loading={devicesLoading} />
+            </ErrorBoundary>
           </div>
         </div>
 
         {/* OS Version Tracking - 50/50 Split */}
         <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* macOS Versions */}
-          <OSVersionWidget devices={devices} loading={devicesLoading} osType="macOS" />
+          <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading macOS stats</div>}>
+            <OSVersionWidget devices={devices} loading={devicesLoading} osType="macOS" />
+          </ErrorBoundary>
 
           {/* Windows Versions */}
-          <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
+          <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading Windows stats</div>}>
+            <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
+          </ErrorBoundary>
         </div>
       </div>
     </div>
