@@ -16,6 +16,27 @@ interface Event {
   payload: Record<string, unknown> | string
 }
 
+// Helper function to safely display payload
+const safeDisplayPayload = (payload: any): string => {
+  try {
+    if (!payload) return 'No payload'
+    if (typeof payload === 'string') return payload
+    if (typeof payload !== 'object') return String(payload)
+    
+    // Check if payload has a message property
+    if (payload.message) return String(payload.message)
+    
+    // Try to stringify, but with size limit
+    const stringified = JSON.stringify(payload)
+    if (stringified.length > 200) {
+      return `Large payload (${stringified.length} chars) - ${Object.keys(payload).slice(0, 3).join(', ')}...`
+    }
+    return stringified
+  } catch (error) {
+    return 'Complex payload (non-serializable)'
+  }
+}
+
 function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -390,9 +411,7 @@ function EventsPageContent() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-900 dark:text-white max-w-md">
-                            {typeof event.payload === 'object' && event.payload !== null ? 
-                              (event.payload as any).message || JSON.stringify(event.payload) : 
-                              String(event.payload)}
+                            {safeDisplayPayload(event.payload)}
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">

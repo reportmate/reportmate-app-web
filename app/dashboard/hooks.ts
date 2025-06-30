@@ -35,12 +35,14 @@ export function useLiveEvents() {
             if (prev.length === 0) {
               console.log("Loading initial events:", data.events.length)
               setLastUpdateTime(new Date())
-              return data.events.slice(-100) // Keep only last 100 events
+              return data.events.slice(-100).map(sanitizeEventForDisplay) // Keep only last 100 events
             }
             
             // Otherwise, merge new events, avoiding duplicates
             const existingIds = new Set(prev.map(e => e.id))
-            const newEvents = data.events.filter((e: FleetEvent) => !existingIds.has(e.id))
+            const newEvents = data.events
+              .filter((e: FleetEvent) => !existingIds.has(e.id))
+              .map(sanitizeEventForDisplay)
             if (newEvents.length > 0) {
               setLastUpdateTime(new Date())
               return [...prev, ...newEvents].slice(-100) // Keep only last 100 events
@@ -53,6 +55,62 @@ export function useLiveEvents() {
       console.error("Failed to fetch local events:", error)
     }
   }, [])
+
+  // Helper function to sanitize events for safe display
+  const sanitizeEventForDisplay = (event: any): FleetEvent => {
+    try {
+      return {
+        id: String(event.id || `event-${Date.now()}`),
+        device: String(event.device || 'unknown'),
+        kind: String(event.kind || 'info'),
+        ts: String(event.ts || new Date().toISOString()),
+        payload: sanitizePayloadForDisplay(event.payload)
+      }
+    } catch (error) {
+      console.error("Error sanitizing event:", error)
+      return {
+        id: `error-${Date.now()}`,
+        device: 'unknown',
+        kind: 'error',
+        ts: new Date().toISOString(),
+        payload: { message: 'Error processing event', error: String(error) }
+      }
+    }
+  }
+
+  // Helper function to sanitize payload for safe display
+  const sanitizePayloadForDisplay = (payload: any): Record<string, unknown> => {
+    try {
+      if (!payload) return {}
+      if (typeof payload === 'string') return { message: payload }
+      if (typeof payload !== 'object') return { value: String(payload) }
+      
+      // Test if payload can be safely stringified
+      const test = JSON.stringify(payload)
+      
+      // If payload is too large, summarize it
+      if (test.length > 5000) {
+        return {
+          message: 'Large data payload (summarized)',
+          dataSize: test.length,
+          keys: Object.keys(payload).slice(0, 10),
+          type: payload.type || 'unknown',
+          truncated: true
+        }
+      }
+      
+      return payload
+    } catch (error) {
+      console.warn("Payload contains non-serializable data, creating safe version:", error)
+      return {
+        message: 'Complex data payload (non-serializable)',
+        type: typeof payload,
+        keys: Object.keys(payload || {}).slice(0, 10),
+        hasCircularRefs: true,
+        error: 'JSON.stringify failed - likely circular references'
+      }
+    }
+  }
 
   useEffect(() => {
     let connection: HubConnection | null = null

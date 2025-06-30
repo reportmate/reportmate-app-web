@@ -492,7 +492,14 @@ export default function DashboardPage() {
                                 <td className="px-3 py-2.5 hidden md:table-cell">
                                   <div className="text-sm text-gray-900 dark:text-white truncate">
                                     {typeof event.payload === 'object' && event.payload !== null ? 
-                                      (event.payload as any).message || JSON.stringify(event.payload) : 
+                                      (event.payload as any).message || (() => {
+                                        try {
+                                          const str = JSON.stringify(event.payload)
+                                          return str.length > 100 ? `${str.substring(0, 100)}...` : str
+                                        } catch (error) {
+                                          return `Complex payload (${Object.keys(event.payload).length} fields)`
+                                        }
+                                      })() : 
                                       String(event.payload)}
                                   </div>
                                 </td>
