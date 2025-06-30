@@ -12,7 +12,7 @@ interface FleetEvent {
   device: string
   kind: string
   ts: string
-  payload: Record<string, unknown>
+  payload: Record<string, unknown> | string
 }
 
 interface RecentEventsWidgetProps {
@@ -162,27 +162,30 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                             {(() => {
                               try {
                                 if (!event.payload) return 'No payload'
-                                if (typeof event.payload === 'string') return event.payload
-                                if (typeof event.payload !== 'object') return String(event.payload)
+                                if (typeof event.payload === 'string') {
+                                  const str = event.payload
+                                  return str.substring(0, 80) + (str.length > 80 ? '...' : '')
+                                }
+                                if (typeof event.payload !== 'object') return String(event.payload).substring(0, 80)
                                 
                                 // Check if payload has a message property
-                                if ((event.payload as any).message) return String((event.payload as any).message)
+                                if ((event.payload as any).message) return String((event.payload as any).message).substring(0, 80)
                                 
                                 // For objects, show a safe summary instead of stringifying
                                 const keys = Object.keys(event.payload)
                                 if (keys.length === 0) return 'Empty payload'
                                 if (keys.length > 3) {
-                                  return `Large payload (${keys.length} fields): ${keys.slice(0, 3).join(', ')}...`
+                                  return `Large object (${keys.length} fields): ${keys.slice(0, 2).join(', ')}...`
                                 }
                                 
-                                // For small objects, try to stringify with size check
+                                // For very small objects, try to show them
                                 const str = JSON.stringify(event.payload)
-                                if (str.length > 100) {
-                                  return `Large data (${str.length} chars): ${keys.join(', ')}`
+                                if (str.length > 80) {
+                                  return `Data (${str.length} chars): ${keys.slice(0, 2).join(', ')}`
                                 }
-                                return str
+                                return str.substring(0, 80)
                               } catch (error) {
-                                return 'Complex payload (non-serializable)'
+                                return 'Complex payload'
                               }
                             })()}
                           </div>
