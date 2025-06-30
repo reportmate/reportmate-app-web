@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import fs from 'fs'
+import path from 'path'
 
 // Simple in-memory storage for recent events (in production, use Redis or database)
 let recentEvents: Array<Record<string, unknown>> = [
@@ -46,6 +48,28 @@ let recentEvents: Array<Record<string, unknown>> = [
   }
 ]
 
+// Check for clear events flag on module load
+const clearEventsFlag = path.join(process.cwd(), 'clear-events-flag.txt')
+if (fs.existsSync(clearEventsFlag)) {
+  console.log('[EVENTS API] Clear events flag detected, resetting to demo events only')
+  recentEvents = [
+    {
+      id: 'system-reset',
+      device: 'system',
+      kind: 'info',
+      ts: new Date().toISOString(),
+      payload: { message: 'Events cleared due to large payload recovery', reason: 'system_recovery' }
+    }
+  ]
+  // Remove the flag file
+  try {
+    fs.unlinkSync(clearEventsFlag)
+    console.log('[EVENTS API] Clear events flag removed')
+  } catch (err) {
+    console.error('[EVENTS API] Could not remove clear events flag:', err)
+  }
+}
+
 export async function GET() {
   try {
     // Return the most recent 50 events
@@ -75,11 +99,30 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    // Check content length first to prevent large payloads from crashing
+    const contentLength = request.headers.get('content-length')
+    if (contentLength && parseInt(contentLength) > 10000000) { // 10MB limit
+      console.warn(`[EVENTS API] Rejecting very large payload: ${contentLength} bytes`)
+      return NextResponse.json({
+        success: false,
+        error: "Payload too large for processing"
+      }, { status: 413 })
+    }
+
     const rawEvent = await request.json()
     
     console.log(`[EVENTS API] Received event from device: ${rawEvent.device || 'unknown'}`)
     console.log(`[EVENTS API] Event type/kind: ${rawEvent.kind || 'unknown'}`)
-    console.log(`[EVENTS API] Raw data size: ${JSON.stringify(rawEvent).length} bytes`)
+    
+    // Calculate size safely
+    let rawDataSize = 0
+    try {
+      rawDataSize = JSON.stringify(rawEvent).length
+      console.log(`[EVENTS API] Raw data size: ${rawDataSize} bytes`)
+    } catch (stringifyError) {
+      console.warn(`[EVENTS API] Could not calculate payload size - likely circular references`)
+      rawDataSize = -1 // Flag for problematic data
+    }
     
     // Validate and sanitize the event data
     const event = sanitizeEvent(rawEvent)
@@ -119,6 +162,24 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE() {
+  try {
+    console.log('[EVENTS API] Clearing all events from memory...')
+    recentEvents = []
+    
+    return NextResponse.json({
+      success: true,
+      message: "All events cleared"
+    })
+  } catch (error) {
+    console.error('Error clearing events:', error)
+    return NextResponse.json({
+      success: false,
+      error: (error as Error).message
+    }, { status: 500 })
+  }
+}
+
 // Helper function to sanitize event data and prevent dashboard crashes
 function sanitizeEvent(rawEvent: any): any {
   try {
@@ -127,7 +188,35 @@ function sanitizeEvent(rawEvent: any): any {
       // If this looks like a Windows client report (large payload with device info)
       if (rawEvent.device && (rawEvent.systemInfo || rawEvent.osqueryData)) {
         console.log(`Processing Windows client report from device: ${rawEvent.device}`)
-        console.log(`Data size: ${JSON.stringify(rawEvent).length} bytes`)
+        const dataSize = JSON.stringify(rawEvent).length
+        console.log(`Data size: ${dataSize} bytes`)
+        
+        // For very large payloads, create a minimal summary to prevent crashes
+        if (dataSize > 100000) { // 100KB limit for raw data
+          console.log(`[LARGE PAYLOAD] Received ${dataSize} bytes from ${rawEvent.device}, creating minimal summary`)
+          return {
+            id: rawEvent.id || `windows-large-${Date.now()}`,
+            device: String(rawEvent.device || 'unknown'),
+            kind: 'system',
+            ts: rawEvent.timestamp || new Date().toISOString(),
+            payload: {
+              message: 'Large Windows client report received (minimized for stability)',
+              type: 'windows_client_report_large',
+              dataSize: dataSize,
+              deviceInfo: {
+                hostname: rawEvent.device,
+                timestamp: rawEvent.timestamp || new Date().toISOString()
+              },
+              summary: {
+                originalDataSize: dataSize,
+                queryCount: rawEvent.osqueryData ? Object.keys(rawEvent.osqueryData).length : 0,
+                hasSystemInfo: !!rawEvent.systemInfo,
+                hasOsqueryData: !!rawEvent.osqueryData,
+                processingTime: new Date().toISOString()
+              }
+            }
+          }
+        }
         
         return {
           id: rawEvent.id || `windows-${Date.now()}`,
@@ -146,7 +235,7 @@ function sanitizeEvent(rawEvent: any): any {
               computerName: rawEvent.systemInfo?.computer_name
             },
             summary: {
-              dataSize: JSON.stringify(rawEvent).length,
+              dataSize: dataSize,
               queryResults: rawEvent.osqueryData ? Object.keys(rawEvent.osqueryData).length : 0,
               systemInfoFields: rawEvent.systemInfo ? Object.keys(rawEvent.systemInfo).length : 0,
               timestamp: rawEvent.timestamp || new Date().toISOString()
@@ -180,7 +269,8 @@ function sanitizeEvent(rawEvent: any): any {
       ts: new Date().toISOString(),
       payload: {
         message: 'Failed to process event data',
-        error: 'Event sanitization failed'
+        error: 'Event sanitization failed',
+        originalError: error instanceof Error ? error.message : String(error)
       }
     }
   }
@@ -193,36 +283,73 @@ function sanitizePayload(payload: any): Record<string, unknown> {
   }
   
   try {
-    // Test if the payload can be safely stringified
-    const payloadStr = JSON.stringify(payload)
+    // Create a safer version by limiting depth and excluding problematic fields
+    const safePayload = createSafePayload(payload)
     
-    // If payload is too large, summarize it
+    // Test if the payload can be safely stringified
+    const payloadStr = JSON.stringify(safePayload)
+    
+    // If payload is too large, summarize it more aggressively
     const payloadSize = payloadStr.length
-    if (payloadSize > 10000) { // 10KB limit for display
+    if (payloadSize > 500) { // Even smaller limit: 500 bytes instead of 1KB
       console.log(`[SANITIZE] Large payload detected: ${payloadSize} bytes, summarizing...`)
       return {
         message: 'Large data payload received',
         dataSize: payloadSize,
-        keys: Object.keys(payload).slice(0, 10), // First 10 keys
+        keys: Object.keys(payload).slice(0, 2), // Further reduced to just 2 keys
         truncated: true,
-        // Preserve important summary fields if they exist
-        ...(payload.message && { originalMessage: payload.message }),
-        ...(payload.type && { type: payload.type }),
-        ...(payload.deviceInfo && { deviceInfo: payload.deviceInfo }),
-        ...(payload.summary && { summary: payload.summary })
+        // Preserve only the most essential summary fields
+        ...(payload.message && { originalMessage: String(payload.message).substring(0, 50) }),
+        ...(payload.type && { type: String(payload.type).substring(0, 15) })
       }
     }
     
-    return payload
+    return safePayload
   } catch (error) {
     // If JSON.stringify fails (circular references, etc.), create a safe version
     console.error('[SANITIZE] Payload contains non-serializable data:', error)
     return {
       message: 'Complex data payload (non-serializable)',
       type: typeof payload,
-      keys: Object.keys(payload).slice(0, 10),
+      keys: Object.keys(payload || {}).slice(0, 3),
       hasCircularRefs: true,
-      error: error instanceof Error ? error.message : String(error)
+      error: error instanceof Error ? error.message.substring(0, 50) : String(error).substring(0, 50)
     }
   }
+}
+
+// Helper function to create a safe payload by limiting depth and size
+function createSafePayload(obj: any, depth = 0, maxDepth = 1): any {
+  if (depth > maxDepth) {
+    return '[Max depth reached]'
+  }
+  
+  if (obj === null || obj === undefined) {
+    return obj
+  }
+  
+  if (typeof obj !== 'object') {
+    const str = String(obj)
+    return str.length > 100 ? str.substring(0, 100) + '...' : str
+  }
+  
+  if (Array.isArray(obj)) {
+    // Limit array size and process only first few elements
+    return obj.slice(0, 3).map(item => createSafePayload(item, depth + 1, maxDepth))
+  }
+  
+  // For objects, limit the number of keys and process each safely
+  const result: any = {}
+  const keys = Object.keys(obj).slice(0, 5) // Limit to 5 keys max
+  
+  for (const key of keys) {
+    try {
+      if (key.length > 30) continue // Skip keys that are too long
+      result[key] = createSafePayload(obj[key], depth + 1, maxDepth)
+    } catch (error) {
+      result[key] = '[Error processing value]'
+    }
+  }
+  
+  return result
 }
