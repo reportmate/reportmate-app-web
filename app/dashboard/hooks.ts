@@ -82,34 +82,79 @@ export function useLiveEvents() {
   const sanitizePayloadForDisplay = (payload: any): Record<string, unknown> => {
     try {
       if (!payload) return {}
-      if (typeof payload === 'string') return { message: payload }
-      if (typeof payload !== 'object') return { value: String(payload) }
+      if (typeof payload === 'string') return { message: payload.substring(0, 200) }
+      if (typeof payload !== 'object') return { value: String(payload).substring(0, 200) }
+      
+      // Create a safer version with limited depth
+      const safePayload = createSafeDisplayPayload(payload)
       
       // Test if payload can be safely stringified
-      const test = JSON.stringify(payload)
+      const test = JSON.stringify(safePayload)
       
-      // If payload is too large, summarize it
-      if (test.length > 5000) {
+      // If payload is still too large, summarize it more aggressively
+      if (test.length > 1000) { // Reduced from 2000 to 1000
         return {
           message: 'Large data payload (summarized)',
           dataSize: test.length,
-          keys: Object.keys(payload).slice(0, 10),
-          type: payload.type || 'unknown',
-          truncated: true
+          keys: Object.keys(payload).slice(0, 3), // Reduced from 5 to 3
+          type: String(payload.type || 'unknown').substring(0, 20),
+          truncated: true,
+          // Only preserve essential fields
+          ...(payload.message && { 
+            originalMessage: String(payload.message).substring(0, 50) 
+          })
         }
       }
       
-      return payload
+      return safePayload
     } catch (error) {
       console.warn("Payload contains non-serializable data, creating safe version:", error)
       return {
         message: 'Complex data payload (non-serializable)',
         type: typeof payload,
-        keys: Object.keys(payload || {}).slice(0, 10),
+        keys: Object.keys(payload || {}).slice(0, 3),
         hasCircularRefs: true,
         error: 'JSON.stringify failed - likely circular references'
       }
     }
+  }
+
+  // Helper function to create safe payload for display with strict limits
+  const createSafeDisplayPayload = (obj: any, depth = 0): any => {
+    const maxDepth = 1 // Reduced max depth for display
+    
+    if (depth > maxDepth) {
+      return '[Max depth reached]'
+    }
+    
+    if (obj === null || obj === undefined) {
+      return obj
+    }
+    
+    if (typeof obj !== 'object') {
+      const str = String(obj)
+      return str.length > 100 ? str.substring(0, 100) + '...' : str // Reduced from 200 to 100
+    }
+    
+    if (Array.isArray(obj)) {
+      // Only show first 2 items for display
+      return obj.slice(0, 2).map(item => createSafeDisplayPayload(item, depth + 1))
+    }
+    
+    // For objects, be very selective about what we include
+    const result: any = {}
+    const keys = Object.keys(obj).slice(0, 5) // Reduced from 8 to 5
+    
+    for (const key of keys) {
+      try {
+        if (key.length > 30) continue // Reduced from 50 to 30
+        result[key] = createSafeDisplayPayload(obj[key], depth + 1)
+      } catch (error) {
+        result[key] = '[Error processing value]'
+      }
+    }
+    
+    return result
   }
 
   useEffect(() => {
