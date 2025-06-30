@@ -8,6 +8,44 @@ import { BaseModule } from '../BaseModule'
 import { ModuleManifest } from '../ModuleRegistry'
 import { formatRelativeTime } from '../../time'
 
+// Helper function to safely stringify payloads
+const safeStringifyPayload = (payload: any): string => {
+  try {
+    // Handle null/undefined
+    if (!payload) return 'No payload'
+    
+    // Handle strings
+    if (typeof payload === 'string') return payload
+    
+    // For objects, try to stringify with size limit
+    const stringified = JSON.stringify(payload, null, 2)
+    
+    // If too large, truncate
+    if (stringified.length > 5000) {
+      return JSON.stringify({
+        ...payload,
+        _truncated: true,
+        _originalSize: stringified.length,
+        _message: 'Payload too large for display, showing first part only'
+      }, null, 2).substring(0, 5000) + '\n... (truncated)'
+    }
+    
+    return stringified
+  } catch (error) {
+    // Handle circular references or other stringify errors
+    try {
+      return JSON.stringify({
+        _error: 'Could not stringify payload',
+        _type: typeof payload,
+        _keys: Object.keys(payload || {}).slice(0, 10),
+        _hasCircularRefs: error instanceof Error && error.message.includes('circular')
+      }, null, 2)
+    } catch {
+      return `Error displaying payload: ${String(payload).substring(0, 200)}`
+    }
+  }
+}
+
 // Events Tab Component
 const EventsTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   const [events, setEvents] = React.useState<any[]>([])
@@ -133,7 +171,7 @@ const EventsTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                         </summary>
                         <div className="mt-2 p-3 bg-gray-50 dark:bg-gray-900 rounded border">
                           <pre className="text-xs text-gray-600 dark:text-gray-300 overflow-x-auto">
-                            {JSON.stringify(event.payload, null, 2)}
+                            {safeStringifyPayload(event.payload)}
                           </pre>
                         </div>
                       </details>

@@ -159,9 +159,32 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                         </td>
                         <td className="px-3 py-2.5 hidden md:table-cell">
                           <div className="text-sm text-gray-900 dark:text-white truncate">
-                            {typeof event.payload === 'object' && event.payload !== null ? 
-                              (event.payload as any).message || JSON.stringify(event.payload) : 
-                              String(event.payload)}
+                            {(() => {
+                              try {
+                                if (!event.payload) return 'No payload'
+                                if (typeof event.payload === 'string') return event.payload
+                                if (typeof event.payload !== 'object') return String(event.payload)
+                                
+                                // Check if payload has a message property
+                                if ((event.payload as any).message) return String((event.payload as any).message)
+                                
+                                // For objects, show a safe summary instead of stringifying
+                                const keys = Object.keys(event.payload)
+                                if (keys.length === 0) return 'Empty payload'
+                                if (keys.length > 3) {
+                                  return `Large payload (${keys.length} fields): ${keys.slice(0, 3).join(', ')}...`
+                                }
+                                
+                                // For small objects, try to stringify with size check
+                                const str = JSON.stringify(event.payload)
+                                if (str.length > 100) {
+                                  return `Large data (${str.length} chars): ${keys.join(', ')}`
+                                }
+                                return str
+                              } catch (error) {
+                                return 'Complex payload (non-serializable)'
+                              }
+                            })()}
                           </div>
                         </td>
                         <td className="w-44 px-3 py-2.5">

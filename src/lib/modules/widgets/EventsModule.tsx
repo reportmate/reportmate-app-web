@@ -7,6 +7,44 @@ import React from 'react'
 import { formatRelativeTime } from '../../time'
 import { ExtendedModuleManifest, DeviceWidget, WidgetCondition, DeviceWidgetProps } from '../EnhancedModule'
 
+// Helper function to safely stringify payloads
+const safeStringifyPayload = (payload: any): string => {
+  try {
+    // Handle null/undefined
+    if (!payload) return 'No payload'
+    
+    // Handle strings
+    if (typeof payload === 'string') return payload
+    
+    // For objects, try to stringify with size limit
+    const stringified = JSON.stringify(payload, null, 2)
+    
+    // If too large, truncate
+    if (stringified.length > 3000) {
+      return JSON.stringify({
+        ...payload,
+        _truncated: true,
+        _originalSize: stringified.length,
+        _message: 'Payload too large for display, showing summary only'
+      }, null, 2).substring(0, 3000) + '\n... (truncated)'
+    }
+    
+    return stringified
+  } catch (error) {
+    // Handle circular references or other stringify errors
+    try {
+      return JSON.stringify({
+        _error: 'Could not stringify payload',
+        _type: typeof payload,
+        _keys: Object.keys(payload || {}).slice(0, 10),
+        _hasCircularRefs: error instanceof Error && error.message.includes('circular')
+      }, null, 2)
+    } catch {
+      return `Error displaying payload: ${String(payload).substring(0, 200)}`
+    }
+  }
+}
+
 interface FleetEvent {
   id: string
   device: string
@@ -161,7 +199,7 @@ const EventsListWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
                     {event.payload && Object.keys(event.payload).length > 0 && (
                       <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2 font-mono">
                         <pre className="whitespace-pre-wrap text-xs">
-                          {JSON.stringify(event.payload, null, 2)}
+                          {safeStringifyPayload(event.payload)}
                         </pre>
                       </div>
                     )}
