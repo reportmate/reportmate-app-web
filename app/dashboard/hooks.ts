@@ -92,16 +92,16 @@ export function useLiveEvents() {
       const test = JSON.stringify(safePayload)
       
       // If payload is still too large, summarize it more aggressively
-      if (test.length > 1000) { // Reduced from 2000 to 1000
+      if (test.length > 500) { // Reduced from 1000 to 500 bytes
         return {
           message: 'Large data payload (summarized)',
           dataSize: test.length,
-          keys: Object.keys(payload).slice(0, 3), // Reduced from 5 to 3
-          type: String(payload.type || 'unknown').substring(0, 20),
+          keys: Object.keys(payload).slice(0, 2), // Reduced from 3 to 2
+          type: String(payload.type || 'unknown').substring(0, 15), // Reduced from 20 to 15
           truncated: true,
           // Only preserve essential fields
           ...(payload.message && { 
-            originalMessage: String(payload.message).substring(0, 50) 
+            originalMessage: String(payload.message).substring(0, 30) // Reduced from 50 to 30
           })
         }
       }
@@ -121,7 +121,7 @@ export function useLiveEvents() {
 
   // Helper function to create safe payload for display with strict limits
   const createSafeDisplayPayload = (obj: any, depth = 0): any => {
-    const maxDepth = 1 // Reduced max depth for display
+    const maxDepth = 1 // Keep reduced max depth for display
     
     if (depth > maxDepth) {
       return '[Max depth reached]'
@@ -133,24 +133,24 @@ export function useLiveEvents() {
     
     if (typeof obj !== 'object') {
       const str = String(obj)
-      return str.length > 100 ? str.substring(0, 100) + '...' : str // Reduced from 200 to 100
+      return str.length > 50 ? str.substring(0, 50) + '...' : str // Reduced from 100 to 50
     }
     
     if (Array.isArray(obj)) {
-      // Only show first 2 items for display
-      return obj.slice(0, 2).map(item => createSafeDisplayPayload(item, depth + 1))
+      // Only show first item for display
+      return obj.slice(0, 1).map(item => createSafeDisplayPayload(item, depth + 1))
     }
     
     // For objects, be very selective about what we include
     const result: any = {}
-    const keys = Object.keys(obj).slice(0, 5) // Reduced from 8 to 5
+    const keys = Object.keys(obj).slice(0, 3) // Reduced from 5 to 3 keys max
     
     for (const key of keys) {
+      if (key.length > 20) continue // Skip long keys
       try {
-        if (key.length > 30) continue // Reduced from 50 to 30
         result[key] = createSafeDisplayPayload(obj[key], depth + 1)
-      } catch (error) {
-        result[key] = '[Error processing value]'
+      } catch {
+        result[key] = '[Error]'
       }
     }
     
