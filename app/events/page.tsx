@@ -20,18 +20,23 @@ interface Event {
 const safeDisplayPayload = (payload: any): string => {
   try {
     if (!payload) return 'No payload'
-    if (typeof payload === 'string') return payload
-    if (typeof payload !== 'object') return String(payload)
+    if (typeof payload === 'string') return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
+    if (typeof payload !== 'object') return String(payload).substring(0, 100)
     
     // Check if payload has a message property
-    if (payload.message) return String(payload.message)
+    if (payload.message) return String(payload.message).substring(0, 100)
     
-    // Try to stringify, but with size limit
+    // For large or complex objects, show summary instead of stringifying
+    const keys = Object.keys(payload)
+    if (keys.length === 0) return 'Empty payload'
+    if (keys.length > 5) return `Large object (${keys.length} fields): ${keys.slice(0, 3).join(', ')}...`
+    
+    // Try to stringify, but with strict size limit
     const stringified = JSON.stringify(payload)
-    if (stringified.length > 200) {
-      return `Large payload (${stringified.length} chars) - ${Object.keys(payload).slice(0, 3).join(', ')}...`
+    if (stringified.length > 150) {
+      return `Large payload (${stringified.length} chars) - ${keys.slice(0, 3).join(', ')}...`
     }
-    return stringified
+    return stringified.substring(0, 150)
   } catch (error) {
     return 'Complex payload (non-serializable)'
   }
