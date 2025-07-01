@@ -20,6 +20,19 @@ export class ErrorBoundary extends Component<Props, State> {
 
   static getDerivedStateFromError(error: Error): State {
     console.error('ErrorBoundary caught an error:', error)
+    console.error('Error stack:', error.stack)
+    console.error('Error name:', error.name)
+    console.error('Error message:', error.message)
+    
+    // Log additional context
+    console.error('Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR')
+    console.error('User agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown')
+    console.error('Memory usage:', typeof performance !== 'undefined' && (performance as any).memory ? {
+      usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
+      totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
+      jsHeapSizeLimit: (performance as any).memory.jsHeapSizeLimit
+    } : 'Unknown')
+    
     return { hasError: true, error }
   }
 
