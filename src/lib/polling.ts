@@ -13,22 +13,23 @@ export function usePollingEvents() {
     
     const fetchEvents = async () => {
       try {
-        // For now, create mock events to test the UI
-        const mockEvent: FleetEvent = {
-          id: `mock-${Date.now()}`,
-          device: "test-device",
-          kind: "ping",
-          ts: new Date().toISOString(),
-          payload: { test: true, timestamp: new Date().toISOString() }
+        // Fetch real events from the API
+        const response = await fetch('/api/events')
+        if (response.ok) {
+          const newEvents: FleetEvent[] = await response.json()
+          
+          // Update events, keeping only recent ones (last hour)
+          setEvents(prev => {
+            const oneHourAgo = Date.now() - 3600000
+            const recentEvents = prev.filter(e => new Date(e.ts).getTime() > oneHourAgo)
+            
+            // Merge new events with existing ones, avoiding duplicates
+            const eventIds = new Set(recentEvents.map(e => e.id))
+            const uniqueNewEvents = newEvents.filter(e => !eventIds.has(e.id))
+            
+            return [...uniqueNewEvents, ...recentEvents].slice(0, 100) // Keep last 100 events
+          })
         }
-        
-        // Only add if we don't have recent mock events
-        setEvents(prev => {
-          const recentMock = prev.find(e => e.device === "test-device" && 
-            Date.now() - new Date(e.ts).getTime() < 30000)
-          if (recentMock) return prev
-          return [mockEvent, ...prev]
-        })
       } catch (error) {
         console.error("Polling failed:", error)
       }
