@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { pool } from '../../../../src/lib/db'
 
 // Comprehensive mock device database with 6 devices (3 Macs, 3 Windows)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1313,213 +1314,358 @@ export const deviceDatabase: Record<string, any> = {
         size: '285 MB'
       }
     ]
+  },
+
+  // Windows Device 4 - Local Development (Rod's Machine)
+  '0F33V9G25083HJ': {
+    id: '0F33V9G25083HJ',
+    name: 'Rod Christiansen',
+    model: 'Windows 11 Development Machine',
+    os: 'Windows 11 Pro 23H2',
+    lastSeen: new Date(Date.now() - 30000).toISOString(), // 30 seconds ago
+    status: 'online',
+    uptime: '2 days, 8 hours',
+    location: 'Development',
+    serialNumber: '0F33V9G25083HJ',
+    assetTag: 'DEV-001',
+    ipAddress: '192.168.1.97',
+    macAddress: '00:0C:29:8F:A2:B5',
+    totalEvents: 25,
+    lastEventTime: new Date(Date.now() - 30000).toISOString(),
+    
+    // System Information
+    processor: 'Intel Core i7-12700K @ 3.60GHz',
+    processorSpeed: '3.60 GHz',
+    cores: 12,
+    memory: '32 GB DDR4',
+    availableRAM: '18.2 GB',
+    memorySlots: '4 slots (2 occupied)',
+    storage: '1 TB NVMe SSD',
+    availableStorage: '450 GB',
+    storageType: 'NVMe SSD',
+    graphics: 'NVIDIA GeForce RTX 3070',
+    vram: '8 GB GDDR6',
+    resolution: '2560 x 1440',
+    architecture: 'x64',
+    diskUtilization: 55,
+    memoryUtilization: 43,
+    cpuUtilization: 28,
+    temperature: 45,
+    batteryLevel: null, // Desktop machine
+    bootTime: new Date(Date.now() - 208800000).toISOString(), // 2 days ago
+    
+    // Network Information
+    networkInterfaces: [
+      {
+        name: 'Ethernet',
+        type: 'Ethernet',
+        status: 'Connected',
+        ipAddress: '192.168.1.97',
+        macAddress: '00:0C:29:8F:A2:B5',
+        gateway: '192.168.1.1',
+        dns: ['192.168.1.1', '8.8.8.8'],
+        speed: '1 Gbps'
+      },
+      {
+        name: 'Wi-Fi',
+        type: 'Wi-Fi',
+        status: 'Disabled',
+        ipAddress: null,
+        macAddress: '48:2A:E3:4F:7D:C2',
+        gateway: null,
+        dns: [],
+        speed: null
+      }
+    ],
+    
+    // Security Information
+    securityFeatures: {
+      bitlocker: { enabled: true, status: 'Encrypted' },
+      windowsDefender: { enabled: true, status: 'Active', lastScan: new Date(Date.now() - 3600000).toISOString() },
+      firewall: { enabled: true, status: 'Active' },
+      uac: { enabled: true, status: 'Active' },
+      automaticUpdates: { enabled: true, status: 'Enabled' },
+      edr: { installed: false, name: null, status: 'Not Installed', version: null }
+    },
+    
+    // Applications
+    applications: [
+      {
+        name: 'Visual Studio Code',
+        version: '1.85.2',
+        bundleId: 'Microsoft.VisualStudioCode',
+        path: 'C:\\Users\\rchristiansen\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe',
+        lastOpened: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+        size: '285 MB'
+      },
+      {
+        name: 'PowerShell 7',
+        version: '7.4.0',
+        bundleId: 'Microsoft.PowerShell.7',
+        path: 'C:\\Program Files\\PowerShell\\7\\pwsh.exe',
+        lastOpened: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+        size: '85 MB'
+      },
+      {
+        name: 'osquery',
+        version: '5.10.2',
+        bundleId: 'Facebook.osquery',
+        path: 'C:\\Program Files\\osquery\\osqueryi.exe',
+        lastOpened: new Date(Date.now() - 180000).toISOString(), // 3 minutes ago
+        size: '25 MB'
+      },
+      {
+        name: 'Google Chrome',
+        version: '120.0.6099.129',
+        bundleId: 'Google.Chrome',
+        path: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+        lastOpened: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
+        size: '285 MB'
+      }
+    ]
   }
 }
 
 // Mock events data for each device
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const eventsDatabase: Record<string, any[]> = {
-  'JY93C5YGGM': [
-    {
-      id: 'evt-001',
-      ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
-      kind: 'Software Update',
-      device: 'JY93C5YGGM',
-      payload: {
-        package: 'Adobe Photoshop 2024',
-        version: '25.2.0',
-        status: 'completed'
+    'JY93C5YGGM': [
+      {
+        id: 'evt-001',
+        ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+        kind: 'Software Update',
+        device: 'JY93C5YGGM',
+        payload: {
+          package: 'Adobe Photoshop 2024',
+          version: '25.2.0',
+          status: 'completed'
+        }
+      },
+      {
+        id: 'evt-002',
+        ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        kind: 'Login',
+        device: 'JY93C5YGGM',
+        payload: {
+          user: 'celeste.martin',
+          method: 'password',
+          ip_address: '108.172.84.175'
+        }
+      },
+      {
+        id: 'evt-003',
+        ts: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
+        kind: 'Network Change',
+        device: 'JY93C5YGGM',
+        payload: {
+          interface: 'Wi-Fi',
+          old_ip: '108.172.84.174',
+          new_ip: '108.172.84.175',
+          ssid: 'Company-WiFi'
+        }
       }
-    },
-    {
-      id: 'evt-002',
-      ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      kind: 'Login',
-      device: 'JY93C5YGGM',
-      payload: {
-        user: 'celeste.martin',
-        method: 'password',
-        ip_address: '108.172.84.175'
+    ],
+    'FVFXQ2P3JM': [
+      {
+        id: 'evt-004',
+        ts: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
+        kind: 'Application Launch',
+        device: 'FVFXQ2P3JM',
+        payload: {
+          application: 'Docker Desktop',
+          version: '4.26.1',
+          user: 'alex.chen'
+        }
+      },
+      {
+        id: 'evt-005',
+        ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        kind: 'Error',
+        device: 'FVFXQ2P3JM',
+        payload: {
+          source: 'Docker Desktop',
+          message: 'Container failed to start',
+          details: 'Port 3000 already in use'
+        }
+      },
+      {
+        id: 'evt-006',
+        ts: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
+        kind: 'Software Install',
+        device: 'FVFXQ2P3JM',
+        payload: {
+          package: 'Node.js LTS',
+          version: '20.10.0',
+          status: 'completed'
+        }
       }
-    },
-    {
-      id: 'evt-003',
-      ts: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-      kind: 'Network Change',
-      device: 'JY93C5YGGM',
-      payload: {
-        interface: 'Wi-Fi',
-        old_ip: '108.172.84.174',
-        new_ip: '108.172.84.175',
-        ssid: 'Company-WiFi'
+    ],
+    'C02ZK8WVLVDQ': [
+      {
+        id: 'evt-007',
+        ts: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
+        kind: 'Logout',
+        device: 'C02ZK8WVLVDQ',
+        payload: {
+          user: 'sarah.johnson',
+          session_duration: '8h 32m'
+        }
+      },
+      {
+        id: 'evt-008',
+        ts: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+        kind: 'Error',
+        device: 'C02ZK8WVLVDQ',
+        payload: {
+          source: 'System Update',
+          message: 'Network timeout during download',
+          details: 'Failed to download macOS 15.2.0 update'
+        }
       }
-    }
-  ],
-  'FVFXQ2P3JM': [
-    {
-      id: 'evt-004',
-      ts: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
-      kind: 'Application Launch',
-      device: 'FVFXQ2P3JM',
-      payload: {
-        application: 'Docker Desktop',
-        version: '4.26.1',
-        user: 'alex.chen'
+    ],
+    'WS-ACC-001': [
+      {
+        id: 'evt-009',
+        ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        kind: 'Application Launch',
+        device: 'WS-ACC-001',
+        payload: {
+          application: 'QuickBooks Enterprise',
+          version: '23.0.8',
+          user: 'jennifer.davis'
+        }
+      },
+      {
+        id: 'evt-010',
+        ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        kind: 'Warning',
+        device: 'WS-ACC-001',
+        payload: {
+          source: 'QuickBooks Enterprise',
+          message: 'License expiration warning',
+          details: 'License expires in 15 days'
+        }
+      },
+      {
+        id: 'evt-011',
+        ts: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
+        kind: 'Login',
+        device: 'WS-ACC-001',
+        payload: {
+          user: 'jennifer.davis',
+          method: 'domain',
+          ip_address: '192.168.1.156'
+        }
       }
-    },
-    {
-      id: 'evt-005',
-      ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      kind: 'Error',
-      device: 'FVFXQ2P3JM',
-      payload: {
-        source: 'Docker Desktop',
-        message: 'Container failed to start',
-        details: 'Port 3000 already in use'
+    ],
+    'LT-SAL-007': [
+      {
+        id: 'evt-012',
+        ts: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
+        kind: 'Network Change',
+        device: 'LT-SAL-007',
+        payload: {
+          interface: 'Wi-Fi',
+          old_ip: '10.0.2.46',
+          new_ip: '10.0.2.47',
+          ssid: 'Company-Guest'
+        }
+      },
+      {
+        id: 'evt-013',
+        ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+        kind: 'Software Update',
+        device: 'LT-SAL-007',
+        payload: {
+          package: 'Zoom Client',
+          version: '5.16.10.24060',
+          status: 'completed'
+        }
+      },
+      {
+        id: 'evt-014',
+        ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        kind: 'Application Launch',
+        device: 'LT-SAL-007',
+        payload: {
+          application: 'Microsoft Teams',
+          version: '1.6.00.32562',
+          user: 'marcus.thompson'
+        }
       }
-    },
-    {
-      id: 'evt-006',
-      ts: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-      kind: 'Software Install',
-      device: 'FVFXQ2P3JM',
-      payload: {
-        package: 'Node.js LTS',
-        version: '20.10.0',
-        status: 'completed'
+    ],
+    'WS-IT-003': [
+      {
+        id: 'evt-015',
+        ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+        kind: 'Application Launch',
+        device: 'WS-IT-003',
+        payload: {
+          application: 'Remote Desktop Connection Manager',
+          version: '2.90.0',
+          user: 'ryan.martinez'
+        }
+      },
+      {
+        id: 'evt-016',
+        ts: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
+        kind: 'Error',
+        device: 'WS-IT-003',
+        payload: {
+          source: 'SCCM Client',
+          message: 'Configuration sync failed',
+          details: 'Unable to contact SCCM management point'
+        }
+      },
+      {
+        id: 'evt-017',
+        ts: new Date(Date.now() - 21600000).toISOString(), // 6 hours ago
+        kind: 'Error',
+        device: 'WS-IT-003',
+        payload: {
+          source: 'VMware vSphere Client',
+          message: 'Installation failed',
+          details: 'Service dependency error - Access denied'
+        }
       }
-    }
-  ],
-  'C02ZK8WVLVDQ': [
-    {
-      id: 'evt-007',
-      ts: new Date(Date.now() - 43200000).toISOString(), // 12 hours ago
-      kind: 'Logout',
-      device: 'C02ZK8WVLVDQ',
-      payload: {
-        user: 'sarah.johnson',
-        session_duration: '8h 32m'
+    ],
+    '0F33V9G25083HJ': [
+      {
+        id: 'evt-018',
+        ts: new Date(Date.now() - 30000).toISOString(), // 30 seconds ago
+        kind: 'Login',
+        device: '0F33V9G25083HJ',
+        payload: {
+          user: 'rod.christiansen',
+          method: 'password',
+          ip_address: '192.168.1.97'
+        }
+      },
+      {
+        id: 'evt-019',
+        ts: new Date(Date.now() - 60000).toISOString(), // 1 minute ago
+        kind: 'Network Change',
+        device: '0F33V9G25083HJ',
+        payload: {
+          interface: 'Ethernet',
+          old_ip: '192.168.1.96',
+          new_ip: '192.168.1.97',
+          ssid: null
+        }
+      },
+      {
+        id: 'evt-020',
+        ts: new Date(Date.now() - 120000).toISOString(), // 2 minutes ago
+        kind: 'Software Install',
+        device: '0F33V9G25083HJ',
+        payload: {
+          package: 'Visual Studio Code',
+          version: '1.85.2',
+          status: 'completed'
+        }
       }
-    },
-    {
-      id: 'evt-008',
-      ts: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-      kind: 'Error',
-      device: 'C02ZK8WVLVDQ',
-      payload: {
-        source: 'System Update',
-        message: 'Network timeout during download',
-        details: 'Failed to download macOS 15.2.0 update'
-      }
-    }
-  ],
-  'WS-ACC-001': [
-    {
-      id: 'evt-009',
-      ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      kind: 'Application Launch',
-      device: 'WS-ACC-001',
-      payload: {
-        application: 'QuickBooks Enterprise',
-        version: '23.0.8',
-        user: 'jennifer.davis'
-      }
-    },
-    {
-      id: 'evt-010',
-      ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      kind: 'Warning',
-      device: 'WS-ACC-001',
-      payload: {
-        source: 'QuickBooks Enterprise',
-        message: 'License expiration warning',
-        details: 'License expires in 15 days'
-      }
-    },
-    {
-      id: 'evt-011',
-      ts: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-      kind: 'Login',
-      device: 'WS-ACC-001',
-      payload: {
-        user: 'jennifer.davis',
-        method: 'domain',
-        ip_address: '192.168.1.156'
-      }
-    }
-  ],
-  'LT-SAL-007': [
-    {
-      id: 'evt-012',
-      ts: new Date(Date.now() - 600000).toISOString(), // 10 minutes ago
-      kind: 'Network Change',
-      device: 'LT-SAL-007',
-      payload: {
-        interface: 'Wi-Fi',
-        old_ip: '10.0.2.46',
-        new_ip: '10.0.2.47',
-        ssid: 'Company-Guest'
-      }
-    },
-    {
-      id: 'evt-013',
-      ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
-      kind: 'Software Update',
-      device: 'LT-SAL-007',
-      payload: {
-        package: 'Zoom Client',
-        version: '5.16.10.24060',
-        status: 'completed'
-      }
-    },
-    {
-      id: 'evt-014',
-      ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      kind: 'Application Launch',
-      device: 'LT-SAL-007',
-      payload: {
-        application: 'Microsoft Teams',
-        version: '1.6.00.32562',
-        user: 'marcus.thompson'
-      }
-    }
-  ],
-  'WS-IT-003': [
-    {
-      id: 'evt-015',
-      ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      kind: 'Application Launch',
-      device: 'WS-IT-003',
-      payload: {
-        application: 'Remote Desktop Connection Manager',
-        version: '2.90.0',
-        user: 'ryan.martinez'
-      }
-    },
-    {
-      id: 'evt-016',
-      ts: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-      kind: 'Error',
-      device: 'WS-IT-003',
-      payload: {
-        source: 'SCCM Client',
-        message: 'Configuration sync failed',
-        details: 'Unable to contact SCCM management point'
-      }
-    },
-    {
-      id: 'evt-017',
-      ts: new Date(Date.now() - 21600000).toISOString(), // 6 hours ago
-      kind: 'Error',
-      device: 'WS-IT-003',
-      payload: {
-        source: 'VMware vSphere Client',
-        message: 'Installation failed',
-        details: 'Service dependency error - Access denied'
-      }
-    }
-  ]
-}
+    ]
+  }
 
 export async function GET(
   request: Request,
@@ -1527,13 +1673,153 @@ export async function GET(
 ) {
   const { deviceId } = await params
   
-  if (!deviceDatabase[deviceId]) {
-    return NextResponse.json({ error: 'Device not found' }, { status: 404 })
+  console.log(`[DEVICE LOOKUP] Looking up device: ${deviceId}`)
+  
+  // First check if device exists in production database
+  try {
+    const deviceResult = await pool.query(`
+      SELECT id, name, machine_group_id, created_at, updated_at, last_seen 
+      FROM devices 
+      WHERE id = $1
+    `, [deviceId])
+    
+    if (deviceResult.rows.length === 0) {
+      console.log(`[DEVICE LOOKUP] Device ${deviceId} not found in database`)
+      return NextResponse.json({ 
+        error: 'Device not found', 
+        message: `Device '${deviceId}' is not registered. Please register the device first.`,
+        code: "DEVICE_NOT_REGISTERED"
+      }, { status: 404 })
+    }
+    
+    const dbDevice = deviceResult.rows[0]
+    console.log(`[DEVICE LOOKUP] Found device in database: ${dbDevice.name}`)
+    
+    // Get events for this device from database
+    const eventsResult = await pool.query(`
+      SELECT id, device_id, kind, ts, payload, created_at
+      FROM events 
+      WHERE device_id = $1
+      ORDER BY created_at DESC
+      LIMIT 20
+    `, [deviceId])
+    
+    const events = eventsResult.rows.map(row => ({
+      id: row.id,
+      device: row.device_id,
+      kind: row.kind,
+      ts: row.ts,
+      payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload
+    }))
+    
+    console.log(`[DEVICE LOOKUP] Found ${events.length} events for device ${deviceId}`)
+    
+    // Check if we have mock data for additional device details
+    const mockDevice = deviceDatabase[deviceId]
+    
+    if (mockDevice) {
+      console.log(`[DEVICE LOOKUP] Using extended mock data for device ${deviceId}`)
+      
+      // Merge database info with mock device data
+      const deviceInfo = {
+        ...mockDevice,
+        // Override with database values
+        id: dbDevice.id,
+        name: dbDevice.name,
+        serialNumber: dbDevice.id,
+        lastSeen: dbDevice.last_seen || dbDevice.updated_at,
+        totalEvents: events.length,
+        lastEventTime: events.length > 0 ? events[0].ts : dbDevice.last_seen,
+        // Add registration info
+        registeredAt: dbDevice.created_at,
+        lastUpdated: dbDevice.updated_at,
+        isRegistered: true
+      }
+      
+      // Apply transformations for compatibility
+      const transformedDevice = transformDeviceData(deviceInfo)
+      
+      return NextResponse.json({
+        deviceInfo: transformedDevice,
+        events,
+        source: 'database-with-mock-details'
+      })
+      
+    } else {
+      console.log(`[DEVICE LOOKUP] No mock data, using database info only for device ${deviceId}`)
+      
+      // Return basic device info from database only
+      const basicDeviceInfo = {
+        id: dbDevice.id,
+        name: dbDevice.name,
+        serialNumber: dbDevice.id,
+        lastSeen: dbDevice.last_seen || dbDevice.updated_at,
+        status: calculateDeviceStatus(dbDevice.last_seen || dbDevice.updated_at),
+        totalEvents: events.length,
+        lastEventTime: events.length > 0 ? events[0].ts : dbDevice.last_seen,
+        registeredAt: dbDevice.created_at,
+        lastUpdated: dbDevice.updated_at,
+        isRegistered: true,
+        // Default values for missing data
+        model: 'Unknown Model',
+        os: 'Unknown OS',
+        location: 'Unknown',
+        ipAddress: 'Unknown',
+        macAddress: 'Unknown',
+        assetTag: dbDevice.id
+      }
+      
+      return NextResponse.json({
+        deviceInfo: basicDeviceInfo,
+        events,
+        source: 'database-only'
+      })
+    }
+    
+  } catch (dbError) {
+    console.error(`[DEVICE LOOKUP] Database error for device ${deviceId}:`, dbError)
+    
+    // Fallback to mock data if database fails
+    if (deviceDatabase[deviceId]) {
+      console.log(`[DEVICE LOOKUP] Using fallback mock data for device ${deviceId}`)
+      const deviceInfo = deviceDatabase[deviceId]
+      const events = eventsDatabase[deviceId] || []
+      
+      const transformedDevice = transformDeviceData(deviceInfo)
+      
+      return NextResponse.json({
+        deviceInfo: transformedDevice,
+        events,
+        source: 'mock-fallback',
+        warning: 'Database unavailable, using cached data'
+      })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Device not found and database unavailable', 
+      details: dbError instanceof Error ? dbError.message : String(dbError)
+    }, { status: 500 })
   }
+}
 
-  const deviceInfo = deviceDatabase[deviceId]
-  const events = eventsDatabase[deviceId] || []
+// Helper function to calculate device status based on last seen time
+function calculateDeviceStatus(lastSeen: string | null): string {
+  if (!lastSeen) return 'unknown'
+  
+  const lastSeenTime = new Date(lastSeen).getTime()
+  const now = Date.now()
+  const timeDiff = now - lastSeenTime
+  
+  // Less than 15 minutes = online
+  if (timeDiff < 15 * 60 * 1000) return 'online'
+  // Less than 1 hour = warning  
+  if (timeDiff < 60 * 60 * 1000) return 'warning'
+  // More than 1 hour = offline
+  return 'offline'
+}
 
+// Helper function to transform device data for compatibility
+function transformDeviceData(deviceInfo: any) {
   // Transform applications data to match interface
   if (deviceInfo.applications && Array.isArray(deviceInfo.applications)) {
     const applications = {
@@ -1648,8 +1934,5 @@ export async function GET(
     deviceInfo.managedInstalls.failed = deviceInfo.managedInstalls.packages.filter((p: any) => p.status.includes('failed')).length
   }
 
-  return NextResponse.json({
-    deviceInfo,
-    events
-  })
+  return deviceInfo
 }

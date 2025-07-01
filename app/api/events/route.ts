@@ -1,158 +1,150 @@
 import { NextResponse } from 'next/server'
-import fs from 'fs'
-import path from 'path'
-
-// Simple in-memory storage for recent events (in production, use Redis or database)
-let recentEvents: Array<Record<string, unknown>> = [
-  {
-    id: 'demo-1',
-    device: 'JY93C5YGGM', // Celeste Martin's MacBook Air
-    kind: 'success',
-    ts: new Date(Date.now() - 60000).toISOString(),
-    payload: { message: 'Creative Suite update completed successfully', app: 'Adobe Photoshop' }
-  },
-  {
-    id: 'demo-2', 
-    device: 'WS-ACC-001', // Jennifer Davis's Dell OptiPlex
-    kind: 'warning',
-    ts: new Date(Date.now() - 120000).toISOString(),
-    payload: { message: 'Disk space running low (15% remaining)', threshold: '85%' }
-  },
-  {
-    id: 'demo-3',
-    device: 'FVFXQ2P3JM', // Alex Chen's MacBook Pro
-    kind: 'info',
-    ts: new Date(Date.now() - 180000).toISOString(),
-    payload: { message: 'Development environment updated', version: 'Node.js 20.10.0' }
-  },
-  {
-    id: 'demo-4',
-    device: 'LT-SAL-007', // Marcus Thompson's ThinkPad
-    kind: 'info',
-    ts: new Date(Date.now() - 240000).toISOString(),
-    payload: { message: 'CRM sync completed', records: 247 }
-  },
-  {
-    id: 'demo-5',
-    device: 'C02ZK8WVLVDQ', // Sarah Johnson's iMac
-    kind: 'system',
-    ts: new Date(Date.now() - 300000).toISOString(),
-    payload: { message: 'System backup completed', size: '2.4 GB' }
-  },
-  {
-    id: 'demo-6',
-    device: 'WS-IT-003', // Ryan Martinez's HP Workstation
-    kind: 'success',
-    ts: new Date(Date.now() - 420000).toISOString(),
-    payload: { message: 'Network monitoring tools updated', tools: 'Wireshark, nmap' }
-  }
-]
-
-// Check for clear events flag on module load
-const clearEventsFlag = path.join(process.cwd(), 'clear-events-flag.txt')
-if (fs.existsSync(clearEventsFlag)) {
-  console.log('[EVENTS API] Clear events flag detected, resetting to demo events only')
-  recentEvents = [
-    {
-      id: 'system-reset',
-      device: 'system',
-      kind: 'info',
-      ts: new Date().toISOString(),
-      payload: { message: 'Events cleared due to large payload recovery', reason: 'system_recovery' }
-    }
-  ]
-  // Remove the flag file
-  try {
-    fs.unlinkSync(clearEventsFlag)
-    console.log('[EVENTS API] Clear events flag removed')
-  } catch (err) {
-    console.error('[EVENTS API] Could not remove clear events flag:', err)
-  }
-}
+import { pool } from '../../../src/lib/db'
 
 export async function GET() {
   try {
-    // Return the most recent 50 events
-    const events = recentEvents
-      .slice(-50)
-      .reverse() // Most recent first
-      .map(event => ({
-        id: event.id || `event-${Date.now()}-${Math.random()}`,
-        device: event.device || 'unknown',
-        kind: event.kind || 'unknown',
-        ts: event.ts || new Date().toISOString(),
-        payload: event.payload || {}
-      }))
+    console.log('[EVENTS API] Fetching events from production database...')
+    
+    // Query the production database for recent events
+    const result = await pool.query(`
+      SELECT 
+        id,
+        device_id as device,
+        kind,
+        ts,
+        payload,
+        created_at
+      FROM events 
+      ORDER BY created_at DESC 
+      LIMIT 50
+    `)
+    
+    console.log(`[EVENTS API] Retrieved ${result.rows.length} events from database`)
+    
+    // Transform database rows to API format
+    const events = result.rows.map(row => ({
+      id: row.id,
+      device: row.device || 'unknown',
+      kind: row.kind || 'info',
+      ts: row.ts || row.created_at,
+      payload: typeof row.payload === 'string' ? JSON.parse(row.payload) : row.payload || {}
+    }))
 
     return NextResponse.json({
       success: true,
       events,
-      count: events.length
+      count: events.length,
+      source: 'production-database'
     })
   } catch (error) {
+    console.error('[EVENTS API] Database query failed:', error)
+    
+    // Fallback to demo data if database fails
+    const fallbackEvents = [
+      {
+        id: 'fallback-1',
+        device: 'database-error',
+        kind: 'error',
+        ts: new Date().toISOString(),
+        payload: { 
+          message: 'Database connection failed, using fallback data',
+          error: error instanceof Error ? error.message : String(error)
+        }
+      }
+    ]
+    
     return NextResponse.json({
-      success: false,
-      error: (error as Error).message
-    }, { status: 500 })
+      success: true,
+      events: fallbackEvents,
+      count: fallbackEvents.length,
+      source: 'fallback-demo',
+      error: error instanceof Error ? error.message : String(error)
+    })
   }
 }
 
 export async function POST(request: Request) {
   try {
-    // Check content length first to prevent large payloads from crashing
-    const contentLength = request.headers.get('content-length')
-    if (contentLength && parseInt(contentLength) > 10000000) { // 10MB limit
-      console.warn(`[EVENTS API] Rejecting very large payload: ${contentLength} bytes`)
-      return NextResponse.json({
-        success: false,
-        error: "Payload too large for processing"
-      }, { status: 413 })
-    }
-
     const rawEvent = await request.json()
     
     console.log(`[EVENTS API] Received event from device: ${rawEvent.device || 'unknown'}`)
-    console.log(`[EVENTS API] Event type/kind: ${rawEvent.kind || 'unknown'}`)
     
-    // Calculate size safely
-    let rawDataSize = 0
+    // Basic sanitization for large payloads
+    const event = {
+      id: rawEvent.id || `event-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      device: String(rawEvent.device || 'unknown'),
+      kind: String(rawEvent.kind || 'info'),
+      ts: rawEvent.ts || new Date().toISOString(),
+      payload: rawEvent.payload || {}
+    }
+
+    // ENFORCE DEVICE REGISTRATION: Reject events from unregistered devices
+    if (!event.device || event.device === 'unknown') {
+      console.log(`[EVENTS API] REJECTED: Event missing device serial number`)
+      return NextResponse.json({
+        success: false,
+        error: "Device serial number is required",
+        code: "DEVICE_SERIAL_REQUIRED"
+      }, { status: 400 })
+    }
+
+    // Store event in production database
     try {
-      rawDataSize = JSON.stringify(rawEvent).length
-      console.log(`[EVENTS API] Raw data size: ${rawDataSize} bytes`)
-    } catch (stringifyError) {
-      console.warn(`[EVENTS API] Could not calculate payload size - likely circular references`)
-      rawDataSize = -1 // Flag for problematic data
+      // First, check if the device is already registered
+      const deviceCheck = await pool.query(`
+        SELECT id, name FROM devices WHERE id = $1
+      `, [event.device])
+      
+      if (deviceCheck.rows.length === 0) {
+        console.log(`[EVENTS API] REJECTED: Device ${event.device} is not registered`)
+        return NextResponse.json({
+          success: false,
+          error: `Device '${event.device}' is not registered. Please register the device first.`,
+          code: "DEVICE_NOT_REGISTERED",
+          deviceId: event.device
+        }, { status: 403 })
+      }
+      
+      console.log(`[EVENTS API] Device ${event.device} is registered: ${deviceCheck.rows[0].name}`)
+      
+      // Update device last_seen timestamp
+      await pool.query(`
+        UPDATE devices 
+        SET updated_at = NOW(), last_seen = NOW()
+        WHERE id = $1
+      `, [event.device])
+      
+      // Insert the event with device_id reference
+      const insertResult = await pool.query(`
+        INSERT INTO events (id, device_id, kind, ts, payload, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id
+      `, [
+        event.id,
+        event.device, // This is now the device_id
+        event.kind,
+        event.ts,
+        JSON.stringify(event.payload)
+      ])
+      
+      console.log(`[EVENTS API] Event stored in database with ID: ${insertResult.rows[0].id}`)
+      
+      return NextResponse.json({
+        success: true,
+        message: "Event stored in production database",
+        eventId: event.id
+      })
+      
+    } catch (dbError) {
+      console.error('[EVENTS API] Database insert failed:', dbError)
+      
+      return NextResponse.json({
+        success: false,
+        error: "Failed to store event in database",
+        details: dbError instanceof Error ? dbError.message : String(dbError)
+      }, { status: 500 })
     }
     
-    // Validate and sanitize the event data
-    const event = sanitizeEvent(rawEvent)
-    
-    console.log(`[EVENTS API] Sanitized event ID: ${event.id}`)
-    console.log(`[EVENTS API] Sanitized event kind: ${event.kind}`)
-    
-    // Add ID if not present
-    if (!event.id) {
-      event.id = `event-${Date.now()}-${Math.random()}`
-    }
-    
-    // Add timestamp if not present
-    if (!event.ts) {
-      event.ts = new Date().toISOString()
-    }
-    
-    // Add to recent events
-    recentEvents.push(event)
-    
-    // Keep only last 100 events in memory
-    if (recentEvents.length > 100) {
-      recentEvents = recentEvents.slice(-100)
-    }
-    
-    return NextResponse.json({
-      success: true,
-      message: "Event stored",
-      eventId: event.id
-    })
   } catch (error) {
     console.error('Error processing event:', error)
     return NextResponse.json({
@@ -160,196 +152,4 @@ export async function POST(request: Request) {
       error: (error as Error).message
     }, { status: 500 })
   }
-}
-
-export async function DELETE() {
-  try {
-    console.log('[EVENTS API] Clearing all events from memory...')
-    recentEvents = []
-    
-    return NextResponse.json({
-      success: true,
-      message: "All events cleared"
-    })
-  } catch (error) {
-    console.error('Error clearing events:', error)
-    return NextResponse.json({
-      success: false,
-      error: (error as Error).message
-    }, { status: 500 })
-  }
-}
-
-// Helper function to sanitize event data and prevent dashboard crashes
-function sanitizeEvent(rawEvent: any): any {
-  try {
-    // Handle large Windows client payloads
-    if (rawEvent && typeof rawEvent === 'object') {
-      // If this looks like a Windows client report (large payload with device info)
-      if (rawEvent.device && (rawEvent.systemInfo || rawEvent.osqueryData)) {
-        console.log(`Processing Windows client report from device: ${rawEvent.device}`)
-        const dataSize = JSON.stringify(rawEvent).length
-        console.log(`Data size: ${dataSize} bytes`)
-        
-        // For very large payloads, create a minimal summary to prevent crashes
-        if (dataSize > 100000) { // 100KB limit for raw data
-          console.log(`[LARGE PAYLOAD] Received ${dataSize} bytes from ${rawEvent.device}, creating minimal summary`)
-          return {
-            id: rawEvent.id || `windows-large-${Date.now()}`,
-            device: String(rawEvent.device || 'unknown'),
-            kind: 'system',
-            ts: rawEvent.timestamp || new Date().toISOString(),
-            payload: {
-              message: 'Large Windows client report received (minimized for stability)',
-              type: 'windows_client_report_large',
-              dataSize: dataSize,
-              deviceInfo: {
-                hostname: rawEvent.device,
-                timestamp: rawEvent.timestamp || new Date().toISOString()
-              },
-              summary: {
-                originalDataSize: dataSize,
-                queryCount: rawEvent.osqueryData ? Object.keys(rawEvent.osqueryData).length : 0,
-                hasSystemInfo: !!rawEvent.systemInfo,
-                hasOsqueryData: !!rawEvent.osqueryData,
-                processingTime: new Date().toISOString()
-              }
-            }
-          }
-        }
-        
-        return {
-          id: rawEvent.id || `windows-${Date.now()}`,
-          device: String(rawEvent.device || 'unknown'),
-          kind: 'system',
-          ts: rawEvent.timestamp || new Date().toISOString(),
-          payload: {
-            message: 'Windows client report received',
-            type: 'windows_client_report',
-            deviceInfo: {
-              hostname: rawEvent.device,
-              os: rawEvent.systemInfo?.os_name || 'Windows',
-              version: rawEvent.systemInfo?.version,
-              manufacturer: rawEvent.systemInfo?.manufacturer,
-              model: rawEvent.systemInfo?.model,
-              computerName: rawEvent.systemInfo?.computer_name
-            },
-            summary: {
-              dataSize: dataSize,
-              queryResults: rawEvent.osqueryData ? Object.keys(rawEvent.osqueryData).length : 0,
-              systemInfoFields: rawEvent.systemInfo ? Object.keys(rawEvent.systemInfo).length : 0,
-              timestamp: rawEvent.timestamp || new Date().toISOString()
-            },
-            // Include first few query results for debugging if needed
-            ...(rawEvent.osqueryData && Object.keys(rawEvent.osqueryData).length > 0 && {
-              sampleQueries: Object.keys(rawEvent.osqueryData).slice(0, 5)
-            })
-          }
-        }
-      }
-      
-      // For normal events, ensure the structure is safe
-      return {
-        id: rawEvent.id || `event-${Date.now()}`,
-        device: String(rawEvent.device || 'unknown'),
-        kind: String(rawEvent.kind || 'info').toLowerCase(),
-        ts: rawEvent.ts || new Date().toISOString(),
-        payload: sanitizePayload(rawEvent.payload || {})
-      }
-    }
-    
-    return rawEvent
-  } catch (error) {
-    console.error('Error sanitizing event:', error)
-    // Return a safe fallback event
-    return {
-      id: `error-${Date.now()}`,
-      device: 'unknown',
-      kind: 'error',
-      ts: new Date().toISOString(),
-      payload: {
-        message: 'Failed to process event data',
-        error: 'Event sanitization failed',
-        originalError: error instanceof Error ? error.message : String(error)
-      }
-    }
-  }
-}
-
-// Helper function to sanitize payload and prevent JSON.stringify issues
-function sanitizePayload(payload: any): Record<string, unknown> {
-  if (!payload || typeof payload !== 'object') {
-    return { message: String(payload || 'No payload') }
-  }
-  
-  try {
-    // Create a safer version by limiting depth and excluding problematic fields
-    const safePayload = createSafePayload(payload)
-    
-    // Test if the payload can be safely stringified
-    const payloadStr = JSON.stringify(safePayload)
-    
-    // If payload is too large, summarize it more aggressively
-    const payloadSize = payloadStr.length
-    if (payloadSize > 500) { // Even smaller limit: 500 bytes instead of 1KB
-      console.log(`[SANITIZE] Large payload detected: ${payloadSize} bytes, summarizing...`)
-      return {
-        message: 'Large data payload received',
-        dataSize: payloadSize,
-        keys: Object.keys(payload).slice(0, 2), // Further reduced to just 2 keys
-        truncated: true,
-        // Preserve only the most essential summary fields
-        ...(payload.message && { originalMessage: String(payload.message).substring(0, 50) }),
-        ...(payload.type && { type: String(payload.type).substring(0, 15) })
-      }
-    }
-    
-    return safePayload
-  } catch (error) {
-    // If JSON.stringify fails (circular references, etc.), create a safe version
-    console.error('[SANITIZE] Payload contains non-serializable data:', error)
-    return {
-      message: 'Complex data payload (non-serializable)',
-      type: typeof payload,
-      keys: Object.keys(payload || {}).slice(0, 3),
-      hasCircularRefs: true,
-      error: error instanceof Error ? error.message.substring(0, 50) : String(error).substring(0, 50)
-    }
-  }
-}
-
-// Helper function to create a safe payload by limiting depth and size
-function createSafePayload(obj: any, depth = 0, maxDepth = 1): any {
-  if (depth > maxDepth) {
-    return '[Max depth reached]'
-  }
-  
-  if (obj === null || obj === undefined) {
-    return obj
-  }
-  
-  if (typeof obj !== 'object') {
-    const str = String(obj)
-    return str.length > 100 ? str.substring(0, 100) + '...' : str
-  }
-  
-  if (Array.isArray(obj)) {
-    // Limit array size and process only first few elements
-    return obj.slice(0, 3).map(item => createSafePayload(item, depth + 1, maxDepth))
-  }
-  
-  // For objects, limit the number of keys and process each safely
-  const result: any = {}
-  const keys = Object.keys(obj).slice(0, 5) // Limit to 5 keys max
-  
-  for (const key of keys) {
-    try {
-      if (key.length > 30) continue // Skip keys that are too long
-      result[key] = createSafePayload(obj[key], depth + 1, maxDepth)
-    } catch (error) {
-      result[key] = '[Error processing value]'
-    }
-  }
-  
-  return result
 }

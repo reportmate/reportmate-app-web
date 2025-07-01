@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { pool } from '../../../src/lib/db'
 
 // Mock device database - extended to match individual device endpoint
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -273,6 +274,123 @@ const deviceDatabase: Record<string, any> = {
   }
 }
 
+// Function to register/update a device from ingest data
+export function registerDevice(deviceName: string, eventData: any) {
+  const deviceId = deviceName.toUpperCase()
+  const now = new Date().toISOString()
+  
+  // Create or update device entry
+  if (!deviceDatabase[deviceId]) {
+    console.log(`[DEVICE] Registering new device: ${deviceId}`)
+    
+    // Create new device entry with defaults
+    deviceDatabase[deviceId] = {
+      id: deviceId,
+      name: deviceName,
+      model: 'Unknown Model',
+      os: 'Unknown OS',
+      lastSeen: now,
+      status: 'online',
+      uptime: 'Unknown',
+      location: 'Unknown',
+      serialNumber: deviceId,
+      assetTag: deviceId,
+      ipAddress: 'Unknown',
+      macAddress: 'Unknown',
+      totalEvents: 1,
+      lastEventTime: now,
+      // Extended properties
+      processor: 'Unknown',
+      memory: 'Unknown',
+      storage: 'Unknown',
+      networkInterfaces: [],
+      securityFeatures: {},
+      applications: [],
+      isRealDevice: true // Flag to distinguish from demo devices
+    }
+  } else {
+    console.log(`[DEVICE] Updating existing device: ${deviceId}`)
+    
+    // Update existing device
+    deviceDatabase[deviceId].lastSeen = now
+    deviceDatabase[deviceId].lastEventTime = now
+    deviceDatabase[deviceId].status = 'online'
+    deviceDatabase[deviceId].totalEvents = (deviceDatabase[deviceId].totalEvents || 0) + 1
+  }
+  
+  // Extract and update device info from osquery data if available
+  if (eventData.payload) {
+    updateDeviceFromOsqueryData(deviceId, eventData.payload)
+  }
+  
+  return deviceDatabase[deviceId]
+}
+
+// Function to update device details from osquery data
+function updateDeviceFromOsqueryData(deviceId: string, payload: any) {
+  const device = deviceDatabase[deviceId]
+  if (!device) return
+  
+  try {
+    // Update from system_info if available
+    if (payload.system_info && Array.isArray(payload.system_info) && payload.system_info.length > 0) {
+      const systemInfo = payload.system_info[0]
+      device.name = systemInfo.hostname || device.name
+      device.processor = systemInfo.cpu_brand || device.processor
+      device.memory = systemInfo.physical_memory ? `${Math.round(systemInfo.physical_memory / 1024 / 1024 / 1024)} GB` : device.memory
+      device.model = `${systemInfo.hardware_vendor || ''} ${systemInfo.hardware_model || ''}`.trim() || device.model
+    }
+    
+    // Update from os_version if available
+    if (payload.os_version && Array.isArray(payload.os_version) && payload.os_version.length > 0) {
+      const osVersion = payload.os_version[0]
+      device.os = `${osVersion.name || ''} ${osVersion.version || ''}`.trim() || device.os
+    }
+    
+    // Update from network interfaces if available
+    if (payload.network_interfaces && Array.isArray(payload.network_interfaces)) {
+      device.networkInterfaces = payload.network_interfaces.map((intf: any) => ({
+        name: intf.interface || 'Unknown',
+        ipAddress: intf.address || null,
+        type: 'Network',
+        status: intf.address ? 'Connected' : 'Disconnected'
+      }))
+      
+      // Set primary IP address
+      const primaryInterface = payload.network_interfaces.find((intf: any) => 
+        intf.address && !intf.address.startsWith('127.') && !intf.address.startsWith('169.254.')
+      )
+      if (primaryInterface) {
+        device.ipAddress = primaryInterface.address
+      }
+    }
+    
+    // Update from installed applications if available
+    if (payload.installed_applications && Array.isArray(payload.installed_applications)) {
+      device.applications = payload.installed_applications.slice(0, 20).map((app: any) => ({
+        name: app.name || 'Unknown Application',
+        version: app.version || 'Unknown',
+        publisher: app.publisher || 'Unknown',
+        installDate: app.install_date || null,
+        size: 'Unknown'
+      }))
+    }
+    
+    // Update security features for Windows
+    if (payload.bitlocker_status || payload.security_features) {
+      device.securityFeatures = {
+        ...device.securityFeatures,
+        bitlocker: payload.bitlocker_status ? { enabled: true, status: 'Encrypted' } : undefined,
+        windowsDefender: payload.security_features ? { enabled: true, status: 'Active' } : undefined
+      }
+    }
+    
+    console.log(`[DEVICE] Updated device ${deviceId} with osquery data`)
+  } catch (error) {
+    console.warn(`[DEVICE] Failed to update device ${deviceId} from osquery data:`, error)
+  }
+}
+
 export async function GET() {
   try {
     // Return all devices as an array
@@ -300,6 +418,78 @@ export async function GET() {
     })
   } catch (error) {
     console.error('API: Error in device GET:', error)
+    return NextResponse.json({
+      success: false,
+      error: (error as Error).message
+    }, { status: 500 })
+  }
+}
+
+// POST method for device registration
+export async function POST(request: Request) {
+  try {
+    const deviceData = await request.json()
+    
+    console.log(`[DEVICE REGISTRATION] Registering device: ${deviceData.serialNumber || deviceData.id || 'unknown'}`)
+    
+    // Validate required fields
+    if (!deviceData.serialNumber && !deviceData.id) {
+      return NextResponse.json({
+        success: false,
+        error: "Device serial number or ID is required",
+        code: "SERIAL_REQUIRED"
+      }, { status: 400 })
+    }
+    
+    const deviceId = deviceData.serialNumber || deviceData.id
+    const deviceName = deviceData.name || deviceData.hostname || deviceId
+    
+    // Insert or update device in the production database
+    try {
+      const insertResult = await pool.query(`
+        INSERT INTO devices (id, name, machine_group_id, created_at, updated_at, last_seen)
+        VALUES ($1, $2, NULL, NOW(), NOW(), NOW())
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          updated_at = NOW(),
+          last_seen = NOW()
+        RETURNING id, name, created_at, updated_at
+      `, [
+        deviceId,
+        deviceName
+      ])
+      
+      const device = insertResult.rows[0]
+      
+      console.log(`[DEVICE REGISTRATION] Device ${device.id} registered successfully: ${device.name}`)
+      
+      // Also register in the in-memory cache for immediate lookup
+      registerDevice(deviceId, { payload: deviceData })
+      
+      return NextResponse.json({
+        success: true,
+        message: "Device registered successfully",
+        device: {
+          id: device.id,
+          name: device.name,
+          serialNumber: device.id,
+          registeredAt: device.created_at,
+          lastUpdated: device.updated_at
+        }
+      })
+      
+    } catch (dbError) {
+      console.error('[DEVICE REGISTRATION] Database insert failed:', dbError)
+      
+      return NextResponse.json({
+        success: false,
+        error: "Failed to register device in database",
+        details: dbError instanceof Error ? dbError.message : String(dbError)
+      }, { status: 500 })
+    }
+    
+  } catch (error) {
+    console.error('[DEVICE REGISTRATION] Error processing registration:', error)
     return NextResponse.json({
       success: false,
       error: (error as Error).message

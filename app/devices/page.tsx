@@ -38,7 +38,7 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/device')
+        const response = await fetch('/api/devices')
         if (!response.ok) {
           throw new Error('Failed to fetch devices')
         }

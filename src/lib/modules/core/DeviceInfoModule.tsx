@@ -187,7 +187,7 @@ const DeviceInfoWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/device')
+        const response = await fetch('/api/devices')
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.devices) {
