@@ -170,10 +170,10 @@ export function useLiveEvents() {
         
         // Check if SignalR is enabled
         const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+        const apiBaseUrl = 'https://reportmate-api.azurewebsites.net'
         
-        if (!isSignalREnabled || !apiBaseUrl) {
-          console.log("SignalR disabled or missing config, using polling mode...")
+        if (!isSignalREnabled) {
+          console.log("SignalR disabled, using polling mode...")
           setConnectionStatus("polling")
           startPolling()
           return
