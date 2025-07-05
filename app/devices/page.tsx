@@ -29,73 +29,99 @@ function DevicesPageContent() {
 
   // Initialize search query from URL parameters
   useEffect(() => {
-    const urlSearch = searchParams.get('search')
-    if (urlSearch) {
-      setSearchQuery(urlSearch)
+    try {
+      const urlSearch = searchParams.get('search')
+      if (urlSearch) {
+        setSearchQuery(urlSearch)
+      }
+    } catch (e) {
+      console.warn('Failed to get search params:', e)
     }
   }, [searchParams])
 
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        // Use the local Next.js API route instead of direct Azure Functions call
+        // Use Next.js API route
         const apiUrl = '/api/devices'
-        
         console.log('Fetching devices from Next.js API route:', apiUrl)
         
         const response = await fetch(apiUrl)
-        console.log('Response status:', response.status, response.statusText)
         
         if (!response.ok) {
-          const errorText = await response.text()
-          console.error('Next.js API error response:', errorText)
-          throw new Error(`Next.js API failed: ${response.status} ${response.statusText}`)
+          throw new Error(`API request failed: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
-        console.log('Raw API response type:', typeof data)
-        console.log('Raw API response length:', Array.isArray(data) ? data.length : 'Not an array')
-        console.log('Raw API response:', data)
+        console.log('API response received:', { type: typeof data, isArray: Array.isArray(data) })
         
-        // The Next.js API route returns a direct array of devices
-        if (!Array.isArray(data)) {
-          console.error('Unexpected Next.js API response structure - expected array, got:', typeof data)
-          throw new Error('Invalid device data structure received from Next.js API')
+        // The API returns a direct array of devices
+        let devicesArray: Device[]
+        
+        if (Array.isArray(data)) {
+          devicesArray = data
+          console.log('✅ Successfully received devices array:', devicesArray.length, 'devices')
+        } else {
+          console.error('❌ Invalid API response format:', data)
+          throw new Error('API returned invalid data format')
         }
         
-        console.log(`Successfully processed ${data.length} devices`)
-        console.log('First device sample:', data[0])
-        
-        setDevices(data)
-        setError(null) // Clear any previous errors
+        if (devicesArray.length === 0) {
+          console.warn('⚠️ No devices found in API response')
+          setDevices([])
+          setError(null)
+        } else {
+          console.log('✅ Successfully loaded', devicesArray.length, 'devices from API')
+          setDevices(devicesArray)
+          setError(null)
+        }
         
       } catch (error) {
-        console.error('Failed to fetch devices:', error)
+        console.error('❌ Failed to fetch devices:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-        console.error('Error details:', errorMessage)
         setError(errorMessage)
+        setDevices([]) // Set empty array on error
       } finally {
+        // ALWAYS clear loading state
         setLoading(false)
+        console.log('✅ Loading state cleared')
       }
     }
 
     fetchDevices()
   }, [])
 
-  // Filter devices based on search query
-  const filteredDevices = devices.filter(device => {
-    if (!searchQuery.trim()) return true
-    
-    const query = searchQuery.toLowerCase()
-    return (
-      device.name?.toLowerCase().includes(query) ||
-      device.model?.toLowerCase().includes(query) ||
-      device.os?.toLowerCase().includes(query) ||
-      device.serialNumber?.toLowerCase().includes(query) ||
-      device.ipAddress?.toLowerCase().includes(query) ||
-      device.id?.toLowerCase().includes(query)
-    )
-  })
+  // Filter devices based on search query with error handling
+  const filteredDevices = (() => {
+    try {
+      if (!Array.isArray(devices)) {
+        console.warn('Devices is not an array:', devices)
+        return []
+      }
+      
+      if (!searchQuery.trim()) return devices
+      
+      const query = searchQuery.toLowerCase()
+      return devices.filter(device => {
+        try {
+          return (
+            device?.name?.toLowerCase().includes(query) ||
+            device?.model?.toLowerCase().includes(query) ||
+            device?.os?.toLowerCase().includes(query) ||
+            device?.serialNumber?.toLowerCase().includes(query) ||
+            device?.ipAddress?.toLowerCase().includes(query) ||
+            device?.id?.toLowerCase().includes(query)
+          )
+        } catch (e) {
+          console.warn('Error filtering device:', device, e)
+          return false
+        }
+      })
+    } catch (e) {
+      console.error('Error in filteredDevices:', e)
+      return []
+    }
+  })()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -214,12 +240,25 @@ function DevicesPageContent() {
             <p className="text-gray-600 dark:text-gray-400 mb-6">
               {error}
             </p>
-            <Link
-              href="/dashboard"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              ← Back to Dashboard
-            </Link>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => {
+                  setError(null)
+                  setLoading(true)
+                  // Trigger a re-fetch by forcing component re-render
+                  window.location.reload()
+                }}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                Try Again
+              </button>
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+              >
+                ← Back to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       </div>
