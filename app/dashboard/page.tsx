@@ -50,10 +50,30 @@ export default function DashboardPage() {
     const fetchDevices = async () => {
       try {
         setError(null)
-        const response = await fetch('/api/devices')
+        // Use Azure Functions API with environment variable for cloud-agnostic deployment
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/devices`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.devices) {
+          // Handle both response formats: {success: true, devices: [...]} or direct array
+          if (Array.isArray(data)) {
+            // Sort devices by lastSeen descending (newest first)
+            const sortedDevices = data.sort((a: Device, b: Device) => 
+              new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+            )
+            setDevices(sortedDevices)
+            
+            // Build device name mapping (serial -> name)
+            const nameMap: Record<string, string> = {}
+            data.forEach((device: Device) => {
+              if (device.serialNumber && device.name) {
+                nameMap[device.serialNumber] = device.name
+              }
+              // Also map by ID in case that's used
+              nameMap[device.id] = device.name
+            })
+            setDeviceNameMap(nameMap)
+          } else if (data.success && data.devices) {
             // Sort devices by lastSeen descending (newest first)
             const sortedDevices = data.devices.sort((a: Device, b: Device) => 
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()

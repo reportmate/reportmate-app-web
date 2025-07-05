@@ -11,7 +11,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'online' | 'offline' | 'warning' | 'error' | 'unknown'
   uptime?: string
   location?: string
   serialNumber?: string
@@ -38,20 +38,42 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/devices')
+        // Use the local Next.js API route instead of direct Azure Functions call
+        const apiUrl = '/api/devices'
+        
+        console.log('Fetching devices from Next.js API route:', apiUrl)
+        
+        const response = await fetch(apiUrl)
+        console.log('Response status:', response.status, response.statusText)
+        
         if (!response.ok) {
-          throw new Error('Failed to fetch devices')
+          const errorText = await response.text()
+          console.error('Next.js API error response:', errorText)
+          throw new Error(`Next.js API failed: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
-        if (data.success && data.devices) {
-          setDevices(data.devices)
-        } else {
-          setError('Invalid device data received')
+        console.log('Raw API response type:', typeof data)
+        console.log('Raw API response length:', Array.isArray(data) ? data.length : 'Not an array')
+        console.log('Raw API response:', data)
+        
+        // The Next.js API route returns a direct array of devices
+        if (!Array.isArray(data)) {
+          console.error('Unexpected Next.js API response structure - expected array, got:', typeof data)
+          throw new Error('Invalid device data structure received from Next.js API')
         }
+        
+        console.log(`Successfully processed ${data.length} devices`)
+        console.log('First device sample:', data[0])
+        
+        setDevices(data)
+        setError(null) // Clear any previous errors
+        
       } catch (error) {
         console.error('Failed to fetch devices:', error)
-        setError((error as Error).message)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+        console.error('Error details:', errorMessage)
+        setError(errorMessage)
       } finally {
         setLoading(false)
       }
@@ -80,6 +102,8 @@ function DevicesPageContent() {
       case 'online': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
       case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
+      case 'offline': return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
+      case 'unknown': return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900'
       default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
     }
   }
@@ -102,6 +126,12 @@ function DevicesPageContent() {
         return (
           <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+          </svg>
+        )
+      case 'unknown':
+        return (
+          <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
         )
       default:
@@ -316,7 +346,7 @@ function DevicesPageContent() {
                   </p>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {filteredDevices.filter(d => d.status === 'online').length} online • {filteredDevices.filter(d => d.status === 'warning').length} warnings • {filteredDevices.filter(d => d.status === 'error').length} errors
+                  {filteredDevices.filter(d => d.status === 'online').length} online • {filteredDevices.filter(d => d.status === 'warning').length} warnings • {filteredDevices.filter(d => d.status === 'error').length} errors • {filteredDevices.filter(d => d.status === 'unknown').length} unknown
                 </div>
               </div>
             </div>

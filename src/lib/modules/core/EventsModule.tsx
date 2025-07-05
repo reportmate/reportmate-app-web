@@ -54,11 +54,17 @@ const EventsTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   React.useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetch('/api/events')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/events`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.events) {
+          // The Azure Functions API returns a direct array of events
+          if (Array.isArray(data)) {
             // Filter events for this device
+            const deviceEvents = data.filter((event: any) => event.device === deviceId)
+            setEvents(deviceEvents)
+          } else if (data.success && data.events) {
+            // Fallback for wrapped format
             const deviceEvents = data.events.filter((event: any) => event.device === deviceId)
             setEvents(deviceEvents)
           }
@@ -195,11 +201,16 @@ const RecentEventsWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetch('/api/events')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/events`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.events) {
+          // The Azure Functions API returns a direct array of events
+          if (Array.isArray(data)) {
             // Take the 5 most recent events
+            setEvents(data.slice(0, 5))
+          } else if (data.success && data.events) {
+            // Fallback for wrapped format
             setEvents(data.events.slice(0, 5))
           }
         }
@@ -272,10 +283,20 @@ const EventStatsWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/events')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/events`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.events) {
+          // The Azure Functions API returns a direct array of events
+          if (Array.isArray(data)) {
+            const events = data
+            const now = new Date()
+            const last24h = events.filter((e: any) => {
+              const eventTime = new Date(e.ts)
+              return (now.getTime() - eventTime.getTime()) < (24 * 60 * 60 * 1000)
+            })
+          } else if (data.success && data.events) {
+            // Fallback for wrapped format
             const events = data.events
             const now = new Date()
             const last24h = events.filter((e: any) => {

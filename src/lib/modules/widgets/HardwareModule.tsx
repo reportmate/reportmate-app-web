@@ -17,7 +17,8 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
   useEffect(() => {
     const fetchHardware = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}/hardware`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/hardware`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {
@@ -208,7 +209,8 @@ const StorageDetailsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) => {
   useEffect(() => {
     const fetchStorage = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}/storage`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/storage`)
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.storage) {

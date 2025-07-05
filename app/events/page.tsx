@@ -60,13 +60,17 @@ function EventsPageContent() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const response = await fetch('/api/events')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/events`)
         if (!response.ok) {
           throw new Error('Failed to fetch events')
         }
         
         const data = await response.json()
-        if (data.success && data.events) {
+        // The Azure Functions API returns a direct array of events
+        if (Array.isArray(data)) {
+          setEvents(data)
+        } else if (data.success && data.events) {
           setEvents(data.events)
         } else {
           setError('Invalid events data received')

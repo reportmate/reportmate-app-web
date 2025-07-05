@@ -15,7 +15,8 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   React.useEffect(() => {
     const fetchDevice = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {
@@ -187,11 +188,13 @@ const DeviceInfoWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const response = await fetch('/api/devices')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/devices`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.devices) {
-            const devices = data.devices
+          // The Azure Functions API returns a direct array of devices
+          if (Array.isArray(data)) {
+            const devices = data
             const stats = {
               total: devices.length,
               online: devices.filter((d: any) => d.status === 'online').length,

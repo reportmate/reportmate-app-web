@@ -114,9 +114,10 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex gap-3">
               <button
                 onClick={() => {
+                  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
                   Promise.all([
-                    fetch('/api/events', { method: 'DELETE' }).catch(() => null),
-                    fetch('http://localhost:3000/api/events', { method: 'DELETE' }).catch(() => null)
+                    fetch(`${apiBaseUrl}/api/events`, { method: 'DELETE' }).catch(() => null),
+                    fetch('/api/events', { method: 'DELETE' }).catch(() => null) // Keep Next.js fallback for emergency cleanup
                   ]).then(() => {
                     // Clear browser storage
                     try {
@@ -146,7 +147,7 @@ export class ErrorBoundary extends Component<Props, State> {
                           <p>Run these commands to recover from the crash:</p>
                           <h3>For Production:</h3>
                           <code style="background: #f0f0f0; padding: 10px; display: block; margin: 10px 0;">
-                            curl -X DELETE https://reportmate.ecuad.ca/api/events
+                            curl -X DELETE ${window.location.origin}/api/events
                           </code>
                           <h3>For Local Development:</h3>
                           <code style="background: #f0f0f0; padding: 10px; display: block; margin: 10px 0;">

@@ -206,11 +206,22 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/device')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/devices`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.devices) {
+          // The Azure Functions API returns a direct array of devices
+          if (Array.isArray(data)) {
             // Sort devices by lastSeen descending (newest first)
+            const sortedDevices = data.sort((a: Device, b: Device) => 
+              new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+            )
+            setDevices(sortedDevices)
+            
+            // Build device name mapping (serial -> name)
+            const nameMap: Record<string, string> = {}
+          } else if (data.success && data.devices) {
+            // Fallback for wrapped format
             const sortedDevices = data.devices.sort((a: Device, b: Device) => 
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )

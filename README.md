@@ -41,7 +41,7 @@ Configure your environment variables in `.env.local`:
 ```env
 NEXT_PUBLIC_WPS_URL=wss://<your-pubsub>.webpubsub.azure.com/client/?hub=fleet
 NEXT_PUBLIC_WPS_TOKEN=<jwt-from-/api/negotiate>
-NEXT_PUBLIC_API_BASE_URL=https://reportmate-api.azurewebsites.net
+NEXT_PUBLIC_API_BASE_URL=https://your-functions-api.azurewebsites.net
 NEXT_PUBLIC_ENABLE_SIGNALR=true
 ```
 

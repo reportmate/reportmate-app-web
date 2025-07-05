@@ -352,7 +352,8 @@ export default function DeviceDetailPage() {
         setLoading(true)
         
         // Fetch device info
-        const deviceResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`)
         if (!deviceResponse.ok) {
           if (deviceResponse.status === 404) {
             setError('Device not found')

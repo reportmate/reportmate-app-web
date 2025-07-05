@@ -27,14 +27,16 @@ export default function DevicesPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/devices')
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/devices`)
         if (!response.ok) {
           throw new Error('Failed to fetch devices')
         }
         
         const data = await response.json()
-        if (data.success && data.devices) {
-          setDevices(data.devices)
+        // The Azure Functions API returns a direct array of devices
+        if (Array.isArray(data)) {
+          setDevices(data)
         } else {
           setError('Invalid device data received')
         }

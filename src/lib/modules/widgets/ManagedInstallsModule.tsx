@@ -18,7 +18,8 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
   useEffect(() => {
     const fetchManagedInstalls = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}/managed-installs`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {
@@ -113,7 +114,8 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}/managed-installs/packages`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs/packages`)
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.packages) {
@@ -269,7 +271,8 @@ const ManagedInstallsErrorsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await fetch(`/api/device/${deviceId}/managed-installs/messages`)
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
+        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs/messages`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {
