@@ -18,12 +18,12 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
   useEffect(() => {
     const fetchManagedInstalls = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs`)
+        // Use Next.js API route - get full device data and extract managed installs
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success) {
-            setManagedInstalls(data.managedInstalls)
+          if (data.success && data.device && data.device.managedInstalls) {
+            setManagedInstalls(data.device.managedInstalls)
           }
         }
       } catch (error) {
@@ -114,12 +114,12 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
   useEffect(() => {
     const fetchPackages = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs/packages`)
+        // Use Next.js API route - get full device data and extract managed installs packages
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.packages) {
-            setPackages(data.packages)
+          if (data.success && data.device && data.device.managedInstalls && data.device.managedInstalls.packages) {
+            setPackages(data.device.managedInstalls.packages)
           }
         }
       } catch (error) {
@@ -271,13 +271,13 @@ const ManagedInstallsErrorsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) 
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/managed-installs/messages`)
+        // Use Next.js API route - get full device data and extract managed installs messages
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success) {
-            setErrors(data.errors || [])
-            setWarnings(data.warnings || [])
+          if (data.success && data.device && data.device.managedInstalls) {
+            setErrors(data.device.managedInstalls.errors || [])
+            setWarnings(data.device.managedInstalls.warnings || [])
           }
         }
       } catch (error) {

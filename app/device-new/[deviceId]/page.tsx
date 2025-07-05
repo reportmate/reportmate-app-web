@@ -47,8 +47,8 @@ export default function NewModularDeviceDetailPage() {
   useEffect(() => {
     const fetchDevice = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}`)
+        // Use Next.js API route
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {

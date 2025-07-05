@@ -54,11 +54,11 @@ const EventsTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   React.useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/events`)
+        // Use Next.js API route
+        const response = await fetch('/api/events')
         if (response.ok) {
           const data = await response.json()
-          // The Azure Functions API returns a direct array of events
+          // The API returns a direct array of events
           if (Array.isArray(data)) {
             // Filter events for this device
             const deviceEvents = data.filter((event: any) => event.device === deviceId)
@@ -201,11 +201,11 @@ const RecentEventsWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/events`)
+        // Use Next.js API route
+        const response = await fetch('/api/events')
         if (response.ok) {
           const data = await response.json()
-          // The Azure Functions API returns a direct array of events
+          // The API returns a direct array of events
           if (Array.isArray(data)) {
             // Take the 5 most recent events
             setEvents(data.slice(0, 5))
@@ -283,11 +283,11 @@ const EventStatsWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/events`)
+        // Use Next.js API route
+        const response = await fetch('/api/events')
         if (response.ok) {
           const data = await response.json()
-          // The Azure Functions API returns a direct array of events
+          // The API returns a direct array of events
           if (Array.isArray(data)) {
             const events = data
             const now = new Date()

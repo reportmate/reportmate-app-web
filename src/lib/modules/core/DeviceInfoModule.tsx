@@ -15,8 +15,8 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
   React.useEffect(() => {
     const fetchDevice = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}`)
+        // Use Next.js API route
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
           if (data.success) {
@@ -188,11 +188,11 @@ const DeviceInfoWidget: React.FC = () => {
   React.useEffect(() => {
     const fetchStats = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/devices`)
+        // Use Next.js API route
+        const response = await fetch('/api/devices')
         if (response.ok) {
           const data = await response.json()
-          // The Azure Functions API returns a direct array of devices
+          // The API returns a direct array of devices
           if (Array.isArray(data)) {
             const devices = data
             const stats = {

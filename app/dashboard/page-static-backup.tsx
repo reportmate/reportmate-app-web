@@ -206,11 +206,11 @@ export default function DashboardPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/devices`)
+        // Use Next.js API route
+        const response = await fetch('/api/devices')
         if (response.ok) {
           const data = await response.json()
-          // The Azure Functions API returns a direct array of devices
+          // The API returns a direct array of devices
           if (Array.isArray(data)) {
             // Sort devices by lastSeen descending (newest first)
             const sortedDevices = data.sort((a: Device, b: Device) => 

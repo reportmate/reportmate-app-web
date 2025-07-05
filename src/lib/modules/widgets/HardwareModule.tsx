@@ -17,12 +17,12 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
   useEffect(() => {
     const fetchHardware = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/hardware`)
+        // Use Next.js API route - get full device data and extract hardware
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success) {
-            setHardware(data.hardware)
+          if (data.success && data.device && data.device.hardware) {
+            setHardware(data.device.hardware)
           }
         }
       } catch (error) {
@@ -209,12 +209,12 @@ const StorageDetailsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) => {
   useEffect(() => {
     const fetchStorage = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/device/${deviceId}/storage`)
+        // Use Next.js API route - get full device data and extract storage
+        const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.storage) {
-            setStorageDevices(data.storage)
+          if (data.success && data.device && data.device.storage) {
+            setStorageDevices(data.device.storage)
           }
         }
       } catch (error) {

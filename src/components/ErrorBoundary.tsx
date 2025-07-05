@@ -114,22 +114,17 @@ export class ErrorBoundary extends Component<Props, State> {
             <div className="flex gap-3">
               <button
                 onClick={() => {
-                  const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-                  Promise.all([
-                    fetch(`${apiBaseUrl}/api/events`, { method: 'DELETE' }).catch(() => null),
-                    fetch('/api/events', { method: 'DELETE' }).catch(() => null) // Keep Next.js fallback for emergency cleanup
-                  ]).then(() => {
-                    // Clear browser storage
-                    try {
-                      localStorage.clear()
-                      sessionStorage.clear()
-                    } catch (e) {}
-                    window.location.reload()
-                  }).catch(err => {
-                    console.error('Failed to clear events:', err)
-                    // Force reload anyway
-                    window.location.reload()
-                  })
+                  // Use Next.js API route for clearing events (if implemented)
+                  fetch('/api/events', { method: 'DELETE' }).catch(() => null)
+                  // Clear browser storage
+                  try {
+                    localStorage.clear()
+                    sessionStorage.clear()
+                  } catch (e) {
+                    console.warn('Failed to clear storage:', e)
+                  }
+                  // Force reload
+                  window.location.reload()
                 }}
                 className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
               >

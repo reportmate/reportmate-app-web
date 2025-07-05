@@ -170,7 +170,11 @@ export function useLiveEvents() {
         
         // Check if SignalR is enabled
         const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
-        const apiBaseUrl = 'https://reportmate-api.azurewebsites.net'
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+        
+        if (!apiBaseUrl) {
+          throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is not configured')
+        }
         
         if (!isSignalREnabled) {
           console.log("SignalR disabled, using polling mode...")
@@ -181,7 +185,7 @@ export function useLiveEvents() {
         
         console.log("🚀 Starting SignalR connection...")
         
-        // Get negotiate token from Azure Functions with timeout
+        // Get negotiate token from API with timeout
         const negotiateResponse = await Promise.race([
           fetch(`${apiBaseUrl}/api/negotiate?device=dashboard`),
           new Promise((_, reject) => 

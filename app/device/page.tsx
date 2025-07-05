@@ -27,14 +27,14 @@ export default function DevicesPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/devices`)
+        // Use Next.js API route
+        const response = await fetch('/api/devices')
         if (!response.ok) {
           throw new Error('Failed to fetch devices')
         }
         
         const data = await response.json()
-        // The Azure Functions API returns a direct array of devices
+        // The API returns a direct array of devices
         if (Array.isArray(data)) {
           setDevices(data)
         } else {

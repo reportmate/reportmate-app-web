@@ -60,20 +60,18 @@ function EventsPageContent() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/events`)
+        // Use Next.js API route
+        const response = await fetch('/api/events')
         if (!response.ok) {
           throw new Error('Failed to fetch events')
         }
         
         const data = await response.json()
-        // The Azure Functions API returns a direct array of events
-        if (Array.isArray(data)) {
-          setEvents(data)
-        } else if (data.success && data.events) {
+        // API returns: {success: true, events: [...]}
+        if (data.success && Array.isArray(data.events)) {
           setEvents(data.events)
         } else {
-          setError('Invalid events data received')
+          setError('Invalid events data received from API')
         }
       } catch (error) {
         console.error('Failed to fetch events:', error)

@@ -8,6 +8,7 @@ import { SuccessStatsWidget, WarningStatsWidget, ErrorStatsWidget, DevicesStatsW
 import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
+import { useLiveEvents } from "./hooks"
 
 // Import the same hooks and types from the original dashboard
 interface FleetEvent {
@@ -34,7 +35,6 @@ interface Device {
 }
 
 // Reuse the live events hook from the original dashboard
-import { useLiveEvents } from "../dashboard/hooks"
 
 export default function DashboardPage() {
   const { events, connectionStatus, lastUpdateTime, mounted, addEvent } = useLiveEvents()
@@ -50,9 +50,8 @@ export default function DashboardPage() {
     const fetchDevices = async () => {
       try {
         setError(null)
-        // Use Azure Functions API with environment variable for cloud-agnostic deployment
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate.ecuad.ca'
-        const response = await fetch(`${apiBaseUrl}/api/devices`)
+        // Use Next.js API route
+        const response = await fetch('/api/devices')
         if (response.ok) {
           const data = await response.json()
           // Handle both response formats: {success: true, devices: [...]} or direct array
