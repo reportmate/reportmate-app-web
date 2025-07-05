@@ -50,7 +50,9 @@ export function usePollingEvents() {
 // WebSocket test function
 export function testWebSocketConnection() {
   return new Promise((resolve, reject) => {
-    fetch('https://reportmate-api.azurewebsites.net/api/negotiate?device=test')
+    const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL || 'http://localhost:7071'
+    
+    fetch(`${apiBaseUrl}/api/negotiate?device=test`)
       .then(res => res.json())
       .then(connectionInfo => {
         console.log("Negotiate successful:", connectionInfo)
