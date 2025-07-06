@@ -47,16 +47,32 @@ function DevicesPageContent() {
       try {
         // Use Next.js API route
         const apiUrl = '/api/devices'
-        console.log('Fetching devices from Next.js API route:', apiUrl)
+        const timestamp = new Date().toISOString()
+        console.log(`${timestamp} - Fetching devices from Next.js API route:`, apiUrl)
         
-        const response = await fetch(apiUrl)
+        const response = await fetch(apiUrl, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        
+        console.log(`${timestamp} - API Response Status:`, response.status)
+        console.log(`${timestamp} - API Response Headers:`, Object.fromEntries(response.headers.entries()))
         
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status} ${response.statusText}`)
         }
         
         const data = await response.json()
-        console.log('API response received:', { type: typeof data, isArray: Array.isArray(data) })
+        console.log(`${timestamp} - API response received:`, { 
+          type: typeof data, 
+          isArray: Array.isArray(data), 
+          length: Array.isArray(data) ? data.length : 'N/A',
+          fetchedAt: response.headers.get('X-Fetched-At'),
+          keys: Array.isArray(data) ? [] : Object.keys(data || {})
+        })
         
         // The API returns a direct array of devices
         let devicesArray: Device[]
