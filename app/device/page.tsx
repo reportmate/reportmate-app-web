@@ -31,7 +31,13 @@ export default function DevicesPage() {
     const fetchDevices = async () => {
       try {
         // Use Next.js API route
-        const response = await fetch('/api/devices')
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (!response.ok) {
           throw new Error('Failed to fetch devices')
         }

@@ -54,7 +54,13 @@ export default function DashboardPage() {
       try {
         setError(null)
         // Use Next.js API route
-        const response = await fetch('/api/devices')
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (response.ok) {
           const data = await response.json()
           // Handle both response formats: {success: true, devices: [...]} or direct array

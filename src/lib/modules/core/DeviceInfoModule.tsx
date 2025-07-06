@@ -189,7 +189,13 @@ const DeviceInfoWidget: React.FC = () => {
     const fetchStats = async () => {
       try {
         // Use Next.js API route
-        const response = await fetch('/api/devices')
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (response.ok) {
           const data = await response.json()
           // The API returns a direct array of devices

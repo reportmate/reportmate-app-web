@@ -23,7 +23,13 @@ export default function DeviceListPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/devices')
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
         if (!response.ok) {
           throw new Error(`Failed to fetch devices: ${response.status}`)
         }
