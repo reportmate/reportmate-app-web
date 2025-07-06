@@ -1,12 +1,14 @@
 "use client"
 
+// Force dynamic rendering and disable caching for events page
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 
-// Force dynamic rendering for this page to avoid SSG issues with useSearchParams  
-export const dynamic = 'force-dynamic'
+// Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
 interface Event {
   id: string

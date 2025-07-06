@@ -1,5 +1,8 @@
 "use client"
 
+// Force dynamic rendering and disable caching for settings page
+export const dynamic = 'force-dynamic'
+
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { ModuleManager } from '../../src/components/ModuleManager'

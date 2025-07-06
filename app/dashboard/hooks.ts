@@ -170,10 +170,10 @@ export function useLiveEvents() {
         
         // Check if SignalR is enabled
         const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+        const apiBaseUrl = process.env.API_BASE_URL
         
         if (!apiBaseUrl) {
-          throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is not configured')
+          throw new Error('API_BASE_URL environment variable is not configured')
         }
         
         if (!isSignalREnabled) {

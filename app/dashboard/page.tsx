@@ -1,5 +1,8 @@
 "use client"
 
+// Force dynamic rendering and disable caching for dashboard
+export const dynamic = 'force-dynamic'
+
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
