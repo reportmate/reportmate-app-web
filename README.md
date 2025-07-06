@@ -41,7 +41,7 @@ Configure your environment variables in `.env.local`:
 ```env
 NEXT_PUBLIC_WPS_URL=wss://<your-pubsub>.webpubsub.azure.com/client/?hub=fleet
 NEXT_PUBLIC_WPS_TOKEN=<jwt-from-/api/negotiate>
-NEXT_PUBLIC_API_BASE_URL=https://your-functions-api.azurewebsites.net
+API_BASE_URL=https://your-functions-api.azurewebsites.net
 NEXT_PUBLIC_ENABLE_SIGNALR=true
 ```
 
@@ -146,7 +146,7 @@ The Dockerfile is optimized for production deployment with:
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `NEXT_PUBLIC_WPS_URL` | Azure Web PubSub WebSocket URL | Yes |
-| `NEXT_PUBLIC_API_BASE_URL` | Backend API base URL | Yes |
+| `API_BASE_URL` | Backend API base URL | Yes |
 | `NEXT_PUBLIC_ENABLE_SIGNALR` | Enable real-time features | No (default: true) |
 
 ### Next.js Configuration

@@ -31,6 +31,6 @@ export default {
   env: {
     NEXT_PUBLIC_WPS_URL: process.env.NEXT_PUBLIC_WPS_URL,
     NEXT_PUBLIC_ENABLE_SIGNALR: process.env.NEXT_PUBLIC_ENABLE_SIGNALR,
-    NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL
+    API_BASE_URL: process.env.API_BASE_URL
   }
 }

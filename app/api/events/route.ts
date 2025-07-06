@@ -5,9 +5,7 @@ export async function GET() {
     console.log('[EVENTS API] Fetching events from Azure Functions API')
 
     // Use server-side API base URL configuration
-    // Priority: 1. Runtime environment variable 2. Build-time variable 3. Default fallback
     const apiBaseUrl = process.env.API_BASE_URL || 
-                      process.env.NEXT_PUBLIC_API_BASE_URL || 
                       'https://reportmate-api.azurewebsites.net'
     
     console.log('[EVENTS API] Using API base URL:', apiBaseUrl)
