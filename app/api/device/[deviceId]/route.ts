@@ -9,9 +9,7 @@ export async function GET(
     console.log('[DEVICE API] Fetching device data for:', deviceId)
 
     // Use server-side API base URL configuration
-    // Priority: 1. Runtime environment variable 2. Build-time variable 3. Default fallback
     const apiBaseUrl = process.env.API_BASE_URL || 
-                      process.env.NEXT_PUBLIC_API_BASE_URL || 
                       'https://reportmate-api.azurewebsites.net'
     
     console.log('[DEVICE API] Using API base URL:', apiBaseUrl)
