@@ -2,6 +2,7 @@ import React from 'react';
 import { ExtendedModuleManifest, DeviceWidget, DeviceWidgetProps, ModuleConfigSchema } from '../EnhancedModule';
 
 interface SecurityInfo {
+  // macOS security features
   gatekeeper?: string;
   sip?: string;
   ssh_groups?: string;
@@ -18,13 +19,31 @@ interface SecurityInfo {
   filevault_status?: boolean;
   filevault_users?: string;
   as_security_mode?: string;
+  
+  // Windows security features
+  antivirus?: {
+    enabled: boolean;
+    status: string;
+  };
+  firewall?: {
+    enabled: boolean;
+    status: string;
+  };
+  bitlocker?: {
+    enabled: boolean;
+    status: string;
+  };
+  tpm?: {
+    enabled: boolean;
+    status: string;
+  };
 }
 
 // Security Overview Widget
 const SecurityOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
   const security = device?.security as SecurityInfo | undefined;
 
-  if (!security) {
+  if (!security || Object.keys(security).length === 0) {
     return (
       <div className="text-center py-8">
         <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
@@ -38,36 +57,105 @@ const SecurityOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
     );
   }
 
-  return (
-    <div className="p-6">
-      <div className="grid grid-cols-3 gap-4">
-        <div className="text-center">
-          <div className={`text-lg font-bold mb-1 ${
-            security.filevault_status ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
-          }`}>
-            {security.filevault_status ? 'ON' : 'OFF'}
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">FileVault</div>
-        </div>
-        
-        <div className="text-center">
-          <div className={`text-lg font-bold mb-1 ${
-            security.firewall_state === 'On' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
-          }`}>
-            {security.firewall_state === 'On' ? 'ON' : 'OFF'}
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Firewall</div>
-        </div>
-        
-        <div className="text-center">
-          <div className={`text-lg font-bold mb-1 ${
-            security.gatekeeper === 'Enabled' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
-          }`}>
-            {security.gatekeeper === 'Enabled' ? 'ON' : 'OFF'}
-          </div>
-          <div className="text-xs text-gray-600 dark:text-gray-400">Gatekeeper</div>
+  // Detect platform based on available security features
+  const isWindows = !!(security.antivirus || security.firewall || security.bitlocker || security.tpm);
+  const isMacOS = !!(security.gatekeeper || security.sip || security.filevault_status !== undefined);
+
+  if (isWindows) {
+    // Windows Security Overview
+    const getSecurityStatus = (feature: any) => {
+      if (!feature) return { color: 'text-gray-600 dark:text-gray-400', status: 'Unknown' };
+      if (feature.enabled) return { color: 'text-green-600 dark:text-green-400', status: 'Enabled' };
+      return { color: 'text-red-600 dark:text-red-400', status: 'Disabled' };
+    };
+
+    return (
+      <div className="p-6">
+        <div className="space-y-4">
+          {security.antivirus && (
+            <div className="text-center">
+              <div className={`text-sm font-bold mb-1 ${getSecurityStatus(security.antivirus).color}`}>
+                {getSecurityStatus(security.antivirus).status.toUpperCase()}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">Antivirus Protection</div>
+            </div>
+          )}
+          
+          {security.firewall && (
+            <div className="text-center">
+              <div className={`text-sm font-bold mb-1 ${getSecurityStatus(security.firewall).color}`}>
+                {getSecurityStatus(security.firewall).status.toUpperCase()}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">Windows Firewall</div>
+            </div>
+          )}
+          
+          {security.bitlocker && (
+            <div className="text-center">
+              <div className={`text-sm font-bold mb-1 ${getSecurityStatus(security.bitlocker).color}`}>
+                {getSecurityStatus(security.bitlocker).status.toUpperCase()}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">BitLocker Encryption</div>
+            </div>
+          )}
+          
+          {security.tpm && (
+            <div className="text-center">
+              <div className={`text-sm font-bold mb-1 ${getSecurityStatus(security.tpm).color}`}>
+                {getSecurityStatus(security.tpm).status.toUpperCase()}
+              </div>
+              <div className="text-xs text-gray-600 dark:text-gray-400">TPM Security</div>
+            </div>
+          )}
         </div>
       </div>
+    );
+  } else if (isMacOS) {
+    // macOS Security Overview (existing implementation)
+    return (
+      <div className="p-6">
+        <div className="grid grid-cols-3 gap-4">
+          <div className="text-center">
+            <div className={`text-lg font-bold mb-1 ${
+              security.filevault_status ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
+            }`}>
+              {security.filevault_status ? 'ON' : 'OFF'}
+            </div>
+            <div className="text-xs text-gray-600 dark:text-gray-400">FileVault</div>
+          </div>
+          
+          <div className="text-center">
+            <div className={`text-lg font-bold mb-1 ${
+              security.firewall_state === 'On' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
+            }`}>
+              {security.firewall_state === 'On' ? 'ON' : 'OFF'}
+            </div>
+            <div className="text-xs text-gray-600 dark:text-gray-400">Firewall</div>
+          </div>
+          
+          <div className="text-center">
+            <div className={`text-lg font-bold mb-1 ${
+              security.gatekeeper === 'Enabled' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-300'
+            }`}>
+              {security.gatekeeper === 'Enabled' ? 'ON' : 'OFF'}
+            </div>
+            <div className="text-xs text-gray-600 dark:text-gray-400">Gatekeeper</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
+  // Fallback for unknown platform
+  return (
+    <div className="text-center py-8">
+      <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+        </svg>
+      </div>
+      <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">Unknown Platform</h3>
+      <p className="text-xs text-gray-600 dark:text-gray-400">Security information format not recognized</p>
     </div>
   );
 };
