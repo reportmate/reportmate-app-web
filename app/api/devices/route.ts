@@ -10,8 +10,15 @@ export async function GET() {
     console.log(`[DEVICES API] ${timestamp} - Fetching devices from Azure Functions API`)
 
     // Use server-side API base URL configuration
-    const apiBaseUrl = process.env.API_BASE_URL || 
-                      'https://reportmate-api.azurewebsites.net'
+    const apiBaseUrl = process.env.API_BASE_URL
+    
+    if (!apiBaseUrl) {
+      console.error(`[DEVICES API] ${timestamp} - API_BASE_URL environment variable not configured`)
+      return NextResponse.json({
+        error: 'API configuration error',
+        details: 'API_BASE_URL environment variable not configured'
+      }, { status: 500 })
+    }
     
     console.log(`[DEVICES API] ${timestamp} - Using API base URL:`, apiBaseUrl)
     const response = await fetch(`${apiBaseUrl}/api/devices`, {

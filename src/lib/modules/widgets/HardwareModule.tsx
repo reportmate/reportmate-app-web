@@ -21,8 +21,9 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
         const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.device && data.device.hardware) {
-            setHardware(data.device.hardware)
+          if (data.success && data.device) {
+            // Device hardware info is stored directly in device object
+            setHardware(data.device)
           }
         }
       } catch (error) {
@@ -108,22 +109,16 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
             </div>
           </div>
           <div className="space-y-1 text-sm">
-            {hardware.totalRAM && (
+            {hardware.memory && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Total:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.totalRAM}</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.memory}</span>
               </div>
             )}
-            {hardware.availableRAM && (
+            {hardware.memoryUtilization && (
               <div>
-                <span className="text-gray-600 dark:text-gray-400">Available:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.availableRAM}</span>
-              </div>
-            )}
-            {hardware.memorySlots && (
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Slots:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.memorySlots}</span>
+                <span className="text-gray-600 dark:text-gray-400">Usage:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.memoryUtilization}%</span>
               </div>
             )}
           </div>
@@ -172,26 +167,26 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
               </svg>
             </div>
             <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">Graphics</h4>
+              <h4 className="font-medium text-gray-900 dark:text-white">System</h4>
             </div>
           </div>
           <div className="space-y-1 text-sm">
-            {hardware.gpu && (
+            {hardware.manufacturer && (
               <div>
-                <span className="text-gray-600 dark:text-gray-400">GPU:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.gpu}</span>
+                <span className="text-gray-600 dark:text-gray-400">Manufacturer:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.manufacturer}</span>
               </div>
             )}
-            {hardware.vram && (
+            {hardware.model && (
               <div>
-                <span className="text-gray-600 dark:text-gray-400">VRAM:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.vram}</span>
+                <span className="text-gray-600 dark:text-gray-400">Model:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.model}</span>
               </div>
             )}
-            {hardware.resolution && (
+            {hardware.architecture && (
               <div>
-                <span className="text-gray-600 dark:text-gray-400">Resolution:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.resolution}</span>
+                <span className="text-gray-600 dark:text-gray-400">Architecture:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.architecture}</span>
               </div>
             )}
           </div>
