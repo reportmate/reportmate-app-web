@@ -50,7 +50,12 @@ export function usePollingEvents() {
 // WebSocket test function
 export function testWebSocketConnection() {
   return new Promise((resolve, reject) => {
-    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:7071'
+    const apiBaseUrl = process.env.API_BASE_URL
+    
+    if (!apiBaseUrl) {
+      reject(new Error('API_BASE_URL environment variable not configured'))
+      return
+    }
     
     fetch(`${apiBaseUrl}/api/negotiate?device=test`)
       .then(res => res.json())

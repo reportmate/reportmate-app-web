@@ -365,13 +365,23 @@ export default function DeviceDetailPage() {
         }
         
         const deviceData = await deviceResponse.json()
-        if (deviceData.deviceInfo) {
-          setDeviceInfo(deviceData.deviceInfo)
+        console.log('Device API Response:', {
+          hasSuccess: 'success' in deviceData,
+          successValue: deviceData.success,
+          hasDevice: 'device' in deviceData,
+          deviceValue: !!deviceData.device,
+          responseKeys: Object.keys(deviceData),
+          responseSize: JSON.stringify(deviceData).length
+        })
+        
+        if (deviceData.success && deviceData.device) {
+          setDeviceInfo(deviceData.device)
           // Use events directly from the device API response
           if (deviceData.events) {
             setEvents(deviceData.events)
           }
         } else {
+          console.error('Invalid device data structure:', deviceData)
           setError('Invalid device data received')
           return
         }
@@ -547,6 +557,10 @@ export default function DeviceDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Device Name</label>
                     <p className="text-gray-900 dark:text-white">{deviceInfo.name}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Device ID</label>
+                    <p className="text-gray-900 dark:text-white font-mono text-sm">{deviceInfo.id}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Serial Number</label>
