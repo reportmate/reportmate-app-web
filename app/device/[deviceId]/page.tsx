@@ -488,11 +488,11 @@ export default function DeviceDetailPage() {
                   </h1>
                   <div className="flex items-center gap-2">
                     {deviceInfo.assetTag && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
                         {deviceInfo.assetTag}
                       </span>
                     )}
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 min-w-[80px] justify-center">
                       {deviceInfo.serialNumber}
                     </span>
                   </div>

@@ -18,8 +18,14 @@ interface Device {
   location?: string
   serialNumber?: string
   ipAddress?: string
+  ipAddressV4?: string
+  ipAddressV6?: string
+  macAddress?: string
   totalEvents: number
   lastEventTime: string
+  architecture?: string
+  processor?: string
+  memory?: string
 }
 
 interface NewClientsWidgetProps {
