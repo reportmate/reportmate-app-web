@@ -78,10 +78,6 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.model || 'Unknown'}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Operating System</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.os || 'Unknown'}</dd>
-            </div>
-            <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Seen</dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.lastSeen}</dd>
             </div>
@@ -101,6 +97,59 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                 </span>
               </dd>
             </div>
+          </dl>
+        </div>
+      </div>
+
+      {/* Operating System Information */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
+            Operating System
+          </h3>
+        </div>
+        <div className="px-6 py-4">
+          <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Operating System</dt>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                {device.osDisplayName || device.osName || device.os || 'Unknown'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Version</dt>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                {device.osVersionName || device.osVersion || 'Unknown'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Build</dt>
+              <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">
+                {device.osBuild || 'Unknown'}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Architecture</dt>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                {device.osArchitecture || device.architecture || 'Unknown'}
+              </dd>
+            </div>
+            {device.osInstallDate && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Installed on</dt>
+                <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">
+                  {new Date(device.osInstallDate).toLocaleDateString()}
+                </dd>
+              </div>
+            )}
+            {device.experiencePack && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Experience Pack</dt>
+                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">
+                  {device.experiencePack}
+                </dd>
+              </div>
+            )}
           </dl>
         </div>
       </div>
