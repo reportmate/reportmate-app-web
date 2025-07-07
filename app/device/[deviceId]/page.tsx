@@ -561,6 +561,7 @@ export default function DeviceDetailPage() {
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Device ID</label>
                     <p className="text-gray-900 dark:text-white font-mono text-sm">{deviceInfo.id}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hardware UUID</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Serial Number</label>
