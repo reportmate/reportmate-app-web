@@ -13,8 +13,15 @@ export async function GET(
     console.log('[DEVICE API] Fetching device data for:', deviceId)
 
     // Use server-side API base URL configuration
-    const apiBaseUrl = process.env.API_BASE_URL || 
-                      'https://reportmate-api.azurewebsites.net'
+    const apiBaseUrl = process.env.API_BASE_URL
+    
+    if (!apiBaseUrl) {
+      console.error('[DEVICE API] API_BASE_URL environment variable not configured')
+      return NextResponse.json({
+        error: 'API configuration error',
+        details: 'API_BASE_URL environment variable not configured'
+      }, { status: 500 })
+    }
     
     console.log('[DEVICE API] Using API base URL:', apiBaseUrl)
     const response = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
@@ -54,6 +61,14 @@ export async function GET(
 
     const data = await response.json()
     console.log('[DEVICE API] Successfully fetched device data from Azure Functions')
+    console.log('[DEVICE API] Response structure:', {
+      hasSuccess: 'success' in data,
+      successValue: data.success,
+      hasDevice: 'device' in data,
+      deviceValue: !!data.device,
+      responseKeys: Object.keys(data),
+      responseSize: JSON.stringify(data).length
+    })
     
     // Return the data as-is since the Azure Functions API should return the correct format
     return NextResponse.json(data, {
