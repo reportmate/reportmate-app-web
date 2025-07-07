@@ -492,7 +492,7 @@ export default function DeviceDetailPage() {
                         {deviceInfo.assetTag}
                       </span>
                     )}
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900">
                       {deviceInfo.serialNumber}
                     </span>
                   </div>
@@ -660,22 +660,22 @@ export default function DeviceDetailPage() {
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Operating System</label>
                     <p className="text-gray-900 dark:text-white">{deviceInfo.os}</p>
                   </div>
-                  {deviceInfo.software && (
-                    <>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Build Version</label>
-                        <p className="text-gray-900 dark:text-white">{deviceInfo.software.buildVersion}</p>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Boot ROM Version</label>
-                        <p className="text-gray-900 dark:text-white">{deviceInfo.software.bootROMVersion}</p>
-                      </div>
-                    </>
+                  {deviceInfo.architecture && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
+                      <p className="text-gray-900 dark:text-white">{deviceInfo.architecture}</p>
+                    </div>
                   )}
                   {deviceInfo.uptime && (
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Uptime</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.uptime}</p>
+                    </div>
+                  )}
+                  {deviceInfo.bootTime && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Boot Time</label>
+                      <p className="text-gray-900 dark:text-white">{formatExactTime(deviceInfo.bootTime)}</p>
                     </div>
                   )}
                 </div>
@@ -703,7 +703,16 @@ export default function DeviceDetailPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Processor</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.processor}</p>
+                      {deviceInfo.processorSpeed && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{deviceInfo.processorSpeed}</p>
+                      )}
                     </div>
+                    {deviceInfo.cores && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">CPU Cores</label>
+                        <p className="text-gray-900 dark:text-white">{deviceInfo.cores} cores</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Memory</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.memory}</p>
@@ -711,17 +720,25 @@ export default function DeviceDetailPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Storage</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.storage}</p>
+                      {deviceInfo.storageType && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400">{deviceInfo.storageType}</p>
+                      )}
                     </div>
                     {deviceInfo.graphics && (
                       <div>
                         <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Graphics</label>
                         <p className="text-gray-900 dark:text-white">{deviceInfo.graphics}</p>
+                        {deviceInfo.vram && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400">{deviceInfo.vram} VRAM</p>
+                        )}
                       </div>
                     )}
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
-                      <p className="text-gray-900 dark:text-white">{deviceInfo.architecture}</p>
-                    </div>
+                    {deviceInfo.resolution && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Resolution</label>
+                        <p className="text-gray-900 dark:text-white">{deviceInfo.resolution}</p>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-gray-600 dark:text-gray-400">Hardware information not available</p>
@@ -745,125 +762,186 @@ export default function DeviceDetailPage() {
                 </div>
               </div>
               <div className="p-6">
-                {deviceInfo.securityFeatures ? (
+                {deviceInfo.securityFeatures && Object.keys(deviceInfo.securityFeatures).length > 0 ? (
                   <div className="space-y-4">
-                    {/* Platform-specific security features */}
-                    {deviceInfo.os?.toLowerCase().includes('mac') ? (
+                    {/* Security features based on OS type */}
+                    {deviceInfo.os?.toLowerCase().includes('windows') ? (
+                      <>
+                        {/* Windows Security Features */}
+                        {deviceInfo.securityFeatures.bitlocker && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">BitLocker</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.bitlocker?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.bitlocker?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.windowsDefender && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Defender</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.windowsDefender?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.windowsDefender?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.uac && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">UAC</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.uac?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.uac?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.tpm && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">TPM</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.tpm?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.tpm?.status || 'Unknown'} {deviceInfo.securityFeatures.tpm?.version && `(${deviceInfo.securityFeatures.tpm.version})`}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.windowsUpdates && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Updates</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.windowsUpdates?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.windowsUpdates?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.firewall && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Firewall</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.firewall?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.firewall?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : deviceInfo.os?.toLowerCase().includes('mac') ? (
                       <>
                         {/* Mac Security Features */}
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">FileVault</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.filevault?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.filevault?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Gatekeeper</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.gatekeeper?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.gatekeeper?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SIP</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.sip?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.sip?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">XProtect</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.xprotect?.status === 'Up to date' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.xprotect?.status || 'Unknown'}
-                          </span>
-                        </div>
+                        {deviceInfo.securityFeatures.filevault && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">FileVault</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.filevault?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.filevault?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.gatekeeper && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Gatekeeper</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.gatekeeper?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.gatekeeper?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.sip && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SIP</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.sip?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.sip?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.xprotect && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">XProtect</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.xprotect?.status === 'Up to date' 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.xprotect?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
+                        {deviceInfo.securityFeatures.firewall && (
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">macOS Firewall</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.securityFeatures.firewall?.enabled 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {deviceInfo.securityFeatures.firewall?.status || 'Unknown'}
+                            </span>
+                          </div>
+                        )}
                       </>
                     ) : (
                       <>
-                        {/* Windows Security Features */}
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">BitLocker</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.bitlocker?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.bitlocker?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Defender</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.windowsDefender?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.windowsDefender?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">UAC</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.uac?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.uac?.status || 'Unknown'}
-                          </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">TPM</label>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.tpm?.enabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.tpm?.status || 'Unknown'} {deviceInfo.securityFeatures.tpm?.version && `(${deviceInfo.securityFeatures.tpm.version})`}
-                          </span>
-                        </div>
+                        {/* Generic Security Features */}
+                        {Object.entries(deviceInfo.securityFeatures).map(([feature, info]) => (
+                          <div key={feature} className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400 capitalize">{feature}</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              (info && typeof info === 'object' && 'enabled' in info && info.enabled) || 
+                              (info && typeof info === 'object' && 'installed' in info && info.installed)
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            }`}>
+                              {(info && typeof info === 'object' && 'status' in info && info.status) || 
+                               (info && typeof info === 'object' && 'installed' in info && !info.installed && 'Not Installed') ||
+                               'Unknown'}
+                            </span>
+                          </div>
+                        ))}
                       </>
                     )}
                     
-                    {/* Universal Security Features */}
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Firewall</label>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        deviceInfo.securityFeatures.firewall?.enabled 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {deviceInfo.securityFeatures.firewall?.status || 'Unknown'}
-                      </span>
-                    </div>
-                    
                     {/* EDR Status */}
-                    <div className="flex justify-between items-center">
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">EDR</label>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        deviceInfo.securityFeatures.edr?.installed 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {deviceInfo.securityFeatures.edr?.installed 
-                          ? `${deviceInfo.securityFeatures.edr.name} (${deviceInfo.securityFeatures.edr.status})`
-                          : 'Not Installed'
-                        }
-                      </span>
-                    </div>
+                    {deviceInfo.securityFeatures.edr && (
+                      <div className="flex justify-between items-center">
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">EDR</label>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          deviceInfo.securityFeatures.edr?.installed 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {deviceInfo.securityFeatures.edr?.installed 
+                            ? `${deviceInfo.securityFeatures.edr.name} (${deviceInfo.securityFeatures.edr.status})`
+                            : 'Not Installed'
+                          }
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-gray-600 dark:text-gray-400">Security information not available</p>
