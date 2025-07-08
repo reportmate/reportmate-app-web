@@ -37,6 +37,9 @@ interface MDMInfo {
 // MDM Overview Widget
 const MDMOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
   const mdm = device?.mdm as MDMInfo | undefined;
+  
+  // Check if this is a Windows device
+  const isWindows = device?.os?.toLowerCase().includes('windows');
 
   if (!mdm || mdm.enrolled === false) {
     return (
@@ -66,23 +69,29 @@ const MDMOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
         
         {mdm.enrolled && (
           <>
-            <div className="text-center">
-              <div className={`text-sm font-bold mb-1 ${
-                mdm.enrolled_via_dep ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
-              }`}>
-                {mdm.enrolled_via_dep ? 'DEP ENROLLED' : 'MANUAL ENROLLMENT'}
+            {/* Hide DEP Enrollment for Windows devices */}
+            {!isWindows && (
+              <div className="text-center">
+                <div className={`text-sm font-bold mb-1 ${
+                  mdm.enrolled_via_dep ? 'text-blue-600 dark:text-blue-400' : 'text-gray-600 dark:text-gray-400'
+                }`}>
+                  {mdm.enrolled_via_dep ? 'DEP ENROLLED' : 'MANUAL ENROLLMENT'}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Enrollment Type</div>
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Enrollment Type</div>
-            </div>
+            )}
             
-            <div className="text-center">
-              <div className={`text-sm font-bold mb-1 ${
-                mdm.user_approved ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
-              }`}>
-                {mdm.user_approved ? 'USER APPROVED' : 'NOT APPROVED'}
+            {/* Hide User Approved for Windows devices */}
+            {!isWindows && (
+              <div className="text-center">
+                <div className={`text-sm font-bold mb-1 ${
+                  mdm.user_approved ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
+                }`}>
+                  {mdm.user_approved ? 'USER APPROVED' : 'NOT APPROVED'}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">Approval Status</div>
               </div>
-              <div className="text-xs text-gray-600 dark:text-gray-400">Approval Status</div>
-            </div>
+            )}
           </>
         )}
       </div>
@@ -93,6 +102,9 @@ const MDMOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
 // MDM Details Widget
 const MDMDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
   const mdm = device?.mdm as MDMInfo | undefined;
+  
+  // Check if this is a Windows device
+  const isWindows = device?.os?.toLowerCase().includes('windows');
 
   if (!mdm || !mdm.enrolled) {
     return (
@@ -123,32 +135,39 @@ const MDMDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
             </span>
           </div>
           
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DEP Enrollment</label>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              mdm.enrolled_via_dep 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-            }`}>
-              {mdm.enrolled_via_dep ? 'Yes' : 'No'}
-            </span>
-          </div>
+          {/* Hide DEP Enrollment for Windows devices */}
+          {!isWindows && (
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DEP Enrollment</label>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                mdm.enrolled_via_dep 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                  : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+              }`}>
+                {mdm.enrolled_via_dep ? 'Yes' : 'No'}
+              </span>
+            </div>
+          )}
           
-          <div className="flex justify-between items-center">
-            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">User Approved</label>
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-              mdm.user_approved 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-            }`}>
-              {mdm.user_approved ? 'Yes' : 'No'}
-            </span>
-          </div>
+          {/* Hide User Approved for Windows devices */}
+          {!isWindows && (
+            <div className="flex justify-between items-center">
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">User Approved</label>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                mdm.user_approved 
+                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+              }`}>
+                {mdm.user_approved ? 'Yes' : 'No'}
+              </span>
+            </div>
+          )}
           
+          {/* Move Organization to right side like other fields */}
           {mdm.organization && (
-            <div>
+            <div className="flex justify-between items-center">
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Organization</label>
-              <p className="text-gray-900 dark:text-white text-sm">{mdm.organization}</p>
+              <span className="text-gray-900 dark:text-white text-sm">{mdm.organization}</span>
             </div>
           )}
           
