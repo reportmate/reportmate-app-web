@@ -61,22 +61,25 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
         <div className="px-6 py-4">
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Name</dt>
+              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Device Name</dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.name}</dd>
             </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Device ID</dt>
-              <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.id}</dd>
-              <dd className="mt-1 text-xs text-gray-500 dark:text-gray-400">Hardware UUID</dd>
-            </div>
+            {device.assetTag && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Asset Tag</dt>
+                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.assetTag}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Serial Number</dt>
-              <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.serialNumber || device.id}</dd>
+              <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.serialNumber || 'Unknown'}</dd>
             </div>
-            <div>
-              <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Model</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.model || 'Unknown'}</dd>
-            </div>
+            {device.deviceId && (
+              <div>
+                <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Hardware UUID</dt>
+                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.deviceId}</dd>
+              </div>
+            )}
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Seen</dt>
               <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.lastSeen}</dd>

@@ -35,9 +35,11 @@ interface ApplicationInfo {
 
 interface DeviceInfo {
   id: string
+  deviceId?: string
   name: string
   model?: string
   os?: string
+  platform?: string
   lastSeen: string
   status: 'online' | 'offline' | 'warning' | 'error'
   uptime?: string
@@ -558,23 +560,22 @@ export default function DeviceDetailPage() {
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Device Name</label>
                     <p className="text-gray-900 dark:text-white">{deviceInfo.name}</p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Device ID</label>
-                    <p className="text-gray-900 dark:text-white font-mono text-sm">{deviceInfo.id}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Hardware UUID</p>
-                  </div>
+                  {deviceInfo.assetTag && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Asset Tag</label>
+                      <p className="text-gray-900 dark:text-white">{deviceInfo.assetTag}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Serial Number</label>
                     <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.serialNumber}</p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</label>
-                    <p className="text-gray-900 dark:text-white">{deviceInfo.model}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Asset Tag</label>
-                    <p className="text-gray-900 dark:text-white">{deviceInfo.assetTag || 'Not assigned'}</p>
-                  </div>
+                  {deviceInfo.deviceId && deviceInfo.deviceId !== deviceInfo.id && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Hardware UUID</label>
+                      <p className="text-gray-900 dark:text-white font-mono text-sm">{deviceInfo.deviceId}</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -608,31 +609,35 @@ export default function DeviceDetailPage() {
                   </div>
                   {deviceInfo.mdm?.enrolled && (
                     <>
-                      <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DEP Enrollment</label>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          deviceInfo.mdm.enrolled_via_dep 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                        }`}>
-                          {deviceInfo.mdm.enrolled_via_dep ? 'Yes' : 'No'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">User Approved</label>
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          deviceInfo.mdm.user_approved 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        }`}>
-                          {deviceInfo.mdm.user_approved ? 'Yes' : 'No'}
-                        </span>
-                      </div>
                       {deviceInfo.mdm.organization && (
-                        <div>
+                        <div className="flex justify-between items-center">
                           <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Organization</label>
                           <p className="text-gray-900 dark:text-white text-sm">{deviceInfo.mdm.organization}</p>
                         </div>
+                      )}
+                      {deviceInfo.platform !== 'Windows' && (
+                        <>
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DEP Enrollment</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.mdm.enrolled_via_dep 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                            }`}>
+                              {deviceInfo.mdm.enrolled_via_dep ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-gray-600 dark:text-gray-400">User Approved</label>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              deviceInfo.mdm.user_approved 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            }`}>
+                              {deviceInfo.mdm.user_approved ? 'Yes' : 'No'}
+                            </span>
+                          </div>
+                        </>
                       )}
                     </>
                   )}
@@ -701,6 +706,12 @@ export default function DeviceDetailPage() {
               <div className="p-6">
                 {deviceInfo.processor ? (
                   <div className="space-y-4">
+                    {deviceInfo.model && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</label>
+                        <p className="text-gray-900 dark:text-white">{deviceInfo.model}</p>
+                      </div>
+                    )}
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Processor</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.processor}</p>
