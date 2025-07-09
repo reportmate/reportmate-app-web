@@ -8,6 +8,7 @@ interface MDMInfo {
   user_approved?: boolean;
   organization?: string | null;
   department?: string | null;
+  vendor?: string | null;
   profiles?: Array<{
     id: string;
     name: string;
@@ -92,6 +93,16 @@ const MDMOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
                 <div className="text-xs text-gray-600 dark:text-gray-400">Approval Status</div>
               </div>
             )}
+            
+            {/* Show vendor for Windows devices */}
+            {isWindows && mdm.vendor && (
+              <div className="text-center">
+                <div className="text-sm font-bold mb-1 text-blue-600 dark:text-blue-400">
+                  {mdm.vendor.toUpperCase()}
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">MDM Vendor</div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -163,12 +174,24 @@ const MDMDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
             </div>
           )}
           
-          {/* Move Organization to right side like other fields */}
-          {mdm.organization && (
+          {/* Show vendor for Mac devices (check vendor first, then fall back to organization) */}
+          {!isWindows && (mdm.vendor || mdm.organization) && (
             <div className="flex justify-between items-center">
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Organization</label>
-              <span className="text-gray-900 dark:text-white text-sm">{mdm.organization}</span>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
+              <span className="text-gray-900 dark:text-white text-sm">{mdm.vendor || mdm.organization}</span>
             </div>
+          )}
+          
+          {/* Windows-specific fields */}
+          {isWindows && (
+            <>
+              {mdm.vendor && (
+                <div className="flex justify-between items-center">
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
+                  <span className="text-gray-900 dark:text-white text-sm">{mdm.vendor}</span>
+                </div>
+              )}
+            </>
           )}
           
           {mdm.department && (
