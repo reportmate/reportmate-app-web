@@ -1302,7 +1302,7 @@ export default function DeviceDetailPage() {
                   <div className="p-6">
                     <DeviceEventsSimple events={events.map(event => ({
                       id: event.id,
-                      name: event.device,
+                      name: event.kind || 'Event', // Use event kind as fallback name
                       raw: event.payload,
                       kind: event.kind,
                       ts: event.ts
