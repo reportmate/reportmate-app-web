@@ -165,6 +165,7 @@ interface DeviceInfo {
     user_approved?: boolean
     organization?: string | null
     department?: string | null
+    vendor?: string | null
     profiles?: Array<{
       id: string
       name: string
@@ -614,13 +615,15 @@ export default function DeviceDetailPage() {
                   </div>
                   {deviceInfo.mdm?.enrolled && (
                     <>
-                      {deviceInfo.mdm.organization && (
+                      {(deviceInfo.mdm.vendor || deviceInfo.mdm.organization) && (
                         <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Organization</label>
-                          <p className="text-gray-900 dark:text-white text-sm">{deviceInfo.mdm.organization}</p>
+                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
+                          <p className="text-gray-900 dark:text-white text-sm">{deviceInfo.mdm.vendor || deviceInfo.mdm.organization}</p>
                         </div>
                       )}
-                      {deviceInfo.platform !== 'Windows' && (
+                      
+                      {/* Platform-specific fields */}
+                      {deviceInfo.platform === 'macOS' && (
                         <>
                           <div className="flex justify-between items-center">
                             <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DEP Enrollment</label>
@@ -642,6 +645,23 @@ export default function DeviceDetailPage() {
                               {deviceInfo.mdm.user_approved ? 'Yes' : 'No'}
                             </span>
                           </div>
+                        </>
+                      )}
+                      
+                      {deviceInfo.platform === 'Windows' && (
+                        <>
+                          {deviceInfo.mdm.vendor && (
+                            <div className="flex justify-between items-center">
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
+                              <p className="text-gray-900 dark:text-white text-sm">{deviceInfo.mdm.vendor}</p>
+                            </div>
+                          )}
+                          {deviceInfo.mdm.server_url && (
+                            <div className="flex justify-between items-center">
+                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Server URL</label>
+                              <p className="text-gray-900 dark:text-white text-sm font-mono break-all">{deviceInfo.mdm.server_url}</p>
+                            </div>
+                          )}
                         </>
                       )}
                     </>
