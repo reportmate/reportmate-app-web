@@ -22,10 +22,10 @@ interface ApplicationInfo {
   id: string
   name: string
   displayName?: string
-  path: string
+  path?: string
   version: string
   bundle_version?: string
-  last_modified: number
+  last_modified?: number
   obtained_from?: string
   runtime_environment?: string
   info?: string
@@ -33,6 +33,9 @@ interface ApplicationInfo {
   signed_by?: string
   publisher?: string
   category?: string
+  installDate?: string  // Windows install date format (YYYYMMDD)
+  size?: string
+  bundleId?: string
 }
 
 interface DeviceInfo {
@@ -1345,6 +1348,25 @@ export default function DeviceDetailPage() {
               totalApps: 0,
               installedApps: []
             }} />
+          </div>
+        )}
+
+        {/* Network Tab */}
+        {activeTab === 'network' && (
+          <div className="space-y-8">
+            <NetworkTable data={deviceInfo.network || {
+              hostname: deviceInfo.name || 'Unknown',
+              connectionType: 'Unknown',
+              ipv4ip: deviceInfo.ipAddress,
+              ethernet: deviceInfo.macAddress
+            }} />
+          </div>
+        )}
+
+        {/* Security Tab */}
+        {activeTab === 'security' && (
+          <div className="space-y-8">
+            <SecurityCard data={deviceInfo.security || {}} />
           </div>
         )}
 

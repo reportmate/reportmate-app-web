@@ -13,6 +13,7 @@ interface Device {
   os: string
   lastSeen?: string
   status?: string
+  serialNumber?: string
 }
 
 export default function DeviceListPage() {
@@ -180,7 +181,7 @@ export default function DeviceListPage() {
               {devices.map((device) => (
                 <Link
                   key={device.id}
-                  href={`/device/${device.id}`}
+                  href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
                   className="block px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <div className="flex items-center justify-between">
