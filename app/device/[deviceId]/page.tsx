@@ -7,6 +7,8 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
+import { ManagedInstallsTable, ApplicationsTable, NetworkTable, SecurityCard } from "../../../src/components/tables"
+import DeviceEventsSimple from "../../../src/components/DeviceEventsSimple"
 
 interface FleetEvent {
   id: string
@@ -1018,466 +1020,35 @@ export default function DeviceDetailPage() {
 
         {/* Managed Installs Tab */}
         {activeTab === 'managed-installs' && (
-          <div className="space-y-6">
-            {deviceInfo.managedInstalls ? (
-              <>
-                {/* Installation Status Overview */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                      {deviceInfo.managedInstalls.installed}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Installed</div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <div className="text-3xl font-bold text-cyan-600 dark:text-cyan-400">
-                      {deviceInfo.managedInstalls.pending}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Pending</div>
-                  </div>
-                  
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                    <div className="text-3xl font-bold text-red-600 dark:text-red-400">
-                      {deviceInfo.managedInstalls.failed}
-                    </div>
-                    <div className="text-sm text-gray-600 dark:text-gray-400">Failed</div>
-                  </div>
-                </div>
-
-                {/* Two-column layout: 33% for Errors/Warnings/Configuration, 67% for Managed Packages */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                  {/* Column A (33%): Errors/Warnings and Configuration */}
-                  <div className="space-y-4">
-                    {/* Show Configuration first if no errors or warnings exist */}
-                    {(!deviceInfo.managedInstalls.messages?.errors || deviceInfo.managedInstalls.messages.errors.length === 0) &&
-                     (!deviceInfo.managedInstalls.messages?.warnings || deviceInfo.managedInstalls.messages.warnings.length === 0) &&
-                     deviceInfo.managedInstalls.config && (
-                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                              {deviceInfo.os?.includes('macOS') || deviceInfo.os?.includes('Mac') ? 'Munki' : 
-                               deviceInfo.os?.includes('Windows') ? 'Cimian' : 
-                               deviceInfo.managedInstalls.config.type === 'munki' ? 'Munki' : 'Cimian'} Configuration
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="p-0">
-                          {renderConfigurationFields(deviceInfo.managedInstalls.config)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Errors */}
-                    {deviceInfo.managedInstalls.messages?.errors && deviceInfo.managedInstalls.messages.errors.length > 0 && (
-                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                              <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                              </svg>
-                            </div>
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                              Errors ({deviceInfo.managedInstalls.messages.errors.length})
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <div className="space-y-3">
-                            {deviceInfo.managedInstalls.messages.errors.map((error) => (
-                              <div key={error.id} className="border border-red-200 dark:border-red-800 rounded-lg p-3 bg-red-50 dark:bg-red-900/20">
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                                    {error.package}
-                                  </span>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {formatRelativeTime(error.timestamp)}
-                                  </span>
-                                </div>
-                                <div className="text-sm font-medium text-red-900 dark:text-red-100 mb-1">
-                                  {error.message}
-                                </div>
-                                <div className="text-xs text-red-700 dark:text-red-300 font-mono bg-red-100 dark:bg-red-800/20 rounded p-2 whitespace-pre-wrap">
-                                  {error.details}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Warnings */}
-                    {deviceInfo.managedInstalls.messages?.warnings && deviceInfo.managedInstalls.messages.warnings.length > 0 && (
-                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
-                              <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.664-.833-2.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                              </svg>
-                            </div>
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                              Warnings ({deviceInfo.managedInstalls.messages.warnings.length})
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="p-4">
-                          <div className="space-y-3">
-                            {deviceInfo.managedInstalls.messages.warnings.map((warning) => (
-                              <div key={warning.id} className="border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 bg-yellow-50 dark:bg-yellow-900/20">
-                                <div className="flex justify-between items-start mb-1">
-                                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                                    {warning.package}
-                                  </span>
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {formatRelativeTime(warning.timestamp)}
-                                  </span>
-                                </div>
-                                <div className="text-sm font-medium text-yellow-900 dark:text-yellow-100 mb-1">
-                                  {warning.message}
-                                </div>
-                                <div className="text-xs text-yellow-700 dark:text-yellow-300 font-mono bg-yellow-100 dark:bg-yellow-800/20 rounded p-2 whitespace-pre-wrap">
-                                  {warning.details}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Configuration (shown below errors/warnings when they exist) */}
-                    {((deviceInfo.managedInstalls.messages?.errors && deviceInfo.managedInstalls.messages.errors.length > 0) ||
-                      (deviceInfo.managedInstalls.messages?.warnings && deviceInfo.managedInstalls.messages.warnings.length > 0)) &&
-                     deviceInfo.managedInstalls.config && (
-                      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                        <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                            </div>
-                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                              {deviceInfo.os?.includes('macOS') || deviceInfo.os?.includes('Mac') ? 'Munki' : 
-                               deviceInfo.os?.includes('Windows') ? 'Cimian' : 
-                               deviceInfo.managedInstalls.config.type === 'munki' ? 'Munki' : 'Cimian'} Configuration
-                            </h3>
-                          </div>
-                        </div>
-                        <div className="p-0">
-                          {renderConfigurationFields(deviceInfo.managedInstalls.config)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Column B (67%): Managed Packages Table */}
-                  <div className="lg:col-span-2">
-                    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
-                            <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                          </div>
-                          <div>
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Managed Packages</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                              Software managed by {
-                                deviceInfo.os?.includes('macOS') || deviceInfo.os?.includes('Mac') ? 'Munki' : 
-                                deviceInfo.os?.includes('Windows') ? 'Cimian' : 
-                                deviceInfo.managedInstalls.config?.type === 'munki' ? 'Munki' : 
-                                deviceInfo.managedInstalls.config?.type === 'cimian' ? 'Cimian' : 
-                                'management system'
-                              }
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="overflow-x-auto hide-scrollbar">
-                        <table className="w-full">
-                          <thead className="bg-gray-50 dark:bg-gray-900">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Update</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                            {[...deviceInfo.managedInstalls.packages].sort((a, b) => 
-                              (a.displayName || a.name).localeCompare(b.displayName || b.name)
-                            ).map((pkg) => (
-                              <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName}</div>
-                                    <div className="text-sm text-gray-500 dark:text-gray-400">{pkg.name}</div>
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-sm text-gray-900 dark:text-white">
-                                    {pkg.version}
-                                    {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
-                                      <div className="text-xs text-gray-500 dark:text-gray-400">
-                                        (installed: {pkg.installedVersion})
-                                      </div>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                    pkg.status === 'installed' || pkg.status === 'Installed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                    pkg.status === 'pending_install' || pkg.status === 'Pending Update' ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200' :
-                                    pkg.status === 'pending_removal' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                    pkg.status.includes('failed') || pkg.status === 'Failed' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                    pkg.status === 'install_succeeded' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                    'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                                  }`}>
-                                    {pkg.status.replace(/_/g, ' ')}
-                                  </span>
-                                </td>
-                                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                  {formatRelativeTime(pkg.lastUpdate)}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Managed Installs</h3>
-                <p className="text-gray-600 dark:text-gray-400">This device does not have managed software installations configured.</p>
-              </div>
-            )}
+          <div className="space-y-8">
+            <ManagedInstallsTable data={deviceInfo.managedInstalls || {
+              totalPackages: 0,
+              installed: 0,
+              pending: 0,
+              failed: 0,
+              lastUpdate: '',
+              packages: []
+            }} />
           </div>
         )}
 
         {/* Applications Tab */}
         {activeTab === 'applications' && (
           <div className="space-y-8">
-            {deviceInfo.applications && deviceInfo.applications.installedApps && Array.isArray(deviceInfo.applications.installedApps) && deviceInfo.applications.installedApps.length > 0 ? (
-              <>
-                {/* Applications List */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Installed Applications</h3>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">Applications currently installed on this device</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 dark:bg-gray-900">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bundle ID</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Publisher</th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Modified</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                        {deviceInfo.applications.installedApps.map((app, index) => (
-                          <tr key={app.id || app.name || `app-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div>
-                                <div className="text-sm font-medium text-gray-900 dark:text-white">{app.displayName || app.name}</div>
-                                <div className="text-sm text-gray-500 dark:text-gray-400">{app.path}</div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">
-                                {app.version}
-                                {app.bundle_version && app.bundle_version !== app.version && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">Build: {app.bundle_version}</div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white font-mono">{app.id}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-sm text-gray-900 dark:text-white">{app.publisher || app.signed_by || 'Unknown'}</div>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                              {app.last_modified ? formatRelativeTime(new Date(app.last_modified * 1000).toISOString()) : 'Unknown'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Applications Data</h3>
-                <p className="text-gray-600 dark:text-gray-400">Application information is not available for this device.</p>
-              </div>
-            )}
+            <ApplicationsTable data={deviceInfo.applications || {
+              totalApps: 0,
+              installedApps: []
+            }} />
           </div>
         )}
 
         {/* Network Tab */}
         {activeTab === 'network' && (
           <div className="space-y-8">
-            {deviceInfo.network ? (
-              <>
-                {/* Network Overview */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-                      <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Network Configuration</h2>
-                      <p className="text-gray-600 dark:text-gray-400">Network connectivity and configuration details</p>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-                        {deviceInfo.network.connectionType}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">Connection Type</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1 font-mono">
-                        {deviceInfo.ipAddress}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">IP Address</div>
-                    </div>
-                    
-                    <div className="text-center">
-                      <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1 font-mono">
-                        {deviceInfo.macAddress}
-                      </div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">MAC Address</div>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Detailed Network Information */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* Basic Network Info */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h3>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Hostname</label>
-                        <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.hostname}</p>
-                      </div>
-                      {deviceInfo.network.service && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Service</label>
-                          <p className="text-gray-900 dark:text-white">{deviceInfo.network.service}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.ethernet && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Interface</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.ethernet}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.clientid && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Client ID</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.clientid}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* IPv4 Configuration */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">IPv4 Configuration</h3>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      {deviceInfo.network.ipv4conf && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration</label>
-                          <p className="text-gray-900 dark:text-white">{deviceInfo.network.ipv4conf}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.ipv4ip && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">IP Address</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.ipv4ip}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.ipv4mask && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Subnet Mask</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.ipv4mask}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.ipv4router && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Router</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.ipv4router}</p>
-                        </div>
-                      )}
-                      {deviceInfo.network.ipv4dns && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">DNS Servers</label>
-                          <p className="text-gray-900 dark:text-white font-mono">{deviceInfo.network.ipv4dns}</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Network Data</h3>
-                <p className="text-gray-600 dark:text-gray-400">Network information is not available for this device.</p>
-              </div>
-            )}
+            <NetworkTable data={deviceInfo.network || {
+              hostname: deviceInfo.name || '',
+              connectionType: 'Unknown'
+            }} />
           </div>
         )}
 
@@ -1728,42 +1299,14 @@ export default function DeviceDetailPage() {
                   <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Events</h3>
                   </div>
-                  <div className="divide-y divide-gray-200 dark:divide-gray-700">
-                    {events.map((event) => {
-                      const statusConfig = getEventStatusConfig(event.kind)
-                      return (
-                        <div key={event.id} className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                          <div className="flex items-start gap-4">
-                            <div className={`w-3 h-3 rounded-full mt-2 ${statusConfig.bg}`}></div>
-                            <div className="flex-1">
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusConfig.badge}`}>
-                                    {event.kind}
-                                  </span>
-                                  <span className="text-sm text-gray-500 dark:text-gray-400">
-                                    {formatRelativeTime(event.ts)}
-                                  </span>
-                                </div>
-                                <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
-                                  {event.id}
-                                </span>
-                              </div>
-                              <div className="text-sm text-gray-900 dark:text-white mb-2">
-                                Device: {event.device}
-                              </div>
-                              {event.payload && Object.keys(event.payload).length > 0 && (
-                                <div className="text-sm text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded p-2 font-mono">
-                                  <pre className="whitespace-pre-wrap">
-                                    {JSON.stringify(event.payload, null, 2)}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
+                  <div className="p-6">
+                    <DeviceEventsSimple events={events.map(event => ({
+                      id: event.id,
+                      name: event.device,
+                      raw: event.payload,
+                      kind: event.kind,
+                      ts: event.ts
+                    }))} />
                   </div>
                 </div>
               </>
@@ -1778,6 +1321,30 @@ export default function DeviceDetailPage() {
                 <p className="text-gray-600 dark:text-gray-400">No events have been recorded for this device yet.</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Managed Installs Tab */}
+        {activeTab === 'managed-installs' && (
+          <div className="space-y-8">
+            <ManagedInstallsTable data={deviceInfo.managedInstalls || {
+              totalPackages: 0,
+              installed: 0,
+              pending: 0,
+              failed: 0,
+              lastUpdate: '',
+              packages: []
+            }} />
+          </div>
+        )}
+
+        {/* Applications Tab */}
+        {activeTab === 'applications' && (
+          <div className="space-y-8">
+            <ApplicationsTable data={deviceInfo.applications || {
+              totalApps: 0,
+              installedApps: []
+            }} />
           </div>
         )}
 
