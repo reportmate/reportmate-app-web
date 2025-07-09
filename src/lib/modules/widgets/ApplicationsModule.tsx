@@ -6,10 +6,10 @@ interface ApplicationInfo {
   id: string;
   name: string;
   displayName?: string;
-  path: string;
+  path?: string;
   version: string;
   bundle_version?: string;
-  last_modified: number;
+  last_modified?: number;
   obtained_from?: string;
   runtime_environment?: string;
   info?: string;
@@ -17,6 +17,9 @@ interface ApplicationInfo {
   signed_by?: string;
   publisher?: string;
   category?: string;
+  installDate?: string;  // Windows install date format (YYYYMMDD)
+  size?: string;
+  bundleId?: string;
 }
 
 interface ApplicationsData {
@@ -99,9 +102,8 @@ const ApplicationsTableWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bundle ID</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Publisher</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Modified</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -110,7 +112,9 @@ const ApplicationsTableWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
               <td className="px-6 py-4 whitespace-nowrap">
                 <div>
                   <div className="text-sm font-medium text-gray-900 dark:text-white">{app.displayName || app.name}</div>
-                  <div className="text-sm text-gray-500 dark:text-gray-400">{app.path}</div>
+                  {app.path && (
+                    <div className="text-sm text-gray-500 dark:text-gray-400">{app.path}</div>
+                  )}
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
@@ -122,13 +126,19 @@ const ApplicationsTableWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
                 </div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap">
-                <div className="text-sm text-gray-900 dark:text-white font-mono">{app.id}</div>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap">
                 <div className="text-sm text-gray-900 dark:text-white">{app.publisher || app.signed_by || 'Unknown'}</div>
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                {app.last_modified ? formatRelativeTime(new Date(app.last_modified * 1000).toISOString()) : 'Unknown'}
+                {app.installDate && app.installDate !== '' ? (
+                  // Handle Windows date format (YYYYMMDD)
+                  app.installDate.length === 8 ? 
+                    `${app.installDate.slice(4, 6)}/${app.installDate.slice(6, 8)}/${app.installDate.slice(0, 4)}` :
+                    app.installDate
+                ) : app.last_modified ? (
+                  formatRelativeTime(new Date(app.last_modified * 1000).toISOString())
+                ) : (
+                  'Unknown'
+                )}
               </td>
             </tr>
           ))}
