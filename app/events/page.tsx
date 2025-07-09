@@ -3,10 +3,9 @@
 // Force dynamic rendering and disable caching for events page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import React, { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
@@ -49,7 +48,12 @@ function EventsPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
   const searchParams = useSearchParams()
+  
+  const EVENTS_PER_PAGE = 10
 
   // Initialize filter from URL parameters
   useEffect(() => {
@@ -91,6 +95,85 @@ function EventsPageContent() {
     if (filterType === 'all') return true
     return event.kind.toLowerCase() === filterType.toLowerCase()
   })
+
+  // Reset to page 1 when filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [filterType])
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
+  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE
+  const endIndex = startIndex + EVENTS_PER_PAGE
+  const currentEvents = filteredEvents.slice(startIndex, endIndex)
+
+  // Helper function to format full payload for display
+  const formatFullPayload = (payload: any): string => {
+    try {
+      if (!payload) return 'No payload'
+      if (typeof payload === 'string') return payload
+      return JSON.stringify(payload, null, 2)
+    } catch (error) {
+      return 'Error formatting payload: ' + String(payload)
+    }
+  }
+
+  // Helper function to copy payload to clipboard
+  const copyToClipboard = async (text: string, eventId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedEventId(eventId);
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setCopiedEventId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedEventId(eventId);
+      setTimeout(() => setCopiedEventId(null), 2000);
+    }
+  };
+
+  // Helper function to format relative time
+  const formatRelativeTime = (timestamp: string): string => {
+    try {
+      const date = new Date(timestamp)
+      const now = new Date()
+      const diffInMs = now.getTime() - date.getTime()
+      const diffInSeconds = Math.floor(diffInMs / 1000)
+      const diffInMinutes = Math.floor(diffInSeconds / 60)
+      const diffInHours = Math.floor(diffInMinutes / 60)
+      const diffInDays = Math.floor(diffInHours / 24)
+      
+      if (diffInSeconds < 60) {
+        return 'just now'
+      } else if (diffInMinutes < 60) {
+        return `${diffInMinutes}m ago`
+      } else if (diffInHours < 24) {
+        return `${diffInHours}h ago`
+      } else if (diffInDays < 7) {
+        return `${diffInDays}d ago`
+      } else {
+        return date.toLocaleDateString()
+      }
+    } catch (error) {
+      return 'Invalid date'
+    }
+  }
+
+  // Helper function to format exact time
+  const formatExactTime = (timestamp: string): string => {
+    try {
+      return new Date(timestamp).toLocaleString()
+    } catch (error) {
+      return 'Invalid date'
+    }
+  }
 
   const getStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
@@ -409,73 +492,210 @@ function EventsPageContent() {
             </div>
           </div>
         ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Device
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Message
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Time
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {filteredEvents.map((event) => {
-                    const statusConfig = getStatusConfig(event.kind)
-                    return (
-                      <tr 
-                        key={event.id} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-4 h-4 ${statusConfig.text}`}>
-                              {statusConfig.icon}
-                            </div>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                              {event.kind}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <Link
-                            href={`/device/${encodeURIComponent(event.device)}`}
-                            className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                          >
-                            {event.device}
-                          </Link>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white max-w-md">
-                            {safeDisplayPayload(event.payload)}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            <div className="font-medium">
-                              {formatRelativeTime(event.ts)}
-                            </div>
-                            <div className="text-xs opacity-75" title={formatExactTime(event.ts)}>
-                              {formatExactTime(event.ts)}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+          <>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Device
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Message
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {currentEvents.map((event) => {
+                      const statusConfig = getStatusConfig(event.kind)
+                      const isExpanded = expandedEvent === event.id
+                      
+                      return (
+                        <React.Fragment key={event.id}>
+                          <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-4 h-4 ${statusConfig.text}`}>
+                                  {statusConfig.icon}
+                                </div>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                                  {event.kind}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Link
+                                href={`/device/${encodeURIComponent(event.device)}`}
+                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                              >
+                                {event.device}
+                              </Link>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="text-sm text-gray-900 dark:text-white max-w-md">
+                                {safeDisplayPayload(event.payload)}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <div className="font-medium">
+                                  {formatRelativeTime(event.ts)}
+                                </div>
+                                <div className="text-xs opacity-75" title={formatExactTime(event.ts)}>
+                                  {formatExactTime(event.ts)}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                              >
+                                {isExpanded ? 'Hide' : 'Show'} Payload
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                                </svg>
+                              </button>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={5} className="px-6 py-4 bg-gray-50 dark:bg-gray-900">
+                                <div className="space-y-3">
+                                  <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">Raw Payload</h4>
+                                    <button
+                                      onClick={() => copyToClipboard(formatFullPayload(event.payload), event.id)}
+                                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                      title="Copy payload to clipboard"
+                                    >
+                                      {copiedEventId === event.id ? (
+                                        <>
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                          </svg>
+                                          Copied!
+                                        </>
+                                      ) : (
+                                        <>
+                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                          </svg>
+                                          Copy
+                                        </>
+                                      )}
+                                    </button>
+                                  </div>
+                                  <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
+                                    <pre className="overflow-x-auto p-4 text-sm text-gray-100 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                      <code>{formatFullPayload(event.payload)}</code>
+                                    </pre>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-xl">
+                <div className="flex-1 flex justify-between sm:hidden">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Previous
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
+                      <span className="font-medium">{Math.min(endIndex, filteredEvents.length)}</span> of{' '}
+                      <span className="font-medium">{filteredEvents.length}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                      
+                      {/* Page numbers */}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          // Show first page, last page, current page, and 2 pages before/after current
+                          return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2
+                        })
+                        .map((page, index, array) => (
+                          <React.Fragment key={page}>
+                            {/* Add ellipsis if there's a gap */}
+                            {index > 0 && page - array[index - 1] > 1 && (
+                              <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
+                                ...
+                              </span>
+                            )}
+                            <button
+                              onClick={() => setCurrentPage(page)}
+                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                page === currentPage
+                                  ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-400'
+                                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                              }`}
+                            >
+                              {page}
+                            </button>
+                          </React.Fragment>
+                        ))}
+                      
+                      <button
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="sr-only">Next</span>
+                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </button>
+                    </nav>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
