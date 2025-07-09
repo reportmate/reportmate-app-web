@@ -472,7 +472,7 @@ function DevicesPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <Link
-                            href={`/device/${encodeURIComponent(device.id)}`}
+                            href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
                             className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                           >
                             {device.name}

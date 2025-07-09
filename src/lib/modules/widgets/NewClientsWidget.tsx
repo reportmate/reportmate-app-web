@@ -95,7 +95,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
             {devices.slice(0, 8).map((device) => (
               <Link
                 key={device.id}
-                href={`/device/${device.id}`}
+                href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
                 className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center gap-3">
