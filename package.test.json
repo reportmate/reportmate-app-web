@@ -1,0 +1,43 @@
+{
+  "name": "reportmate-testing",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:ci": "jest --ci --coverage --watchAll=false",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:api": "jest --testPathPattern=api",
+    "test:staging": "cross-env TEST_ENV=staging playwright test",
+    "test:performance": "lighthouse-ci",
+    "test:security": "npm audit && snyk test",
+    "test:smoke": "jest --testPathPattern=smoke",
+    "test:db-connectivity": "node scripts/test-db-connection.js",
+    "test:all": "npm run test:ci && npm run test:e2e && npm run test:security"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.40.0",
+    "@testing-library/jest-dom": "^6.1.0",
+    "@testing-library/react": "^13.4.0",
+    "@testing-library/user-event": "^14.5.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.0.0",
+    "cross-env": "^7.0.3",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0",
+    "lighthouse-ci": "^0.12.0",
+    "node-mocks-http": "^1.12.0",
+    "snyk": "^1.1200.0",
+    "supertest": "^6.3.0",
+    "ts-jest": "^29.1.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "playwright": "^1.40.0"
+  }
+}
