@@ -61,7 +61,7 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
 
   return (
     <div className="p-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
         {/* CPU */}
         <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
           <div className="flex items-center gap-3 mb-2">
@@ -81,16 +81,16 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.processor}</span>
               </div>
             )}
-            {hardware.processorSpeed && (
-              <div>
-                <span className="text-gray-600 dark:text-gray-400">Speed:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.processorSpeed}</span>
-              </div>
-            )}
             {hardware.cores && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Cores:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.cores}</span>
+              </div>
+            )}
+            {hardware.architecture && (
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">Architecture:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.architecture}</span>
               </div>
             )}
           </div>
@@ -167,6 +167,39 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
               </svg>
             </div>
             <div>
+              <h4 className="font-medium text-gray-900 dark:text-white">Graphics</h4>
+            </div>
+          </div>
+          <div className="space-y-1 text-sm">
+            {hardware.graphics && (
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">GPU:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.graphics}</span>
+              </div>
+            )}
+            {hardware.vram && (
+              <div>
+                <span className="text-gray-600 dark:text-gray-400">VRAM:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.vram}</span>
+              </div>
+            )}
+            {!hardware.graphics && (
+              <div className="text-gray-500 dark:text-gray-400 text-sm">
+                Graphics information not available
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* System Information */}
+        <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-4">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+              </svg>
+            </div>
+            <div>
               <h4 className="font-medium text-gray-900 dark:text-white">System</h4>
             </div>
           </div>
@@ -183,10 +216,10 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.model}</span>
               </div>
             )}
-            {hardware.architecture && (
+            {hardware.serialNumber && (
               <div>
-                <span className="text-gray-600 dark:text-gray-400">Architecture:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.architecture}</span>
+                <span className="text-gray-600 dark:text-gray-400">Serial:</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white font-mono">{hardware.serialNumber}</span>
               </div>
             )}
           </div>

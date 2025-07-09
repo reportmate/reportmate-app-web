@@ -9,6 +9,7 @@ import Link from "next/link"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { ManagedInstallsTable, ApplicationsTable, NetworkTable, SecurityCard } from "../../../src/components/tables"
 import DeviceEventsSimple from "../../../src/components/DeviceEventsSimple"
+import { OperatingSystemWidget } from "../../../src/components/widgets/OperatingSystem"
 
 interface FleetEvent {
   id: string
@@ -57,7 +58,6 @@ interface DeviceInfo {
   lastEventTime: string
   // Hardware properties (direct properties, not nested)
   processor?: string
-  processorSpeed?: string
   cores?: number
   memory?: string
   availableRAM?: string
@@ -603,6 +603,12 @@ export default function DeviceDetailPage() {
               </div>
               <div className="p-6">
                 <div className="space-y-4">
+                  {(deviceInfo.mdm?.vendor || deviceInfo.mdm?.organization) && (
+                    <div className="flex justify-between items-center">
+                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
+                      <p className="text-gray-900 dark:text-white text-base font-bold pr-2">{deviceInfo.mdm.vendor || deviceInfo.mdm.organization}</p>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment</label>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -615,12 +621,6 @@ export default function DeviceDetailPage() {
                   </div>
                   {deviceInfo.mdm?.enrolled && (
                     <>
-                      {(deviceInfo.mdm.vendor || deviceInfo.mdm.organization) && (
-                        <div className="flex justify-between items-center">
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Vendor</label>
-                          <p className="text-gray-900 dark:text-white text-sm">{deviceInfo.mdm.vendor || deviceInfo.mdm.organization}</p>
-                        </div>
-                      )}
                       
                       {/* Platform-specific fields */}
                       {deviceInfo.platform === 'macOS' && (
@@ -671,47 +671,7 @@ export default function DeviceDetailPage() {
             </div>
 
             {/* Operating System Widget */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                    <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">System version and details</p>
-                  </div>
-                </div>
-              </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Operating System</label>
-                    <p className="text-gray-900 dark:text-white">{deviceInfo.os}</p>
-                  </div>
-                  {deviceInfo.architecture && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
-                      <p className="text-gray-900 dark:text-white">{deviceInfo.architecture}</p>
-                    </div>
-                  )}
-                  {deviceInfo.uptime && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Uptime</label>
-                      <p className="text-gray-900 dark:text-white">{deviceInfo.uptime}</p>
-                    </div>
-                  )}
-                  {deviceInfo.bootTime && (
-                    <div>
-                      <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Boot Time</label>
-                      <p className="text-gray-900 dark:text-white">{formatExactTime(deviceInfo.bootTime)}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <OperatingSystemWidget device={deviceInfo} />
 
             {/* Hardware Widget */}
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -740,9 +700,6 @@ export default function DeviceDetailPage() {
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Processor</label>
                       <p className="text-gray-900 dark:text-white">{deviceInfo.processor}</p>
-                      {deviceInfo.processorSpeed && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400">{deviceInfo.processorSpeed}</p>
-                      )}
                     </div>
                     {deviceInfo.cores && (
                       <div>
