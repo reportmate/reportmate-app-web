@@ -68,7 +68,8 @@ pnpm start
 - Event timeline with filtering
 - Connection status indicators
 
-### Device Details (`/device-new/[deviceId]`)
+### Device Details (`/device/[deviceId]`)
+
 - Individual device information
 - Hardware and software inventory
 - Security status and compliance
