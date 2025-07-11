@@ -47,3 +47,4 @@ Thumbs.db
 
 # pnpm
 .pnpm-debug.log*
+tailwindcss*.log
