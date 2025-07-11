@@ -82,9 +82,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
       iconColor={WidgetColors.indigo}
     >
       {/* Basic Network Info */}
-      {network?.hostname && (
-        <Stat label="Hostname" value={network.hostname} isMono />
-      )}
       
       {(device.ipAddress || device.ipAddressV4) && (
         <Stat label="IP Address" value={device.ipAddress || device.ipAddressV4} isMono />
@@ -101,6 +98,10 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
       {/* Connection Type and Details */}
       {network?.connectionType && (
         <Stat label="Connection Type" value={network.connectionType} />
+      )}
+
+      {network?.hostname && (
+        <Stat label="Hostname" value={network.hostname} isMono />
       )}
 
       {/* WiFi Specific Info */}
