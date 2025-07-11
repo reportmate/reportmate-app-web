@@ -73,16 +73,90 @@ const StatBlock: React.FC<StatBlockProps> = ({ title, children }) => (
   </div>
 )
 
-export const OperatingSystemWidget: React.FC<OperatingSystemWidgetProps> = ({ device }) => {
-  // Use granular OS data if available, otherwise fall back to legacy format
-  const osName = device.osName || device.os || 'Unknown'
-  const osVersion = device.osVersion || 'Unknown'
-  const osBuild = device.osBuild || 'Unknown'
+/**
+ * Parse legacy OS string into granular components
+ * Input: "Microsoft Windows 11 Enterprise 10.0.26100 (Build 26100)"
+ * Output: { osName, osVersion, osBuild }
+ */
+const parseOperatingSystem = (osString: string) => {
+  if (!osString) return { osName: 'Unknown', osVersion: 'Unknown', osBuild: 'Unknown' }
+
+  // Windows format: "Microsoft Windows 11 Enterprise 10.0.26100 (Build 26100)"
+  const windowsMatch = osString.match(/^(Microsoft Windows \d+.*?)\s+(\d+\.\d+\.\d+).*?\(Build (\d+)\)/)
+  if (windowsMatch) {
+    const [, osName, buildNumber, buildVersion] = windowsMatch
+    // Convert build number to version name for common Windows versions
+    let versionName = 'Unknown'
+    if (buildNumber.startsWith('10.0.26100')) versionName = '24H2'
+    else if (buildNumber.startsWith('10.0.22631')) versionName = '23H2'
+    else if (buildNumber.startsWith('10.0.22621')) versionName = '22H2'
+    else if (buildNumber.startsWith('10.0.19045')) versionName = '22H2'
+    else if (buildNumber.startsWith('10.0.19044')) versionName = '21H2'
+    
+    return {
+      osName: osName.trim(),
+      osVersion: versionName,
+      osBuild: buildNumber
+    }
+  }
+
+  // macOS format: "macOS 15.2.0" or "macOS Sequoia 15.2.0"
+  const macOSMatch = osString.match(/^(macOS.*?)\s+(\d+\.\d+\.\d+)/)
+  if (macOSMatch) {
+    const [, osName, version] = macOSMatch
+    return {
+      osName: osName.trim(),
+      osVersion: version,
+      osBuild: version
+    }
+  }
+
+  // Generic version pattern: "OS Name version.number"
+  const genericMatch = osString.match(/^(.*?)\s+(\d+\.\d+(?:\.\d+)?)/)
+  if (genericMatch) {
+    const [, osName, version] = genericMatch
+    return {
+      osName: osName.trim(),
+      osVersion: version,
+      osBuild: version
+    }
+  }
+
+  // Fallback: use the entire string as OS name
+  return {
+    osName: osString,
+    osVersion: 'Unknown',
+    osBuild: 'Unknown'
+  }
+}
+
+export const SystemWidget: React.FC<OperatingSystemWidgetProps> = ({ device }) => {
+  // Use granular OS data if available, otherwise parse legacy format
+  let osName: string, osVersion: string, osBuild: string
+  
+  if (device.osName && device.osVersion && device.osBuild) {
+    // Use granular data directly
+    osName = device.osName
+    osVersion = device.osVersion
+    osBuild = device.osBuild
+  } else if (device.os) {
+    // Parse legacy format
+    const parsed = parseOperatingSystem(device.os)
+    osName = parsed.osName
+    osVersion = parsed.osVersion
+    osBuild = parsed.osBuild
+  } else {
+    // Fallback
+    osName = 'Unknown'
+    osVersion = 'Unknown'
+    osBuild = 'Unknown'
+  }
+
   const osArchitecture = device.osArchitecture || device.architecture || 'Unknown'
 
   return (
     <StatBlock title="Operating System">
-      <Stat label="Operating System" value={osName} />
+      <Stat label="OS" value={osName} />
       <Stat label="Version" value={osVersion} />
       <Stat label="Build" value={osBuild} />
       <Stat label="Architecture" value={osArchitecture} />
@@ -90,4 +164,4 @@ export const OperatingSystemWidget: React.FC<OperatingSystemWidgetProps> = ({ de
   )
 }
 
-export default OperatingSystemWidget
+export default SystemWidget
