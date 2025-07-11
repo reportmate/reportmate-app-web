@@ -4,6 +4,7 @@
  */
 
 import React from 'react'
+import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
 
 interface Device {
   id: string
@@ -29,100 +30,70 @@ interface HardwareWidgetProps {
   device: Device
 }
 
-const getHardwareIcon = () => (
-  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-  </svg>
-)
-
 export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   const hasHardwareInfo = device.processor || device.memory || device.storage || device.graphics
 
+  if (!hasHardwareInfo) {
+    return (
+      <StatBlock 
+        title="Hardware" 
+        subtitle="Device specs"
+        icon={Icons.hardware}
+        iconColor={WidgetColors.orange}
+      >
+        <EmptyState message="Hardware information not available" />
+      </StatBlock>
+    )
+  }
+
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-            {getHardwareIcon()}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Hardware</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">System specifications</p>
-          </div>
-        </div>
-      </div>
-      <div className="p-6">
-        {hasHardwareInfo ? (
-          <div className="space-y-4">
-            {device.model && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</label>
-                <p className="text-gray-900 dark:text-white">{device.model}</p>
-              </div>
-            )}
-            {device.processor && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Processor</label>
-                <p className="text-gray-900 dark:text-white">{device.processor}</p>
-                {device.processorSpeed && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{device.processorSpeed}</p>
-                )}
-              </div>
-            )}
-            {device.cores && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">CPU Cores</label>
-                <p className="text-gray-900 dark:text-white">{device.cores} cores</p>
-              </div>
-            )}
-            {device.memory && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Memory</label>
-                <p className="text-gray-900 dark:text-white">{device.memory}</p>
-                {device.availableRAM && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Available: {device.availableRAM}</p>
-                )}
-              </div>
-            )}
-            {device.storage && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Storage</label>
-                <p className="text-gray-900 dark:text-white">{device.storage}</p>
-                {device.storageType && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{device.storageType}</p>
-                )}
-                {device.availableStorage && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">Available: {device.availableStorage}</p>
-                )}
-              </div>
-            )}
-            {device.graphics && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Graphics</label>
-                <p className="text-gray-900 dark:text-white">{device.graphics}</p>
-                {device.vram && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{device.vram} VRAM</p>
-                )}
-              </div>
-            )}
-            {device.resolution && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Resolution</label>
-                <p className="text-gray-900 dark:text-white">{device.resolution}</p>
-              </div>
-            )}
-            {device.architecture && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
-                <p className="text-gray-900 dark:text-white">{device.architecture}</p>
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="text-gray-600 dark:text-gray-400">Hardware information not available</p>
-        )}
-      </div>
-    </div>
+    <StatBlock 
+      title="Hardware" 
+      subtitle="Device specs"
+      icon={Icons.hardware}
+      iconColor={WidgetColors.orange}
+    >
+      {device.model && (
+        <Stat label="Model" value={device.model} />
+      )}
+      {device.processor && (
+        <Stat 
+          label="Processor" 
+          value={device.processor} 
+          sublabel={device.processorSpeed}
+        />
+      )}
+      {device.cores && (
+        <Stat label="CPU Cores" value={`${device.cores} cores`} />
+      )}
+      {device.memory && (
+        <Stat 
+          label="Memory" 
+          value={device.memory}
+          sublabel={device.availableRAM ? `Available: ${device.availableRAM}` : undefined}
+        />
+      )}
+      {device.storage && (
+        <Stat 
+          label="Storage" 
+          value={device.storage}
+          sublabel={device.storageType ? device.storageType : (device.availableStorage ? `Available: ${device.availableStorage}` : undefined)}
+        />
+      )}
+      {device.graphics && (
+        <Stat 
+          label="Graphics" 
+          value={device.graphics}
+          sublabel={device.vram ? `${device.vram} VRAM` : undefined}
+        />
+      )}
+      {device.resolution && (
+        <Stat label="Display Resolution" value={device.resolution} />
+      )}
+      {device.architecture && (
+        <Stat label="Architecture" value={device.architecture} />
+      )}
+    </StatBlock>
   )
 }
 

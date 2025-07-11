@@ -9,11 +9,11 @@ import Link from "next/link"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { ManagedInstallsTable, ApplicationsTable, NetworkTable, SecurityCard } from "../../../src/components/tables"
 import DeviceEventsSimple from "../../../src/components/DeviceEventsSimple"
+import { InformationWidget } from "../../../src/components/widgets/Information"
 import { SystemWidget } from "../../../src/components/widgets/System"
 import { SecurityWidget } from "../../../src/components/widgets/Security"
 import { HardwareWidget } from "../../../src/components/widgets/Hardware"
 import { NetworkWidget } from "../../../src/components/widgets/Network"
-import { ApplicationsWidget } from "../../../src/components/widgets/Applications"
 import { ManagementWidget } from "../../../src/components/widgets/Management"
 
 interface FleetEvent {
@@ -551,6 +551,9 @@ export default function DeviceDetailPage() {
         {/* Info Tab */}
         {activeTab === 'info' && (
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {/* Basic Information Widget */}
+            <InformationWidget device={deviceInfo} />
+            
             {/* System (Operating System) Widget */}
             <SystemWidget device={deviceInfo} />
             
@@ -565,9 +568,6 @@ export default function DeviceDetailPage() {
             
             {/* Network Widget */}
             <NetworkWidget device={deviceInfo} />
-            
-            {/* Applications Widget */}
-            <ApplicationsWidget device={deviceInfo} />
             
             {/* Management Widget */}
             <ManagementWidget device={deviceInfo} />
