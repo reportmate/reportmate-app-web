@@ -1,8 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+// import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 /**
  * API handler for Business Units management
@@ -14,6 +14,10 @@ const prisma = new PrismaClient();
  */
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Temporarily disabled during build restructure
+  return res.status(503).json({ error: 'Business Units API temporarily unavailable' });
+  
+  /*
   try {
     switch (req.method) {
       case 'GET':
@@ -28,9 +32,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Business Units API error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+  */
 }
 
 async function getBusinessUnits(req: NextApiRequest, res: NextApiResponse) {
+  /*
   const businessUnits = await prisma.businessUnit.findMany({
     include: {
       machineGroups: {
@@ -59,9 +65,12 @@ async function getBusinessUnits(req: NextApiRequest, res: NextApiResponse) {
   });
 
   return res.status(200).json(businessUnits);
+  */
+  return res.status(503).json({ error: 'Temporarily disabled' });
 }
 
 async function createBusinessUnit(req: NextApiRequest, res: NextApiResponse) {
+  /*
   const { name, description } = req.body;
 
   if (!name) {
@@ -90,4 +99,6 @@ async function createBusinessUnit(req: NextApiRequest, res: NextApiResponse) {
   });
 
   return res.status(201).json(businessUnit);
+  */
+  return res.status(503).json({ error: 'Temporarily disabled' });
 }

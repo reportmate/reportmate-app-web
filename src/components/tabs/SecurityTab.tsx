@@ -8,12 +8,13 @@ import { SecurityCard } from '../tables'
 
 interface SecurityTabProps {
   device: any
+  data?: any
 }
 
-export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
+export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
   return (
     <div className="space-y-8">
-      <SecurityCard data={device.security || {}} />
+      <SecurityCard data={data || device.security || {}} />
     </div>
   )
 }

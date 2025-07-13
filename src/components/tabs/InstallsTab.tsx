@@ -8,12 +8,13 @@ import { ManagedInstallsTable } from '../tables'
 
 interface InstallsTabProps {
   device: any
+  data?: any
 }
 
-export const InstallsTab: React.FC<InstallsTabProps> = ({ device }) => {
+export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   return (
     <div className="space-y-8">
-      <ManagedInstallsTable data={device.managedInstalls || {
+      <ManagedInstallsTable data={data || device.managedInstalls || {
         totalPackages: 0,
         installed: 0,
         pending: 0,
