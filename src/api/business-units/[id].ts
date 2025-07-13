@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { PrismaClient } from '@prisma/client';
+// import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+// const prisma = new PrismaClient();
 
 /**
  * API handler for individual Business Unit operations
@@ -12,6 +12,10 @@ const prisma = new PrismaClient();
  */
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Temporarily disabled during build restructure
+  return res.status(503).json({ error: 'Business Unit API temporarily unavailable' });
+  
+  /*
   const { id } = req.query;
   const businessUnitId = parseInt(id as string);
 
@@ -35,9 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.error('Business Unit API error:', error);
     return res.status(500).json({ error: 'Internal server error' });
   }
+  */
 }
 
 async function getBusinessUnit(id: number, res: NextApiResponse) {
+  /*
   const businessUnit = await prisma.businessUnit.findUnique({
     where: { id },
     include: {
@@ -65,9 +71,12 @@ async function getBusinessUnit(id: number, res: NextApiResponse) {
   }
 
   return res.status(200).json(businessUnit);
+  */
+  return res.status(503).json({ error: 'Temporarily disabled' });
 }
 
 async function updateBusinessUnit(id: number, req: NextApiRequest, res: NextApiResponse) {
+  /*
   const { name, description } = req.body;
 
   if (!name) {
@@ -109,9 +118,12 @@ async function updateBusinessUnit(id: number, req: NextApiRequest, res: NextApiR
   });
 
   return res.status(200).json(businessUnit);
+  */
+  return res.status(503).json({ error: 'Temporarily disabled' });
 }
 
 async function deleteBusinessUnit(id: number, res: NextApiResponse) {
+  /*
   // Check if business unit exists
   const existing = await prisma.businessUnit.findUnique({
     where: { id },
@@ -140,4 +152,6 @@ async function deleteBusinessUnit(id: number, res: NextApiResponse) {
   });
 
   return res.status(204).end();
+  */
+  return res.status(503).json({ error: 'Temporarily disabled' });
 }

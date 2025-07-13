@@ -8,9 +8,10 @@ import { SystemWidget } from '../widgets/System'
 
 interface SystemTabProps {
   device: any
+  data?: any
 }
 
-export const SystemTab: React.FC<SystemTabProps> = ({ device }) => {
+export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   return (
     <div className="space-y-8">
       {/* System Overview Widget */}

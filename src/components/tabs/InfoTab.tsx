@@ -27,6 +27,9 @@ export const InfoTab: React.FC<InfoTabProps> = ({ device }) => {
       {/* Hardware Widget */}
       <HardwareWidget device={device} />
       
+      {/* Management Widget */}
+      <ManagementWidget device={device} />
+      
       {/* Security Widget */}
       <SecurityWidget 
         platform={device.platform || device.os} 
@@ -35,9 +38,6 @@ export const InfoTab: React.FC<InfoTabProps> = ({ device }) => {
       
       {/* Network Widget */}
       <NetworkWidget device={device} />
-      
-      {/* Management Widget */}
-      <ManagementWidget device={device} />
     </div>
   )
 }

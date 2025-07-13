@@ -9,9 +9,10 @@ import DeviceEventsSimple from '../DeviceEventsSimple'
 interface EventsTabProps {
   device: any
   events: any[]
+  data?: any
 }
 
-export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
+export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) => {
   const getEventStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'success':
