@@ -8,25 +8,6 @@ export default {
     ignoreBuildErrors: true,
   },
   
-  // Use standalone output for Docker builds (enables API routes)
-  // Use static export only for static hosting deployments
-  ...(process.env.DOCKER_BUILD === 'true' ? {
-    output: 'standalone',
-  } : process.env.STATIC_EXPORT === 'true' ? {
-    output: 'export',
-    trailingSlash: true,
-    skipTrailingSlashRedirect: true,
-    distDir: 'out',
-  } : {
-    // Default to standalone for server-side features
-    output: 'standalone',
-  }),
-  
-  // Disable image optimization for static export only
-  images: {
-    unoptimized: process.env.STATIC_EXPORT === 'true'
-  },
-  
   // Environment variables
   env: {
     NEXT_PUBLIC_WPS_URL: process.env.NEXT_PUBLIC_WPS_URL,

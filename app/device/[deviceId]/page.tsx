@@ -7,14 +7,28 @@ import { useEffect, useState } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
-import { ManagedInstallsTable, ApplicationsTable, NetworkTable, SecurityCard } from "../../../src/components/tables"
-import DeviceEventsSimple from "../../../src/components/DeviceEventsSimple"
-import { InformationWidget } from "../../../src/components/widgets/Information"
-import { SystemWidget } from "../../../src/components/widgets/System"
-import { SecurityWidget } from "../../../src/components/widgets/Security"
-import { HardwareWidget } from "../../../src/components/widgets/Hardware"
-import { NetworkWidget } from "../../../src/components/widgets/Network"
-import { ManagementWidget } from "../../../src/components/widgets/Management"
+import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing/device-mapper"
+import { 
+  processApplicationsData,
+  processHardwareData,
+  processNetworkData,
+  processSecurityData,
+  processSystemData,
+  processEventsData,
+  processInstallsData,
+  processProfilesData
+} from "../../../src/lib/data-processing/component-data"
+import { 
+  InfoTab,
+  InstallsTab,
+  ProfilesTab,
+  ApplicationsTab,
+  SystemTab,
+  HardwareTab,
+  NetworkTab,
+  SecurityTab,
+  EventsTab
+} from "../../../src/components/tabs"
 
 interface FleetEvent {
   id: string
@@ -249,13 +263,16 @@ interface ManagedPackage {
   category?: string
 }
 
-type TabType = 'info' | 'managed-installs' | 'applications' | 'network' | 'security' | 'events'
+type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'system' | 'hardware' | 'network' | 'security' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string }[] = [
   { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Device information, management status, and system details' },
-  { id: 'managed-installs', label: 'Managed Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates' },
+  { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates' },
+  { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', description: 'MDM configuration profiles and settings' },
   { id: 'applications', label: 'Applications', icon: 'M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z', description: 'Installed applications and packages' },
-  { id: 'network', label: 'Network', icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z', description: 'Network connectivity and settings' },
+  { id: 'system', label: 'System', icon: 'M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z', description: 'Operating system and system information' },
+  { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance' },
+  { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', description: 'Network connectivity and settings' },
   { id: 'security', label: 'Security', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', description: 'Security status and compliance' },
   { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Event history and activity log' }
 ]
@@ -265,9 +282,21 @@ export default function DeviceDetailPage() {
   const deviceId = params.deviceId as string
   const [activeTab, setActiveTab] = useState<TabType>('info')
   const [events, setEvents] = useState<FleetEvent[]>([])
-  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null)
+  const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  // Processed component data
+  const [processedData, setProcessedData] = useState<{
+    applications?: any
+    hardware?: any
+    network?: any
+    security?: any
+    system?: any
+    events?: any
+    installs?: any
+    profiles?: any
+  }>({});
   
   // Handle URL hash navigation
   useEffect(() => {
@@ -389,7 +418,23 @@ export default function DeviceDetailPage() {
         })
         
         if (deviceData.success && deviceData.device) {
-          setDeviceInfo(deviceData.device)
+          // Process the raw device data through our mapper
+          const processedDevice = mapDeviceData(deviceData.device)
+          setDeviceInfo(processedDevice)
+          
+          // Process component-specific data
+          const componentData = {
+            applications: processApplicationsData(deviceData.device),
+            hardware: processHardwareData(deviceData.device),
+            network: processNetworkData(deviceData.device),
+            security: processSecurityData(deviceData.device),
+            system: processSystemData(deviceData.device),
+            events: processEventsData(deviceData.device, deviceData.events || []),
+            installs: processInstallsData(deviceData.device),
+            profiles: processProfilesData(deviceData.device)
+          }
+          setProcessedData(componentData)
+          
           // Use events directly from the device API response
           if (deviceData.events) {
             setEvents(deviceData.events)
@@ -548,392 +593,15 @@ export default function DeviceDetailPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Info Tab */}
-        {activeTab === 'info' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {/* Basic Information Widget */}
-            <InformationWidget device={deviceInfo} />
-            
-            {/* System (Operating System) Widget */}
-            <SystemWidget device={deviceInfo} />
-            
-            {/* Hardware Widget */}
-            <HardwareWidget device={deviceInfo} />
-            
-            {/* Security Widget */}
-            <SecurityWidget 
-              platform={deviceInfo.platform || deviceInfo.os} 
-              securityFeatures={deviceInfo.securityFeatures} 
-            />
-            
-            {/* Network Widget */}
-            <NetworkWidget device={deviceInfo} />
-            
-            {/* Management Widget */}
-            <ManagementWidget device={deviceInfo} />
-          </div>
-        )}
-
-        {/* Managed Installs Tab */}
-        {activeTab === 'managed-installs' && (
-          <div className="space-y-8">
-            <ManagedInstallsTable data={deviceInfo.managedInstalls || {
-              totalPackages: 0,
-              installed: 0,
-              pending: 0,
-              failed: 0,
-              lastUpdate: '',
-              packages: []
-            }} />
-          </div>
-        )}
-
-        {/* Applications Tab */}
-        {activeTab === 'applications' && (
-          <div className="space-y-8">
-            <ApplicationsTable data={deviceInfo.applications || {
-              totalApps: 0,
-              installedApps: []
-            }} />
-          </div>
-        )}
-
-        {/* Network Tab */}
-        {activeTab === 'network' && (
-          <div className="space-y-8">
-            <NetworkTable data={deviceInfo.network || {
-              hostname: deviceInfo.name || '',
-              connectionType: 'Unknown'
-            }} />
-          </div>
-        )}
-
-        {/* Security Tab */}
-        {activeTab === 'security' && (
-          <div className="space-y-8">
-            {deviceInfo.securityFeatures ? (
-              <>
-                {/* Security Overview */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                      <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Security Status</h2>
-                      <p className="text-gray-600 dark:text-gray-400">Security features and compliance status</p>
-                    </div>
-                  </div>
-                  
-                  {/* Platform-specific security overview */}
-                  {deviceInfo.os?.toLowerCase().includes('mac') ? (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.filevault?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.filevault?.enabled ? 'Enabled' : 'Disabled'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">FileVault</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.firewall?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.firewall?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">Firewall</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.gatekeeper?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.gatekeeper?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">Gatekeeper</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.sip?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.sip?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">SIP</div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.bitlocker?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.bitlocker?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">BitLocker</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.firewall?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.firewall?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">Firewall</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.windowsDefender?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.windowsDefender?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">Windows Defender</div>
-                      </div>
-                      
-                      <div className="text-center">
-                        <div className={`text-2xl font-bold mb-1 ${
-                          deviceInfo.securityFeatures.tpm?.enabled ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                        }`}>
-                          {deviceInfo.securityFeatures.tpm?.status || 'Unknown'}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">TPM {deviceInfo.securityFeatures.tpm?.version}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Detailed Security Information */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* System Security */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                        {deviceInfo.os?.toLowerCase().includes('mac') ? 'macOS Security' : 'Windows Security'}
-                      </h3>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      {deviceInfo.os?.toLowerCase().includes('mac') ? (
-                        <>
-                          {/* Mac-specific security features */}
-                          {deviceInfo.securityFeatures.sip && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Integrity Protection</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.sip.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.sip.status}
-                              </span>
-                            </div>
-                          )}
-                          {deviceInfo.securityFeatures.xprotect && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">XProtect</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.xprotect.status === 'Up to date' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.xprotect.status}
-                              </span>
-                            </div>
-                          )}
-                          {deviceInfo.securityFeatures.automaticUpdates && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Automatic Updates</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.automaticUpdates.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.automaticUpdates.status}
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          {/* Windows-specific security features */}
-                          {deviceInfo.securityFeatures.uac && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">User Account Control</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.uac.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.uac.status}
-                              </span>
-                            </div>
-                          )}
-                          {deviceInfo.securityFeatures.windowsUpdates && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Updates</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.windowsUpdates.status === 'Up to date' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.windowsUpdates.status}
-                              </span>
-                            </div>
-                          )}
-                          {deviceInfo.securityFeatures.smartScreen && (
-                            <div className="flex justify-between items-center">
-                              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SmartScreen</label>
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                deviceInfo.securityFeatures.smartScreen.enabled ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                              }`}>
-                                {deviceInfo.securityFeatures.smartScreen.status}
-                              </span>
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Endpoint Security */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Endpoint Security</h3>
-                    </div>
-                    <div className="p-6 space-y-4">
-                      {/* EDR Status */}
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Endpoint Detection & Response</label>
-                          {deviceInfo.securityFeatures.edr?.installed && deviceInfo.securityFeatures.edr.version && (
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                              Version {deviceInfo.securityFeatures.edr.version}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            deviceInfo.securityFeatures.edr?.installed ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {deviceInfo.securityFeatures.edr?.installed ? deviceInfo.securityFeatures.edr.status : 'Not Installed'}
-                          </span>
-                          {deviceInfo.securityFeatures.edr?.installed && (
-                            <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                              {deviceInfo.securityFeatures.edr.name}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Additional endpoint security info could go here */}
-                      <div className="text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-3">
-                        {deviceInfo.securityFeatures.edr?.installed ? (
-                          <p>✓ Active EDR monitoring provides real-time threat detection and response capabilities.</p>
-                        ) : (
-                          <p>⚠ No EDR solution detected. Consider deploying endpoint protection for enhanced security monitoring.</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Security Data</h3>
-                <p className="text-gray-600 dark:text-gray-400">Security information is not available for this device.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Events Tab */}
-        {activeTab === 'events' && (
-          <div className="space-y-8">
-            {events.length > 0 ? (
-              <>
-                {/* Events List */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Events</h3>
-                  </div>
-                  <div className="p-6">
-                    <DeviceEventsSimple events={events.map(event => ({
-                      id: event.id,
-                      name: event.kind || 'Event', // Use event kind as fallback name
-                      raw: event.payload,
-                      kind: event.kind,
-                      ts: event.ts
-                    }))} />
-                  </div>
-                </div>
-              </>
-            ) : (
-              <div className="text-center py-16">
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Events</h3>
-                <p className="text-gray-600 dark:text-gray-400">No events have been recorded for this device yet.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Managed Installs Tab */}
-        {activeTab === 'managed-installs' && (
-          <div className="space-y-8">
-            <ManagedInstallsTable data={deviceInfo.managedInstalls || {
-              totalPackages: 0,
-              installed: 0,
-              pending: 0,
-              failed: 0,
-              lastUpdate: '',
-              packages: []
-            }} />
-          </div>
-        )}
-
-        {/* Applications Tab */}
-        {activeTab === 'applications' && (
-          <div className="space-y-8">
-            <ApplicationsTable data={deviceInfo.applications || {
-              totalApps: 0,
-              installedApps: []
-            }} />
-          </div>
-        )}
-
-        {/* Network Tab */}
-        {activeTab === 'network' && (
-          <div className="space-y-8">
-            <NetworkTable data={deviceInfo.network || {
-              hostname: deviceInfo.name || 'Unknown',
-              connectionType: 'Unknown',
-              ipv4ip: deviceInfo.ipAddress,
-              ethernet: deviceInfo.macAddress
-            }} />
-          </div>
-        )}
-
-        {/* Security Tab */}
-        {activeTab === 'security' && (
-          <div className="space-y-8">
-            <SecurityCard data={deviceInfo.security || {}} />
-          </div>
-        )}
-
-        {/* Placeholder for remaining tabs */}
-        {!['info', 'managed-installs', 'applications', 'network', 'security', 'events'].includes(activeTab) && (
-          <div className="text-center py-16">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {tabs.find(t => t.id === activeTab)?.label} Tab Coming Soon
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400">
-              This tab content will be implemented next.
-            </p>
-          </div>
-        )}
+        {activeTab === 'info' && <InfoTab device={deviceInfo} />}
+        {activeTab === 'installs' && <InstallsTab device={deviceInfo} data={processedData.installs} />}
+        {activeTab === 'profiles' && <ProfilesTab device={deviceInfo} data={processedData.profiles} />}
+        {activeTab === 'applications' && <ApplicationsTab device={deviceInfo} data={processedData.applications} />}
+        {activeTab === 'system' && <SystemTab device={deviceInfo} data={processedData.system} />}
+        {activeTab === 'hardware' && <HardwareTab device={deviceInfo} data={processedData.hardware} />}
+        {activeTab === 'network' && <NetworkTab device={deviceInfo} data={processedData.network} />}
+        {activeTab === 'security' && <SecurityTab device={deviceInfo} data={processedData.security} />}
+        {activeTab === 'events' && <EventsTab device={deviceInfo} events={events} data={processedData.events} />}
       </div>
     </div>
   )

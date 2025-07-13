@@ -25,10 +25,11 @@ interface ProfileInfo {
 
 interface ProfilesTabProps {
   device: any
+  data?: any
 }
 
-export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device }) => {
-  const profiles = device.profiles || []
+export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
+  const profiles = data?.profiles || device.profiles || []
 
   if (!profiles || profiles.length === 0) {
     return (

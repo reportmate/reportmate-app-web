@@ -1,12 +1,8 @@
 import { NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-// Initialize Prisma client
-const prisma = new PrismaClient()
 
 export async function GET() {
   try {
@@ -49,8 +45,15 @@ export async function GET() {
     
     // Fallback to local database query if Azure Functions API fails
     if (useLocalFallback) {
-      console.log(`[DEVICES API] ${timestamp} - Using local database fallback`)
+      console.log(`[DEVICES API] ${timestamp} - Local database fallback temporarily disabled`)
       
+      // TODO: Restore local database fallback once Prisma is properly configured
+      return NextResponse.json({
+        error: 'Azure Functions API unavailable and local database fallback is disabled',
+        details: 'Please check Azure Functions API connectivity'
+      }, { status: 503 })
+      
+      /*
       try {
         const devices = await prisma.device.findMany({
           orderBy: {
@@ -100,9 +103,9 @@ export async function GET() {
         console.error(`[DEVICES API] ${timestamp} - Local database query failed:`, dbError)
         return NextResponse.json({
           error: 'Failed to fetch devices from both Azure Functions API and local database',
-          details: dbError instanceof Error ? dbError.message : String(dbError)
-        }, { status: 500 })
-      }
+          details: 'Local database fallback is temporarily disabled'
+        }, { status: 503 })
+      */
     }
     
     // Continue with Azure Functions API response processing if we have a valid response
@@ -142,7 +145,7 @@ export async function GET() {
       }
       
       // Always return a direct array for the frontend
-      console.log(`[DEVICES API] ${timestamp} - 🚀 Returning devices array with ${devicesArray.length} items`)
+      console.log(`[DEVICES API] ${timestamp} - Returning devices array with ${devicesArray.length} items`)
       return NextResponse.json(devicesArray, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

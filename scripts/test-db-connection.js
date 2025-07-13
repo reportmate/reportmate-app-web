@@ -5,7 +5,7 @@
  * Tests connection to PostgreSQL database for ReportMate
  */
 
-const { PrismaClient } = require('@prisma/client')
+// const { PrismaClient } = require('@prisma/client')
 
 async function testDatabaseConnection() {
   const prisma = new PrismaClient({

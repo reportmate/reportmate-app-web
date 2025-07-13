@@ -8,9 +8,10 @@ import { HardwareWidget } from '../widgets/Hardware'
 
 interface HardwareTabProps {
   device: any
+  data?: any
 }
 
-export const HardwareTab: React.FC<HardwareTabProps> = ({ device }) => {
+export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   return (
     <div className="space-y-8">
       {/* Hardware Overview Widget */}
