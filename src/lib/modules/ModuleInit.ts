@@ -6,12 +6,33 @@
 import { moduleRegistry } from './ModuleRegistry'
 import { moduleLoader } from './BaseModule'
 
+/**
+ * Map ExtendedModuleManifest category to ModuleManifest category
+ */
+function mapExtendedCategory(category?: string): 'core' | 'widget' | 'integration' | 'security' | 'hardware' | 'software' | undefined {
+  switch (category) {
+    case 'device':
+    case 'dashboard':
+    case 'reporting':
+      return 'widget'
+    case 'integration':
+      return 'integration'
+    case 'security':
+      return 'security'
+    case 'core':
+      return 'core'
+    default:
+      return 'widget'
+  }
+}
+
 // Import core modules
 import DeviceInfoModule from './core/DeviceInfoModule'
 import EventsModule from './core/EventsModule'
 
 // Import widget modules
 import ManagedInstallsModule from './widgets/ManagedInstallsModule'
+import InstallsModule from './widgets/InstallsModule'
 import HardwareModule from './widgets/HardwareModule'
 import ApplicationsModule from './widgets/ApplicationsModule'
 import NetworkModule from './widgets/NetworkModuleWidget'
@@ -35,6 +56,7 @@ export async function initializeCoreModules(): Promise<void> {
     // Register widget modules
     const widgetModules = [
       new ManagedInstallsModule(),
+      new InstallsModule(),
       new HardwareModule(),
       ApplicationsModule,
       NetworkModule,
@@ -51,17 +73,8 @@ export async function initializeCoreModules(): Promise<void> {
         await module.onLoad()
       }
       
-      let manifest = module.manifest
-      
-      // For enhanced modules, add deviceWidgets to the manifest
-      if ('deviceWidgets' in module && module.deviceWidgets) {
-        manifest = {
-          ...manifest,
-          deviceWidgets: module.deviceWidgets
-        }
-      }
-      
-      moduleRegistry.register(manifest)
+      // Register the manifest, casting to handle type compatibility
+      moduleRegistry.register(module.manifest as any)
     }
     
     console.log(`Loaded ${allModules.length} modules (${coreModules.length} core, ${widgetModules.length} widgets)`)
