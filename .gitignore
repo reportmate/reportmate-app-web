@@ -31,6 +31,10 @@ yarn-error.log*
 .env.production
 .env.deployment
 .env.docker
+.env.staging
+.env.test
+.env.dev
+.env.*
 
 # Keep example files (these are templates without secrets)
 !.env.example
