@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./apps/www
+      dockerfile: Dockerfile
+      args:
+        - DOCKER_BUILD=true
+    image: reportmate:latest
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./apps/www/.env.docker
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL:-postgresql://reportmate:${DB_PASSWORD:-reportmate123}@postgres:5432/reportmate}
+      - NEXT_PUBLIC_WPS_URL=${NEXT_PUBLIC_WPS_URL:-wss://reportmate-signalr.webpubsub.azure.com/client/hubs/fleet}
+      - NEXT_PUBLIC_ENABLE_SIGNALR=${NEXT_PUBLIC_ENABLE_SIGNALR:-true}
+      - API_BASE_URL=${API_BASE_URL:-https://reportmate-api.azurewebsites.net}
+      - WPS_CONNECTION_STRING=${WPS_CONNECTION_STRING:-}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - reportmate-network
+    restart: unless-stopped
+
+  # Backend Functions (optional local container)
+  functions:
+    build:
+      context: ./functions
+      dockerfile: Dockerfile
+    ports:
+      - "7071:80"
+    environment:
+      - FUNCTIONS_WORKER_RUNTIME=python
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING:-UseDevelopmentStorage=true}
+      - QUEUE_NAME=${QUEUE_NAME:-osquery-ingest}
+      - DATABASE_URL=postgresql://reportmate:${DB_PASSWORD:-reportmate123}@postgres:5432/reportmate
+      - EVENTS_CONNECTION=${EVENTS_CONNECTION:-}
+      - CLIENT_PASSPHRASES=${CLIENT_PASSPHRASES:-}
+    depends_on:
+      - postgres
+      - azurite
+    networks:
+      - reportmate-network
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reportmate
+      POSTGRES_USER: reportmate
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-reportmate123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - reportmate-network
+    restart: unless-stopped
+
+  # Redis (for caching/session management)
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - reportmate-network
+    restart: unless-stopped
+
+  # Azurite (Azure Storage Emulator for local development)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    ports:
+      - "10000:10000"  # Blob service
+      - "10001:10001"  # Queue service
+      - "10002:10002"  # Table service
+    volumes:
+      - azurite_data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --location /data
+    networks:
+      - reportmate-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  azurite_data:
+
+networks:
+  reportmate-network:
+    driver: bridge
