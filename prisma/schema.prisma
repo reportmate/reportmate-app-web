@@ -1,5 +1,11 @@
 // Enhanced Prisma Schema for ReportMate - Production Normalized Approach
 // This schema provides full normalization for better querying and analytics
+//
+// NOTE: This schema is synchronized with the master schema at:
+// ../../infrastructure/schemas/schema.prisma
+// 
+// The infrastructure schema is the source of truth for database structure.
+// Any changes should be made there first, then synchronized here.
 
 generator client {
   provider = "prisma-client-js"
@@ -83,10 +89,11 @@ model Device {
   name          String
   model         String?
   os            String?
-  serialNumber  String?   @map("serial_number")
+  serialNumber  String?   @unique @map("serial_number") // Add unique constraint
   assetTag      String?   @map("asset_tag")
   ipAddress     String?   @map("ip_address")
   macAddress    String?   @map("mac_address")
+  hostname      String?   // Add missing hostname field
   location      String?
   lastSeen      DateTime? @map("last_seen") @db.Timestamptz
   status        String    @default("unknown")
@@ -101,8 +108,15 @@ model Device {
   // Basic hardware fields (most commonly queried)
   processor     String?
   memory        String?
+  graphics      String?  // Add missing graphics field
   storage       String?
   architecture  String?
+
+  // Granular Operating System fields
+  osName        String?   @map("os_name")        // e.g., "Windows 11 Enterprise"
+  osVersion     String?   @map("os_version")     // e.g., "24H2"
+  osBuild       String?   @map("os_build")       // e.g., "26100.4349"
+  osArchitecture String?  @map("os_architecture") // e.g., "arm64"
 
   // System Performance Metrics
   diskUtilization   Int?      @map("disk_utilization")
@@ -291,11 +305,11 @@ model MDMInfo {
   deviceId String @unique @map("device_id")
   device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
 
-  enrolled        Boolean
-  enrolledViaDep  Boolean @map("enrolled_via_dep")
+  enrolled        Boolean @default(false)
+  enrolledViaDep  Boolean @default(false) @map("enrolled_via_dep")
   serverUrl       String? @map("server_url")
-  userApproved    Boolean @map("user_approved")
-  organization    String?
+  userApproved    Boolean @default(false) @map("user_approved")
+  vendor          String?
   department      String?
 
   // Additional MDM metadata

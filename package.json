@@ -1,57 +1,32 @@
 {
-  "name": "reportmate-app-web",
-  "version": "1.0.0",
-  "description": "ReportMate Web Dashboard - A Next.js-based real-time dashboard for monitoring fleet events",
-  "main": "index.js",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "demo": "node scripts/demo-data.js",
-    "demo:fast": "node scripts/demo-data.js 20 1000",
-    "demo:slow": "node scripts/demo-data.js 5 5000"
-  },
-  "keywords": [
-    "reportmate",
-    "dashboard",
-    "nextjs",
-    "signalr",
-    "monitoring",
-    "real-time",
-    "fleet-management"
+  "name": "reportmate",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@10.8.1",
+  "description": "ReportMate - Comprehensive osquery fleet management platform",
+  "workspaces": [
+    "apps/www",
+    "database"
   ],
-  "author": "ReportMate",
-  "license": "MIT",
+  "scripts": {
+    "dev": "pnpm -C apps/www dev",
+    "build": "pnpm -C apps/www build",
+    "start": "pnpm -C apps/www start",
+    "lint": "pnpm -C apps/www lint",
+    "test": "pnpm -C apps/www test"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/reportmate/reportmate-app-web.git"
   },
-  "homepage": "https://github.com/reportmate/reportmate-app-web#readme",
-  "bugs": {
-    "url": "https://github.com/reportmate/reportmate-app-web/issues"
-  },
-  "packageManager": "pnpm@10.8.1",
-  "dependencies": {
-    "@microsoft/signalr": "^8.0.7",
-    "@prisma/client": "6.9.0",
-    "next": "^15.3.3",
-    "pg": "^8.16.3",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.10",
-    "@types/node": "^24.0.3",
-    "@types/pg": "^8.15.4",
-    "@types/react": "^19.1.8",
-    "autoprefixer": "^10.4.21",
-    "eslint": "^9",
-    "eslint-config-next": "15.3.3",
-    "postcss": "^8.5.6",
-    "prisma": "^6.9.0",
-    "tailwindcss": "^4.1.10",
-    "typescript": "^5.8.3"
-  }
+  "keywords": [
+    "reportmate",
+    "osquery",
+    "fleet-management",
+    "monitoring",
+    "azure",
+    "terraform"
+  ],
+  "author": "ReportMate",
+  "license": "MIT"
 }
