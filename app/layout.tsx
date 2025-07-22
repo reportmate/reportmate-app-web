@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
+import { ThemeProvider } from "../src/components/theme-provider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,9 +19,11 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
-        <ErrorBoundary>
-          {children}
-        </ErrorBoundary>
+        <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
+        </ThemeProvider>
       </body>
     </html>
   );

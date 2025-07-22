@@ -28,7 +28,8 @@ export async function GET(
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Pragma': 'no-cache',
+        'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
       }
     })
     
@@ -70,7 +71,27 @@ export async function GET(
       responseSize: JSON.stringify(data).length
     })
     
-    // Return the data as-is since the Azure Functions API should return the correct format
+    // Transform field names from snake_case to camelCase if needed
+    if (data.device) {
+      const device = data.device
+      const transformedDevice = {
+        id: device.serial_number || device.id, // Use serial number as the primary ID
+        serialNumber: device.serial_number,
+        deviceId: device.device_id,
+        name: device.name,
+        hostname: device.hostname,
+        osName: device.os_name,
+        osVersion: device.os_version,
+        clientVersion: device.client_version,
+        status: device.status,
+        lastSeen: device.last_seen,
+        createdAt: device.created_at
+      }
+      
+      data.device = transformedDevice
+    }
+    
+    // Return the transformed data
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

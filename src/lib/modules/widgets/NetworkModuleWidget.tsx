@@ -987,23 +987,23 @@ const NetworkModule = {
 
   // Lifecycle hooks
   async onInstall() {
-    console.log('NetworkModule installed');
+    // Module installed
   },
 
   async onUninstall() {
-    console.log('NetworkModule uninstalled');
+    // Module uninstalled
   },
 
   async onEnable() {
-    console.log('NetworkModule enabled');
+    // Module enabled
   },
 
   async onDisable() {
-    console.log('NetworkModule disabled');
+    // Module disabled
   },
 
   async onConfigChange(config: any) {
-    console.log('NetworkModule config changed:', config);
+    // Module configuration changed
   },
 };
 
