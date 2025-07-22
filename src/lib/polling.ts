@@ -8,8 +8,7 @@ export function usePollingEvents() {
   const [events, setEvents] = useState<FleetEvent[]>([])
 
   useEffect(() => {
-    // Create a simple API endpoint that returns recent events
-    // This is a temporary solution while we debug WebSocket
+    // Fetch real events from the API
     
     const fetchEvents = async () => {
       try {

@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { ModuleManager } from '../../src/components/ModuleManager'
+import { ThemeToggle } from '../../src/components/theme-toggle'
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations'>('general')
@@ -64,12 +65,6 @@ export default function SettingsPage() {
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors"
               >
                 Events
-              </Link>
-              <Link
-                href="/modules"
-                className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Modules
               </Link>
             </nav>
           </div>
@@ -171,27 +166,40 @@ export default function SettingsPage() {
                     
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
                       <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                        Dashboard Preferences
+                        Appearance & Theme
                       </h3>
-                      <div className="space-y-3">
-                        <label className="flex items-center">
-                          <input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 mr-3" defaultChecked />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            Enable dark mode by default
-                          </span>
-                        </label>
-                        <label className="flex items-center">
-                          <input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 mr-3" defaultChecked />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            Show connection status indicator
-                          </span>
-                        </label>
-                        <label className="flex items-center">
-                          <input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 mr-3" defaultChecked />
-                          <span className="text-sm text-gray-700 dark:text-gray-300">
-                            Auto-refresh widget data
-                          </span>
-                        </label>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              Theme Preference
+                            </label>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                              Choose between light, dark, or system theme
+                            </p>
+                          </div>
+                          <ThemeToggle />
+                        </div>
+                        
+                        <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                          <h4 className="text-md font-medium text-gray-900 dark:text-white mb-3">
+                            Dashboard Preferences
+                          </h4>
+                          <div className="space-y-3">
+                            <label className="flex items-center">
+                              <input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 mr-3" defaultChecked />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                Show connection status indicator
+                              </span>
+                            </label>
+                            <label className="flex items-center">
+                              <input type="checkbox" className="rounded border-gray-300 dark:border-gray-600 mr-3" defaultChecked />
+                              <span className="text-sm text-gray-700 dark:text-gray-300">
+                                Auto-refresh widget data
+                              </span>
+                            </label>
+                          </div>
+                        </div>
                       </div>
                     </div>
                     
@@ -213,9 +221,12 @@ export default function SettingsPage() {
                       </h2>
                       <p className="text-gray-600 dark:text-gray-400 mt-1">
                         Install, configure, and manage ReportMate modules. 
-                        <Link href="/modules" className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-1">
-                          Visit the full module manager →
-                        </Link>
+                        <button 
+                          onClick={() => setActiveSection('modules')} 
+                          className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-1 underline"
+                        >
+                          View modules section below ↓
+                        </button>
                       </p>
                     </div>
                     <button

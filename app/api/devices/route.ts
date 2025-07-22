@@ -30,7 +30,8 @@ export async function GET() {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
+          'Pragma': 'no-cache',
+          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
         }
       })
       
@@ -144,9 +145,25 @@ export async function GET() {
         })
       }
       
+      // Transform field names from snake_case to camelCase for frontend compatibility
+      const transformedDevices = devicesArray.map((device: any) => ({
+        id: device.serial_number || device.id, // Use serial number as the primary ID
+        serialNumber: device.serial_number,
+        name: device.name,
+        model: device.model || 'Unknown',
+        os: device.os_name || 'Unknown',
+        lastSeen: device.last_seen,
+        status: device.status === 'active' ? 'online' : 'offline',
+        uptime: '0h 0m', // TODO: Calculate from last_seen
+        location: device.location || 'Unknown',
+        ipAddress: device.ip_address || 'N/A',
+        totalEvents: 0, // TODO: Get from events API
+        lastEventTime: device.last_seen
+      }))
+      
       // Always return a direct array for the frontend
-      console.log(`[DEVICES API] ${timestamp} - Returning devices array with ${devicesArray.length} items`)
-      return NextResponse.json(devicesArray, {
+      console.log(`[DEVICES API] ${timestamp} - Returning transformed devices array with ${transformedDevices.length} items`)
+      return NextResponse.json(transformedDevices, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',

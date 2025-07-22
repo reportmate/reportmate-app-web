@@ -32,7 +32,8 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
+        'Pragma': 'no-cache',
+        'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
       },
       body: JSON.stringify(requestData)
     })

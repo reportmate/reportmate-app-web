@@ -59,7 +59,6 @@ export function useLiveEvents() {
       if (pollingInterval) {
         clearInterval(pollingInterval)
       }
-      // Connection cleanup is handled elsewhere due to polling approach
     }
   }, [])
 

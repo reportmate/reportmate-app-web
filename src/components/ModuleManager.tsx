@@ -477,7 +477,6 @@ const RepositoriesTab: React.FC<{
                     checked={repo.enabled}
                     onChange={(e) => {
                       // Handle repository toggle
-                      console.log('Toggle repository:', repo.id, e.target.checked)
                     }}
                     className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
                   />

@@ -16,7 +16,7 @@ export class ManagementModuleClass {
   }
 
   initialize(): void {
-    console.log('Management module initialized')
+    // Module initialization logic
   }
 
   getConfig(): ManagementModuleConfig {
@@ -46,7 +46,8 @@ const ManagementModule = {
   ],
 
   onLoad: async function() {
-    console.log('Management module loaded')
+    // Trigger module loading
+    return module
   }
 }
 

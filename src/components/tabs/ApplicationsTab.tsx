@@ -12,10 +12,6 @@ interface ApplicationsTabProps {
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
-  // Log the processed data for debugging
-  console.log('ApplicationsTab - Processed data:', data)
-  console.log('ApplicationsTab - Raw device data:', device.applications)
-  
   return (
     <div className="space-y-8">
       <ApplicationsTable data={data || device.applications || {

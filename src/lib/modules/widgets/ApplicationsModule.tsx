@@ -299,27 +299,27 @@ const ApplicationsModule = {
 
   // Lifecycle hooks
   async onInstall() {
-    console.log('ApplicationsModule installed');
+    // Module installed
   },
 
   async onUninstall() {
-    console.log('ApplicationsModule uninstalled');
+    // Module uninstalled
   },
 
   async onEnable() {
-    console.log('ApplicationsModule enabled');
+    // Module enabled
   },
 
   async onDisable() {
-    console.log('ApplicationsModule disabled');
+    // Module disabled
   },
 
   async onConfigChange(config: any) {
-    console.log('ApplicationsModule config changed:', config);
+    // Module configuration changed
   },
 
   async onDataUpdate(newData: any, oldData: any) {
-    console.log('ApplicationsModule data updated');
+    // Module data updated
   },
 };
 
