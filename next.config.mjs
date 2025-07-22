@@ -8,6 +8,9 @@ export default {
     ignoreBuildErrors: true,
   },
   
+  // Enable standalone output for Docker deployment
+  output: 'standalone',
+  
   // Environment variables
   env: {
     NEXT_PUBLIC_WPS_URL: process.env.NEXT_PUBLIC_WPS_URL,
