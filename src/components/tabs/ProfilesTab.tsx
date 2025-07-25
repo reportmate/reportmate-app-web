@@ -13,11 +13,11 @@ interface ProfileInfo {
   uuid: string
   installDate: string
   type: 'Device' | 'User'
-  payloads: Array<{
-    type: string
-    displayName: string
-    identifier: string
-  }>
+  payloads?: Array<{
+    type?: string
+    displayName?: string
+    identifier?: string
+  }> | null
   isRemovable: boolean
   hasRemovalPasscode: boolean
   isEncrypted: boolean
@@ -40,7 +40,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
           </svg>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Configuration Profiles</h3>
-        <p className="text-gray-600 dark:text-gray-400">This device does not have any MDM configuration profiles installed.</p>
+        <p className="text-gray-600 dark:text-gray-400">This device does not have any managed configuration installed.</p>
       </div>
     )
   }
@@ -116,15 +116,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {profile.payloads.length} payload{profile.payloads.length !== 1 ? 's' : ''}
+                        {Array.isArray(profile.payloads) ? profile.payloads.length : 0} payload{(Array.isArray(profile.payloads) ? profile.payloads.length : 0) !== 1 ? 's' : ''}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {profile.payloads.slice(0, 3).map(p => p.type).join(', ')}
-                        {profile.payloads.length > 3 && '...'}
+                        {Array.isArray(profile.payloads) && profile.payloads.length > 0 
+                          ? profile.payloads.slice(0, 3).map(p => p.type || 'Unknown').join(', ')
+                          : 'No payloads'
+                        }
+                        {Array.isArray(profile.payloads) && profile.payloads.length > 3 && '...'}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {new Date(profile.installDate).toLocaleDateString()}
+                      {profile.installDate ? new Date(profile.installDate).toLocaleDateString() : 'Unknown'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
@@ -192,15 +195,18 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {profile.payloads.length} payload{profile.payloads.length !== 1 ? 's' : ''}
+                        {Array.isArray(profile.payloads) ? profile.payloads.length : 0} payload{(Array.isArray(profile.payloads) ? profile.payloads.length : 0) !== 1 ? 's' : ''}
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {profile.payloads.slice(0, 3).map(p => p.type).join(', ')}
-                        {profile.payloads.length > 3 && '...'}
+                        {Array.isArray(profile.payloads) && profile.payloads.length > 0 
+                          ? profile.payloads.slice(0, 3).map(p => p.type || 'Unknown').join(', ')
+                          : 'No payloads'
+                        }
+                        {Array.isArray(profile.payloads) && profile.payloads.length > 3 && '...'}
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {new Date(profile.installDate).toLocaleDateString()}
+                      {profile.installDate ? new Date(profile.installDate).toLocaleDateString() : 'Unknown'}
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

@@ -73,9 +73,13 @@ export const StatBlock: React.FC<StatBlockProps> = ({ title, subtitle, icon, ico
           {icon}
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{title}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {title}
+          </h3>
           {subtitle && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {subtitle}
+            </p>
           )}
         </div>
       </div>
@@ -98,17 +102,25 @@ export interface ListItemProps {
 export const ListItem: React.FC<ListItemProps> = ({ title, subtitle, badge, value }) => (
   <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-b-0">
     <div className="flex-1 min-w-0">
-      <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{title}</p>
+      <div className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+        {title}
+      </div>
       {subtitle && (
-        <p className="text-xs text-gray-500 dark:text-gray-400">{subtitle}</p>
+        <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+          {subtitle}
+        </div>
       )}
     </div>
     <div className="flex items-center gap-2 ml-2">
       {badge && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{badge}</span>
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+          {badge}
+        </span>
       )}
       {value && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{value}</span>
+        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+          {value}
+        </span>
       )}
     </div>
   </div>
@@ -156,6 +168,21 @@ export const Icons = {
   management: (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+    </svg>
+  ),
+  display: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  ),
+  printers: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+    </svg>
+  ),
+  profiles: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
     </svg>
   )
 }

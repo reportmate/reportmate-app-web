@@ -6,6 +6,7 @@
 import React from 'react'
 import { BaseModule } from '../BaseModule'
 import { ModuleManifest } from '../ModuleRegistry'
+import { formatRelativeTime } from '../../time'
 
 // Device Info Tab Component
 const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
@@ -51,11 +52,11 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
 
   return (
     <div className="space-y-6">
-      {/* Basic Information */}
+      {/* Inventory */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
-            Basic Information
+            Inventory
           </h3>
         </div>
         <div className="px-6 py-4">
@@ -82,7 +83,7 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
             )}
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Last Seen</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.lastSeen}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{formatRelativeTime(device.lastSeen)}</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>

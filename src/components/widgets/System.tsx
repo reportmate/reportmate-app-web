@@ -1,106 +1,152 @@
-/**
- * System Widget
- * Displays operating system information with separate fields for OS name, version, build, and architecture
- */
-
 import React from 'react'
-import { StatBlock, Stat, Icons, WidgetColors } from './shared'
+import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
 
 interface Device {
   id: string
   name: string
+  serialNumber?: string
+  os?: string
+  platform?: string
+  architecture?: string
+  uptime?: string
+  // API response fields for operating system
   osName?: string
   osVersion?: string
-  osBuild?: string
-  osArchitecture?: string
-  os?: string // Fallback for legacy format
-  architecture?: string // Fallback for legacy format
+  osDisplayVersion?: string
+  osEdition?: string
+  osFeatureUpdate?: string
+  osInstallDate?: string
+  osLocale?: string
+  osTimeZone?: string
+  keyboardLayouts?: string[]
+  // Legacy interface fields for backward compatibility
+  operatingSystem?: {
+    name: string
+    edition?: string
+    version?: string
+    displayVersion?: string
+    build?: string
+    architecture?: string
+    locale?: string
+    timeZone?: string
+    activeKeyboardLayout?: string
+    featureUpdate?: string
+  }
+  // Modular system data
+  system?: {
+    operatingSystem?: {
+      name: string
+      edition?: string
+      version?: string
+      displayVersion?: string
+      build?: string
+      architecture?: string
+      locale?: string
+      timeZone?: string
+      activeKeyboardLayout?: string
+      featureUpdate?: string
+    }
+    uptimeString?: string
+  }
+  // Modules structure
+  modules?: {
+    system?: {
+      operatingSystem?: {
+        name: string
+        edition?: string
+        version?: string
+        displayVersion?: string
+        build?: string
+        architecture?: string
+        locale?: string
+        timeZone?: string
+        activeKeyboardLayout?: string
+        featureUpdate?: string
+      }
+      uptimeString?: string
+    }
+  }
 }
 
 interface SystemWidgetProps {
   device: Device
 }
 
-/**
- * Parse legacy OS string into granular components
- * Input: "Microsoft Windows 11 Enterprise 10.0.26100 (Build 26100)"
- * Output: { osName, osVersion, osBuild }
- */
-const parseOperatingSystem = (osString: string) => {
-  if (!osString) return { osName: 'Unknown', osVersion: 'Unknown', osBuild: 'Unknown' }
-
-  // Windows format: "Microsoft Windows 11 Enterprise 10.0.26100 (Build 26100)"
-  const windowsMatch = osString.match(/^(Microsoft Windows \d+.*?)\s+(\d+\.\d+\.\d+).*?\(Build (\d+)\)/)
-  if (windowsMatch) {
-    const [, osName, buildNumber, buildVersion] = windowsMatch
-    // Convert build number to version name for common Windows versions
-    let versionName = 'Unknown'
-    if (buildNumber.startsWith('10.0.26100')) versionName = '24H2'
-    else if (buildNumber.startsWith('10.0.22631')) versionName = '23H2'
-    else if (buildNumber.startsWith('10.0.22621')) versionName = '22H2'
-    else if (buildNumber.startsWith('10.0.19045')) versionName = '22H2'
-    else if (buildNumber.startsWith('10.0.19044')) versionName = '21H2'
-    
-    return {
-      osName: osName.trim(),
-      osVersion: versionName,
-      osBuild: buildNumber
-    }
-  }
-
-  // macOS format: "macOS 15.2.0" or "macOS Sequoia 15.2.0"
-  const macOSMatch = osString.match(/^(macOS.*?)\s+(\d+\.\d+\.\d+)/)
-  if (macOSMatch) {
-    const [, osName, version] = macOSMatch
-    return {
-      osName: osName.trim(),
-      osVersion: version,
-      osBuild: version
-    }
-  }
-
-  // Generic version pattern: "OS Name version.number"
-  const genericMatch = osString.match(/^(.*?)\s+(\d+\.\d+(?:\.\d+)?)/)
-  if (genericMatch) {
-    const [, osName, version] = genericMatch
-    return {
-      osName: osName.trim(),
-      osVersion: version,
-      osBuild: version
-    }
-  }
-
-  // Fallback: use the entire string as OS name
-  return {
-    osName: osString,
-    osVersion: 'Unknown',
-    osBuild: 'Unknown'
-  }
-}
-
 export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
-  // Use granular OS data if available, otherwise parse legacy format
-  let osName: string, osVersion: string, osBuild: string
-  
-  if (device.osName && device.osVersion && device.osBuild) {
-    // Use granular data directly
-    osName = device.osName
-    osVersion = device.osVersion
-    osBuild = device.osBuild
-  } else if (device.os) {
-    // Parse legacy format
-    const parsed = parseOperatingSystem(device.os)
-    osName = parsed.osName
-    osVersion = parsed.osVersion
-    osBuild = parsed.osBuild
-  } else {
-    // Fallback
-    osName = 'Unknown'
-    osVersion = 'Unknown'
-    osBuild = 'Unknown'
+  // Comprehensive debug logging to understand the data structure
+  console.log('=== SystemWidget DEBUG START ===')
+  console.log('Full device object:', JSON.stringify(device, null, 2))
+  console.log('device.system:', device.system)
+  console.log('device.system?.operatingSystem:', device.system?.operatingSystem)
+  console.log('device.modules:', device.modules)
+  console.log('device.modules?.system:', device.modules?.system)
+  console.log('device.modules?.system?.operatingSystem:', device.modules?.system?.operatingSystem)
+  console.log('Top-level OS fields:', {
+    osName: device.osName,
+    osVersion: device.osVersion,
+    osDisplayVersion: device.osDisplayVersion,
+    osEdition: device.osEdition,
+    osFeatureUpdate: device.osFeatureUpdate,
+    osLocale: device.osLocale,
+    osTimeZone: device.osTimeZone,
+    keyboardLayouts: device.keyboardLayouts,
+    architecture: device.architecture,
+    uptime: device.uptime
+  })
+  console.log('=== SystemWidget DEBUG END ===')
+
+  // Try multiple data paths to find the operating system data
+  let operatingSystem = null
+  let uptimeString = null
+
+  // Path 1: device.system.operatingSystem (most likely based on API logs)
+  if (device.system?.operatingSystem) {
+    console.log('Using data from device.system.operatingSystem')
+    operatingSystem = device.system.operatingSystem
+    uptimeString = device.system.uptimeString || device.uptime
+  }
+  // Path 2: device.modules.system.operatingSystem
+  else if (device.modules?.system?.operatingSystem) {
+    console.log('Using data from device.modules.system.operatingSystem')
+    operatingSystem = device.modules.system.operatingSystem
+    uptimeString = device.modules.system.uptimeString || device.uptime
+  }
+  // Path 3: Top-level device properties (fallback)
+  else {
+    console.log('Using data from top-level device properties')
+    operatingSystem = {
+      name: device.osName,
+      edition: device.osEdition,
+      version: device.osVersion,
+      displayVersion: device.osDisplayVersion,
+      build: device.osVersion?.split('.').pop(),
+      architecture: device.architecture,
+      locale: device.osLocale,
+      timeZone: device.osTimeZone,
+      activeKeyboardLayout: device.keyboardLayouts?.[0],
+      featureUpdate: device.osFeatureUpdate
+    }
+    uptimeString = device.uptime
   }
 
-  const osArchitecture = device.osArchitecture || device.architecture || 'Unknown'
+  console.log('Final operatingSystem object:', operatingSystem)
+  console.log('Final uptimeString:', uptimeString)
+
+  // Check if we have any system information
+  const hasSystemInfo = operatingSystem || device.os
+
+  if (!hasSystemInfo) {
+    return (
+      <StatBlock 
+        title="System" 
+        subtitle="Operating system details"
+        icon={Icons.system}
+        iconColor={WidgetColors.blue}
+      >
+        <EmptyState message="System information not available" />
+      </StatBlock>
+    )
+  }
 
   return (
     <StatBlock 
@@ -109,10 +155,69 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
       icon={Icons.system}
       iconColor={WidgetColors.blue}
     >
-      <Stat label="Operating System" value={osName} />
-      <Stat label="Version" value={osVersion} />
-      <Stat label="Build" value={osBuild} isMono />
-      <Stat label="Architecture" value={osArchitecture} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column */}
+        <div className="space-y-4">
+          <Stat 
+            label="Operating System" 
+            value={operatingSystem?.name ? 
+              operatingSystem.name.replace('Microsoft ', '') : 
+              device.os || 'Unknown'
+            } 
+          />
+          
+          <Stat 
+            label="Edition" 
+            value={operatingSystem?.edition || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Version" 
+            value={operatingSystem?.version ? 
+              `${operatingSystem.version}${operatingSystem.build ? ` (Build ${operatingSystem.build})` : ''}` : 
+              'Unknown'
+            } 
+          />
+          
+          <Stat 
+            label="Display Version" 
+            value={operatingSystem?.displayVersion || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Feature Update" 
+            value={operatingSystem?.featureUpdate || 'Unknown'} 
+          />
+        </div>
+        
+        {/* Right Column */}
+        <div className="space-y-4">
+          <Stat 
+            label="Architecture" 
+            value={operatingSystem?.architecture || device.architecture || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Uptime" 
+            value={uptimeString || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Locale" 
+            value={operatingSystem?.locale || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Time Zone" 
+            value={operatingSystem?.timeZone || 'Unknown'} 
+          />
+          
+          <Stat 
+            label="Keyboard Layout" 
+            value={operatingSystem?.activeKeyboardLayout || 'Unknown'} 
+          />
+        </div>
+      </div>
     </StatBlock>
   )
 }

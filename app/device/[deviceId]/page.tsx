@@ -246,6 +246,16 @@ interface DeviceInfo {
     }
     packages: ManagedPackage[]
   }
+  inventory?: {
+    deviceName?: string
+    usage?: string
+    catalog?: string
+    department?: string
+    location?: string
+    assetTag?: string
+    serialNumber?: string
+    uuid?: string
+  }
 }
 
 interface ManagedPackage {
@@ -418,9 +428,27 @@ export default function DeviceDetailPage() {
         })
         
         if (deviceData.success && deviceData.device) {
-          // Process the raw device data through our mapper
-          const processedDevice = mapDeviceData(deviceData.device)
-          setDeviceInfo(processedDevice)
+          // Add debug logging before using mapDeviceData
+          console.log('About to call mapDeviceData with:', {
+            deviceData: !!deviceData.device,
+            mapDeviceDataType: typeof mapDeviceData,
+            mapDeviceDataExists: !!mapDeviceData
+          });
+          
+          // Test if the function is available
+          if (typeof mapDeviceData !== 'function') {
+            console.error('mapDeviceData is not a function!', { mapDeviceData });
+            throw new Error('mapDeviceData is not available');
+          }
+          
+          try {
+            // Process the raw device data through our mapper
+            const processedDevice = mapDeviceData(deviceData.device)
+            setDeviceInfo(processedDevice)
+          } catch (mappingError) {
+            console.error('Error in mapDeviceData:', mappingError);
+            throw mappingError;
+          }
           
           // Process component-specific data
           const componentData = {
@@ -429,23 +457,41 @@ export default function DeviceDetailPage() {
             network: processNetworkData(deviceData.device),
             security: processSecurityData(deviceData.device),
             system: processSystemData(deviceData.device),
-            events: processEventsData(deviceData.device, deviceData.events || []),
             installs: processInstallsData(deviceData.device),
             profiles: processProfilesData(deviceData.device)
           }
           setProcessedData(componentData)
-          
-          // Use events directly from the device API response
-          if (deviceData.events) {
-            setEvents(deviceData.events)
-          }
         } else {
           console.error('Invalid device data structure:', deviceData)
           setError('Invalid device data received')
           return
         }
         
-        // No need to fetch events separately since they come with device data
+        // Fetch events separately from the new device events endpoint
+        try {
+          const eventsResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}/events`)
+          if (eventsResponse.ok) {
+            const eventsData = await eventsResponse.json()
+            if (eventsData.success && eventsData.events) {
+              setEvents(eventsData.events)
+              
+              // Process events data for the component
+              const eventsComponentData = processEventsData(deviceData.device, eventsData.events)
+              setProcessedData(prev => ({
+                ...prev,
+                events: eventsComponentData
+              }))
+            }
+          } else {
+            console.warn('Failed to fetch events for device:', deviceId)
+            // Set empty events array
+            setEvents([])
+          }
+        } catch (eventsError) {
+          console.warn('Error fetching events:', eventsError)
+          setEvents([])
+        }
+        
       } catch (error) {
         console.error('Failed to fetch device data:', error)
         setError((error as Error).message)
@@ -546,14 +592,11 @@ export default function DeviceDetailPage() {
                     {deviceInfo.name}
                   </h1>
                   <div className="flex items-center gap-2">
-                    {deviceInfo.assetTag && (
+                    {(deviceInfo.assetTag || deviceInfo.inventory?.assetTag) && (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
-                        {deviceInfo.assetTag}
+                        {deviceInfo.assetTag || deviceInfo.inventory?.assetTag}
                       </span>
                     )}
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 min-w-[80px] justify-center">
-                      {deviceInfo.serialNumber}
-                    </span>
                   </div>
                 </div>
               </div>

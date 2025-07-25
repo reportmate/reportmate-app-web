@@ -12,6 +12,7 @@ import { SuccessStatsWidget, WarningStatsWidget, ErrorStatsWidget, DevicesStatsW
 import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
+import { ConnectionStatusWidget } from "../../src/lib/modules/widgets/ConnectionStatusWidget"
 import { useLiveEvents } from "./hooks"
 
 // Import the same hooks and types from the original dashboard
@@ -149,6 +150,11 @@ export default function DashboardPage() {
             
             {/* Actions */}
             <div className="flex items-center gap-3">
+              {/* Connection Status */}
+              <ConnectionStatusWidget 
+                connectionStatus={connectionStatus}
+              />
+              
               {/* Settings Gear Icon */}
               <Link
                 href="/settings"

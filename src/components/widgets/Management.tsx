@@ -45,6 +45,10 @@ interface Device {
   name: string
   platform?: string
   management?: Management
+  // Modular management data
+  modules?: {
+    management?: Management
+  }
 }
 
 interface ManagementWidgetProps {
@@ -52,7 +56,8 @@ interface ManagementWidgetProps {
 }
 
 export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) => {
-  const { management } = device
+  // Access management data from modular structure or fallback to device level
+  const management = device.management || device.modules?.management
 
   if (!management) {
     return (
@@ -87,7 +92,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
           {(management.vendor || management.organization) && (
             <Stat 
               label="Vendor" 
-              value={management.vendor || management.organization} 
+              value={(management.vendor || management.organization) || ''} 
             />
           )}
 

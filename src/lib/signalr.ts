@@ -20,7 +20,7 @@ export function useLiveEvents() {
     let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     
-    // Initialize with empty events array - no fake test events
+    // Initialize with empty events array
     console.log("🚀 SignalR client initialized")
     
     const startPolling = () => {

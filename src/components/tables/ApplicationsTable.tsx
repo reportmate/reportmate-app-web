@@ -19,10 +19,16 @@ interface ApplicationInfo {
   installDate?: string;  // Windows install date format
   size?: string;
   bundleId?: string;
+  // Service-specific fields
+  status?: string;
+  startType?: string;
+  description?: string;
 }
 
 interface ApplicationsData {
   totalApps: number;
+  runningApps?: number;
+  stoppedApps?: number;
   installedApps: ApplicationInfo[];
 }
 
@@ -48,9 +54,19 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
   return (
     <div className="space-y-8">
       {/* Summary Stats */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <div className="text-2xl font-bold text-gray-900 dark:text-white">{data.totalApps}</div>
-        <div className="text-sm text-gray-600 dark:text-gray-400">Total Applications</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-gray-900 dark:text-white">{data.totalApps}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Total Services</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{data.runningApps || 0}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Running Services</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{data.stoppedApps || 0}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Stopped Services</div>
+        </div>
       </div>
 
       {/* Applications Table */}
@@ -63,8 +79,8 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Installed Applications</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Applications currently installed on this device</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Windows Services</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">System services and applications running on this device</p>
             </div>
           </div>
         </div>
@@ -72,45 +88,45 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Publisher</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Type</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Path</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {data.installedApps.map((app, index) => (
-                <tr key={app.id || app.name || `app-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                  <td className="px-6 py-4 whitespace-nowrap">
+              {data.installedApps.map((service, index) => (
+                <tr key={service.id || service.name || `service-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4">
                     <div>
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{app.displayName || app.name}</div>
-                      {app.path && (
-                        <div className="text-sm text-gray-500 dark:text-gray-400">{app.path}</div>
+                      <div className="text-sm font-medium text-gray-900 dark:text-white">
+                        {service.displayName || service.name}
+                      </div>
+                      {service.description && (
+                        <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                          {service.description}
+                        </div>
                       )}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      service.status === 'RUNNING' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                    }`}>
+                      {service.status || 'Unknown'}
+                    </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="text-sm text-gray-900 dark:text-white">
-                      {app.version}
-                      {app.bundle_version && app.bundle_version !== app.version && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Build: {app.bundle_version}</div>
-                      )}
+                      {service.startType?.replace(/_/g, ' ') || 'Unknown'}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900 dark:text-white">{app.publisher || app.signed_by || 'Unknown'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {app.installDate && app.installDate !== '' ? (
-                      // Handle Windows date format (YYYYMMDD)
-                      app.installDate.length === 8 ? 
-                        `${app.installDate.slice(4, 6)}/${app.installDate.slice(6, 8)}/${app.installDate.slice(0, 4)}` :
-                        app.installDate
-                    ) : app.last_modified ? (
-                      formatRelativeTime(new Date(app.last_modified * 1000).toISOString())
-                    ) : (
-                      'Unknown'
-                    )}
+                  <td className="px-6 py-4">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 font-mono break-all">
+                      {service.path || 'N/A'}
+                    </div>
                   </td>
                 </tr>
               ))}

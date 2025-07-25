@@ -51,6 +51,10 @@ interface Device {
   ipAddressV6?: string
   macAddress?: string
   network?: NetworkInfo
+  // Modular network data
+  modules?: {
+    network?: NetworkInfo
+  }
 }
 
 interface NetworkWidgetProps {
@@ -58,8 +62,9 @@ interface NetworkWidgetProps {
 }
 
 export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
-  const { network } = device
-  const hasNetworkInfo = device.ipAddress || device.macAddress || device.network
+  // Access network data from modular structure or fallback to device level
+  const network = device.network || device.modules?.network
+  const hasNetworkInfo = device.ipAddress || device.macAddress || network
 
   if (!hasNetworkInfo) {
     return (

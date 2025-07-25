@@ -450,16 +450,14 @@ function DevicesPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Last Seen
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Actions
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredDevices.map((device) => (
-                    <tr 
-                      key={device.id} 
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    <Link
+                      key={device.id}
+                      href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
+                      className="table-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-2">
@@ -471,12 +469,9 @@ function DevicesPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <Link
-                            href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
-                            className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                          >
-                            {device.name}
-                          </Link>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {device.name || device.serialNumber}
+                          </div>
                           <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">
                             {device.serialNumber}
                           </div>
@@ -484,12 +479,12 @@ function DevicesPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {device.model}
+                          {device.model || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {device.os}
+                          {device.os || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -497,18 +492,10 @@ function DevicesPageContent() {
                           {formatRelativeTime(device.lastSeen)}
                         </div>
                         <div className="text-sm text-gray-600 dark:text-gray-400">
-                          Uptime: {device.uptime}
+                          Uptime: {device.uptime || 'Unknown'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link
-                          href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
-                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-                        >
-                          View Details
-                        </Link>
-                      </td>
-                    </tr>
+                    </Link>
                   ))}
                 </tbody>
               </table>
