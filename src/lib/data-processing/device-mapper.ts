@@ -361,7 +361,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const mappedDevice: ProcessedDeviceInfo = {
     id: rawDevice.id || rawDevice.device_id || rawDevice.serialNumber,
     deviceId: rawDevice.device_id || rawDevice.deviceId,
-    name: rawDevice.name || rawDevice.hostname || rawDevice.computer_name || 'Unknown Device',
+    name: rawDevice.name || rawDevice.hostname || rawDevice.computer_name || rawDevice.deviceName || rawDevice.device_name || 'Unknown Device',
     model: rawDevice.model,
     os: rawDevice.os,
     platform: rawDevice.platform,
@@ -498,19 +498,26 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     if (inventoryData) {
       console.log('Processing inventory data:', inventoryData)
       mappedDevice.inventory = {
-        deviceName: inventoryData.deviceName,
+        deviceName: inventoryData.deviceName || inventoryData.device_name,
         usage: inventoryData.usage,
         catalog: inventoryData.catalog,
         department: inventoryData.department,
         location: inventoryData.location,
-        assetTag: inventoryData.assetTag,
-        serialNumber: inventoryData.serialNumber,
+        assetTag: inventoryData.assetTag || inventoryData.asset_tag,
+        serialNumber: inventoryData.serialNumber || inventoryData.serial_number,
         uuid: inventoryData.uuid
       }
       
+      // Override top-level device name with inventory deviceName if available
+      const inventoryDeviceName = inventoryData.deviceName || inventoryData.device_name
+      if (inventoryDeviceName && inventoryDeviceName !== 'Unknown') {
+        mappedDevice.name = inventoryDeviceName
+        console.log('DeviceMapper DEBUG - Device name overridden from inventory:', inventoryDeviceName)
+      }
+      
       // Override top-level assetTag with inventory data if available, or keep existing
-      if (inventoryData.assetTag) {
-        mappedDevice.assetTag = inventoryData.assetTag
+      if (inventoryData.assetTag || inventoryData.asset_tag) {
+        mappedDevice.assetTag = inventoryData.assetTag || inventoryData.asset_tag
       }
     }
 
