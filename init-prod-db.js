@@ -10,8 +10,8 @@ async function initializeDatabase() {
   try {
     console.log('🔧 Initializing production database schema...')
     
-    // Read the schema file
-    const schemaSQL = fs.readFileSync('../../scripts/init-db.sql', 'utf8')
+    // Read the simplified Azure-compatible schema file
+    const schemaSQL = fs.readFileSync('../../azure-database-core.sql', 'utf8')
     
     // Execute the schema
     await pool.query(schemaSQL)
@@ -22,15 +22,20 @@ async function initializeDatabase() {
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public'
+      ORDER BY table_name
     `)
     
-    console.log('📋 Created tables:')
+    console.log('📋 Available tables:')
     tablesResult.rows.forEach(row => {
       console.log(`  - ${row.table_name}`)
     })
     
+    console.log('✅ Database initialization completed successfully!')
+    console.log('🎯 The API should now be able to store device data properly!')
+    
   } catch (error) {
     console.error('❌ Database initialization failed:', error.message)
+    console.error('Full error:', error)
   } finally {
     await pool.end()
   }

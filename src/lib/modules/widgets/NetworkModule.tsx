@@ -141,7 +141,7 @@ const BasicNetworkInfoWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Basic Information</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Inventory</h3>
       </div>
       <div className="p-6 space-y-4">
         <div>
@@ -342,7 +342,7 @@ export class NetworkModule extends EnhancedBaseModule {
         },
         showBasicInfo: {
           type: 'boolean',
-          title: 'Show Basic Information',
+          title: 'Show Inventory',
           description: 'Display hostname, service, and media information',
           default: true
         },

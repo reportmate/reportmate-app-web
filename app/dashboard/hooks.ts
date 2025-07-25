@@ -161,7 +161,6 @@ export function useLiveEvents() {
     let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     
-    // Don't add fake test events - just start with empty state
     console.log("Dashboard initialized - starting event polling")
     
     async function startConnection() {
