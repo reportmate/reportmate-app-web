@@ -1,6 +1,6 @@
 /**
  * New Clients Widget
- * Displays recently discovered devices
+ * Displays recently discovered devices - simplified version
  */
 
 import React from 'react'
@@ -18,14 +18,9 @@ interface Device {
   location?: string
   serialNumber?: string
   ipAddress?: string
-  ipAddressV4?: string
-  ipAddressV6?: string
-  macAddress?: string
   totalEvents: number
   lastEventTime: string
-  architecture?: string
-  processor?: string
-  memory?: string
+  assetTag?: string
 }
 
 interface NewClientsWidgetProps {
@@ -33,7 +28,7 @@ interface NewClientsWidgetProps {
   loading: boolean
 }
 
-export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }) => {
+export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }: NewClientsWidgetProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'online': return 'bg-green-500'
@@ -92,23 +87,40 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
       ) : (
         <div className="flex-1 overflow-auto hide-scrollbar">
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {devices.slice(0, 8).map((device) => (
+            {devices.slice(0, 10).map((device) => (
               <Link
                 key={device.id}
                 href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
                 className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(device.status)} flex-shrink-0`}></div>
+                <div className="flex items-start gap-3">
+                  {/* Status Indicator */}
+                  <div className={`w-3 h-3 rounded-full ${getStatusColor(device.status)} flex-shrink-0 mt-1`}></div>
+                  
+                  {/* Device Info */}
                   <div className="flex-1 min-w-0">
+                    {/* Device Name */}
                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {device.name}
                     </div>
-                    <div className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                      {device.model}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      {formatRelativeTime(device.lastSeen)}
+                    
+                    {/* Serial Number */}
+                    {device.serialNumber && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                        Serial: {device.serialNumber}
+                      </div>
+                    )}
+                    
+                    {/* Asset Tag */}
+                    {device.assetTag && (
+                      <div className="text-xs text-gray-600 dark:text-gray-400">
+                        Asset: {device.assetTag}
+                      </div>
+                    )}
+                    
+                    {/* Last Seen */}
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                      Last seen: {formatRelativeTime(device.lastSeen)}
                     </div>
                   </div>
                 </div>

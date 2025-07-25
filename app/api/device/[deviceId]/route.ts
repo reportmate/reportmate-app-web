@@ -63,36 +63,156 @@ export async function GET(
     const data = await response.json()
     console.log('[DEVICE API] Successfully fetched device data from Azure Functions')
     console.log('[DEVICE API] Response structure:', {
-      hasSuccess: 'success' in data,
-      successValue: data.success,
-      hasDevice: 'device' in data,
-      deviceValue: !!data.device,
+      hasMetadata: 'metadata' in data,
+      metadataKeys: data.metadata ? Object.keys(data.metadata) : [],
       responseKeys: Object.keys(data),
       responseSize: JSON.stringify(data).length
     })
     
-    // Transform field names from snake_case to camelCase if needed
-    if (data.device) {
-      const device = data.device
-      const transformedDevice = {
-        id: device.serial_number || device.id, // Use serial number as the primary ID
-        serialNumber: device.serial_number,
-        deviceId: device.device_id,
-        name: device.name,
-        hostname: device.hostname,
-        osName: device.os_name,
-        osVersion: device.os_version,
-        clientVersion: device.client_version,
-        status: device.status,
-        lastSeen: device.last_seen,
-        createdAt: device.created_at
+    console.log('[DEVICE API] Unified data structure sample:', JSON.stringify({
+      metadata: data.metadata,
+      moduleKeys: Object.keys(data).filter(k => k !== 'metadata')
+    }, null, 2).substring(0, 500) + '...')
+    
+    // Handle new unified structure - data is the device info directly
+    if (data.metadata) {
+      const metadata = data.metadata
+      const inventory = data.inventory || {}
+      const system = data.system || {}
+      const hardware = data.hardware || {}
+      
+      console.log('[DEVICE API] Metadata:', {
+        deviceId: metadata.deviceId,
+        serialNumber: metadata.serialNumber,
+        clientVersion: metadata.clientVersion,
+        collectedAt: metadata.collectedAt
+      })
+      console.log('[DEVICE API] Available modules:', Object.keys(data).filter(k => k !== 'metadata'))
+      
+      // Extract system data from the system module
+      // First try the correct location: system.operatingSystem (from database)
+      const operatingSystem = system.operatingSystem || {}
+      
+      // For backward compatibility, also try the old nested location
+      const systemData = system.osQuery?.system?.[0] || system || {}
+      
+      console.log('[DEVICE API] System module keys:', Object.keys(system))
+      console.log('[DEVICE API] Operating system data:', Object.keys(operatingSystem))
+      console.log('[DEVICE API] Operating system sample:', {
+        name: operatingSystem.name,
+        version: operatingSystem.version,
+        build: operatingSystem.build,
+        architecture: operatingSystem.architecture
+      })
+      console.log('[DEVICE API] Inventory data structure:', JSON.stringify(inventory, null, 2))
+      console.log('[DEVICE API] Inventory data structure loaded successfully')
+      
+      const transformedDevice: any = {
+        id: metadata.serialNumber || metadata.deviceId, // Use serial number as the primary ID
+        serialNumber: metadata.serialNumber,
+        deviceId: metadata.deviceId,
+        name: inventory.deviceName || inventory.ComputerName || metadata.serialNumber || 'Unknown Device',
+        hostname: inventory.deviceName,
+        osName: operatingSystem.name,
+        osVersion: operatingSystem.version,
+        clientVersion: metadata.clientVersion,
+        status: 'active', // Default status since we have recent data
+        lastSeen: metadata.collectedAt,
+        createdAt: metadata.collectedAt,
+        
+        // Extract hardware information from modules
+        model: hardware.model || inventory.model,
+        manufacturer: hardware.manufacturer || inventory.manufacturer,
+        processor: hardware.processor?.name,
+        cores: hardware.processor?.cores,
+        memory: hardware.memory?.totalPhysical ? `${Math.round(hardware.memory.totalPhysical / (1024*1024*1024))} GB` : undefined,
+        graphics: hardware.graphics?.name,
+        architecture: operatingSystem.architecture,
+        
+        // Battery information
+        batteryLevel: hardware.battery?.chargePercent,
+        batteryHealth: hardware.battery?.health,
+        batteryCycleCount: hardware.battery?.cycleCount,
+        isCharging: hardware.battery?.isCharging,
+        
+        // Storage information (extract main drive)
+        storage: hardware.storage && Array.isArray(hardware.storage) ? (() => {
+          console.log('[DEVICE API] Hardware storage array:', hardware.storage)
+          const mainDrive = hardware.storage.find((s: any) => s.type === 'SSD' && s.capacity > 0) || 
+                           hardware.storage.find((s: any) => s.capacity > 0) || 
+                           hardware.storage[0]
+          console.log('[DEVICE API] Found main drive:', mainDrive)
+          if (mainDrive && mainDrive.capacity) {
+            const totalGB = Math.round(mainDrive.capacity / (1024*1024*1024))
+            const freeGB = Math.round((mainDrive.freeSpace || 0) / (1024*1024*1024))
+            console.log('[DEVICE API] Storage calculations:', {
+              capacity: mainDrive.capacity,
+              freeSpace: mainDrive.freeSpace,
+              totalGB: totalGB,
+              freeGB: freeGB,
+              type: mainDrive.type
+            })
+            if (freeGB > 0) {
+              return `${totalGB} GB ${mainDrive.type || 'Drive'} • ${freeGB} GB free`
+            } else {
+              return `${totalGB} GB ${mainDrive.type || 'Drive'}`
+            }
+          }
+          return undefined
+        })() : undefined,
+        os: operatingSystem.name ? `${operatingSystem.name} ${operatingSystem.version || ''} ${operatingSystem.build ? `(Build ${operatingSystem.build})` : ''}`.trim() : 'Unknown OS',
+        uptime: systemData.uptimeString || systemData.uptime,
+        bootTime: systemData.lastBootTime,
+        
+        // System information
+        osDisplayVersion: operatingSystem.displayVersion,
+        osEdition: operatingSystem.edition,
+        osFeatureUpdate: operatingSystem.featureUpdate,
+        osInstallDate: operatingSystem.installDate,
+        osLocale: operatingSystem.locale,
+        osTimeZone: operatingSystem.timeZone,
+        keyboardLayouts: operatingSystem.keyboardLayouts,
+        
+        // Pass through the complete modules data for processing by the frontend
+        modules: data,
+        
+        // Extract specific module data for backward compatibility
+        system: systemData,
+        operatingSystem: operatingSystem,
+        inventory: inventory,
+        hardware: hardware,
+        
+        // Environment and service information
+        services: systemData.services || [],
+        environment: systemData.environment || [],
+        
+        // Module counts for debugging
+        moduleCount: Object.keys(data).filter(k => k !== 'metadata').length
       }
       
-      data.device = transformedDevice
+      // Return device in the expected format for the frontend
+      const responseData = {
+        success: true,
+        device: transformedDevice
+      }
+      
+      console.log('[DEVICE API] Returning transformed device data')
+      return NextResponse.json(responseData, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
     }
     
-    // Return the transformed data
-    return NextResponse.json(data, {
+    // If no metadata found, return error
+    console.log('[DEVICE API] No metadata found in response')
+    return NextResponse.json({
+      error: 'Invalid device data structure',
+      details: 'Expected unified data format with metadata'
+    }, { 
+      status: 500,
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
         'Pragma': 'no-cache',

@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { ManagedInstallsTable } from '../tables'
+import { processInstallsData } from '../../lib/data-processing/component-data'
 
 interface InstallsTabProps {
   device: any
@@ -12,16 +13,13 @@ interface InstallsTabProps {
 }
 
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
+  // Use the processed installs data which includes configuration
+  const installsData = data || processInstallsData(device)
+
   return (
     <div className="space-y-8">
-      <ManagedInstallsTable data={data || device.managedInstalls || {
-        totalPackages: 0,
-        installed: 0,
-        pending: 0,
-        failed: 0,
-        lastUpdate: '',
-        packages: []
-      }} />
+      {/* Managed Installs with Configuration */}
+      <ManagedInstallsTable data={installsData} />
     </div>
   )
 }

@@ -4,7 +4,7 @@
  */
 
 import React from 'react'
-import { InformationWidget } from '../widgets/Information'
+import { InventoryWidget } from '../widgets/Inventory'
 import { SystemWidget } from '../widgets/System'
 import { HardwareWidget } from '../widgets/Hardware'
 import { ManagementWidget } from '../widgets/Management'
@@ -19,7 +19,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({ device }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
       {/* Information Widget (Basic device info) */}
-      <InformationWidget device={device} />
+      <InventoryWidget device={device} />
       
       {/* System (Operating System) Widget */}
       <SystemWidget device={device} />
@@ -32,8 +32,9 @@ export const InfoTab: React.FC<InfoTabProps> = ({ device }) => {
       
       {/* Security Widget */}
       <SecurityWidget 
+        device={device}
         platform={device.platform || device.os} 
-        securityFeatures={device.securityFeatures} 
+        securityFeatures={device.securityFeatures || device.security} 
       />
       
       {/* Network Widget */}
