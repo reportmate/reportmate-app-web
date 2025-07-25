@@ -111,8 +111,8 @@ export async function GET(
         id: metadata.serialNumber || metadata.deviceId, // Use serial number as the primary ID
         serialNumber: metadata.serialNumber,
         deviceId: metadata.deviceId,
-        name: inventory.deviceName || inventory.ComputerName || metadata.serialNumber || 'Unknown Device',
-        hostname: inventory.deviceName,
+        name: inventory.deviceName || inventory.device_name || inventory.ComputerName || metadata.serialNumber || 'Unknown Device',
+        hostname: inventory.deviceName || inventory.device_name,
         osName: operatingSystem.name,
         osVersion: operatingSystem.version,
         clientVersion: metadata.clientVersion,
