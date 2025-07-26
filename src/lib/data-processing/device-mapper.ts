@@ -1053,43 +1053,43 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
       // Add security module data to mappedDevice.modules.security
       if (!mappedDevice.modules) mappedDevice.modules = {}
       mappedDevice.modules.security = {
-        antivirus: securityModuleData.Antivirus || {},
-        firewall: securityModuleData.Firewall || {},
-        encryption: securityModuleData.Encryption || {},
-        tpm: securityModuleData.Tpm || {},
-        securityUpdates: securityModuleData.SecurityUpdates || [],
-        securityEvents: securityModuleData.SecurityEvents || [],
-        lastSecurityScan: securityModuleData.LastSecurityScan
+        antivirus: securityModuleData.antivirus || {},
+        firewall: securityModuleData.firewall || {},
+        encryption: securityModuleData.encryption || {},
+        tpm: securityModuleData.tpm || {},
+        securityUpdates: securityModuleData.securityUpdates || [],
+        securityEvents: securityModuleData.securityEvents || [],
+        lastSecurityScan: securityModuleData.lastSecurityScan
       }
       
       // Update legacy securityFeatures for compatibility
-      const antivirus = securityModuleData.Antivirus || {}
-      const firewall = securityModuleData.Firewall || {}
-      const encryption = securityModuleData.Encryption || {}
-      const tpm = securityModuleData.Tpm || {}
+      const antivirus = securityModuleData.antivirus || {}
+      const firewall = securityModuleData.firewall || {}
+      const encryption = securityModuleData.encryption || {}
+      const tpm = securityModuleData.tpm || {}
       
       mappedDevice.securityFeatures = {
         ...mappedDevice.securityFeatures,
         // Windows Defender / Antivirus
         windowsDefender: {
-          enabled: antivirus.IsEnabled || false,
-          status: antivirus.IsUpToDate ? 'Up to date' : (antivirus.IsEnabled ? 'Active' : 'Disabled')
+          enabled: antivirus.isEnabled || false,
+          status: antivirus.isUpToDate ? 'Up to date' : (antivirus.isEnabled ? 'Active' : 'Disabled')
         },
         // Firewall
         firewall: {
-          enabled: firewall.IsEnabled || false,
-          status: firewall.IsEnabled ? 'Active' : 'Disabled'
+          enabled: firewall.isEnabled || false,
+          status: firewall.isEnabled ? 'Active' : 'Disabled'
         },
         // BitLocker
         bitlocker: {
-          enabled: encryption.BitLocker?.IsEnabled || false,
-          status: encryption.BitLocker?.Status || 'Unknown'
+          enabled: encryption.bitLocker?.isEnabled || false,
+          status: encryption.bitLocker?.status || 'Unknown'
         },
         // TPM
         tpm: {
-          enabled: tpm.IsEnabled || false,
-          status: tpm.IsActivated ? 'Active' : (tpm.IsPresent ? 'Present' : 'Not Available'),
-          version: tpm.Version || undefined
+          enabled: tpm.isEnabled || false,
+          status: tpm.isActivated ? 'Active' : (tpm.isPresent ? 'Present' : 'Not Available'),
+          version: tpm.version || undefined
         }
       }
     }
