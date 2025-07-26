@@ -8,7 +8,7 @@ import { InventoryWidget } from '../widgets/Inventory'
 import { SystemWidget } from '../widgets/System'
 import { HardwareWidget } from '../widgets/Hardware'
 import { ManagementWidget } from '../widgets/Management'
-import { SecurityWidget } from '../widgets/SecurityWidgetFixed'
+import { SecurityWidget } from '../widgets/Security'
 import { NetworkWidget } from '../widgets/Network'
 
 interface InfoTabProps {

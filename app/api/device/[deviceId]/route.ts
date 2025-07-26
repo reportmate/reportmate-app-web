@@ -188,49 +188,110 @@ export async function GET(
           system: {
             operatingSystem: operatingSystem
           },
-          security: data.security || {
-            // Mock comprehensive security data for development
-            moduleId: 'security-mock',
+          security: data.security ? (() => {
+            console.log('[DEVICE API] Processing security module data...')
+            console.log('[DEVICE API] Raw security data type:', typeof data.security)
+            console.log('[DEVICE API] Raw security data sample:', JSON.stringify(data.security).substring(0, 500))
+            
+            // The Azure Functions API returns the security data as an object
+            // but nested objects might still be PowerShell object representations
+            let securityData = data.security
+            
+            if (typeof securityData === 'object' && securityData !== null) {
+              console.log('[DEVICE API] Security data is an object, processing nested fields...')
+              
+              // Process and clean up the security data structure
+              const processedSecurity = {
+                moduleId: securityData.moduleId || 'security',
+                deviceId: securityData.deviceId || metadata.deviceId,
+                collectedAt: securityData.collectedAt || metadata.collectedAt,
+                version: securityData.version || '1.0.0',
+                
+                // Process antivirus data
+                antivirus: securityData.antivirus ? {
+                  name: securityData.antivirus.name || 'Unknown',
+                  version: securityData.antivirus.version || 'Unknown',
+                  isEnabled: Boolean(securityData.antivirus.isEnabled),
+                  isUpToDate: Boolean(securityData.antivirus.isUpToDate),
+                  lastScan: securityData.antivirus.lastScan || null,
+                  scanType: securityData.antivirus.scanType || 'Unknown',
+                  lastUpdate: securityData.antivirus.lastUpdate || null
+                } : { name: 'Unknown', isEnabled: false, isUpToDate: false },
+                
+                // Process firewall data
+                firewall: securityData.firewall ? {
+                  isEnabled: Boolean(securityData.firewall.isEnabled),
+                  profile: securityData.firewall.profile || 'Unknown',
+                  rules: Array.isArray(securityData.firewall.rules) ? securityData.firewall.rules : []
+                } : { isEnabled: false, profile: 'Unknown', rules: [] },
+                
+                // Process TPM data
+                tpm: securityData.tpm ? {
+                  version: securityData.tpm.version || 'Unknown',
+                  isEnabled: Boolean(securityData.tpm.isEnabled),
+                  isPresent: Boolean(securityData.tpm.isPresent),
+                  isActivated: Boolean(securityData.tpm.isActivated),
+                  manufacturer: securityData.tpm.manufacturer || 'Unknown'
+                } : { isPresent: false, isEnabled: false, isActivated: false },
+                
+                // Process encryption data
+                encryption: securityData.encryption ? {
+                  deviceEncryption: Boolean(securityData.encryption.deviceEncryption),
+                  bitLocker: securityData.encryption.bitLocker ? {
+                    status: securityData.encryption.bitLocker.status || 'Unknown',
+                    isEnabled: Boolean(securityData.encryption.bitLocker.isEnabled),
+                    recoveryKeyId: securityData.encryption.bitLocker.recoveryKeyId || '',
+                    encryptedDrives: Array.isArray(securityData.encryption.bitLocker.encryptedDrives) 
+                      ? securityData.encryption.bitLocker.encryptedDrives 
+                      : []
+                  } : { isEnabled: false, status: 'Disabled', encryptedDrives: [] },
+                  encryptedVolumes: Array.isArray(securityData.encryption.encryptedVolumes) ? 
+                    securityData.encryption.encryptedVolumes : []
+                } : { deviceEncryption: false, encryptedVolumes: [] },
+                
+                // Process security updates
+                securityUpdates: Array.isArray(securityData.securityUpdates) ? 
+                  securityData.securityUpdates.map((update: any) => ({
+                    id: update.id || 'Unknown',
+                    title: update.title || 'Unknown Update',
+                    status: update.status || 'Unknown',
+                    severity: update.severity || 'Unknown',
+                    installDate: update.installDate || null
+                  })) : [],
+                
+                // Process security events
+                securityEvents: Array.isArray(securityData.securityEvents) ? 
+                  securityData.securityEvents : [],
+                
+                lastSecurityScan: securityData.lastSecurityScan || metadata.collectedAt
+              }
+              
+              console.log('[DEVICE API] Processed security data:', JSON.stringify(processedSecurity).substring(0, 500))
+              return processedSecurity
+            }
+            
+            console.log('[DEVICE API] Security data is not an object, using fallback')
+            return {
+              moduleId: 'security-fallback',
+              deviceId: metadata.deviceId,
+              collectedAt: metadata.collectedAt,
+              antivirus: { name: 'Unknown', isEnabled: false },
+              firewall: { isEnabled: false },
+              encryption: { deviceEncryption: false },
+              tpm: { isPresent: false },
+              securityUpdates: [],
+              securityEvents: [],
+              lastSecurityScan: metadata.collectedAt
+            }
+          })() : {
+            // Complete fallback if no security data at all
+            moduleId: 'security-no-data',
             deviceId: metadata.deviceId,
             collectedAt: metadata.collectedAt,
-            antivirus: {
-              name: 'Windows Defender',
-              version: '4.18.2409.8',
-              isEnabled: true,
-              isUpToDate: true,
-              lastScan: '2024-01-15T10:30:00Z',
-              scanType: 'Quick Scan',
-              lastUpdate: '2024-01-15T08:00:00Z'
-            },
-            firewall: {
-              isEnabled: true,
-              profile: 'Domain',
-              rules: []
-            },
-            encryption: {
-              bitLocker: {
-                isEnabled: true,
-                status: 'Fully Encrypted',
-                encryptedDrives: ['C:', 'D:'],
-                recoveryKeyId: 'key-12345'
-              },
-              deviceEncryption: true,
-              encryptedVolumes: [
-                {
-                  driveLetter: 'C:',
-                  status: 'Fully Encrypted',
-                  encryptionMethod: 'XTS-AES 256',
-                  encryptionPercentage: 100
-                }
-              ]
-            },
-            tpm: {
-              version: '2.0',
-              isEnabled: true,
-              isPresent: true,
-              isActivated: true,
-              manufacturer: 'Microsoft'
-            },
+            antivirus: { name: 'Unknown', isEnabled: false },
+            firewall: { isEnabled: false },
+            encryption: { deviceEncryption: false },
+            tpm: { isPresent: false },
             securityUpdates: [],
             securityEvents: [],
             lastSecurityScan: metadata.collectedAt
