@@ -1,6 +1,6 @@
 /**
  * Hardware Tab Component
- * System hardware and specifications
+ * Displays device hardware information and specifications
  */
 
 import React from 'react'
@@ -19,7 +19,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       <div className="text-center py-16">
         <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 002 2v10a2 2 0 002 2z" />
           </svg>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Hardware Information</h3>
@@ -28,8 +28,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     )
   }
 
-  // Hardware stats for overview cards - fix storage handling
-  const storageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
+  // Hardware stats for overview cards - filter out invalid storage devices
+  const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
+  // Filter out devices with 0 capacity or 0 free space as they don't have proper data collection
+  const storageDevices = allStorageDevices.filter((drive: any) => 
+    (drive.capacity && drive.capacity > 0) && (drive.freeSpace && drive.freeSpace > 0)
+  )
   const totalStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) || 0
   const freeStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.freeSpace || 0), 0) || 0
   const usedStorage = totalStorage - freeStorage
@@ -50,16 +54,82 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
   return (
     <div className="space-y-8">
+
+      {/* Detailed Hardware Information */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex justify-between items-start mb-6">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{hardwareData.model || 'Unknown Model'}</h3>
+            <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">{hardwareData.manufacturer}</p>
+          </div>
+          {hardwareData.processor?.architecture && (
+            <div className="flex-shrink-0">
+              <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                {hardwareData.processor.architecture}
+              </span>
+            </div>
+          )}
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+          <div>
+            <div className="font-medium text-gray-900 dark:text-white">Processor</div>
+            <div className="text-gray-600 dark:text-gray-400">{hardwareData.processor?.name || 'Unknown'}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {hardwareData.processor?.cores} cores @ {hardwareData.processor?.maxSpeed} GHz
+            </div>
+          </div>
+          
+          <div>
+            <div className="font-medium text-gray-900 dark:text-white">Memory</div>
+            <div className="text-gray-600 dark:text-gray-400">{formatBytes(totalMemory)}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {hardwareData.memory?.modules?.[0]?.type || 'Unknown'} • {hardwareData.memory?.modules?.[0]?.manufacturer || 'Unknown'}
+            </div>
+          </div>
+          
+          <div>
+            <div className="font-medium text-gray-900 dark:text-white">Primary Storage</div>
+            <div className="text-gray-600 dark:text-gray-400">
+              {storageDevices[0] ? formatBytes(storageDevices[0].capacity) : 'Unknown'}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {storageDevices[0]?.type || 'Unknown'} • {storageDevices[0]?.health || 'Unknown'} Health
+            </div>
+          </div>
+          
+          <div>
+            <div className="font-medium text-gray-900 dark:text-white">Graphics</div>
+            <div className="text-gray-600 dark:text-gray-400">{hardwareData.graphics?.name || 'Unknown'}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
+            </div>
+          </div>
+          
+          {hardwareData.battery && (
+            <div>
+              <div className="font-medium text-gray-900 dark:text-white">Battery</div>
+              <div className="text-gray-600 dark:text-gray-400">
+                {hardwareData.battery.chargePercent}% • {hardwareData.battery.health}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                {hardwareData.battery.cycleCount} cycles • {hardwareData.battery.isCharging ? 'Charging' : 'Not charging'}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Hardware Overview Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Processor */}
+        {/* Architecture */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {hardwareData.processor?.cores || 'N/A'}
+            {hardwareData.processor?.architecture || 'N/A'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">CPU Cores</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {hardwareData.processor?.name || 'Unknown Processor'}
+            {hardwareData.processor?.cores || 'N/A'} cores @ {hardwareData.processor?.maxSpeed || 'N/A'} GHz
           </div>
         </div>
 
@@ -85,25 +155,25 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           </div>
         </div>
 
-        {/* Graphics */}
+        {/* Battery */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {hardwareData.graphics?.memorySize || 'N/A'}
+            {hardwareData.battery?.cycleCount || 'N/A'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">GPU Memory (GB)</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Battery Cycles</div>
           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {hardwareData.graphics?.name || 'Unknown Graphics'}
+            {hardwareData.battery?.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
           </div>
         </div>
       </div>
 
-      {/* Storage Devices */}
+      {/* Storage Devices - Only show devices with valid capacity or free space data */}
       {storageDevices && storageDevices.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Storage Devices</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Physical and logical storage devices attached to this system
+              Physical and logical storage devices
             </p>
           </div>
           <div className="overflow-x-auto">
@@ -221,44 +291,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
       )}
 
-      {/* Detailed Hardware Information */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Hardware Summary</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">Processor</div>
-            <div className="text-gray-600 dark:text-gray-400">{hardwareData.processor?.name || 'Unknown'}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {hardwareData.processor?.cores} cores @ {hardwareData.processor?.maxSpeed} GHz
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">Graphics</div>
-            <div className="text-gray-600 dark:text-gray-400">{hardwareData.graphics?.name || 'Unknown'}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
-            </div>
-          </div>
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">System Model</div>
-            <div className="text-gray-600 dark:text-gray-400">{hardwareData.model || 'Unknown'}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {hardwareData.manufacturer}
-            </div>
-          </div>
-          {hardwareData.battery && (
-            <div>
-              <div className="font-medium text-gray-900 dark:text-white">Battery</div>
-              <div className="text-gray-600 dark:text-gray-400">
-                {hardwareData.battery.chargePercent}% • {hardwareData.battery.health}
-              </div>
-              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                {hardwareData.battery.cycleCount} cycles • {hardwareData.battery.isCharging ? 'Charging' : 'Not charging'}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   )
 }

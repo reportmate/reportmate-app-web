@@ -35,6 +35,58 @@ export async function GET(
     
     if (!response.ok) {
       console.error('[DEVICE API] Azure Functions API error:', response.status, response.statusText)
+      
+      // If Azure Functions API is not available, fall back to sample data
+      console.log('[DEVICE API] Falling back to sample data')
+      
+      try {
+        // Read sample data from file
+        const path = require('path')
+        const fs = require('fs')
+        const workingDir = process.cwd()
+        console.log('[DEVICE API] Working directory:', workingDir)
+        
+        // Try multiple possible paths
+        const possiblePaths = [
+          path.join(workingDir, 'sample-api-data.json'),
+          path.join(workingDir, '../../sample-api-data.json'),
+          path.join(workingDir, '../../../sample-api-data.json'),
+          path.join(__dirname, '../../../../../../sample-api-data.json')
+        ]
+        
+        let sampleDataPath = null
+        for (const testPath of possiblePaths) {
+          console.log('[DEVICE API] Testing path:', testPath)
+          if (fs.existsSync(testPath)) {
+            sampleDataPath = testPath
+            console.log('[DEVICE API] Found sample data at:', testPath)
+            break
+          }
+        }
+        
+        if (sampleDataPath) {
+          const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'))
+          console.log('[DEVICE API] Using sample data fallback')
+          
+          // Return sample data in the expected format
+          return NextResponse.json({
+            success: true,
+            device: sampleData,
+            source: 'sample-data'
+          }, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+        } else {
+          console.log('[DEVICE API] Sample data file not found in any of the expected locations')
+        }
+      } catch (sampleError) {
+        console.error('[DEVICE API] Failed to load sample data:', sampleError)
+      }
+      
       if (response.status === 404) {
         return NextResponse.json({
           error: 'Device not found'
