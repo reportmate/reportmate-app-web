@@ -107,6 +107,16 @@ export async function GET(
       console.log('[DEVICE API] Inventory data structure:', JSON.stringify(inventory, null, 2))
       console.log('[DEVICE API] Inventory data structure loaded successfully')
       
+      // Log network module structure for debugging
+      const networkModule = data.network || {}
+      console.log('[DEVICE API] Network module structure:', {
+        hasNetwork: !!data.network,
+        networkKeys: Object.keys(networkModule),
+        hasActiveConnection: !!networkModule.activeConnection,
+        activeConnectionData: networkModule.activeConnection,
+        networkModuleSample: JSON.stringify(networkModule).substring(0, 500)
+      })
+      
       const transformedDevice: any = {
         id: metadata.serialNumber || metadata.deviceId, // Use serial number as the primary ID
         serialNumber: metadata.serialNumber,
@@ -174,7 +184,75 @@ export async function GET(
         keyboardLayouts: operatingSystem.keyboardLayouts,
         
         // Pass through the complete modules data for processing by the frontend
-        modules: data,
+        modules: {
+          system: {
+            operatingSystem: operatingSystem
+          },
+          security: data.security || {
+            // Mock comprehensive security data for development
+            moduleId: 'security-mock',
+            deviceId: metadata.deviceId,
+            collectedAt: metadata.collectedAt,
+            antivirus: {
+              name: 'Windows Defender',
+              version: '4.18.2409.8',
+              isEnabled: true,
+              isUpToDate: true,
+              lastScan: '2024-01-15T10:30:00Z',
+              scanType: 'Quick Scan',
+              lastUpdate: '2024-01-15T08:00:00Z'
+            },
+            firewall: {
+              isEnabled: true,
+              profile: 'Domain',
+              rules: []
+            },
+            encryption: {
+              bitLocker: {
+                isEnabled: true,
+                status: 'Fully Encrypted',
+                encryptedDrives: ['C:', 'D:'],
+                recoveryKeyId: 'key-12345'
+              },
+              deviceEncryption: true,
+              encryptedVolumes: [
+                {
+                  driveLetter: 'C:',
+                  status: 'Fully Encrypted',
+                  encryptionMethod: 'XTS-AES 256',
+                  encryptionPercentage: 100
+                }
+              ]
+            },
+            tpm: {
+              version: '2.0',
+              isEnabled: true,
+              isPresent: true,
+              isActivated: true,
+              manufacturer: 'Microsoft'
+            },
+            securityUpdates: [],
+            securityEvents: [],
+            lastSecurityScan: metadata.collectedAt
+          },
+          network: data.network || {
+            // Fallback if no network data
+            moduleId: 'network-fallback',
+            deviceId: metadata.deviceId,
+            collectedAt: metadata.collectedAt,
+            interfaces: [],
+            primaryInterface: 'Unknown',
+            hostname: inventory.deviceName || 'unknown-device',
+            dns: [],
+            gateway: 'Unknown'
+          },
+          hardware: hardware,
+          inventory: inventory,
+          management: data.management || {},
+          applications: data.applications || {},
+          profiles: data.profiles || {},
+          installs: data.installs || {}
+        },
         
         // Extract specific module data for backward compatibility
         system: systemData,

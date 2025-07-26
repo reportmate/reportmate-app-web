@@ -38,6 +38,18 @@ interface NetworkInfo {
   wireless_locale?: string;
   // VPN Properties
   vpnConnections?: VpnConnection[];
+  // Active connection information
+  activeConnection?: {
+    connectionType?: string;
+    interfaceName?: string;
+    friendlyName?: string;
+    ipAddress?: string;
+    gateway?: string;
+    activeWifiSsid?: string;
+    wifiSignalStrength?: number;
+    isVpnActive?: boolean;
+    vpnName?: string;
+  };
 }
 
 interface VpnConnection {
@@ -86,29 +98,56 @@ const NetworkOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
     );
   }
 
+  // Use active connection info if available, fall back to legacy fields
+  const connectionType = network?.activeConnection?.connectionType || network?.connectionType || 'Unknown';
+  const activeIpAddress = network?.activeConnection?.ipAddress || ipAddress;
+  const activeMacAddress = macAddress;
+  const wifiInfo = network?.activeConnection?.activeWifiSsid;
+  const isVpnActive = network?.activeConnection?.isVpnActive;
+
   return (
     <div className="p-6">
       <div className="grid grid-cols-1 gap-4">
         <div className="text-center">
-          <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-1">
-            {network?.connectionType || 'Unknown'}
+          <div className="flex items-center justify-center mb-1">
+            {connectionType === 'Wireless' && (
+              <svg className="w-5 h-5 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+              </svg>
+            )}
+            {connectionType === 'Wired' && (
+              <svg className="w-5 h-5 text-green-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M7 20h4c0 1.1-.9 2-2 2s-2-.9-2-2zm2.8-2h8.2c.44 0 .8-.36.8-.8v-7.6c0-.44-.36-.8-.8-.8h-8.2c-.44 0-.8.36-.8.8v7.6c0 .44.36.8.8.8z"/>
+              </svg>
+            )}
+            <div className="text-lg font-bold text-indigo-600 dark:text-indigo-400">
+              {connectionType}
+            </div>
+            {isVpnActive && (
+              <svg className="w-4 h-4 text-blue-500 ml-2" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M17,7H22V17H17V19A1,1 0 0,0 18,20H20V22H18A3,3 0 0,1 15,19V17H9V19A1,1 0 0,0 10,20H12V22H10A3,3 0 0,1 7,19V17H2V7H7V5A3,3 0 0,1 10,2H12V4H10A1,1 0 0,0 9,5V7H15V5A1,1 0 0,0 14,4H12V2H14A3,3 0 0,1 17,5V7Z"/>
+              </svg>
+            )}
           </div>
           <div className="text-xs text-gray-600 dark:text-gray-400">Connection Type</div>
+          {wifiInfo && (
+            <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">{wifiInfo}</div>
+          )}
         </div>
         
-        {ipAddress && (
+        {activeIpAddress && (
           <div className="text-center">
             <div className="text-sm font-bold text-gray-900 dark:text-white mb-1 font-mono">
-              {ipAddress}
+              {activeIpAddress}
             </div>
             <div className="text-xs text-gray-600 dark:text-gray-400">IP Address</div>
           </div>
         )}
         
-        {macAddress && (
+        {activeMacAddress && (
           <div className="text-center">
             <div className="text-sm font-bold text-gray-900 dark:text-white mb-1 font-mono">
-              {macAddress}
+              {activeMacAddress}
             </div>
             <div className="text-xs text-gray-600 dark:text-gray-400">MAC Address</div>
           </div>
@@ -138,10 +177,136 @@ const NetworkDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
 
   return (
     <div className="space-y-6">
+      {/* Active Connection Status */}
+      {network.activeConnection && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Active Connection</h3>
+          </div>
+          <div className="p-6 space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Connection Type</label>
+                <div className="flex items-center mt-1">
+                  {network.activeConnection.connectionType === 'Wireless' && (
+                    <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.07 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+                    </svg>
+                  )}
+                  {network.activeConnection.connectionType === 'Wired' && (
+                    <svg className="w-4 h-4 text-green-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M7 20h4c0 1.1-.9 2-2 2s-2-.9-2-2zm2.8-2h8.2c.44 0 .8-.36.8-.8v-7.6c0-.44-.36-.8-.8-.8h-8.2c-.44 0-.8.36-.8.8v7.6c0 .44.36.8.8.8z"/>
+                    </svg>
+                  )}
+                  <p className="text-gray-900 dark:text-white font-medium">{network.activeConnection.connectionType}</p>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Interface</label>
+                <p className="text-gray-900 dark:text-white font-mono">{network.activeConnection.friendlyName || network.activeConnection.interfaceName}</p>
+              </div>
+            </div>
+
+            {network.activeConnection.activeWifiSsid && (
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">WiFi Network</label>
+                <div className="flex items-center justify-between">
+                  <p className="text-gray-900 dark:text-white">{network.activeConnection.activeWifiSsid}</p>
+                  {network.activeConnection.wifiSignalStrength && (
+                    <span className="text-sm text-gray-500">Signal: {network.activeConnection.wifiSignalStrength}%</span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">IP Address</label>
+                <p className="text-gray-900 dark:text-white font-mono">{network.activeConnection.ipAddress || network.ipv4ip}</p>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Gateway</label>
+                <p className="text-gray-900 dark:text-white font-mono">{network.activeConnection.gateway || network.ipv4router}</p>
+              </div>
+            </div>
+
+            {network.activeConnection.isVpnActive && network.activeConnection.vpnName && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-4 h-4 text-blue-500 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17,7H22V17H17V19A1,1 0 0,0 18,20H20V22H18A3,3 0 0,1 15,19V17H9V19A1,1 0 0,0 10,20H12V22H10A3,3 0 0,1 7,19V17H2V7H7V5A3,3 0 0,1 10,2H12V4H10A1,1 0 0,0 9,5V7H15V5A1,1 0 0,0 14,4H12V2H14A3,3 0 0,1 17,5V7Z"/>
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">VPN Active</p>
+                    <p className="text-xs text-blue-700 dark:text-blue-300">{network.activeConnection.vpnName}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Network Interfaces */}
+      {device?.modules?.network?.interfaces && device.modules.network.interfaces.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Interfaces</h3>
+          </div>
+          <div className="p-6 space-y-4">
+            {device.modules.network.interfaces.map((iface: any, index: number) => (
+              <div key={index} className={`p-4 border border-gray-200 dark:border-gray-700 rounded-lg ${iface.isActive ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' : ''}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-3 ${iface.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                    <h4 className="font-medium text-gray-900 dark:text-white">
+                      {iface.friendlyName || iface.name} ({iface.type})
+                    </h4>
+                  </div>
+                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                    iface.isActive ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 
+                    iface.status === 'Up' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
+                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
+                    {iface.isActive ? 'Active' : iface.status}
+                  </span>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-400">MAC Address</label>
+                    <p className="font-mono text-gray-900 dark:text-white">{iface.macAddress}</p>
+                  </div>
+                  <div>
+                    <label className="text-gray-600 dark:text-gray-400">IP Addresses</label>
+                    <div className="font-mono text-gray-900 dark:text-white">
+                      {iface.ipAddresses && iface.ipAddresses.length > 0 ? (
+                        iface.ipAddresses.map((ip: string, ipIndex: number) => (
+                          <div key={ipIndex} className={ip.includes(':') ? 'text-xs text-gray-500' : ''}>{ip}</div>
+                        ))
+                      ) : (
+                        <span className="text-gray-500">None assigned</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {iface.mtu && (
+                  <div className="mt-2 text-sm">
+                    <label className="text-gray-600 dark:text-gray-400">MTU</label>
+                    <p className="text-gray-900 dark:text-white">{iface.mtu}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Basic Network Info */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Inventory</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Details</h3>
         </div>
         <div className="p-6 space-y-4">
           <div>

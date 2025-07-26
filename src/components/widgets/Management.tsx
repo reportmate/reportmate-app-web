@@ -7,13 +7,72 @@ import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
 
 interface Management {
-  enrolled: boolean
-  enrolled_via_dep?: boolean
-  server_url?: string | null
-  user_approved?: boolean
-  organization?: string | null
-  department?: string | null
-  vendor?: string | null
+  deviceState?: {
+    status?: string
+    deviceName?: string
+    entraJoined?: boolean
+    domainJoined?: boolean
+    virtualDesktop?: boolean
+    enterpriseJoined?: boolean
+  }
+  deviceDetails?: {
+    deviceId?: string
+    thumbprint?: string
+    keyProvider?: string
+    tmpProtected?: boolean
+    keyContainerId?: string
+    deviceAuthStatus?: string
+    deviceCertificateValidity?: string
+  }
+  mdmEnrollment?: {
+    provider?: string
+    isEnrolled?: boolean
+    managementUrl?: string
+    enrollmentType?: string
+    serverUrl?: string
+  }
+  tenantDetails?: {
+    tenantName?: string
+    tenantId?: string
+    mdmUrl?: string
+  }
+  userState?: {
+    ngcSet?: boolean
+    canReset?: boolean
+    ngcKeyId?: string
+    wamDefaultId?: string
+    wamDefaultSet?: boolean
+    wamDefaultGUID?: string
+    workplaceJoined?: boolean
+    wamDefaultAuthority?: string
+  }
+  ssoState?: {
+    cloudTgt?: boolean
+    entraPrt?: boolean
+    onPremTgt?: boolean
+    enterprisePrt?: boolean
+    entraPrtAuthority?: string
+    kerbTopLevelNames?: string
+    entraPrtExpiryTime?: string
+    entraPrtUpdateTime?: string
+    enterprisePrtAuthority?: string
+  }
+  diagnosticData?: {
+    accessType?: string
+    clientTime?: string
+    keySignTest?: string
+    clientErrorCode?: string
+    hostNameUpdated?: boolean
+    proxyBypassList?: string
+    proxyServerList?: string
+    osVersionUpdated?: string
+    autoDetectSettings?: boolean
+    displayNameUpdated?: string
+    lastHostNameUpdate?: string
+    autoConfigurationUrl?: string
+    entraRecoveryEnabled?: boolean
+    executingAccountName?: string
+  }
   profiles?: Array<{
     id: string
     name: string
@@ -22,22 +81,20 @@ interface Management {
     status: string
     lastModified: string
   }>
-  restrictions?: {
-    app_installation?: string
-    camera_disabled?: boolean
-    screen_recording_disabled?: boolean
-    system_preferences_disabled?: boolean
-    touch_id_disabled?: boolean
-    siri_disabled?: boolean
-  }
-  apps?: Array<{
-    id: string
-    name: string
-    bundleId: string
-    status: string
-    source: string
-    lastUpdate: string
+  compliancePolicies?: Array<{
+    name?: string
+    status?: string
+    lastEvaluated?: string
   }>
+  metadata?: {
+    Certificates?: Array<{
+      Issuer: string
+      Subject: string
+      NotValidAfter: string
+      NotValidBefore: string
+      SigningAlgorithm: string
+    }>
+  }
 }
 
 interface Device {
@@ -72,6 +129,35 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
     )
   }
 
+  // Extract key data from the management structure
+  const isEnrolled = management.mdmEnrollment?.isEnrolled || false
+  const provider = management.mdmEnrollment?.provider
+  const enrollmentType = management.mdmEnrollment?.enrollmentType
+  const deviceStatus = management.deviceState?.status
+  const tenantName = management.tenantDetails?.tenantName
+  const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
+  const profileCount = management.profiles?.length || 0
+  const certificateCount = management.metadata?.Certificates?.length || 0
+
+  // Helper functions
+  const formatExpiryDate = (dateString?: string) => {
+    if (!dateString) return 'Unknown'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+    } catch {
+      return dateString
+    }
+  }
+
+  const getConnectionStatusColor = (status: boolean) => {
+    return status ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+  }
+
   return (
     <StatBlock 
       title="Management" 
@@ -79,74 +165,157 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
       icon={Icons.management}
       iconColor={WidgetColors.green}
     >
-      {/* Enrollment Status */}
+      {/* Primary Enrollment Status */}
       <StatusBadge
         label="Enrollment"
-        status={management.enrolled ? 'Enrolled' : 'Not Enrolled'}
-        type={management.enrolled ? 'success' : 'error'}
+        status={isEnrolled ? 'Enrolled' : 'Not Enrolled'}
+        type={isEnrolled ? 'success' : 'error'}
       />
 
-      {management.enrolled && (
+      {/* Device Status */}
+      {deviceStatus && (
+        <StatusBadge
+          label="Device Status"
+          status={deviceStatus}
+          type={deviceStatus.includes('Joined') ? 'success' : 'warning'}
+        />
+      )}
+
+      {isEnrolled && (
         <>
-          {/* Vendor/Organization */}
-          {(management.vendor || management.organization) && (
+          {/* Core Management Info */}
+          {provider && (
             <Stat 
-              label="Vendor" 
-              value={(management.vendor || management.organization) || ''} 
+              label="Provider" 
+              value={provider} 
             />
           )}
 
-          {/* Platform-specific details */}
-          {device.platform === 'macOS' && (
-            <>
-              {management.enrolled_via_dep !== undefined && (
-                <StatusBadge
-                  label="DEP Enrollment"
-                  status={management.enrolled_via_dep ? 'Yes' : 'No'}
-                  type={management.enrolled_via_dep ? 'success' : 'warning'}
-                />
-              )}
-              {management.user_approved !== undefined && (
-                <StatusBadge
-                  label="User Approved"
-                  status={management.user_approved ? 'Yes' : 'No'}
-                  type={management.user_approved ? 'success' : 'warning'}
-                />
-              )}
-            </>
-          )}
-
-          {device.platform === 'Windows' && (
-            <>
-              {management.server_url && (
-                <Stat 
-                  label="Server URL" 
-                  value={management.server_url} 
-                  isMono 
-                />
-              )}
-            </>
-          )}
-
-          {/* Department */}
-          {management.department && (
-            <Stat label="Department" value={management.department} />
-          )}
-
-          {/* Profile count */}
-          {management.profiles && management.profiles.length > 0 && (
+          {enrollmentType && (
             <Stat 
-              label="Profiles" 
-              value={`${management.profiles.length} installed`} 
+              label="Enrollment Type" 
+              value={enrollmentType} 
             />
           )}
 
-          {/* Managed apps count */}
-          {management.apps && management.apps.length > 0 && (
+          {tenantName && (
             <Stat 
-              label="Managed Apps" 
-              value={`${management.apps.length} apps`} 
+              label="Organization" 
+              value={tenantName} 
             />
+          )}
+
+          {/* Device Authentication Status */}
+          {deviceAuthStatus && (
+            <StatusBadge
+              label="Device Auth"
+              status={deviceAuthStatus}
+              type={deviceAuthStatus === 'SUCCESS' ? 'success' : 'error'}
+            />
+          )}
+
+          {/* Compliance Status */}
+          {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
+            <Stat 
+              label="Compliance Policies" 
+              value={`${management.compliancePolicies.length} policies`} 
+            />
+          ) : (
+            <StatusBadge
+              label="Compliance"
+              status="No policies applied"
+              type="info"
+            />
+          )}
+
+          {/* Resource Counts */}
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {profileCount > 0 && (
+              <Stat 
+                label="Profiles" 
+                value={profileCount.toString()} 
+              />
+            )}
+
+            {certificateCount > 0 && (
+              <Stat 
+                label="Certificates" 
+                value={certificateCount.toString()} 
+              />
+            )}
+          </div>
+
+          {/* Identity & Authentication Details */}
+          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
+              Identity & Authentication
+            </div>
+            <div className="space-y-2">
+              {/* Domain Status */}
+              {management.deviceState?.entraJoined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Entra Joined:</span>
+                  <span className="text-green-600 dark:text-green-400 font-medium">✓ Yes</span>
+                </div>
+              )}
+              
+              {management.deviceState?.domainJoined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Domain Joined:</span>
+                  <span className="text-green-600 dark:text-green-400 font-medium">✓ Yes</span>
+                </div>
+              )}
+
+              {/* SSO Authentication State */}
+              {management.ssoState?.entraPrt !== undefined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Entra PRT:</span>
+                  <span className={`font-medium ${getConnectionStatusColor(management.ssoState.entraPrt)}`}>
+                    {management.ssoState.entraPrt ? '✓ Active' : '✗ Inactive'}
+                  </span>
+                </div>
+              )}
+
+              {management.ssoState?.cloudTgt !== undefined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Cloud TGT:</span>
+                  <span className={`font-medium ${getConnectionStatusColor(management.ssoState.cloudTgt)}`}>
+                    {management.ssoState.cloudTgt ? '✓ Active' : '✗ Inactive'}
+                  </span>
+                </div>
+              )}
+
+              {/* Windows Hello Status */}
+              {management.userState?.ngcSet !== undefined && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">Windows Hello:</span>
+                  <span className={`font-medium ${getConnectionStatusColor(management.userState.ngcSet)}`}>
+                    {management.userState.ngcSet ? '✓ Configured' : '✗ Not Set'}
+                  </span>
+                </div>
+              )}
+
+              {/* PRT Expiry */}
+              {management.ssoState?.entraPrtExpiryTime && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 dark:text-gray-400">PRT Expires:</span>
+                  <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">
+                    {formatExpiryDate(management.ssoState.entraPrtExpiryTime)}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Management URLs */}
+          {management.mdmEnrollment?.managementUrl && (
+            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Stat 
+                label="Management URL" 
+                value={management.mdmEnrollment.managementUrl} 
+                isMono 
+              />
+            </div>
           )}
         </>
       )}

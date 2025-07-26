@@ -88,6 +88,17 @@ export interface ProcessedDeviceInfo {
     country_code?: string
     firmware_version?: string
     wireless_locale?: string
+    activeConnection?: {
+      connectionType?: string
+      interfaceName?: string
+      friendlyName?: string
+      ipAddress?: string
+      gateway?: string
+      activeWifiSsid?: string
+      wifiSignalStrength?: number
+      isVpnActive?: boolean
+      vpnName?: string
+    }
   }
   software?: {
     buildVersion: string
@@ -148,13 +159,82 @@ export interface ProcessedDeviceInfo {
     installedApps: any[]
   }
   management?: {
-    enrolled: boolean
-    enrolled_via_dep: boolean
+    // Legacy macOS MDM fields (for backward compatibility)
+    enrolled?: boolean
+    enrolled_via_dep?: boolean
     server_url?: string | null
     user_approved?: boolean
     organization?: string | null
     department?: string | null
     vendor?: string | null
+    
+    // Windows Management Data (from your API structure)
+    deviceState?: {
+      status?: string
+      deviceName?: string
+      entraJoined?: boolean
+      domainJoined?: boolean
+      virtualDesktop?: boolean
+      enterpriseJoined?: boolean
+    }
+    deviceDetails?: {
+      deviceId?: string
+      thumbprint?: string
+      keyProvider?: string
+      tmpProtected?: boolean
+      keyContainerId?: string
+      deviceAuthStatus?: string
+      deviceCertificateValidity?: string
+    }
+    mdmEnrollment?: {
+      provider?: string
+      isEnrolled?: boolean
+      managementUrl?: string
+      enrollmentType?: string
+      serverUrl?: string
+    }
+    tenantDetails?: {
+      tenantName?: string
+      tenantId?: string
+      mdmUrl?: string
+    }
+    userState?: {
+      ngcSet?: boolean
+      canReset?: boolean
+      ngcKeyId?: string
+      wamDefaultId?: string
+      wamDefaultSet?: boolean
+      wamDefaultGUID?: string
+      workplaceJoined?: boolean
+      wamDefaultAuthority?: string
+    }
+    ssoState?: {
+      cloudTgt?: boolean
+      entraPrt?: boolean
+      onPremTgt?: boolean
+      enterprisePrt?: boolean
+      entraPrtAuthority?: string
+      kerbTopLevelNames?: string
+      entraPrtExpiryTime?: string
+      entraPrtUpdateTime?: string
+      enterprisePrtAuthority?: string
+    }
+    diagnosticData?: {
+      accessType?: string
+      clientTime?: string
+      keySignTest?: string
+      clientErrorCode?: string
+      hostNameUpdated?: boolean
+      proxyBypassList?: string
+      proxyServerList?: string
+      osVersionUpdated?: string
+      autoDetectSettings?: boolean
+      displayNameUpdated?: string
+      lastHostNameUpdate?: string
+      autoConfigurationUrl?: string
+      entraRecoveryEnabled?: boolean
+      executingAccountName?: string
+    }
     profiles?: Array<{
       id: string
       name: string
@@ -163,6 +243,22 @@ export interface ProcessedDeviceInfo {
       status: string
       lastModified: string
     }>
+    compliancePolicies?: Array<{
+      name?: string
+      status?: string
+      lastEvaluated?: string
+    }>
+    metadata?: {
+      Certificates?: Array<{
+        Issuer: string
+        Subject: string
+        NotValidAfter: string
+        NotValidBefore: string
+        SigningAlgorithm: string
+      }>
+    }
+    
+    // Legacy fields for backward compatibility
     restrictions?: {
       app_installation?: string
       camera_disabled?: boolean
@@ -298,6 +394,36 @@ export interface ProcessedDeviceInfo {
     successfulInstalls: number
     failedInstalls: number
     pendingInstalls: number
+  }
+  // Modular data from modules
+  modules?: {
+    system?: {
+      operatingSystem?: any
+    }
+    network?: {
+      interfaces?: any[]
+      wifiNetworks?: any[]
+      vpnConnections?: any[]
+      dns?: any
+      routes?: any[]
+      primaryInterface?: string
+    }
+    security?: {
+      antivirus?: any
+      firewall?: any
+      encryption?: any
+      tpm?: any
+      securityUpdates?: any[]
+      securityEvents?: any[]
+      lastSecurityScan?: string
+    }
+    management?: any
+    hardware?: any
+    displays?: any
+    applications?: any
+    printers?: any
+    profiles?: any
+    installs?: any
   }
 }
 
@@ -607,24 +733,28 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     // Process network data from the network module
     const networkData = modules.network || rawDevice.network
     if (networkData) {
+      // Handle both new modular format and legacy format
+      const activeConnection = networkData.activeConnection || {}
+      const primaryInterface = networkData.interfaces?.find((i: any) => i.isActive) || {}
+      
       mappedDevice.network = {
         hostname: networkData.hostname,
-        connectionType: networkData.connectionType || networkData.interface_type,
-        ssid: networkData.ssid,
-        signalStrength: networkData.signalStrength,
+        connectionType: activeConnection.connectionType || networkData.connectionType || networkData.interface_type || primaryInterface.type,
+        ssid: activeConnection.activeWifiSsid || networkData.ssid,
+        signalStrength: activeConnection.wifiSignalStrength || networkData.signalStrength,
         service: networkData.service,
         status: networkData.status,
         ethernet: networkData.ethernet,
         clientid: networkData.clientid,
         ipv4conf: networkData.ipv4conf,
-        ipv4ip: networkData.ipv4ip,
+        ipv4ip: activeConnection.ipAddress || networkData.ipv4ip || primaryInterface.ipAddresses?.[0],
         ipv4mask: networkData.ipv4mask,
-        ipv4router: networkData.ipv4router,
+        ipv4router: activeConnection.gateway || networkData.ipv4router,
         ipv6conf: networkData.ipv6conf,
         ipv6ip: networkData.ipv6ip,
         ipv6prefixlen: networkData.ipv6prefixlen,
         ipv6router: networkData.ipv6router,
-        ipv4dns: networkData.ipv4dns,
+        ipv4dns: networkData.ipv4dns || networkData.dns?.servers?.[0],
         vlans: networkData.vlans,
         activemtu: networkData.activemtu,
         validmturange: networkData.validmturange,
@@ -632,14 +762,31 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
         activemedia: networkData.activemedia,
         searchdomain: networkData.searchdomain,
         externalip: networkData.externalip,
-        location: networkData.location
+        location: networkData.location,
+        // New fields from modular network data
+        activeConnection: {
+          connectionType: activeConnection.connectionType,
+          interfaceName: activeConnection.interfaceName,
+          friendlyName: activeConnection.friendlyName,
+          ipAddress: activeConnection.ipAddress,
+          gateway: activeConnection.gateway,
+          activeWifiSsid: activeConnection.activeWifiSsid,
+          wifiSignalStrength: activeConnection.wifiSignalStrength,
+          isVpnActive: activeConnection.isVpnActive,
+          vpnName: activeConnection.vpnName
+        }
       }
       
-      // Update top-level network fields
-      if (networkData.ipv4ip) mappedDevice.ipAddress = networkData.ipv4ip
-      if (networkData.ipv4ip) mappedDevice.ipAddressV4 = networkData.ipv4ip
+      // Update top-level network fields - prefer active connection data
+      const primaryIpv4 = activeConnection.ipAddress || networkData.ipv4ip || primaryInterface.ipAddresses?.find((ip: string) => !ip.includes(':'))
+      const primaryMac = primaryInterface.macAddress || networkData.mac_address
+      
+      if (primaryIpv4) {
+        mappedDevice.ipAddress = primaryIpv4
+        mappedDevice.ipAddressV4 = primaryIpv4
+      }
       if (networkData.ipv6ip) mappedDevice.ipAddressV6 = networkData.ipv6ip
-      if (networkData.mac_address) mappedDevice.macAddress = networkData.mac_address
+      if (primaryMac) mappedDevice.macAddress = primaryMac
     }
 
     // Process displays data from the displays module
@@ -743,18 +890,217 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
 
     // Process management data from the management module
     const managementData = modules.management || rawDevice.management
+    console.log('DeviceMapper DEBUG - Management data:', {
+      hasModulesManagement: !!modules.management,
+      hasRawDeviceManagement: !!rawDevice.management,
+      managementDataKeys: managementData ? Object.keys(managementData) : 'none',
+      managementData: managementData
+    })
+    
     if (managementData) {
       mappedDevice.management = {
-        enrolled: managementData.enrolled || false,
+        // Legacy macOS MDM fields (for backward compatibility)
+        enrolled: managementData.enrolled || managementData.mdmEnrollment?.isEnrolled || false,
         enrolled_via_dep: managementData.enrolled_via_dep,
-        server_url: managementData.server_url,
+        server_url: managementData.server_url || managementData.mdmEnrollment?.managementUrl,
         user_approved: managementData.user_approved,
-        organization: managementData.organization,
+        organization: managementData.organization || managementData.tenantDetails?.tenantName,
         department: managementData.department,
         vendor: managementData.vendor,
+        
+        // Windows Management Data (direct mapping from API)
+        deviceState: managementData.deviceState ? {
+          status: managementData.deviceState.status,
+          deviceName: managementData.deviceState.deviceName,
+          entraJoined: managementData.deviceState.entraJoined,
+          domainJoined: managementData.deviceState.domainJoined,
+          virtualDesktop: managementData.deviceState.virtualDesktop,
+          enterpriseJoined: managementData.deviceState.enterpriseJoined
+        } : undefined,
+        
+        deviceDetails: managementData.deviceDetails ? {
+          deviceId: managementData.deviceDetails.deviceId,
+          thumbprint: managementData.deviceDetails.thumbprint,
+          keyProvider: managementData.deviceDetails.keyProvider,
+          tmpProtected: managementData.deviceDetails.tmpProtected,
+          keyContainerId: managementData.deviceDetails.keyContainerId,
+          deviceAuthStatus: managementData.deviceDetails.deviceAuthStatus,
+          deviceCertificateValidity: managementData.deviceDetails.deviceCertificateValidity
+        } : undefined,
+        
+        mdmEnrollment: managementData.mdmEnrollment ? {
+          provider: managementData.mdmEnrollment.provider,
+          isEnrolled: managementData.mdmEnrollment.isEnrolled,
+          managementUrl: managementData.mdmEnrollment.managementUrl,
+          enrollmentType: managementData.mdmEnrollment.enrollmentType,
+          serverUrl: managementData.mdmEnrollment.serverUrl
+        } : undefined,
+        
+        tenantDetails: managementData.tenantDetails ? {
+          tenantName: managementData.tenantDetails.tenantName,
+          tenantId: managementData.tenantDetails.tenantId,
+          mdmUrl: managementData.tenantDetails.mdmUrl
+        } : undefined,
+        
+        userState: managementData.userState ? {
+          ngcSet: managementData.userState.ngcSet,
+          canReset: managementData.userState.canReset,
+          ngcKeyId: managementData.userState.ngcKeyId,
+          wamDefaultId: managementData.userState.wamDefaultId,
+          wamDefaultSet: managementData.userState.wamDefaultSet,
+          wamDefaultGUID: managementData.userState.wamDefaultGUID,
+          workplaceJoined: managementData.userState.workplaceJoined,
+          wamDefaultAuthority: managementData.userState.wamDefaultAuthority
+        } : undefined,
+        
+        ssoState: managementData.ssoState ? {
+          cloudTgt: managementData.ssoState.cloudTgt,
+          entraPrt: managementData.ssoState.entraPrt,
+          onPremTgt: managementData.ssoState.onPremTgt,
+          enterprisePrt: managementData.ssoState.enterprisePrt,
+          entraPrtAuthority: managementData.ssoState.entraPrtAuthority,
+          kerbTopLevelNames: managementData.ssoState.kerbTopLevelNames,
+          entraPrtExpiryTime: managementData.ssoState.entraPrtExpiryTime,
+          entraPrtUpdateTime: managementData.ssoState.entraPrtUpdateTime,
+          enterprisePrtAuthority: managementData.ssoState.enterprisePrtAuthority
+        } : undefined,
+        
+        diagnosticData: managementData.diagnosticData ? {
+          accessType: managementData.diagnosticData.accessType,
+          clientTime: managementData.diagnosticData.clientTime,
+          keySignTest: managementData.diagnosticData.keySignTest,
+          clientErrorCode: managementData.diagnosticData.clientErrorCode,
+          hostNameUpdated: managementData.diagnosticData.hostNameUpdated,
+          proxyBypassList: managementData.diagnosticData.proxyBypassList,
+          proxyServerList: managementData.diagnosticData.proxyServerList,
+          osVersionUpdated: managementData.diagnosticData.osVersionUpdated,
+          autoDetectSettings: managementData.diagnosticData.autoDetectSettings,
+          displayNameUpdated: managementData.diagnosticData.displayNameUpdated,
+          lastHostNameUpdate: managementData.diagnosticData.lastHostNameUpdate,
+          autoConfigurationUrl: managementData.diagnosticData.autoConfigurationUrl,
+          entraRecoveryEnabled: managementData.diagnosticData.entraRecoveryEnabled,
+          executingAccountName: managementData.diagnosticData.executingAccountName
+        } : undefined,
+        
+        compliancePolicies: managementData.compliancePolicies || [],
+        
+        metadata: managementData.metadata ? {
+          Certificates: managementData.metadata.Certificates || []
+        } : undefined,
+        
+        // Legacy fields (for backward compatibility)
         profiles: managementData.profiles || [],
         restrictions: managementData.restrictions || {},
         apps: managementData.apps || []
+      }
+    }
+
+    // Process network data from the network module
+    const networkModuleData = modules.network || rawDevice.networkModule
+    console.log('DeviceMapper DEBUG - Network module data:', {
+      hasNetworkModule: !!modules.network,
+      hasRawNetworkModule: !!rawDevice.networkModule,
+      networkModuleKeys: networkModuleData ? Object.keys(networkModuleData) : 'none'
+    })
+    
+    if (networkModuleData) {
+      // Add network module data to mappedDevice.modules.network
+      if (!mappedDevice.modules) mappedDevice.modules = {}
+      mappedDevice.modules.network = {
+        interfaces: networkModuleData.Interfaces || networkModuleData.interfaces || [],
+        wifiNetworks: networkModuleData.WifiNetworks || networkModuleData.wifiNetworks || [],
+        vpnConnections: networkModuleData.VpnConnections || networkModuleData.vpnConnections || [],
+        dns: networkModuleData.Dns || networkModuleData.dns || {},
+        routes: networkModuleData.Routes || networkModuleData.routes || [],
+        primaryInterface: networkModuleData.PrimaryInterface || networkModuleData.primaryInterface || ''
+      }
+      
+      // Update legacy network field for compatibility
+      if (networkModuleData.Interfaces && networkModuleData.Interfaces.length > 0) {
+        const primaryInterface = networkModuleData.Interfaces[0]
+        mappedDevice.network = {
+          ...mappedDevice.network,
+          hostname: rawDevice.name || rawDevice.hostname,
+          connectionType: primaryInterface.Type || 'Ethernet',
+          ssid: networkModuleData.WifiNetworks?.[0]?.Ssid || null,
+          signalStrength: networkModuleData.WifiNetworks?.[0]?.SignalStrength ? `${networkModuleData.WifiNetworks[0].SignalStrength}%` : null,
+          ethernet: primaryInterface.MacAddress,
+          ipv4ip: primaryInterface.IpAddresses?.[0],
+          activemtu: primaryInterface.Mtu,
+          status: primaryInterface.Status === 'Up' ? 1 : 0,
+          service: primaryInterface.Name
+        }
+        
+        // Update top-level IP/MAC if not already set
+        if (!mappedDevice.ipAddress && primaryInterface.IpAddresses?.[0]) {
+          mappedDevice.ipAddress = primaryInterface.IpAddresses[0]
+        }
+        if (!mappedDevice.macAddress && primaryInterface.MacAddress) {
+          mappedDevice.macAddress = primaryInterface.MacAddress
+        }
+      }
+    }
+
+    // Process security data from the security module
+    const securityModuleData = modules.security || rawDevice.securityModule
+    console.log('DeviceMapper DEBUG - Security module data:', {
+      hasSecurityModule: !!modules.security,
+      hasRawSecurityModule: !!rawDevice.securityModule,
+      securityModuleKeys: securityModuleData ? Object.keys(securityModuleData) : 'none'
+    })
+    
+    if (securityModuleData) {
+      // Add security module data to mappedDevice.modules.security
+      if (!mappedDevice.modules) mappedDevice.modules = {}
+      mappedDevice.modules.security = {
+        antivirus: securityModuleData.Antivirus || {},
+        firewall: securityModuleData.Firewall || {},
+        encryption: securityModuleData.Encryption || {},
+        tpm: securityModuleData.Tpm || {},
+        securityUpdates: securityModuleData.SecurityUpdates || [],
+        securityEvents: securityModuleData.SecurityEvents || [],
+        lastSecurityScan: securityModuleData.LastSecurityScan
+      }
+      
+      // Update legacy securityFeatures for compatibility
+      const antivirus = securityModuleData.Antivirus || {}
+      const firewall = securityModuleData.Firewall || {}
+      const encryption = securityModuleData.Encryption || {}
+      const tpm = securityModuleData.Tpm || {}
+      
+      mappedDevice.securityFeatures = {
+        ...mappedDevice.securityFeatures,
+        // Windows Defender / Antivirus
+        windowsDefender: {
+          enabled: antivirus.IsEnabled || false,
+          status: antivirus.IsUpToDate ? 'Up to date' : (antivirus.IsEnabled ? 'Active' : 'Disabled')
+        },
+        // Firewall
+        firewall: {
+          enabled: firewall.IsEnabled || false,
+          status: firewall.IsEnabled ? 'Active' : 'Disabled'
+        },
+        // BitLocker
+        bitlocker: {
+          enabled: encryption.BitLocker?.IsEnabled || false,
+          status: encryption.BitLocker?.Status || 'Unknown'
+        },
+        // TPM
+        tpm: {
+          enabled: tpm.IsEnabled || false,
+          status: tpm.IsActivated ? 'Active' : (tpm.IsPresent ? 'Present' : 'Not Available'),
+          version: tpm.Version || undefined
+        }
+      }
+    }
+    
+    // Populate modules data container if not already set
+    if (mappedDevice.modules) {
+      mappedDevice.modules = {
+        ...mappedDevice.modules,
+        system: {
+          operatingSystem: operatingSystem
+        }
       }
     }
     
