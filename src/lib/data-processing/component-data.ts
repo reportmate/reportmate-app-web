@@ -92,30 +92,68 @@ export interface HardwareData {
 }
 
 export function processHardwareData(rawDevice: any): HardwareData {
-  // Extract data from device module and system info
+  console.log('Processing hardware data for device:', rawDevice.name || rawDevice.id)
+  console.log('Hardware data structure:', {
+    hasHardware: !!rawDevice.hardware,
+    hardwareKeys: rawDevice.hardware ? Object.keys(rawDevice.hardware) : [],
+    hasModules: !!rawDevice.modules,
+    rawDeviceKeys: Object.keys(rawDevice),
+    rawDeviceSample: JSON.stringify(rawDevice).substring(0, 1000)
+  })
+  
+  // Extract hardware data from the new unified structure first
+  const hardwareModule = rawDevice.hardware || {}
+  console.log('Hardware module data:', JSON.stringify(hardwareModule, null, 2))
+  
+  // Fallback to old module structure if new structure not found
   const deviceModule = rawDevice.modules?.device || {}
   const systemData = rawDevice.modules?.osQuery?.system?.[0] || {}
   const operatingSystem = systemData.operatingSystem || {}
   
+  // Extract processor information
+  const processor = hardwareModule.processor || {}
+  const cpu = processor.name || rawDevice.processor || operatingSystem.architecture || deviceModule.Model || 'Unknown'
+  
+  // Extract memory information
+  const memoryInfo = hardwareModule.memory || {}
+  const totalMemoryBytes = memoryInfo.totalPhysical || 0
+  const totalMemoryGB = totalMemoryBytes > 0 ? Math.round((totalMemoryBytes / (1024 * 1024 * 1024)) * 100) / 100 : 0
+  const memory = totalMemoryGB > 0 ? `${totalMemoryGB} GB` : (rawDevice.memory || 'Unknown')
+  
+  // Extract storage information
+  const storageDevices = hardwareModule.storage || []
+  const totalStorageBytes = Array.isArray(storageDevices) ? 
+    storageDevices.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) : 0
+  const totalStorageGB = totalStorageBytes > 0 ? Math.round((totalStorageBytes / (1024 * 1024 * 1024)) * 100) / 100 : 0
+  const storage = totalStorageGB > 0 ? `${totalStorageGB} GB` : (rawDevice.storage || 'Unknown')
+  
+  // Extract graphics information
+  const graphicsInfo = hardwareModule.graphics || {}
+  const graphics = graphicsInfo.name || rawDevice.graphics || 'Unknown'
+  
+  // Architecture information
+  const architecture = processor.architecture || rawDevice.architecture || operatingSystem.architecture || 'Unknown'
+  
   // Create enhanced hardware data with the available information
   const hardware = {
-    cpu: rawDevice.processor || operatingSystem.architecture || deviceModule.Model || 'Unknown',
-    memory: rawDevice.memory || 'Unknown', // This would come from a future hardware module
-    storage: rawDevice.storage || 'Unknown', // This would come from a future hardware module  
-    graphics: rawDevice.graphics || 'Unknown', // This would come from a future hardware module
-    architecture: rawDevice.architecture || operatingSystem.architecture || 'Unknown',
+    cpu,
+    memory,
+    storage,
+    graphics,
+    architecture,
     temperature: rawDevice.temperature,
     memoryUtilization: rawDevice.memoryUtilization,
     cpuUtilization: rawDevice.cpuUtilization,
     diskUtilization: rawDevice.diskUtilization
   }
-
-  // For demo purposes, add some realistic data for Windows ARM device
-  if (hardware.cpu.includes('ARM')) {
-    hardware.memory = '16 GB LPDDR4X'
-    hardware.storage = '512 GB SSD'
-    hardware.graphics = 'Qualcomm Adreno'
-  }
+  
+  console.log('Processed hardware data:', {
+    cpu: hardware.cpu,
+    memory: hardware.memory,
+    storage: hardware.storage,
+    graphics: hardware.graphics,
+    architecture: hardware.architecture
+  })
 
   return hardware
 }

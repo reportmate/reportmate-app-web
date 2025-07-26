@@ -325,6 +325,17 @@ export interface ProcessedDeviceInfo {
     architecture?: string
     manufacturer?: string
     model?: string
+  } | any  // Allow raw hardware data from API
+  hardwareSummary?: {
+    processor?: string
+    processorSpeed?: string
+    cores?: number
+    memory?: string
+    storage?: string
+    graphics?: string
+    architecture?: string
+    manufacturer?: string
+    model?: string
   }
   displays?: {
     totalDisplays: number
@@ -676,7 +687,11 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
       if (hardwareData.battery) console.log('DeviceMapper DEBUG - Battery data:', hardwareData.battery)
       if (hardwareData.graphics) console.log('DeviceMapper DEBUG - Graphics data:', hardwareData.graphics)
       
-      mappedDevice.hardware = {
+      // Preserve the full hardware data for the HardwareTab component
+      mappedDevice.hardware = hardwareData
+      
+      // Also create summary fields for backward compatibility and other UI components
+      mappedDevice.hardwareSummary = {
         processor: hardwareData.processor?.name || hardwareData.cpu_brand,
         processorSpeed: hardwareData.processor?.speed || hardwareData.cpu_frequency,
         cores: hardwareData.processor?.cores || hardwareData.cpu_logical_cores,

@@ -344,7 +344,7 @@ export default function DevicesPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <Link
-                          href={`/device/${encodeURIComponent(device.id)}`}
+                          href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
                           className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
                         >
                           View Details
