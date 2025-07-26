@@ -1,3 +1,8 @@
+/**
+ * System Widget
+ * Displays operating system information and system details
+ */
+
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
 
@@ -73,47 +78,22 @@ interface SystemWidgetProps {
 }
 
 export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
-  // Comprehensive debug logging to understand the data structure
-  console.log('=== SystemWidget DEBUG START ===')
-  console.log('Full device object:', JSON.stringify(device, null, 2))
-  console.log('device.system:', device.system)
-  console.log('device.system?.operatingSystem:', device.system?.operatingSystem)
-  console.log('device.modules:', device.modules)
-  console.log('device.modules?.system:', device.modules?.system)
-  console.log('device.modules?.system?.operatingSystem:', device.modules?.system?.operatingSystem)
-  console.log('Top-level OS fields:', {
-    osName: device.osName,
-    osVersion: device.osVersion,
-    osDisplayVersion: device.osDisplayVersion,
-    osEdition: device.osEdition,
-    osFeatureUpdate: device.osFeatureUpdate,
-    osLocale: device.osLocale,
-    osTimeZone: device.osTimeZone,
-    keyboardLayouts: device.keyboardLayouts,
-    architecture: device.architecture,
-    uptime: device.uptime
-  })
-  console.log('=== SystemWidget DEBUG END ===')
-
   // Try multiple data paths to find the operating system data
   let operatingSystem = null
   let uptimeString = null
 
   // Path 1: device.system.operatingSystem (most likely based on API logs)
   if (device.system?.operatingSystem) {
-    console.log('Using data from device.system.operatingSystem')
     operatingSystem = device.system.operatingSystem
     uptimeString = device.system.uptimeString || device.uptime
   }
   // Path 2: device.modules.system.operatingSystem
   else if (device.modules?.system?.operatingSystem) {
-    console.log('Using data from device.modules.system.operatingSystem')
     operatingSystem = device.modules.system.operatingSystem
     uptimeString = device.modules.system.uptimeString || device.uptime
   }
   // Path 3: Top-level device properties (fallback)
   else {
-    console.log('Using data from top-level device properties')
     operatingSystem = {
       name: device.osName,
       edition: device.osEdition,
@@ -128,9 +108,6 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
     }
     uptimeString = device.uptime
   }
-
-  console.log('Final operatingSystem object:', operatingSystem)
-  console.log('Final uptimeString:', uptimeString)
 
   // Check if we have any system information
   const hasSystemInfo = operatingSystem || device.os
