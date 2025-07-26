@@ -8,7 +8,7 @@ import { InventoryWidget } from '../widgets/Inventory'
 import { SystemWidget } from '../widgets/System'
 import { HardwareWidget } from '../widgets/Hardware'
 import { ManagementWidget } from '../widgets/Management'
-import { SecurityWidget } from '../widgets/Security'
+import { SecurityWidget } from '../widgets/SecurityWidgetFixed'
 import { NetworkWidget } from '../widgets/Network'
 
 interface InfoTabProps {
@@ -31,11 +31,7 @@ export const InfoTab: React.FC<InfoTabProps> = ({ device }) => {
       <ManagementWidget device={device} />
       
       {/* Security Widget */}
-      <SecurityWidget 
-        device={device}
-        platform={device.platform || device.os} 
-        securityFeatures={device.securityFeatures || device.security} 
-      />
+      <SecurityWidget device={device} />
       
       {/* Network Widget */}
       <NetworkWidget device={device} />
