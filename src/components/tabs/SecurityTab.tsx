@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { Shield, Lock, Key, Download, Activity, CheckCircle, XCircle } from 'lucide-react'
+import { SecurityEventsTable } from '../tables'
 
 interface SecurityTabProps {
   device: any
@@ -400,6 +401,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Security Events Table */}
+      {security && (
+        <SecurityEventsTable data={{ securityEvents: security.securityEvents || [] }} />
       )}
 
       {/* Security Updates - Prominent Table */}
