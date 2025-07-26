@@ -124,26 +124,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {networkData.interfaces
-                  .sort((a: any, b: any) => {
-                    // First priority: Connected status (Connected before Disconnected/Down)
-                    const aConnected = a.status === 'Connected' ? 1 : 0;
-                    const bConnected = b.status === 'Connected' ? 1 : 0;
-                    if (aConnected !== bConnected) {
-                      return bConnected - aConnected; // Connected first
-                    }
-                    
-                    // Second priority: Wireless interfaces first (among connected interfaces)
-                    const aWireless = (a.type?.toLowerCase().includes('wireless') || a.type?.toLowerCase().includes('802.11')) ? 1 : 0;
-                    const bWireless = (b.type?.toLowerCase().includes('wireless') || b.type?.toLowerCase().includes('802.11')) ? 1 : 0;
-                    if (aWireless !== bWireless) {
-                      return bWireless - aWireless; // Wireless first
-                    }
-                    
-                    // Third priority: Sort by interface name
-                    return (a.name || '').localeCompare(b.name || '');
-                  })
-                  .map((iface: any, index: number) => (
+                {networkData.interfaces.map((iface: any, index: number) => (
                   <tr key={iface.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4">
                       <div className="text-sm font-medium text-gray-900 dark:text-white">{iface.name}</div>

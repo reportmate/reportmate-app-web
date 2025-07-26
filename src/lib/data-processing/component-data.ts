@@ -128,7 +128,15 @@ export interface NetworkData {
   hostname: string
   signalStrength?: string
   ssid?: string
+  gateway: string
+  dns: string
+  primaryInterface: string
+  vpnActive: boolean
+  vpnName?: string
   interfaces: NetworkInterface[]
+  wifiNetworks: WifiNetwork[]
+  vpnConnections: VpnConnection[]
+  routes: NetworkRoute[]
 }
 
 export interface NetworkInterface {
@@ -137,40 +145,95 @@ export interface NetworkInterface {
   status: string
   ipAddress?: string
   macAddress?: string
+  mtu?: number
+  bytesSent?: number
+  bytesReceived?: number
+}
+
+export interface WifiNetwork {
+  ssid: string
+  security: string
+  signalStrength: number
+  isConnected: boolean
+  channel: string
+}
+
+export interface VpnConnection {
+  name: string
+  type: string
+  status: string
+  isActive: boolean
+  server?: string
+  localAddress?: string
+  gateway?: string
+}
+
+export interface NetworkRoute {
+  destination: string
+  gateway: string
+  interface: string
+  metric: number
 }
 
 export function processNetworkData(rawDevice: any): NetworkData {
-  const deviceModule = rawDevice.modules?.device || {}
-  const networkModule = rawDevice.network || {}
+  console.log('Processing network data for device:', rawDevice.name || rawDevice.id)
+  console.log('Raw device structure:', {
+    hasNetwork: !!rawDevice.network,
+    hasModules: !!rawDevice.modules,
+    rawDeviceKeys: Object.keys(rawDevice),
+    networkKeys: rawDevice.network ? Object.keys(rawDevice.network) : []
+  })
   
-  // Create enhanced network data from available device info
-  const hostname = deviceModule.ComputerName || rawDevice.name || 'Unknown'
+  const networkModule = rawDevice.network || rawDevice.modules?.network || {}
+  const activeConnection = networkModule.activeConnection || {}
   
-  // For demo purposes, provide realistic network data for the Surface device
+  console.log('Network module data:', {
+    hasNetworkModule: !!networkModule,
+    hasActiveConnection: !!activeConnection,
+    activeConnectionKeys: activeConnection ? Object.keys(activeConnection) : [],
+    interfacesCount: networkModule.interfaces?.length || 0,
+    networkModuleKeys: Object.keys(networkModule),
+    networkModuleSample: JSON.stringify(networkModule).substring(0, 500)
+  })
+  
+  const hostname = rawDevice.name || rawDevice.hostname || 'Unknown'
+  
+  // Use real network data from the new modular network module
+  const interfaces = (networkModule.interfaces || []).map((iface: any) => ({
+    name: iface.name || iface.friendlyName || 'Unknown',
+    type: iface.type || 'Unknown',
+    status: iface.isActive ? 'Connected' : (iface.status === 'Up' ? 'Connected' : 'Disconnected'),
+    ipAddress: iface.ipAddresses?.find((ip: string) => !ip.includes(':')) || 'N/A',
+    macAddress: iface.macAddress || 'N/A',
+    mtu: iface.mtu || 0,
+    bytesSent: iface.bytesSent || 0,
+    bytesReceived: iface.bytesReceived || 0
+  }))
+  
   const networkData = {
-    connectionType: 'WiFi',
-    ipAddress: rawDevice.ipAddress || rawDevice.ipAddressV4 || '192.168.1.100',
-    macAddress: rawDevice.macAddress || 'B4:2E:99:12:34:56',
+    connectionType: activeConnection.connectionType || 'Unknown',
+    ipAddress: activeConnection.ipAddress || rawDevice.ipAddress || rawDevice.ipAddressV4 || 'N/A',
+    macAddress: rawDevice.macAddress || 'N/A',
     hostname: hostname,
-    signalStrength: '-42 dBm',
-    ssid: 'Corporate-WiFi',
-    interfaces: [
-      {
-        name: 'Wi-Fi',
-        type: 'IEEE 802.11',
-        status: 'Connected',
-        ipAddress: '192.168.1.100',
-        macAddress: 'B4:2E:99:12:34:56'
-      },
-      {
-        name: 'Bluetooth',
-        type: 'Bluetooth',
-        status: 'Connected',
-        ipAddress: undefined,
-        macAddress: 'B4:2E:99:12:34:57'
-      }
-    ]
+    signalStrength: activeConnection.wifiSignalStrength ? `${activeConnection.wifiSignalStrength}%` : undefined,
+    ssid: activeConnection.activeWifiSsid || undefined,
+    gateway: activeConnection.gateway || networkModule.routes?.find((r: any) => r.destination === '0.0.0.0')?.gateway || 'N/A',
+    dns: networkModule.dns?.servers?.join(', ') || 'N/A',
+    primaryInterface: networkModule.primaryInterface || activeConnection.interfaceName || 'Unknown',
+    vpnActive: activeConnection.isVpnActive || false,
+    vpnName: activeConnection.vpnName || undefined,
+    interfaces: interfaces,
+    wifiNetworks: networkModule.wifiNetworks || [],
+    vpnConnections: networkModule.vpnConnections || [],
+    routes: networkModule.routes || []
   }
+  
+  console.log('Processed network data:', {
+    connectionType: networkData.connectionType,
+    ipAddress: networkData.ipAddress,
+    interfacesCount: networkData.interfaces.length,
+    hasActiveConnection: !!activeConnection.connectionType
+  })
   
   return networkData
 }
