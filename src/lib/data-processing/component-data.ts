@@ -171,6 +171,9 @@ export interface NetworkData {
   primaryInterface: string
   vpnActive: boolean
   vpnName?: string
+  // Enhanced activeConnection fields
+  interfaceName?: string
+  friendlyName?: string
   interfaces: NetworkInterface[]
   wifiNetworks: WifiNetwork[]
   vpnConnections: VpnConnection[]
@@ -251,7 +254,25 @@ export function processNetworkData(rawDevice: any): NetworkData {
   const networkData = {
     connectionType: activeConnection.connectionType || 'Unknown',
     ipAddress: activeConnection.ipAddress || rawDevice.ipAddress || rawDevice.ipAddressV4 || 'N/A',
-    macAddress: rawDevice.macAddress || 'N/A',
+    macAddress: (() => {
+      // Try to get MAC address from multiple sources in priority order
+      if (rawDevice.macAddress) return rawDevice.macAddress;
+      
+      // Try to find the primary interface and get its MAC address
+      const primaryInterface = networkModule.interfaces?.find((iface: any) => 
+        iface.name === activeConnection.interfaceName || 
+        iface.name === networkModule.primaryInterface ||
+        iface.isActive
+      );
+      
+      if (primaryInterface?.macAddress) return primaryInterface.macAddress;
+      
+      // Fallback to any interface with a MAC address
+      const interfaceWithMac = networkModule.interfaces?.find((iface: any) => iface.macAddress);
+      if (interfaceWithMac?.macAddress) return interfaceWithMac.macAddress;
+      
+      return 'N/A';
+    })(),
     hostname: hostname,
     signalStrength: activeConnection.wifiSignalStrength ? `${activeConnection.wifiSignalStrength}%` : undefined,
     ssid: activeConnection.activeWifiSsid || undefined,
@@ -260,6 +281,9 @@ export function processNetworkData(rawDevice: any): NetworkData {
     primaryInterface: networkModule.primaryInterface || activeConnection.interfaceName || 'Unknown',
     vpnActive: activeConnection.isVpnActive || false,
     vpnName: activeConnection.vpnName || undefined,
+    // Enhanced activeConnection fields
+    interfaceName: activeConnection.interfaceName || 'Unknown',
+    friendlyName: activeConnection.friendlyName || activeConnection.interfaceName || 'Unknown',
     interfaces: interfaces,
     wifiNetworks: networkModule.wifiNetworks || [],
     vpnConnections: networkModule.vpnConnections || [],

@@ -20,7 +20,14 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
     hasDeviceNetwork: !!device?.network,
     dataKeys: data ? Object.keys(data) : [],
     connectionType: networkData.connectionType,
-    interfacesCount: networkData.interfaces?.length || 0
+    interfacesCount: networkData.interfaces?.length || 0,
+    macAddress: networkData.macAddress,
+    activeConnectionData: data ? {
+      interfaceName: data.interfaceName,
+      friendlyName: data.friendlyName,
+      ipAddress: data.ipAddress,
+      gateway: data.gateway
+    } : null
   })
 
   return (
@@ -41,6 +48,18 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">IP Address</div>
           </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {networkData.dns || 'N/A'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">DNS Servers</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {networkData.macAddress || 'N/A'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">MAC Address</div>
+          </div>
           {networkData.ssid && (
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -57,52 +76,144 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <div className="text-sm text-gray-600 dark:text-gray-400">Signal Strength</div>
             </div>
           )}
+          {networkData.vpnActive && (
+            <div className="text-center">
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                Active
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">VPN Status</div>
+            </div>
+          )}
+          {networkData.vpnName && (
+            <div className="text-center">
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {networkData.vpnName}
+              </div>
+              <div className="text-sm text-gray-600 dark:text-gray-400">VPN Connection</div>
+            </div>
+          )}
+        </div>
+        
+        {/* Additional Connection Details */}
+        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+            <div className="text-center">
+              <div className="text-gray-600 dark:text-gray-400">Hostname</div>
+              <div className="font-medium text-gray-900 dark:text-white">{networkData.hostname || 'N/A'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-600 dark:text-gray-400">Gateway</div>
+              <div className="font-medium text-gray-900 dark:text-white">{networkData.gateway || 'N/A'}</div>
+            </div>
+            <div className="text-center">
+              <div className="text-gray-600 dark:text-gray-400">Interface</div>
+              <div className="font-mono text-gray-900 dark:text-white">{networkData.friendlyName || networkData.interfaceName || 'N/A'}</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Network Configuration Details */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Network Configuration</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Basic Information</h4>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-600 dark:text-gray-400">Hostname:</dt>
-                <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.hostname || 'N/A'}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-600 dark:text-gray-400">MAC Address:</dt>
-                <dd className="text-sm font-mono text-gray-900 dark:text-white">{networkData.macAddress || 'N/A'}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-600 dark:text-gray-400">Primary Interface:</dt>
-                <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.primaryInterface || 'N/A'}</dd>
-              </div>
-            </dl>
-          </div>
-          <div>
-            <h4 className="font-medium text-gray-900 dark:text-white mb-2">Network Settings</h4>
-            <dl className="space-y-2">
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-600 dark:text-gray-400">Gateway:</dt>
-                <dd className="text-sm font-mono text-gray-900 dark:text-white">{networkData.gateway || 'N/A'}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-sm text-gray-600 dark:text-gray-400">DNS Servers:</dt>
-                <dd className="text-sm font-mono text-gray-900 dark:text-white">{networkData.dns || 'N/A'}</dd>
-              </div>
-              {networkData.vpnActive && (
+      {/* Network Configuration and WiFi Networks - Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Network Configuration Details - 25% width (1 column) */}
+        <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Network Configuration</h3>
+          <div className="space-y-6">
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white mb-2">Interface Summary</h4>
+              <dl className="space-y-2">
                 <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">VPN:</dt>
-                  <dd className="text-sm text-green-600 dark:text-green-400">
-                    Active {networkData.vpnName && `(${networkData.vpnName})`}
+                  <dt className="text-sm text-gray-600 dark:text-gray-400">Total Interfaces:</dt>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.interfaces?.length || 0}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-600 dark:text-gray-400">Active Interfaces:</dt>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-white">
+                    {networkData.interfaces?.filter((iface: any) => iface.status === 'Connected').length || 0}
                   </dd>
                 </div>
-              )}
-            </dl>
+              </dl>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white mb-2">Network Routes</h4>
+              <dl className="space-y-2">
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-600 dark:text-gray-400">Configured Routes:</dt>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.routes?.length || 0}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-600 dark:text-gray-400">VPN Connections:</dt>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.vpnConnections?.length || 0}</dd>
+                </div>
+                {networkData.vpnActive && (
+                  <div className="flex justify-between">
+                    <dt className="text-sm text-gray-600 dark:text-gray-400">VPN Status:</dt>
+                    <dd className="text-sm text-green-600 dark:text-green-400">
+                      Active {networkData.vpnName && `(${networkData.vpnName})`}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
           </div>
         </div>
+
+        {/* WiFi Networks - 75% width (3 columns) */}
+        {networkData.wifiNetworks && networkData.wifiNetworks.length > 0 ? (
+          <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Saved WiFi Networks</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">SSID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Security</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Channel</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {networkData.wifiNetworks.map((network: any, index: number) => (
+                    <tr key={network.ssid || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{network.ssid}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {network.security}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          network.isConnected
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                        }`}>
+                          {network.isConnected ? 'Connected' : 'Saved'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {network.channel}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Saved WiFi Networks</h3>
+            <div className="text-center py-8">
+              <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                </svg>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">No saved WiFi networks found</p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Network Interfaces Table */}
@@ -174,51 +285,6 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {iface.mtu || 'N/A'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* WiFi Networks */}
-      {networkData.wifiNetworks && networkData.wifiNetworks.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Saved WiFi Networks</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">SSID</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Security</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Channel</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {networkData.wifiNetworks.map((network: any, index: number) => (
-                  <tr key={network.ssid || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{network.ssid}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {network.security}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        network.isConnected
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      }`}>
-                        {network.isConnected ? 'Connected' : 'Saved'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {network.channel}
                     </td>
                   </tr>
                 ))}
