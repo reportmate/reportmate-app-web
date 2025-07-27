@@ -63,11 +63,19 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const eventsPerPage = 10;
 
+  // Valid event categories - filter out everything else
+  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success'];
+  
+  // Filter events to only include valid categories
+  const filteredEvents = events.filter(event => 
+    !event.kind || VALID_EVENT_KINDS.includes(event.kind.toLowerCase())
+  );
+
   // Calculate pagination
-  const totalPages = Math.ceil(events.length / eventsPerPage);
+  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
   const startIndex = (currentPage - 1) * eventsPerPage;
   const endIndex = startIndex + eventsPerPage;
-  const currentEvents = events.slice(startIndex, endIndex);
+  const currentEvents = filteredEvents.slice(startIndex, endIndex);
 
   // Helper function to format JSON for display with NO truncation
   const formatPayload = (raw: Record<string, unknown> | string): string => {
@@ -145,133 +153,147 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
 
   return (
     <div className="space-y-4 w-full max-w-full overflow-hidden">
-      {/* Pagination Controls - Top */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-          <div className="text-sm text-gray-700 dark:text-gray-300">
-            Showing {startIndex + 1} to {Math.min(endIndex, events.length)} of {events.length} events
+      {filteredEvents.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Valid Events</h3>
+          <p className="text-gray-600 dark:text-gray-400">No events of valid types (system, info, error, warning, success) found.</p>
         </div>
-      )}
-
-      {currentEvents.map(ev => (
-        <article key={ev.id} className="rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 w-full max-w-full overflow-hidden min-w-0">
-          <header className="flex justify-between items-center gap-4 min-w-0">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
-              {/* Event Type Pill */}
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} flex-shrink-0`}>
-                {ev.kind || 'unknown'}
-              </span>
-              
-              {/* Event Message - Hidden on mobile (sm and below) */}
-              <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
-                {getEventMessage(ev)}
-              </span>
-              
-              {/* Timestamp */}
-              <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
-                {formatTimestamp(ev.ts)}
-              </span>
-            </div>
-            
-            <button 
-              onClick={() => setExpanded(e => (e === ev.id ? null : ev.id))}
-              className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
-              aria-expanded={expanded === ev.id}
-              aria-controls={`payload-${ev.id}`}
-            >
-              {expanded === ev.id ? 'Hide' : 'Show'} Payload
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={expanded === ev.id ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
-              </svg>
-            </button>
-          </header>
-
-          {expanded === ev.id && (
-            <div 
-              id={`payload-${ev.id}`}
-              className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                  Raw Payload
-                </h4>
-                <button
-                  onClick={() => copyToClipboard(formatPayload(ev.raw), ev.id)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  title="Copy payload to clipboard"
-                >
-                  {copiedEventId === ev.id ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      Copied!
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                      </svg>
-                      Copy
-                    </>
-                  )}
-                </button>
+      ) : (
+        <>
+          {/* Pagination Controls - Top */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
+              <div className="text-sm text-gray-700 dark:text-gray-300">
+                Showing {startIndex + 1} to {Math.min(endIndex, filteredEvents.length)} of {filteredEvents.length} events
               </div>
-              <div className="relative bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 overflow-hidden">
-                <pre className="overflow-x-auto overflow-y-auto max-h-96 p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                  <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                    {formatPayload(ev.raw)}
-                  </code>
-                </pre>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
-        </article>
-      ))}
 
-      {/* Pagination Controls - Bottom */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-700 dark:text-gray-300">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+          {currentEvents.map(ev => (
+            <article key={ev.id} className="rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 w-full max-w-full overflow-hidden min-w-0">
+              <header className="flex justify-between items-center gap-4 min-w-0">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  {/* Event Type Pill */}
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} flex-shrink-0`}>
+                    {ev.kind || 'unknown'}
+                  </span>
+                  
+                  {/* Event Message - Hidden on mobile (sm and below) */}
+                  <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
+                    {getEventMessage(ev)}
+                  </span>
+                  
+                  {/* Timestamp */}
+                  <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    {formatTimestamp(ev.ts)}
+                  </span>
+                </div>
+                
+                <button 
+                  onClick={() => setExpanded(e => (e === ev.id ? null : ev.id))}
+                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                  aria-expanded={expanded === ev.id}
+                  aria-controls={`payload-${ev.id}`}
+                >
+                  {expanded === ev.id ? 'Hide' : 'Show'} Payload
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={expanded === ev.id ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                  </svg>
+                </button>
+              </header>
+
+              {expanded === ev.id && (
+                <div 
+                  id={`payload-${ev.id}`}
+                  className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                      Raw Payload
+                    </h4>
+                    <button
+                      onClick={() => copyToClipboard(formatPayload(ev.raw), ev.id)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                      title="Copy payload to clipboard"
+                    >
+                      {copiedEventId === ev.id ? (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                          Copy
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  <div className="relative bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 overflow-hidden">
+                    <pre className="overflow-x-auto overflow-y-auto max-h-96 p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                      <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                        {formatPayload(ev.raw)}
+                      </code>
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </article>
+          ))}
+
+          {/* Pagination Controls - Bottom */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -54,6 +54,9 @@ function EventsPageContent() {
   const searchParams = useSearchParams()
   
   const EVENTS_PER_PAGE = 10
+  
+  // Valid event categories - filter out everything else
+  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
 
   // Initialize filter from URL parameters
   useEffect(() => {
@@ -75,7 +78,11 @@ function EventsPageContent() {
         const data = await response.json()
         // API returns: {success: true, events: [...]}
         if (data.success && Array.isArray(data.events)) {
-          setEvents(data.events)
+          // Filter events to only include valid categories
+          const filteredEvents = data.events.filter((event: Event) => 
+            VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+          )
+          setEvents(filteredEvents)
         } else {
           setError('Invalid events data received from API')
         }

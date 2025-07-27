@@ -7,6 +7,9 @@ export async function GET(request: NextRequest) {
     console.log('[EVENTS API] Fetching events from Azure Functions API');
     console.log('[EVENTS API] Using API base URL:', AZURE_FUNCTIONS_BASE_URL);
 
+    // Valid event categories - filter out everything else
+    const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success'];
+
     const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events`, {
       method: 'GET',
       headers: {
@@ -25,6 +28,19 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json();
     console.log('[EVENTS API] Successfully fetched events from Azure Functions');
+    
+    // Filter events to only include valid categories
+    if (data.success && Array.isArray(data.events)) {
+      const filteredEvents = data.events.filter((event: any) => 
+        VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+      );
+      const filteredData = {
+        ...data,
+        events: filteredEvents,
+        count: filteredEvents.length
+      };
+      return NextResponse.json(filteredData);
+    }
     
     return NextResponse.json(data);
   } catch (error) {
