@@ -116,64 +116,70 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       </div>
 
       {/* Detailed Hardware Information */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="mb-6">
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+        <div className="mb-8">
           <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{hardwareData.model || 'Unknown Model'}</h3>
-          <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">{hardwareData.manufacturer}</p>
+          <p className="text-xl text-gray-600 dark:text-gray-400 mt-2">Manufacturer: {hardwareData.manufacturer}</p>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-base">
+          {/* 1. CPU */}
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Processor</div>
-            <div className="text-gray-600 dark:text-gray-400">{safeString(hardwareData.processor?.name)}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">CPU</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.processor?.name)}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-500">
               {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
             </div>
           </div>
           
+          {/* 2. GPU */}
           <div>
-            <div className="font-medium text-gray-900 dark:text-white">Memory</div>
-            <div className="text-gray-600 dark:text-gray-400">{formatBytes(totalMemory)}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {hardwareData.memory?.modules?.[0]?.type || 'Unknown'} • {hardwareData.memory?.modules?.[0]?.manufacturer || 'Unknown'}
-            </div>
-          </div>
-          
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">Primary Storage</div>
-            <div className="text-gray-600 dark:text-gray-400">
-              {storageDevices[0] ? formatBytes(storageDevices[0].capacity) : 'Unknown'}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {storageDevices[0]?.type || 'Unknown'} • {storageDevices[0]?.health || 'Unknown'} Health
-            </div>
-          </div>
-          
-          <div>
-            <div className="font-medium text-gray-900 dark:text-white">Graphics</div>
-            <div className="text-gray-600 dark:text-gray-400">{hardwareData.graphics?.name || 'Unknown'}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">GPU</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.graphics?.name || 'Unknown'}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-500">
               {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
             </div>
           </div>
           
+          {/* 3. NPU */}
           {hardwareData.npu && (
             <div>
-              <div className="font-medium text-gray-900 dark:text-white">NPU</div>
-              <div className="text-gray-600 dark:text-gray-400">{hardwareData.npu.name || 'Unknown'}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">NPU</div>
+              <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.npu.name || 'Unknown'}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-500">
                 {hardwareData.npu.manufacturer} • {hardwareData.npu.computeUnits || hardwareData.npu.compute_units || 0} TOPS
               </div>
             </div>
           )}
           
+          {/* 4. Memory */}
+          <div>
+            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Memory</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">{formatBytes(totalMemory)}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-500">
+              {hardwareData.memory?.modules?.[0]?.type || 'Unknown'} • {hardwareData.memory?.modules?.[0]?.manufacturer || 'Unknown'}
+            </div>
+          </div>
+          
+          {/* 5. Storage */}
+          <div>
+            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Storage</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">
+              {storageDevices[0] ? formatBytes(storageDevices[0].capacity) : 'Unknown'}
+            </div>
+            <div className="text-sm text-gray-500 dark:text-gray-500">
+              {storageDevices[0]?.type || 'Unknown'} • {storageDevices[0]?.health || 'Unknown'} Health
+            </div>
+          </div>
+          
+          {/* 6. Battery */}
           {hardwareData.battery && (
             <div>
-              <div className="font-medium text-gray-900 dark:text-white">Battery</div>
-              <div className="text-gray-600 dark:text-gray-400">
+              <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Battery</div>
+              <div className="text-gray-600 dark:text-gray-400 mb-2">
                 {hardwareData.battery.chargePercent}% • {hardwareData.battery.health}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+              <div className="text-sm text-gray-500 dark:text-gray-500">
                 {hardwareData.battery.cycleCount} cycles • {hardwareData.battery.isCharging ? 'Charging' : 'Not charging'}
               </div>
             </div>
