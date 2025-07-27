@@ -32,6 +32,10 @@ export interface ProcessedDeviceInfo {
   storageType?: string
   graphics?: string
   vram?: string
+  npu?: string
+  npuManufacturer?: string
+  npuArchitecture?: string
+  npuComputeUnits?: number
   resolution?: string
   architecture?: string
   diskUtilization?: number
@@ -711,6 +715,14 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
       if (hardwareData.processor?.cores) mappedDevice.cores = hardwareData.processor.cores
       if (hardwareData.graphics?.name) mappedDevice.graphics = hardwareData.graphics.name
       if (hardwareData.processor?.architecture) mappedDevice.architecture = hardwareData.processor.architecture
+      
+      // Map NPU information
+      if (hardwareData.npu) {
+        mappedDevice.npu = hardwareData.npu.name
+        mappedDevice.npuManufacturer = hardwareData.npu.manufacturer
+        mappedDevice.npuArchitecture = hardwareData.npu.architecture
+        mappedDevice.npuComputeUnits = hardwareData.npu.computeUnits || hardwareData.npu.compute_units
+      }
       
       // Map battery information
       if (hardwareData.battery) {

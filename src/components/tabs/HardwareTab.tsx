@@ -57,18 +57,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
       {/* Detailed Hardware Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{hardwareData.model || 'Unknown Model'}</h3>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">{hardwareData.manufacturer}</p>
-          </div>
-          {hardwareData.processor?.architecture && (
-            <div className="flex-shrink-0">
-              <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                {hardwareData.processor.architecture}
-              </span>
-            </div>
-          )}
+        <div className="mb-6">
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{hardwareData.model || 'Unknown Model'}</h3>
+          <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">{hardwareData.manufacturer}</p>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
@@ -105,6 +96,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
             </div>
           </div>
+          
+          {hardwareData.npu && (
+            <div>
+              <div className="font-medium text-gray-900 dark:text-white">NPU</div>
+              <div className="text-gray-600 dark:text-gray-400">{hardwareData.npu.name || 'Unknown'}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                {hardwareData.npu.manufacturer} • {hardwareData.npu.computeUnits || hardwareData.npu.compute_units || 0} TOPS
+              </div>
+            </div>
+          )}
           
           {hardwareData.battery && (
             <div>
