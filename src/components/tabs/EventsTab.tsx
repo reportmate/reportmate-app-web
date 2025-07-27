@@ -13,6 +13,9 @@ interface EventsTabProps {
 }
 
 export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) => {
+  // Valid event categories - filter out everything else
+  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
+  
   const getEventStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'success':
@@ -34,14 +37,19 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
   const processes = device?.processes || []
   const services = device?.services || []
   
-  // Event statistics
-  const eventsByKind = events?.reduce((acc: any, event: any) => {
+  // Filter events to only include valid categories
+  const filteredEvents = events?.filter(event => 
+    VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+  ) || []
+  
+  // Event statistics (only for filtered events)
+  const eventsByKind = filteredEvents.reduce((acc: any, event: any) => {
     const kind = event.kind || 'unknown'
     acc[kind] = (acc[kind] || 0) + 1
     return acc
-  }, {}) || {}
+  }, {})
   
-  const recentEvents = events?.slice(0, 10) || []
+  const recentEvents = filteredEvents.slice(0, 10)
   const systemProcesses = processes.filter((p: any) => 
     p.name?.toLowerCase().includes('system') ||
     p.name?.toLowerCase().includes('svchost') ||
@@ -49,15 +57,11 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
     p.name?.toLowerCase().includes('csrss')
   ).length
 
-  if (!events || events.length === 0) {
+  if (!filteredEvents || filteredEvents.length === 0) {
     return (
       <div className="space-y-8">
         {/* Event Statistics - even when no events */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">0</div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Total Events</div>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{processes.length}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Running Processes</div>
@@ -137,11 +141,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
   return (
     <div className="space-y-8">
       {/* Event Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{events.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Events</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">{eventsByKind.success || 0}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Success Events</div>
@@ -156,29 +156,6 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
         </div>
       </div>
 
-      {/* Event Types Breakdown */}
-      {Object.keys(eventsByKind).length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Event Types</h3>
-          <div className="space-y-3">
-            {Object.entries(eventsByKind).map(([kind, count]: [string, any]) => {
-              const config = getEventStatusConfig(kind)
-              return (
-                <div key={kind} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-900">
-                  <div className="flex items-center gap-3">
-                    <span className={`inline-flex items-center justify-center w-8 h-8 rounded-full ${config.bg} ${config.text} text-sm font-medium`}>
-                      {config.icon}
-                    </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white capitalize">{kind}</span>
-                  </div>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{count}</span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Events List */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -186,7 +163,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
           <p className="text-sm text-gray-600 dark:text-gray-400">Latest device activity and events</p>
         </div>
         <div className="p-6">
-          <DeviceEventsSimple events={events.map(event => ({
+          <DeviceEventsSimple events={filteredEvents.map(event => ({
             id: event.id,
             name: event.kind || 'Event', // Use event kind as fallback name
             raw: event.payload,

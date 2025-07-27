@@ -68,6 +68,53 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   return (
     <div className="space-y-8">
 
+      {/* Hardware Overview Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {/* Architecture */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {safeString(hardwareData.processor?.architecture)}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
+          </div>
+        </div>
+
+        {/* Memory Usage */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            {memoryUsagePercent}%
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Memory Used</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            {formatBytes(usedMemory)} / {formatBytes(totalMemory)}
+          </div>
+        </div>
+
+        {/* Storage Usage */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+            {storageUsagePercent}%
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Storage Used</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            {formatBytes(usedStorage)} / {formatBytes(totalStorage)}
+          </div>
+        </div>
+
+        {/* Battery */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {hardwareData.battery?.cycleCount || 'N/A'}
+          </div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Battery Cycles</div>
+          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+            {hardwareData.battery?.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
+          </div>
+        </div>
+      </div>
+
       {/* Detailed Hardware Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <div className="mb-6">
@@ -131,53 +178,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Hardware Overview Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Architecture */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {safeString(hardwareData.processor?.architecture)}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
-          </div>
-        </div>
-
-        {/* Memory Usage */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {memoryUsagePercent}%
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Memory Used</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {formatBytes(usedMemory)} / {formatBytes(totalMemory)}
-          </div>
-        </div>
-
-        {/* Storage Usage */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-            {storageUsagePercent}%
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Storage Used</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {formatBytes(usedStorage)} / {formatBytes(totalStorage)}
-          </div>
-        </div>
-
-        {/* Battery */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-            {hardwareData.battery?.cycleCount || 'N/A'}
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Battery Cycles</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {hardwareData.battery?.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
-          </div>
         </div>
       </div>
 
