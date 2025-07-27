@@ -26,6 +26,24 @@ const StatusPill = ({ status, text }: { status: 'success' | 'error' | 'warning',
   )
 }
 
+const InlineStatus = ({ enabled, enabledText = 'Yes', disabledText = 'No' }: { 
+  enabled: boolean | undefined, 
+  enabledText?: string, 
+  disabledText?: string 
+}) => {
+  if (enabled === undefined) return <span className="text-gray-500">Unknown</span>
+  
+  return (
+    <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+      enabled 
+        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+        : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+    }`}>
+      {enabled ? enabledText : disabledText}
+    </span>
+  )
+}
+
 export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
   // Get security data from the new modular structure
   const security = device?.modules?.security || device?.security
@@ -137,11 +155,15 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                       <div className="font-medium text-gray-900 dark:text-white mb-2">BitLocker Status</div>
                       <div className="space-y-1 text-xs">
                         <div><span className="font-medium">Overall Status:</span> {security.encryption.bitLocker.status || 'Unknown'}</div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Device Encryption:</span>
-                          <span className={`px-2 py-1 rounded text-xs ${security.encryption.deviceEncryption ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                            {security.encryption.deviceEncryption ? 'Enabled' : 'Disabled'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Device Encryption:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus 
+                              enabled={security.encryption.deviceEncryption} 
+                              enabledText="Enabled" 
+                              disabledText="Disabled" 
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -232,17 +254,25 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                       <div className="space-y-1 text-xs">
                         <div><span className="font-medium">Product:</span> {security.antivirus.name || 'Unknown'}</div>
                         <div><span className="font-medium">Version:</span> {security.antivirus.version || 'Unknown'}</div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Status:</span>
-                          <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {security.antivirus.isEnabled ? 'Active' : 'Disabled'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Status:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus 
+                              enabled={security.antivirus.isEnabled} 
+                              enabledText="Active" 
+                              disabledText="Disabled" 
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Up to Date:</span>
-                          <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isUpToDate ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                            {security.antivirus.isUpToDate ? 'Yes' : 'No'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Up to Date:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus 
+                              enabled={security.antivirus.isUpToDate} 
+                              enabledText="Yes" 
+                              disabledText="No" 
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -307,26 +337,23 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                     <div className="bg-white dark:bg-gray-600 p-3 rounded border">
                       <div className="font-medium text-gray-900 dark:text-white mb-2">TPM State</div>
                       <div className="grid grid-cols-1 gap-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Present:</span>
-                          <span className={`flex items-center ${security.tpm?.isPresent ? 'text-green-600' : 'text-red-600'}`}>
-                            {security.tpm?.isPresent ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                            {security.tpm?.isPresent ? 'Yes' : 'No'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Present:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus enabled={security.tpm?.isPresent} />
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Enabled:</span>
-                          <span className={`flex items-center ${security.tpm?.isEnabled ? 'text-green-600' : 'text-red-600'}`}>
-                            {security.tpm?.isEnabled ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                            {security.tpm?.isEnabled ? 'Yes' : 'No'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Enabled:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus enabled={security.tpm?.isEnabled} />
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Activated:</span>
-                          <span className={`flex items-center ${security.tpm?.isActivated ? 'text-green-600' : 'text-red-600'}`}>
-                            {security.tpm?.isActivated ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                            {security.tpm?.isActivated ? 'Yes' : 'No'}
-                          </span>
+                        <div>
+                          <div className="font-medium">Activated:</div>
+                          <div className="ml-2 mt-1">
+                            <InlineStatus enabled={security.tpm?.isActivated} />
+                          </div>
                         </div>
                       </div>
                     </div>

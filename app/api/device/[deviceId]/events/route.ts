@@ -12,6 +12,9 @@ export async function GET(
     const { deviceId } = await params
     console.log('[DEVICE EVENTS API] Fetching events for device:', deviceId)
 
+    // Valid event categories - filter out everything else
+    const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
+
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -40,6 +43,27 @@ export async function GET(
       if (response.ok) {
         const data = await response.json()
         console.log('[DEVICE EVENTS API] Successfully fetched device events from Azure Functions')
+        
+        // Filter events to only include valid categories
+        if (data.success && Array.isArray(data.events)) {
+          const filteredEvents = data.events.filter((event: any) => 
+            VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+          )
+          const filteredData = {
+            ...data,
+            events: filteredEvents,
+            count: filteredEvents.length
+          }
+          
+          return NextResponse.json(filteredData, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+        }
+        
         return NextResponse.json(data, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
