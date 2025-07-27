@@ -178,6 +178,20 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
             type={getStatusType(security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated, tpmInfo.status)}
           />
         )}
+
+        {/* Windows Hello Authentication (Windows only) */}
+        {isWindows && security?.windowsHello && (
+          <StatusBadge
+            label="Windows Hello"
+            status={security.windowsHello.statusDisplay || 'Unknown'}
+            type={getStatusType(
+              security.windowsHello.credentialProviders?.pinEnabled || 
+              security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
+              security.windowsHello.credentialProviders?.fingerprintEnabled,
+              security.windowsHello.statusDisplay
+            )}
+          />
+        )}
       </div>
     </StatBlock>
   )
