@@ -67,9 +67,10 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
     
     if (isWindows && security.encryption.bitLocker) {
       const isEnabled = security.encryption.bitLocker.isEnabled
+      const status = security.encryption.bitLocker.status || (isEnabled ? 'Enabled' : 'Disabled')
       return {
-        status: isEnabled ? 'Enabled' : 'Disabled',
-        details: isEnabled ? 'Enabled' : 'Disabled'
+        status: status,
+        details: status
       }
     } else if (isMacOS && security.encryption.fileVault) {
       const fileVault = security.encryption.fileVault
@@ -107,10 +108,12 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
     if (!security?.firewall) return { status: 'Unknown', details: 'Unknown' }
     
     const isEnabled = security.firewall.isEnabled
+    const profile = security.firewall.profile || 'Not specified'
     
     return {
       status: isEnabled ? 'Enabled' : 'Disabled',
-      details: isEnabled ? 'Enabled' : 'Disabled'
+      details: isEnabled ? 'Enabled' : 'Disabled',
+      profile: profile
     }
   }
 
