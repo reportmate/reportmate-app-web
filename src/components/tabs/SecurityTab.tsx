@@ -405,6 +405,173 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
         </div>
       )}
 
+      {/* Windows Hello - Enterprise Authentication */}
+      {isWindows && security?.windowsHello && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <svg className="h-6 w-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Windows Hello</h3>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Enterprise authentication and biometric security
+              </p>
+            </div>
+            <div className="ml-auto">
+              <StatusPill 
+                status={security.windowsHello.statusDisplay?.includes('Enabled') ? 'success' : 'error'} 
+                text={security.windowsHello.statusDisplay || 'UNKNOWN'} 
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Authentication Methods */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Authentication Methods</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">PIN</span>
+                  <InlineStatus enabled={security.windowsHello.credentialProviders?.pinEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Face Recognition</span>
+                  <InlineStatus enabled={security.windowsHello.credentialProviders?.faceRecognitionEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Fingerprint</span>
+                  <InlineStatus enabled={security.windowsHello.credentialProviders?.fingerprintEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Smart Card</span>
+                  <InlineStatus enabled={security.windowsHello.credentialProviders?.smartCardEnabled} />
+                </div>
+              </div>
+
+              {/* Credential Providers */}
+              {security.windowsHello.credentialProviders?.providers && security.windowsHello.credentialProviders.providers.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Active Providers</div>
+                  <div className="space-y-1">
+                    {security.windowsHello.credentialProviders.providers.map((provider: any, index: number) => (
+                      <div key={index} className="text-xs bg-white dark:bg-gray-600 p-2 rounded border">
+                        <div className="font-medium text-gray-900 dark:text-white">{provider.name}</div>
+                        <div className="text-gray-500 dark:text-gray-400">{provider.type} • {provider.isEnabled ? 'Enabled' : 'Disabled'}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Policies & Configuration */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Policies & Settings</h4>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Domain PIN Logon</span>
+                  <InlineStatus enabled={security.windowsHello.policies?.allowDomainPinLogon} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Biometric Logon</span>
+                  <InlineStatus enabled={security.windowsHello.policies?.biometricLogonEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Credential Guard</span>
+                  <InlineStatus enabled={security.windowsHello.credentialGuard?.isEnabled} />
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">WebAuthN</span>
+                  <InlineStatus enabled={security.windowsHello.webAuthN?.isEnabled} />
+                </div>
+              </div>
+
+              {/* Policy Details */}
+              {(security.windowsHello.policies?.groupPolicies?.length > 0 || security.windowsHello.policies?.passportPolicies?.length > 0) && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Active Policies</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {security.windowsHello.policies.groupPolicies?.length || 0} Group Policies, {' '}
+                    {security.windowsHello.policies.passportPolicies?.length || 0} Passport Policies
+                  </div>
+                </div>
+              )}
+
+              {/* Credential Guard Details */}
+              {security.windowsHello.credentialGuard?.isEnabled && (
+                <div className="mt-4 pt-3 border-t border-gray-200 dark:border-gray-600">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Credential Guard</div>
+                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                    {security.windowsHello.credentialGuard.configuration}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Recent Activity */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 dark:text-white mb-3">Recent Activity</h4>
+              
+              {/* Biometric Service Status */}
+              <div className="mb-3 pb-3 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Biometric Service</span>
+                  <InlineStatus 
+                    enabled={security.windowsHello.biometricService?.isServiceRunning} 
+                    enabledText="Running"
+                    disabledText="Stopped"
+                  />
+                </div>
+                {security.windowsHello.biometricService?.serviceStatus && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {security.windowsHello.biometricService.serviceStatus}
+                  </div>
+                )}
+              </div>
+
+              {/* Recent Hello Events */}
+              {security.windowsHello.helloEvents && security.windowsHello.helloEvents.length > 0 ? (
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+                    Recent Authentication Events ({security.windowsHello.helloEvents.length})
+                  </div>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {security.windowsHello.helloEvents.slice(0, 3).map((event: any, index: number) => (
+                      <div key={index} className="text-xs bg-white dark:bg-gray-600 p-2 rounded border">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-gray-900 dark:text-white">
+                            Event {event.eventId}
+                          </span>
+                          <span className="text-gray-500 dark:text-gray-400">
+                            {event.eventType}
+                          </span>
+                        </div>
+                        <div className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                          {event.description}
+                        </div>
+                        <div className="text-gray-500 dark:text-gray-500 mt-1">
+                          {formatDate(event.timestamp)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  {security.windowsHello.helloEvents.length > 3 && (
+                    <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
+                      +{security.windowsHello.helloEvents.length - 3} more events
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500 dark:text-gray-400 text-center py-4">
+                  No recent authentication events
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Security Updates - Prominent Table */}
       {security?.securityUpdates && security.securityUpdates.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
