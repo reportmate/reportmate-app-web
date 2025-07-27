@@ -10,6 +10,19 @@ interface HardwareTabProps {
   data?: any
 }
 
+// Helper function to safely render any value as a string
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return 'Unknown'
+  if (typeof value === 'object') {
+    // If it's an object, try to extract meaningful properties
+    if (value.name) return String(value.name)
+    if (value.value) return String(value.value)
+    // Otherwise, just return a placeholder
+    return 'Complex Value'
+  }
+  return String(value)
+}
+
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Extract hardware data from the unified structure
   const hardwareData = device?.hardware || data || {}
@@ -65,9 +78,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 text-sm">
           <div>
             <div className="font-medium text-gray-900 dark:text-white">Processor</div>
-            <div className="text-gray-600 dark:text-gray-400">{hardwareData.processor?.name || 'Unknown'}</div>
+            <div className="text-gray-600 dark:text-gray-400">{safeString(hardwareData.processor?.name)}</div>
             <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-              {hardwareData.processor?.cores} cores @ {hardwareData.processor?.maxSpeed} GHz
+              {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
             </div>
           </div>
           
@@ -126,11 +139,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         {/* Architecture */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {hardwareData.processor?.architecture || 'N/A'}
+            {safeString(hardwareData.processor?.architecture)}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {hardwareData.processor?.cores || 'N/A'} cores @ {hardwareData.processor?.maxSpeed || 'N/A'} GHz
+            {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
           </div>
         </div>
 

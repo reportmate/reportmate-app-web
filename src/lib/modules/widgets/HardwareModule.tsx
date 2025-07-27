@@ -9,6 +9,19 @@ import React, { useState, useEffect } from 'react'
 import { EnhancedBaseModule, ExtendedModuleManifest } from '../EnhancedModule'
 import { DeviceWidgetProps } from '../ModuleRegistry'
 
+// Helper function to safely render any value as a string
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return 'Unknown'
+  if (typeof value === 'object') {
+    // If it's an object, try to extract meaningful properties
+    if (value.name) return String(value.name)
+    if (value.value) return String(value.value)
+    // Otherwise, just return a placeholder
+    return 'Complex Value'
+  }
+  return String(value)
+}
+
 // Hardware Overview Widget
 const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device }) => {
   const [hardware, setHardware] = useState<any>(null)
@@ -75,22 +88,24 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
             </div>
           </div>
           <div className="space-y-1 text-sm">
-            {hardware.processor && (
+            {(hardware.processor || hardware.cpu) && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Name:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.processor}</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                  {typeof hardware.processor === 'object' ? safeString(hardware.processor?.name) : safeString(hardware.processor || hardware.cpu)}
+                </span>
               </div>
             )}
             {hardware.cores && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Cores:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.cores}</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{safeString(hardware.cores)}</span>
               </div>
             )}
             {hardware.architecture && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Architecture:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.architecture}</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{safeString(hardware.architecture)}</span>
               </div>
             )}
           </div>
@@ -118,7 +133,7 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
             {hardware.memoryUtilization && (
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Usage:</span>
-                <span className="ml-2 font-medium text-gray-900 dark:text-white">{hardware.memoryUtilization}%</span>
+                <span className="ml-2 font-medium text-gray-900 dark:text-white">{safeString(hardware.memoryUtilization)}%</span>
               </div>
             )}
           </div>

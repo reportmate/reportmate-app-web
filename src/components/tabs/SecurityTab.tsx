@@ -20,7 +20,7 @@ const StatusPill = ({ status, text }: { status: 'success' | 'error' | 'warning',
   }
   
   return (
-    <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${colors[status]}`}>
+    <span className={`inline-flex items-center px-4 py-1.5 rounded-full text-sm font-medium border ${colors[status]}`}>
       {text}
     </span>
   )
@@ -60,352 +60,307 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
       {/* Security Overview - Platform-aware display */}
       {security && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-3 mb-6">
-            <Shield className="h-6 w-6 text-red-500" />
-            <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                Security Status
-              </h2>
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isWindows ? 'Windows' : isMacOS ? 'macOS' : isLinux ? 'Linux' : 'Device'} security features and compliance
-              </p>
-            </div>
-          </div>
-
-          {/* Top Row - 3 equal columns (1/3 each) */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Antivirus Protection - 1/3 */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Antivirus Protection
-                </h3>
-                
-                {security.antivirus ? (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill 
-                        status={security.antivirus.isEnabled && security.antivirus.isUpToDate ? 'success' : security.antivirus.isEnabled ? 'warning' : 'error'} 
-                        text={security.antivirus.isEnabled && security.antivirus.isUpToDate ? 'UP-TO-DATE' : security.antivirus.isEnabled ? 'NEEDS UPDATE' : 'INACTIVE'} 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                        <div className="font-medium text-gray-900 dark:text-white mb-2">Product Details</div>
-                        <div className="space-y-1 text-xs">
-                          <div><span className="font-medium">Product:</span> {security.antivirus.name || 'Unknown'}</div>
-                          <div><span className="font-medium">Version:</span> {security.antivirus.version || 'Unknown'}</div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Status:</span>
-                            <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {security.antivirus.isEnabled ? 'Active' : 'Disabled'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Up to Date:</span>
-                            <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isUpToDate ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {security.antivirus.isUpToDate ? 'Yes' : 'No'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {security.antivirus.lastScan && (
-                        <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                          <div className="font-medium text-gray-900 dark:text-white mb-2">Last Scan</div>
-                          <div className="space-y-1 text-xs">
-                            <div><span className="font-medium">Date:</span> {formatDate(security.antivirus.lastScan)}</div>
-                            <div><span className="font-medium">Type:</span> {security.antivirus.scanType || 'Unknown'}</div>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {security.antivirus.lastUpdate && (
-                        <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                          <div className="font-medium text-gray-900 dark:text-white mb-2">Updates</div>
-                          <div className="space-y-1 text-xs">
-                            <div><span className="font-medium">Last Update:</span> {formatDate(security.antivirus.lastUpdate)}</div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill status="error" text="UNKNOWN" />
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">No antivirus information available</div>
-                  </>
-                )}
+          <div className="flex items-start justify-between mb-6">
+            {/* Left side: Title and description */}
+            <div className="flex items-center gap-3">
+              <Shield className="h-6 w-6 text-red-500" />
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Security Status
+                </h2>
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  {isWindows ? 'Windows' : isMacOS ? 'macOS' : isLinux ? 'Linux' : 'Device'} security features and compliance
+                </p>
               </div>
             </div>
 
-            {/* Disk Encryption - 1/3 */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Lock className="h-4 w-4" />
-                  {isWindows ? 'BitLocker Encryption' : isMacOS ? 'FileVault' : 'Disk Encryption'}
-                </h3>
-                
-                {security.encryption ? (
-                  <>
-                    {isWindows && security.encryption.bitLocker && (
-                      <>
-                        <div className="flex justify-center">
-                          <StatusPill 
-                            status={security.encryption.bitLocker.isEnabled ? 'success' : 'error'} 
-                            text={security.encryption.bitLocker.isEnabled ? 'ENABLED' : 'DISABLED'} 
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                            <div className="font-medium text-gray-900 dark:text-white mb-2">BitLocker Status</div>
-                            <div className="space-y-1 text-xs">
-                              <div><span className="font-medium">Overall Status:</span> {security.encryption.bitLocker.status || 'Unknown'}</div>
-                              <div className="flex items-center justify-between">
-                                <span className="font-medium">Device Encryption:</span>
-                                <span className={`px-2 py-1 rounded text-xs ${security.encryption.deviceEncryption ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
-                                  {security.encryption.deviceEncryption ? 'Enabled' : 'Disabled'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-
-                          {security.encryption.bitLocker.encryptedDrives && (
-                            <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                              <div className="font-medium text-gray-900 dark:text-white mb-2">
-                                Encrypted Drives ({Array.isArray(security.encryption.bitLocker.encryptedDrives) 
-                                  ? security.encryption.bitLocker.encryptedDrives.length 
-                                  : 1} drive(s))
-                              </div>
-                              <div className="space-y-1">
-                                {Array.isArray(security.encryption.bitLocker.encryptedDrives) 
-                                  ? security.encryption.bitLocker.encryptedDrives.map((drive: string, index: number) => (
-                                      <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1">
-                                        {drive}
-                                      </span>
-                                    ))
-                                  : <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
-                                      {security.encryption.bitLocker.encryptedDrives}
-                                    </span>
-                                }
-                              </div>
-                            </div>
-                          )}
-
-                          {security.encryption.encryptedVolumes && security.encryption.encryptedVolumes.length > 0 && (
-                            <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                              <div className="font-medium text-gray-900 dark:text-white mb-2">Volume Details</div>
-                              <div className="space-y-2">
-                                {security.encryption.encryptedVolumes.map((volume: any, index: number) => (
-                                  <div key={index} className="bg-gray-100 dark:bg-gray-500 p-2 rounded text-xs">
-                                    <div className="grid grid-cols-2 gap-2">
-                                      <div><span className="font-medium">Drive:</span> {volume.driveLetter}</div>
-                                      <div><span className="font-medium">Status:</span> {volume.status}</div>
-                                      <div><span className="font-medium">Method:</span> {volume.encryptionMethod}</div>
-                                      <div><span className="font-medium">Progress:</span> {volume.encryptionPercentage}%</div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    )}
-                    {isMacOS && (
-                      <>
-                        <div className="flex justify-center">
-                          <StatusPill status="warning" text="FILEVAULT" />
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                          FileVault encryption information would be displayed here for macOS devices
-                        </div>
-                      </>
-                    )}
-                    {isLinux && (
-                      <>
-                        <div className="flex justify-center">
-                          <StatusPill status="warning" text="LUKS" />
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                          LUKS encryption information would be displayed here for Linux devices
-                        </div>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill status="error" text="DISABLED" />
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">No encryption information available</div>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Tamper Protection / TPM - 1/3 */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <div className="space-y-3">
-                <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  {isWindows ? 'Tamper Protection' : isMacOS ? 'Secure Enclave' : 'Hardware Security'}
-                </h3>
-                
-                {isWindows && security.tpm ? (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill 
-                        status={security.tpm.isPresent && security.tpm.isEnabled && security.tpm.isActivated ? 'success' : 'error'} 
-                        text={security.tpm.isPresent && security.tpm.isEnabled && security.tpm.isActivated ? 'ENABLED' : 'DISABLED'} 
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                        <div className="font-medium text-gray-900 dark:text-white mb-2">TPM Information</div>
-                        <div className="space-y-1 text-xs">
-                          <div><span className="font-medium">Version:</span> {security.tpm.version || 'Unknown'}</div>
-                          <div><span className="font-medium">Manufacturer:</span> {security.tpm.manufacturer || 'Unknown'}</div>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
-                        <div className="font-medium text-gray-900 dark:text-white mb-2">TPM State</div>
-                        <div className="grid grid-cols-1 gap-2 text-xs">
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Present:</span>
-                            <span className={`flex items-center ${security.tpm.isPresent ? 'text-green-600' : 'text-red-600'}`}>
-                              {security.tpm.isPresent ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                              {security.tpm.isPresent ? 'Yes' : 'No'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Enabled:</span>
-                            <span className={`flex items-center ${security.tpm.isEnabled ? 'text-green-600' : 'text-red-600'}`}>
-                              {security.tpm.isEnabled ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                              {security.tpm.isEnabled ? 'Yes' : 'No'}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="font-medium">Activated:</span>
-                            <span className={`flex items-center ${security.tpm.isActivated ? 'text-green-600' : 'text-red-600'}`}>
-                              {security.tpm.isActivated ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
-                              {security.tpm.isActivated ? 'Yes' : 'No'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </>
-                ) : isMacOS ? (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill status="warning" text="SECURE ENCLAVE" />
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                      Secure Enclave information would be displayed here for macOS devices
-                    </div>
-                  </>
-                ) : isLinux ? (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill status="warning" text="TPM" />
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
-                      TPM information would be displayed here for Linux devices
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="flex justify-center">
-                      <StatusPill status="error" text="UNKNOWN" />
-                    </div>
-                    <div className="text-sm text-gray-500 dark:text-gray-400 text-center">No TPM information available</div>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Additional Security Information - Moved above Security Updates */}
-      {security && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-            <Activity className="h-5 w-5 text-green-500" />
-            Additional Security Information
-          </h3>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Firewall Details */}
-            {security.firewall && (
-              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  {isWindows ? 'Windows Firewall' : isMacOS ? 'macOS Firewall' : 'System Firewall'}
-                </h4>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</span>
-                    <StatusPill 
-                      status={security.firewall.isEnabled ? 'success' : 'error'} 
-                      text={security.firewall.isEnabled ? 'Active' : 'Inactive'} 
-                    />
-                  </div>
-                  <div className="text-sm space-y-2">
-                    <div><span className="font-medium">Profile:</span> {security.firewall.profile || 'Not specified'}</div>
-                    <div><span className="font-medium">Rules:</span> {security.firewall.rules?.length || 0} configured</div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Security Monitoring */}
-            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4" />
-                Security Monitoring
-              </h4>
-              <div className="space-y-3">
+            {/* Right side: Security Monitoring - compact box */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800 min-w-72">
+              <div className="space-y-2 text-sm">
                 {security.lastSecurityScan && (
-                  <div className="text-sm">
-                    <span className="font-medium">Last Security Scan:</span> {formatDate(security.lastSecurityScan)}
+                  <div className="text-blue-800 dark:text-blue-200">
+                    <span className="font-medium">Last Scan:</span> {formatDate(security.lastSecurityScan)}
                   </div>
                 )}
                 {security.collectedAt && (
-                  <div className="text-sm">
+                  <div className="text-blue-800 dark:text-blue-200">
                     <span className="font-medium">Data Collection:</span> {formatDate(security.collectedAt)}
                   </div>
                 )}
                 {security.version && (
-                  <div className="text-sm">
-                    <span className="font-medium">Security Module:</span> v{security.version}
-                  </div>
-                )}
-                {security.deviceId && (
-                  <div className="text-sm">
-                    <span className="font-medium">Device ID:</span> 
-                    <span className="font-mono text-xs ml-1">{security.deviceId}</span>
+                  <div className="text-blue-800 dark:text-blue-200">
+                    <span className="font-medium">Module:</span> v{security.version}
                   </div>
                 )}
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {/* Security Events Table */}
-      {security && (
-        <SecurityEventsTable data={{ securityEvents: security.securityEvents || [] }} />
+          {/* 2x2 Grid Layout */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            {/* Top Left: Disk Encryption */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Lock className="h-4 w-4" />
+                    {isWindows ? 'BitLocker Encryption' : isMacOS ? 'FileVault' : 'Disk Encryption'}
+                  </h3>
+                  {security.encryption ? (
+                    <>
+                      {isWindows && security.encryption.bitLocker && (
+                        <StatusPill 
+                          status={security.encryption.bitLocker.isEnabled ? 'success' : 'error'} 
+                          text={security.encryption.bitLocker.isEnabled ? 'ENABLED' : 'DISABLED'} 
+                        />
+                      )}
+                      {isMacOS && (
+                        <StatusPill status="warning" text="FILEVAULT" />
+                      )}
+                      {isLinux && (
+                        <StatusPill status="warning" text="LUKS" />
+                      )}
+                    </>
+                  ) : (
+                    <StatusPill status="error" text="DISABLED" />
+                  )}
+                </div>
+                
+                {security.encryption && isWindows && security.encryption.bitLocker ? (
+                  <div className="space-y-2">
+                    <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                      <div className="font-medium text-gray-900 dark:text-white mb-2">BitLocker Status</div>
+                      <div className="space-y-1 text-xs">
+                        <div><span className="font-medium">Overall Status:</span> {security.encryption.bitLocker.status || 'Unknown'}</div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Device Encryption:</span>
+                          <span className={`px-2 py-1 rounded text-xs ${security.encryption.deviceEncryption ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                            {security.encryption.deviceEncryption ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {security.encryption.bitLocker.encryptedDrives && (
+                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                        <div className="font-medium text-gray-900 dark:text-white mb-2">
+                          Encrypted Drives ({Array.isArray(security.encryption.bitLocker.encryptedDrives) 
+                            ? security.encryption.bitLocker.encryptedDrives.length 
+                            : 1} drive(s))
+                        </div>
+                        <div className="space-y-1">
+                          {Array.isArray(security.encryption.bitLocker.encryptedDrives) 
+                            ? security.encryption.bitLocker.encryptedDrives.map((drive: string, index: number) => (
+                                <span key={index} className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded mr-1 mb-1">
+                                  {drive}
+                                </span>
+                              ))
+                            : <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded">
+                                {security.encryption.bitLocker.encryptedDrives}
+                              </span>
+                          }
+                        </div>
+                      </div>
+                    )}
+
+                    {security.encryption.encryptedVolumes && security.encryption.encryptedVolumes.length > 0 && (
+                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                        <div className="font-medium text-gray-900 dark:text-white mb-2">Volume Details</div>
+                        <div className="space-y-2">
+                          {security.encryption.encryptedVolumes.map((volume: any, index: number) => (
+                            <div key={index} className="bg-gray-100 dark:bg-gray-500 p-2 rounded text-xs">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div><span className="font-medium">Drive:</span> {volume.driveLetter}</div>
+                                <div><span className="font-medium">Status:</span> {volume.status}</div>
+                                <div><span className="font-medium">Method:</span> {volume.encryptionMethod}</div>
+                                <div><span className="font-medium">Progress:</span> {volume.encryptionPercentage}%</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {isMacOS ? 'FileVault encryption information would be displayed here for macOS devices' :
+                     isLinux ? 'LUKS encryption information would be displayed here for Linux devices' :
+                     'No encryption information available'}
+                  </div>
+                )}
+              </div>
+            </div>
+
+           {/* Top Right: Antivirus Protection */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    Antivirus Protection
+                  </h3>
+                  {security.antivirus ? (
+                    <StatusPill 
+                      status={security.antivirus.isEnabled && security.antivirus.isUpToDate ? 'success' : security.antivirus.isEnabled ? 'warning' : 'error'} 
+                      text={security.antivirus.isEnabled && security.antivirus.isUpToDate ? 'UP-TO-DATE' : security.antivirus.isEnabled ? 'NEEDS UPDATE' : 'INACTIVE'} 
+                    />
+                  ) : (
+                    <StatusPill status="error" text="UNKNOWN" />
+                  )}
+                </div>
+                
+                {security.antivirus ? (
+                  <div className="space-y-2">
+                    <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                      <div className="font-medium text-gray-900 dark:text-white mb-2">Product Details</div>
+                      <div className="space-y-1 text-xs">
+                        <div><span className="font-medium">Product:</span> {security.antivirus.name || 'Unknown'}</div>
+                        <div><span className="font-medium">Version:</span> {security.antivirus.version || 'Unknown'}</div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Status:</span>
+                          <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isEnabled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {security.antivirus.isEnabled ? 'Active' : 'Disabled'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Up to Date:</span>
+                          <span className={`px-2 py-1 rounded text-xs ${security.antivirus.isUpToDate ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {security.antivirus.isUpToDate ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {security.antivirus.lastScan && (
+                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                        <div className="font-medium text-gray-900 dark:text-white mb-2">Last Scan</div>
+                        <div className="space-y-1 text-xs">
+                          <div><span className="font-medium">Date:</span> {formatDate(security.antivirus.lastScan)}</div>
+                          <div><span className="font-medium">Type:</span> {security.antivirus.scanType || 'Unknown'}</div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {security.antivirus.lastUpdate && (
+                      <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                        <div className="font-medium text-gray-900 dark:text-white mb-2">Updates</div>
+                        <div className="space-y-1 text-xs">
+                          <div><span className="font-medium">Last Update:</span> {formatDate(security.antivirus.lastUpdate)}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center">No antivirus information available</div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Left: Tamper Protection / TPM */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Key className="h-4 w-4" />
+                    {isWindows ? 'Tamper Protection' : isMacOS ? 'Secure Enclave' : 'Hardware Security'}
+                  </h3>
+                  {isWindows && security.tpm ? (
+                    <StatusPill 
+                      status={security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated ? 'success' : 'error'} 
+                      text={security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated ? 'ENABLED' : 'DISABLED'} 
+                    />
+                  ) : isMacOS ? (
+                    <StatusPill status="warning" text="SECURE ENCLAVE" />
+                  ) : isLinux ? (
+                    <StatusPill status="warning" text="TPM" />
+                  ) : (
+                    <StatusPill status="error" text="UNKNOWN" />
+                  )}
+                </div>
+                
+                {isWindows && security.tpm ? (
+                  <div className="space-y-2">
+                    <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                      <div className="font-medium text-gray-900 dark:text-white mb-2">TPM Information</div>
+                      <div className="space-y-1 text-xs">
+                        <div><span className="font-medium">Version:</span> {security.tpm?.version || 'Unknown'}</div>
+                        <div><span className="font-medium">Manufacturer:</span> {security.tpm?.manufacturer || 'Unknown'}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                      <div className="font-medium text-gray-900 dark:text-white mb-2">TPM State</div>
+                      <div className="grid grid-cols-1 gap-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Present:</span>
+                          <span className={`flex items-center ${security.tpm?.isPresent ? 'text-green-600' : 'text-red-600'}`}>
+                            {security.tpm?.isPresent ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                            {security.tpm?.isPresent ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Enabled:</span>
+                          <span className={`flex items-center ${security.tpm?.isEnabled ? 'text-green-600' : 'text-red-600'}`}>
+                            {security.tpm?.isEnabled ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                            {security.tpm?.isEnabled ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">Activated:</span>
+                          <span className={`flex items-center ${security.tpm?.isActivated ? 'text-green-600' : 'text-red-600'}`}>
+                            {security.tpm?.isActivated ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                            {security.tpm?.isActivated ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center">
+                    {isMacOS ? 'Secure Enclave information would be displayed here for macOS devices' :
+                     isLinux ? 'TPM information would be displayed here for Linux devices' :
+                     'No TPM information available'}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Bottom Right: Firewall Details */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    {isWindows ? 'Windows Firewall' : isMacOS ? 'macOS Firewall' : 'System Firewall'}
+                  </h3>
+                  {security.firewall ? (
+                    <StatusPill 
+                      status={security.firewall.isEnabled ? 'success' : 'error'} 
+                      text={security.firewall.isEnabled ? 'ACTIVE' : 'INACTIVE'} 
+                    />
+                  ) : (
+                    <StatusPill status="error" text="UNKNOWN" />
+                  )}
+                </div>
+                
+                {security.firewall ? (
+                  <div className="space-y-2">
+                    <div className="bg-white dark:bg-gray-600 p-3 rounded border">
+                      <div className="font-medium text-gray-900 dark:text-white mb-2">Firewall Details</div>
+                      <div className="space-y-1 text-xs">
+                        <div><span className="font-medium">Profile:</span> {security.firewall.profile || 'Not specified'}</div>
+                        <div><span className="font-medium">Rules:</span> {security.firewall.rules?.length || 0} configured</div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400 text-center">No firewall information available</div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Security Updates - Prominent Table */}
@@ -485,6 +440,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
           </div>
         </div>
       )}
+
+      {/* Security Events Table */}
+      {security && (
+        <SecurityEventsTable data={{ securityEvents: security.securityEvents || [] }} />
+      )}
+
     </div>
   )
 }

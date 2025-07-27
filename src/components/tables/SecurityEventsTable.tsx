@@ -102,50 +102,6 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
 
   return (
     <div className="space-y-6">
-      {/* Event Statistics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-          <div className="flex items-center gap-2">
-            <Activity className="h-4 w-4 text-gray-500" />
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{events.length}</div>
-          </div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Events</div>
-        </div>
-        
-        {eventStats.error || eventStats.critical ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <XCircle className="h-4 w-4 text-red-500" />
-              <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {(eventStats.error || 0) + (eventStats.critical || 0)}
-              </div>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Critical/Error</div>
-          </div>
-        ) : null}
-
-        {eventStats.warning ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-yellow-500" />
-              <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{eventStats.warning}</div>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Warnings</div>
-          </div>
-        ) : null}
-
-        {eventStats.information || eventStats.info ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-2">
-              <Info className="h-4 w-4 text-blue-500" />
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {(eventStats.information || 0) + (eventStats.info || 0)}
-              </div>
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Information</div>
-          </div>
-        ) : null}
-      </div>
 
       {/* Security Events Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -178,13 +134,13 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
                   Level
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                  Timestamp
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Source
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                   Message
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                  Timestamp
                 </th>
               </tr>
             </thead>
@@ -202,6 +158,9 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
                       </span>
                     </div>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                    {formatDate(event.timestamp)}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                     {event.source}
                   </td>
@@ -209,9 +168,6 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
                     <div className="truncate" title={event.message}>
                       {event.message}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                    {formatDate(event.timestamp)}
                   </td>
                 </tr>
               ))}
