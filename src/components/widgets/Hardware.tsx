@@ -1,6 +1,6 @@
 /**
  * Hardware Widget
- * Displays system hardware specifications
+ * Displays comprehensive hardware information for devices
  */
 
 import React from 'react'
@@ -10,106 +10,142 @@ interface Device {
   id: string
   name: string
   model?: string
-  processor?: string
-  processorSpeed?: string
+  manufacturer?: string
+  processor?: string | any
   cores?: number
   memory?: string
-  availableRAM?: string
-  memorySlots?: string
   storage?: string
-  availableStorage?: string
-  storageType?: string
+  availability?: string
   graphics?: string
   vram?: string
-  resolution?: string
-  architecture?: string
-  manufacturer?: string
   batteryLevel?: number
-  // Battery information from API
   batteryHealth?: string
-  batteryCycleCount?: number
   isCharging?: boolean
-  // Raw hardware module data
+  architecture?: string
+  // Modular hardware data from modules.hardware
   modules?: {
     hardware?: {
       model?: string
+      manufacturer?: string
       processor?: {
-        name: string
-        cores: number
-        architecture: string
-        manufacturer: string
-        maxSpeed: number
-        baseSpeed: number
-        logicalProcessors: number
+        name?: string
+        cores?: number
+        socket?: string
+        maxSpeed?: number
+        baseSpeed?: number
+        architecture?: string
+        manufacturer?: string
+        logicalProcessors?: number
       }
       memory?: {
-        totalPhysical: number
-        totalVirtual: number
-        availablePhysical: number
-        availableVirtual: number
-        modules: Array<{
-          type: string
-          speed: number
-          capacity: number
-          location: string
-          manufacturer: string
-        }>
-      }
-      battery?: {
-        health: string
-        cycleCount: number
-        isCharging: boolean
-        chargePercent: number
-        estimatedRuntime: string
+        totalPhysical?: number
+        availablePhysical?: number
+        totalFormatted?: string
       }
       storage?: Array<{
-        name: string
-        type: string
-        health: string
-        capacity: number
-        freeSpace: number
-        interface: string
+        name?: string
+        type?: string
+        capacity?: number
+        freeSpace?: number
+        capacityFormatted?: string
+        freeFormatted?: string
+        health?: string
       }>
       graphics?: {
-        name: string
-        driverDate: string
-        memorySize: number
-        manufacturer: string
-        driverVersion: string
+        name?: string
+        manufacturer?: string
+        memory?: number
+        memorySize?: number
+        memoryFormatted?: string
+        driverVersion?: string
       }
-      manufacturer?: string
+      battery?: {
+        chargePercent?: number
+        health?: string
+        isCharging?: boolean
+        cycleCount?: number
+      }
     }
   }
-  // Modular hardware data (legacy)
-  hardware?: {
-    processor?: string
-    processorSpeed?: string
-    cores?: number
-    memory?: string
-    storage?: string
-    graphics?: string
-    architecture?: string
-    manufacturer?: string
-    model?: string
-  }
+  // Legacy hardware properties (fallback)
+  hardware?: any
 }
 
 interface HardwareWidgetProps {
   device: Device
 }
 
+// Helper function to safely render any value as a string
+const safeString = (value: any): string => {
+  if (value === null || value === undefined) return 'Unknown'
+  if (typeof value === 'object') {
+    // If it's an object, try to extract meaningful properties
+    if (value.name) return String(value.name)
+    if (value.value) return String(value.value)
+    // Otherwise, just return a placeholder instead of trying to render the object
+    return 'Complex Value'
+  }
+  return String(value)
+}
+
+// Helper function specifically for processor objects
+const safeProcessorString = (processor: any): string => {
+  if (!processor) return 'Unknown'
+  if (typeof processor === 'string') return processor
+  if (typeof processor === 'object') {
+    // Try to extract the processor name from various possible properties
+    const name = processor.name || processor.displayName || processor.model || processor.brand
+    if (name) return String(name)
+    
+    // If no name property, try to construct a meaningful string from available data
+    if (processor.manufacturer && processor.cores) {
+      return `${processor.manufacturer} ${processor.cores}-core processor`
+    }
+    
+    return 'Unknown Processor'
+  }
+  return String(processor)
+}
+
 export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
-  // Extract hardware data from the correct module structure
+  // Get hardware data from modules first, then fallback to device properties
   const hardwareModule = device.modules?.hardware
   const legacyHardware = device.hardware || {}
+  
+  console.log('[HardwareWidget] Debug data access:', {
+    deviceId: device.id,
+    hasModules: !!device.modules,
+    hasHardwareModule: !!device.modules?.hardware,
+    hasLegacyHardware: !!device.hardware,
+    hardwareModuleKeys: hardwareModule ? Object.keys(hardwareModule) : [],
+    legacyHardwareKeys: Object.keys(legacyHardware)
+  })
 
-  console.log('HardwareWidget device:', device)
-  console.log('Hardware module:', hardwareModule)
-  console.log('Legacy hardware:', legacyHardware)
+  // Build unified hardware info preferring module data over legacy
+  const hardwareInfo = {
+    model: hardwareModule?.model || device.model || 'Unknown',
+    manufacturer: hardwareModule?.manufacturer || device.manufacturer || 'Unknown',
+    processor: safeProcessorString(
+      hardwareModule?.processor || 
+      (typeof legacyHardware.processor === 'object' ? legacyHardware.processor?.name : legacyHardware.processor) || 
+      device.processor || 
+      'Unknown'
+    ),
+    cores: hardwareModule?.processor?.cores || device.cores,
+    memory: hardwareModule?.memory?.totalFormatted || device.memory || 'Unknown',
+    storage: hardwareModule?.storage?.[0]?.capacityFormatted || device.storage || 'Unknown',
+    graphics: hardwareModule?.graphics?.name || device.graphics || 'Unknown',
+    vram: hardwareModule?.graphics?.memoryFormatted || device.vram,
+    architecture: hardwareModule?.processor?.architecture || device.architecture || 'Unknown',
+    batteryLevel: hardwareModule?.battery?.chargePercent || device.batteryLevel,
+    batteryHealth: hardwareModule?.battery?.health || device.batteryHealth,
+    isCharging: hardwareModule?.battery?.isCharging ?? device.isCharging
+  }
 
-  const hasHardwareInfo = hardwareModule || legacyHardware.processor || legacyHardware.memory || 
-                          legacyHardware.storage || legacyHardware.graphics ||
-                          device.processor || device.memory || device.storage || device.graphics
+  // Check if we have any hardware information
+  const hasHardwareInfo = Object.values(hardwareInfo).some(value => 
+    value !== undefined && value !== null && value !== 'Unknown' && value !== ''
+  )
 
   if (!hasHardwareInfo) {
     return (
@@ -124,48 +160,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
     )
   }
 
-  // Helper function to format bytes to GB
-  const formatBytes = (bytes: number) => {
-    if (!bytes) return 'Unknown'
-    return `${Math.round(bytes / (1024*1024*1024))} GB`
-  }
-
-  // Helper function to format storage info
-  const formatStorage = (storage: any[]) => {
-    if (!storage || storage.length === 0) return null
-    
-    // Find the main drive (SSD or first available drive with capacity)
-    const mainDrive = storage.find(s => s.type === 'SSD' && s.capacity > 0) || 
-                     storage.find(s => s.capacity > 0) || 
-                     storage[0]
-    
-    if (!mainDrive || !mainDrive.capacity) return null
-    
-    const totalGB = Math.round(mainDrive.capacity / (1024*1024*1024))
-    const freeGB = Math.round(mainDrive.freeSpace / (1024*1024*1024))
-    
-    return `${totalGB} GB ${mainDrive.type || 'Drive'} • ${freeGB} GB free`
-  }
-
-  // Helper function to format battery info
-  const formatBattery = (battery: any) => {
-    if (!battery) return null
-    
-    const health = battery.health || 'Unknown'
-    const chargePercent = battery.chargePercent || 0
-    const cycleCount = battery.cycleCount || 0
-    
-    return `${health} (${chargePercent}%) • ${cycleCount} cycles`
-  }
-
-  // Use the detailed module data first for rich formatting, then fall back to API string
-  const storageInfo = (hardwareModule?.storage ? formatStorage(hardwareModule.storage) : null) || device.storage
-  
-  // Use the API battery data first, then fall back to module data
-  const batteryInfo = (device.batteryHealth && device.batteryLevel !== undefined && device.batteryCycleCount !== undefined) ? 
-                     `${device.batteryHealth} (${device.batteryLevel}%) • ${device.batteryCycleCount} cycles` : 
-                     (hardwareModule?.battery ? formatBattery(hardwareModule.battery) : null)
-
   return (
     <StatBlock 
       title="Hardware" 
@@ -174,48 +168,70 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
       iconColor={WidgetColors.orange}
     >
       <div className="space-y-4">
-        <Stat 
-          label="Model" 
-          value={hardwareModule?.model || legacyHardware.model || device.model || 'Unknown'} 
-        />
-        
-        <Stat 
-          label="Manufacturer" 
-          value={hardwareModule?.manufacturer || legacyHardware.manufacturer || device.manufacturer || 'Unknown'} 
-        />
-        
-        <Stat 
-          label="Processor" 
-          value={hardwareModule?.processor?.name || legacyHardware.processor || device.processor || 'Unknown'}
-        />
-        
-        <Stat 
-          label="Architecture" 
-          value={hardwareModule?.processor?.architecture || legacyHardware.architecture || device.architecture || 'Unknown'} 
-        />
-        
-        <Stat 
-          label="Graphics" 
-          value={hardwareModule?.graphics?.name || legacyHardware.graphics || device.graphics || 'Unknown'}
-        />
-        
-        <Stat 
-          label="Memory" 
-          value={hardwareModule?.memory ? formatBytes(hardwareModule.memory.totalPhysical) : (legacyHardware.memory || device.memory || 'Unknown')}
-        />
-        
-        {storageInfo && (
+        {/* Primary Hardware Info */}
+        <div className="space-y-4">
           <Stat 
-            label="Storage" 
-            value={storageInfo}
+            label="Model" 
+            value={hardwareInfo.model} 
           />
-        )}
-        
-        {batteryInfo && (
+          
           <Stat 
-            label="Battery" 
-            value={batteryInfo}
+            label="Manufacturer" 
+            value={hardwareInfo.manufacturer} 
           />
+          
+          <Stat 
+            label="Processor" 
+            value={hardwareInfo.processor}
+            sublabel={hardwareInfo.cores ? `${hardwareInfo.cores} cores` : undefined}
+          />
+          
+          <Stat 
+            label="Architecture" 
+            value={hardwareInfo.architecture} 
+          />
+          
+          <Stat 
+            label="Graphics" 
+            value={hardwareInfo.graphics}
+            sublabel={hardwareInfo.vram ? `${hardwareInfo.vram} VRAM` : undefined}
+          />
+          
+          <Stat 
+            label="Memory" 
+            value={hardwareInfo.memory}
+          />
+        </div>
+
+        {/* Battery Info (if available) */}
+        {(hardwareInfo.batteryLevel !== undefined || hardwareInfo.batteryHealth) && (
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="space-y-2">
+              {hardwareInfo.batteryLevel !== undefined && (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Battery</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {hardwareInfo.batteryLevel}%
+                    </span>
+                    {hardwareInfo.isCharging && (
+                      <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                </div>
+              )}
+              {hardwareInfo.batteryHealth && (
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Health</span>
+                  <span className="text-sm text-gray-900 dark:text-white">
+                    {hardwareInfo.batteryHealth}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
         )}
       </div>
     </StatBlock>

@@ -27,6 +27,19 @@ interface Device {
     serialNumber?: string
     uuid?: string
   }
+  // Modular data from modules
+  modules?: {
+    inventory?: {
+      deviceName?: string
+      usage?: string
+      catalog?: string
+      department?: string
+      location?: string
+      assetTag?: string
+      serialNumber?: string
+      uuid?: string
+    }
+  }
 }
 
 interface InventoryWidgetProps {
@@ -35,7 +48,7 @@ interface InventoryWidgetProps {
 
 export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
   // Use inventory module data if available, fallback to device properties
-  const inventory = device.inventory || {}
+  const inventory = device.modules?.inventory || device.inventory || {}
   
   // Check if we have any assignment details for the right column
   const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location
