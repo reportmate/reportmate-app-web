@@ -43,7 +43,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'
     try {
-      return new Date(dateStr).toLocaleDateString('en-US', {
+      const date = new Date(dateStr)
+      // Check if date is valid
+      if (isNaN(date.getTime())) return dateStr
+      
+      return date.toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -77,9 +81,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
             {/* Right side: Security Monitoring - compact box */}
             <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800 min-w-72">
               <div className="space-y-2 text-sm">
-                {security.lastSecurityScan && (
+                {(security.antivirus?.lastScan || security.lastSecurityScan) && (
                   <div className="text-blue-800 dark:text-blue-200">
-                    <span className="font-medium">Last Scan:</span> {formatDate(security.lastSecurityScan)}
+                    <span className="font-medium">Last Scan:</span> {formatDate(security.antivirus?.lastScan || security.lastSecurityScan)}
                   </div>
                 )}
                 {security.collectedAt && (
@@ -168,16 +172,27 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                       <div className="bg-white dark:bg-gray-600 p-3 rounded border">
                         <div className="font-medium text-gray-900 dark:text-white mb-2">Volume Details</div>
                         <div className="space-y-2">
-                          {security.encryption.encryptedVolumes.map((volume: any, index: number) => (
-                            <div key={index} className="bg-gray-100 dark:bg-gray-500 p-2 rounded text-xs">
-                              <div className="grid grid-cols-2 gap-2">
-                                <div><span className="font-medium">Drive:</span> {volume.driveLetter}</div>
-                                <div><span className="font-medium">Status:</span> {volume.status}</div>
-                                <div><span className="font-medium">Method:</span> {volume.encryptionMethod}</div>
-                                <div><span className="font-medium">Progress:</span> {volume.encryptionPercentage}%</div>
+                          {security.encryption.encryptedVolumes.map((volume: any, index: number) => {
+                            // Map numeric status to meaningful text
+                            const getVolumeStatus = (status: string | number) => {
+                              if (status === "1" || status === 1) return "Fully Encrypted"
+                              if (status === "0" || status === 0) return "Not Encrypted"
+                              if (status === "2" || status === 2) return "Encryption In Progress"
+                              if (status === "3" || status === 3) return "Decryption In Progress"
+                              return status?.toString() || "Unknown"
+                            }
+                            
+                            return (
+                              <div key={index} className="bg-gray-100 dark:bg-gray-500 p-2 rounded text-xs">
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div><span className="font-medium">Drive:</span> {volume.driveLetter}</div>
+                                  <div><span className="font-medium">Status:</span> {getVolumeStatus(volume.status)}</div>
+                                  <div><span className="font-medium">Method:</span> {volume.encryptionMethod}</div>
+                                  <div><span className="font-medium">Progress:</span> {volume.encryptionPercentage}%</div>
+                                </div>
                               </div>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
@@ -349,7 +364,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                     <div className="bg-white dark:bg-gray-600 p-3 rounded border">
                       <div className="font-medium text-gray-900 dark:text-white mb-2">Firewall Details</div>
                       <div className="space-y-1 text-xs">
-                        <div><span className="font-medium">Profile:</span> {security.firewall.profile || 'Not specified'}</div>
+                        <div><span className="font-medium">Profile:</span> {security.firewall.profile === 'Unknown' ? 'Not specified' : (security.firewall.profile || 'Not specified')}</div>
                         <div><span className="font-medium">Rules:</span> {security.firewall.rules?.length || 0} configured</div>
                       </div>
                     </div>
