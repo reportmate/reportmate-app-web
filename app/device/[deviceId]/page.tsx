@@ -428,27 +428,71 @@ export default function DeviceDetailPage() {
         })
         
         if (deviceData.success && deviceData.device) {
-          // Add debug logging before using mapDeviceData
-          console.log('About to call mapDeviceData with:', {
-            deviceData: !!deviceData.device,
-            mapDeviceDataType: typeof mapDeviceData,
-            mapDeviceDataExists: !!mapDeviceData
+          // TEMPORARY: Bypass device mapper for debugging
+          console.log('DEBUG: Device data received:', {
+            hasDevice: !!deviceData.device,
+            deviceKeys: Object.keys(deviceData.device || {}),
+            serialNumber: deviceData.device?.serialNumber,
+            hasModules: !!deviceData.device?.modules,
+            moduleKeys: deviceData.device?.modules ? Object.keys(deviceData.device.modules) : [],
+            inventoryDeviceName: deviceData.device?.modules?.inventory?.deviceName
           });
           
-          // Test if the function is available
-          if (typeof mapDeviceData !== 'function') {
-            console.error('mapDeviceData is not a function!', { mapDeviceData });
-            throw new Error('mapDeviceData is not available');
+          // Use device data directly without mapper for now
+          const directDevice = {
+            ...deviceData.device,
+            id: deviceData.device.deviceId || deviceData.device.serialNumber,
+            name: deviceData.device.modules?.inventory?.deviceName || deviceData.device.displayName || 'Unknown Device',
+            totalEvents: 0,
+            lastEventTime: deviceData.device.lastSeen || new Date().toISOString()
+          };
+          
+          console.log('🔍 DEBUG: Direct device creation detailed analysis:');
+          console.log('  📥 Raw device data modules:', JSON.stringify(deviceData.device?.modules, null, 2));
+          console.log('  🎯 Target inventory device name:', deviceData.device?.modules?.inventory?.deviceName);
+          console.log('  📋 Direct device properties:');
+          console.log('    - id:', directDevice.id);
+          console.log('    - name:', directDevice.name);
+          console.log('    - serialNumber:', directDevice.serialNumber);
+          console.log('    - modules present:', !!directDevice.modules);
+          console.log('  🧪 Module analysis:');
+          if (directDevice.modules) {
+            console.log('    - modules keys:', Object.keys(directDevice.modules));
+            if (directDevice.modules.inventory) {
+              console.log('    - inventory module present:', !!directDevice.modules.inventory);
+              console.log('    - inventory deviceName:', directDevice.modules.inventory.deviceName);
+              console.log('  🔍 Full inventory data:', JSON.stringify(directDevice.modules.inventory, null, 2));
+            } else {
+              console.log('    - ❌ NO inventory module found');
+            }
+          } else {
+            console.log('    - ❌ NO modules found on directDevice');
           }
           
-          try {
-            // Process the raw device data through our mapper
-            const processedDevice = mapDeviceData(deviceData.device)
-            setDeviceInfo(processedDevice)
-          } catch (mappingError) {
-            console.error('Error in mapDeviceData:', mappingError);
-            throw mappingError;
-          }
+          setDeviceInfo(directDevice)
+          
+          // ORIGINAL CODE (commented out):
+          // // Add debug logging before using mapDeviceData
+          // console.log('About to call mapDeviceData with:', {
+          //   deviceData: !!deviceData.device,
+          //   mapDeviceDataType: typeof mapDeviceData,
+          //   mapDeviceDataExists: !!mapDeviceData
+          // });
+          // 
+          // // Test if the function is available
+          // if (typeof mapDeviceData !== 'function') {
+          //   console.error('mapDeviceData is not a function!', { mapDeviceData });
+          //   throw new Error('mapDeviceData is not available');
+          // }
+          // 
+          // try {
+          //   // Process the raw device data through our mapper
+          //   const processedDevice = mapDeviceData(deviceData.device)
+          //   setDeviceInfo(processedDevice)
+          // } catch (mappingError) {
+          //   console.error('Error in mapDeviceData:', mappingError);
+          //   throw mappingError;
+          // }
           
           // Process component-specific data
           const componentData = {
