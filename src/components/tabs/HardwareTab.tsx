@@ -23,6 +23,27 @@ const safeString = (value: any): string => {
   return String(value)
 }
 
+// Helper function to safely extract processor name specifically
+const safeProcessorName = (processor: any): string => {
+  if (!processor) return 'Unknown'
+  if (typeof processor === 'string') return processor
+  if (typeof processor === 'object') {
+    return String(processor.name || processor.value || 'Unknown Processor')
+  }
+  return String(processor)
+}
+
+// Helper function to safely get a numeric value
+const safeNumber = (value: any): number => {
+  if (value === null || value === undefined) return 0
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value)
+    return isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
+
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Extract hardware data from the unified structure
   const hardwareData = device?.hardware || data || {}
@@ -77,7 +98,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
           <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
+            {safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)} cores @ {safeNumber(hardwareData.processor?.maxSpeed)}GHz
           </div>
         </div>
 
@@ -126,9 +147,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           {/* 1. CPU */}
           <div>
             <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">CPU</div>
-            <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.processor?.name)}</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">{safeProcessorName(hardwareData.processor)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {safeString(hardwareData.processor?.cores)} cores @ {safeString(hardwareData.processor?.maxSpeed)} GHz
+              {safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)} cores @ {safeNumber(hardwareData.processor?.maxSpeed)}GHz
             </div>
           </div>
           

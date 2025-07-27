@@ -114,7 +114,7 @@ interface ManagementWidgetProps {
 
 export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
-  const management = device.management || device.modules?.management
+  const management = device.modules?.management || device.management
 
   if (!management) {
     return (

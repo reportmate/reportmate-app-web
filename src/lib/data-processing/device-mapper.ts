@@ -446,6 +446,18 @@ export interface ProcessedDeviceInfo {
  * Maps raw device data from the API to the format expected by the UI components
  */
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
+  console.log('🚨🚨🚨 DEVICE MAPPER CALLED! 🚨🚨🚨');
+  console.log('mapDeviceData input - structure:', {
+    id: rawDevice.id,
+    serialNumber: rawDevice.serialNumber,
+    deviceId: rawDevice.deviceId,
+    hasModules: !!rawDevice.modules,
+    moduleKeys: rawDevice.modules ? Object.keys(rawDevice.modules) : [],
+    rawDeviceKeys: Object.keys(rawDevice),
+    hasHardware: !!rawDevice.hardware,
+    hasInventory: !!rawDevice.inventory,
+    sample: JSON.stringify(rawDevice).substring(0, 500)
+  })
   // Extra debugging to catch function availability issues
   if (typeof mapDeviceData !== 'function') {
     console.error('mapDeviceData is not a function!', typeof mapDeviceData);
@@ -519,7 +531,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     lastEventTime: rawDevice.last_event_time || rawDevice.lastEventTime || validLastSeen,
     
     // Hardware information
-    processor: rawDevice.processor,
+    processor: typeof rawDevice.processor === 'object' ? rawDevice.processor?.name : rawDevice.processor,
     processorSpeed: rawDevice.processor_speed,
     cores: rawDevice.cores,
     memory: rawDevice.memory,
@@ -691,8 +703,11 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
       if (hardwareData.battery) console.log('DeviceMapper DEBUG - Battery data:', hardwareData.battery)
       if (hardwareData.graphics) console.log('DeviceMapper DEBUG - Graphics data:', hardwareData.graphics)
       
-      // Preserve the full hardware data for the HardwareTab component
-      mappedDevice.hardware = hardwareData
+      // Preserve the full hardware data for the HardwareTab component but clean up processor objects
+      mappedDevice.hardware = {
+        ...hardwareData,
+        processor: hardwareData.processor?.name || hardwareData.processor || 'Unknown Processor'
+      }
       
       // Also create summary fields for backward compatibility and other UI components
       mappedDevice.hardwareSummary = {
@@ -1180,11 +1195,18 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     }
   }
 
+  // Ensure modules data is preserved from raw device
+  if (rawDevice.modules) {
+    mappedDevice.modules = rawDevice.modules
+  }
+
   console.log('mapDeviceData output:', {
     mappedDeviceId: mappedDevice.id,
     mappedDeviceName: mappedDevice.name,
     mappedDeviceStatus: mappedDevice.status,
-    hasAllRequiredFields: !!(mappedDevice.id && mappedDevice.name)
+    hasAllRequiredFields: !!(mappedDevice.id && mappedDevice.name),
+    hasModules: !!mappedDevice.modules,
+    moduleKeys: mappedDevice.modules ? Object.keys(mappedDevice.modules) : []
   })
 
   return mappedDevice

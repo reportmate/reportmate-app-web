@@ -16,10 +16,22 @@ const safeString = (value: any): string => {
     // If it's an object, try to extract meaningful properties
     if (value.name) return String(value.name)
     if (value.value) return String(value.value)
-    // Otherwise, just return a placeholder
+    // Otherwise, just return a placeholder instead of trying to render the object
     return 'Complex Value'
   }
   return String(value)
+}
+
+// Helper function specifically for processor objects
+const safeProcessorString = (processor: any): string => {
+  if (!processor) return 'Unknown'
+  if (typeof processor === 'string') return processor
+  if (typeof processor === 'object') {
+    // Extract name from processor object
+    const name = processor.name || processor.value || processor.displayName
+    return name ? String(name) : 'Unknown Processor'
+  }
+  return String(processor)
 }
 
 // Hardware Overview Widget
@@ -92,7 +104,7 @@ const HardwareOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device 
               <div>
                 <span className="text-gray-600 dark:text-gray-400">Name:</span>
                 <span className="ml-2 font-medium text-gray-900 dark:text-white">
-                  {typeof hardware.processor === 'object' ? safeString(hardware.processor?.name) : safeString(hardware.processor || hardware.cpu)}
+                  {safeProcessorString(hardware.processor || hardware.cpu)}
                 </span>
               </div>
             )}
