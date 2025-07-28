@@ -99,8 +99,22 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   const networkModule = device.modules?.network as NetworkInfo | undefined
   const network = networkModule || device.network
   
-  // Get activeConnection from either modules.network or direct network level
-  const activeConnection = (network as any)?.activeConnection || (networkModule as any)?.activeConnection
+  // Get activeConnection data using the same structure as NetworkTab
+  const activeConnectionData = (network as any)?.activeConnection || {
+    connectionType: (network as any)?.connectionType || 'Unknown',
+    interfaceName: (network as any)?.primaryInterface || (network as any)?.interfaceName,
+    friendlyName: (network as any)?.friendlyName,
+    ipAddress: (network as any)?.ipAddress || device.ipAddress,
+    gateway: (network as any)?.gateway,
+    macAddress: (network as any)?.activeConnection?.macAddress || (network as any)?.macAddress || device.macAddress,
+    isVpnActive: (network as any)?.isVpnActive || false,
+    vpnName: (network as any)?.vpnName || '',
+    activeWifiSsid: (network as any)?.activeConnection?.activeWifiSsid
+  }
+  
+  // Get DNS servers - handle both array and string formats
+  const dnsServers = (network as any)?.dns?.servers || (network as any)?.dns || []
+  const primaryDns = Array.isArray(dnsServers) ? dnsServers[0] : dnsServers
   
   // Debug logging
   console.log('[NetworkWidget] Device data:', {
@@ -109,12 +123,12 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     hasNetworkModule: !!device.modules?.network,
     hasDirectNetwork: !!device.network,
     networkKeys: network ? Object.keys(network) : [],
-    hasActiveConnection: !!activeConnection,
-    activeConnectionData: activeConnection,
+    activeConnectionData: activeConnectionData,
+    dnsServers: dnsServers,
     networkSample: JSON.stringify(network).substring(0, 300)
   })
   
-  const hasNetworkInfo = device.ipAddress || device.macAddress || network || (network as any)?.interfaces?.length
+  const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown' || network
 
   const formatConnectionStatus = (status?: number) => {
     switch (status) {
@@ -156,271 +170,79 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     >
       <div className="space-y-4">
         {/* Active Connection - Priority Display */}
-        {activeConnection ? (
+        {activeConnectionData.connectionType !== 'Unknown' ? (
           <>            
-            {/* WiFi Network - Show first for wireless connections */}
-            {activeConnection.connectionType === 'Wireless' && (
-              <>
-                {activeConnection.activeWifiSsid ? (
-                  <Stat 
-                    label="WiFi Network" 
-                    value={activeConnection.activeWifiSsid} 
-                  />
-                ) : (
-                  <Stat 
-                    label="WiFi Network" 
-                    value="Connected (Name unavailable)" 
-                  />
-                )}
-              </>
-            )}
-
             {/* Connection Type */}
             <Stat 
               label="Connection Type" 
-              value={activeConnection.connectionType || 'Unknown'} 
+              value={activeConnectionData.connectionType} 
             />
 
-            {/* WiFi Signal Strength - Only show for wireless connections */}
-            {activeConnection.connectionType === 'Wireless' && (
-              <>
-                {activeConnection.wifiSignalStrength ? (
-                  <Stat 
-                    label="Signal Strength" 
-                    value={`${activeConnection.wifiSignalStrength}%`} 
-                  />
-                ) : (
-                  <Stat 
-                    label="Signal Strength" 
-                    value="Unknown (requires location services)" 
-                  />
-                )}
-              </>
-            )}
-
             {/* IP Address */}
-            {activeConnection.ipAddress && (
+            {activeConnectionData.ipAddress && (
               <Stat 
                 label="IP Address" 
-                value={activeConnection.ipAddress} 
+                value={activeConnectionData.ipAddress} 
+                isMono 
+              />
+            )}
+
+            {/* Gateway */}
+            {activeConnectionData.gateway && (
+              <Stat 
+                label="Gateway" 
+                value={activeConnectionData.gateway} 
                 isMono 
               />
             )}
 
             {/* DNS Server */}
-            {((network as any)?.dns && (network as any).dns.length > 0) ? (
+            {primaryDns && (
               <Stat 
                 label="DNS Server" 
-                value={(network as any).dns[0]} 
-                isMono 
-              />
-            ) : (network as any)?.ipv4dns && (
-              <Stat 
-                label="DNS Server" 
-                value={(network as any).ipv4dns} 
-                isMono 
-              />
-            )}
-
-            {/* VPN Status */}
-            {activeConnection.isVpnActive && (
-              <StatusBadge
-                label="VPN Active"
-                status={activeConnection.vpnName || 'Connected'}
-                type="success"
-              />
-            )}
-          </>
-        ) : (
-          <div className="text-xs text-red-500 bg-red-100 p-2 rounded">
-            DEBUG: No activeConnection found!
-            <br />
-            network keys: {network ? Object.keys(network).join(', ') : 'network is null'}
-            <br />
-            Has direct network: {!!device.network ? 'YES' : 'NO'}
-            <br />
-            Has modules.network: {!!device.modules?.network ? 'YES' : 'NO'}
-          </div>
-        )}
-
-        {/* Enhanced Network Interfaces - Secondary Display */}
-        {(network as any)?.interfaces && (network as any).interfaces.length > 0 && (
-          <>
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mt-4">Network Interfaces</div>
-            {(network as any).interfaces.map((iface: any, index: number) => (
-              <div key={index} className="space-y-2 border-l-2 border-gray-200 pl-3">
-                <StatusBadge
-                  label={`${iface.name} (${iface.type})`}
-                  status={iface.status}
-                  type={iface.status === 'Connected' ? 'success' : 'warning'}
-                />
-                {iface.ipAddress && (
-                  <Stat 
-                    label="IP Address" 
-                    value={iface.ipAddress} 
-                    isMono 
-                  />
-                )}
-                {iface.macAddress && (
-                  <Stat 
-                    label="MAC Address" 
-                    value={iface.macAddress} 
-                    isMono 
-                  />
-                )}
-                {iface.speed && (
-                  <Stat 
-                    label="Speed" 
-                    value={iface.speed} 
-                  />
-                )}
-                {iface.ssid && (
-                  <Stat 
-                    label="SSID" 
-                    value={iface.ssid} 
-                  />
-                )}
-                {iface.signalStrength && (
-                  <Stat 
-                    label="Signal Strength" 
-                    value={iface.signalStrength} 
-                  />
-                )}
-              </div>
-            ))}
-            
-            {/* Gateway and DNS for enhanced data */}
-            {(network as any)?.gateway && (
-              <Stat 
-                label="Gateway" 
-                value={(network as any).gateway} 
-                isMono 
-              />
-            )}
-            
-            {(network as any)?.dns && (network as any).dns.length > 0 && (
-              <Stat 
-                label="DNS Servers" 
-                value={(network as any).dns.join(', ')} 
-                isMono 
-              />
-            )}
-            
-            {(network as any)?.externalIp && (
-              <Stat 
-                label="External IP" 
-                value={(network as any).externalIp} 
-                isMono 
-              />
-            )}
-          </>
-        )}
-
-        {/* Legacy Network Data (when enhanced interfaces not available) */}
-        {(!activeConnection?.connectionType && (!(network as any)?.interfaces || (network as any).interfaces.length === 0)) && (
-          <>
-            {/* Connection Status */}
-            {network?.status !== undefined && (
-              <StatusBadge
-                label="Connection Status"
-                status={formatConnectionStatus(network.status)}
-                type={getConnectionStatusType(network.status)}
-              />
-            )}
-
-            {/* Connection Type */}
-            {network?.connectionType && (
-              <Stat 
-                label="Connection Type" 
-                value={network.connectionType} 
-              />
-            )}
-
-            {/* Network Identity */}
-            {network?.hostname && (
-              <Stat 
-                label="Hostname" 
-                value={network.hostname} 
-                isMono 
-              />
-            )}
-
-            {/* IP Address */}
-            {(device.ipAddress || network?.ipv4ip) && (
-              <Stat 
-                label="IPv4 Address" 
-                value={device.ipAddress || network?.ipv4ip || 'Unknown'} 
+                value={primaryDns} 
                 isMono 
               />
             )}
 
             {/* MAC Address */}
-            {device.macAddress && (
+            {activeConnectionData.macAddress && (
               <Stat 
                 label="MAC Address" 
-                value={device.macAddress} 
+                value={activeConnectionData.macAddress} 
                 isMono 
               />
             )}
 
-            {/* WiFi Information */}
-            {network?.ssid && network.ssid !== 'null' && (
-              <>
-                <Stat 
-                  label="WiFi Network" 
-                  value={network.ssid}
-                />
-                {network.signalStrength && network.signalStrength !== 'null' && (
-                  <Stat 
-                    label="Signal Strength" 
-                    value={`${network.signalStrength} dBm`}
-                  />
-                )}
-              </>
-            )}
-
-            {/* Network Configuration */}
-            {network?.ipv4mask && (
+            {/* WiFi SSID */}
+            {activeConnectionData.activeWifiSsid && (
               <Stat 
-                label="Subnet Mask" 
-                value={network.ipv4mask} 
-                isMono 
+                label="WiFi Network" 
+                value={activeConnectionData.activeWifiSsid} 
               />
             )}
 
-            {/* Gateway & DNS */}
-            {network?.ipv4router && (
-              <Stat 
-                label="Gateway" 
-                value={network.ipv4router} 
-                isMono 
+            {/* VPN Status */}
+            {activeConnectionData.isVpnActive && (
+              <StatusBadge
+                label="VPN Active"
+                status={activeConnectionData.vpnName || 'Connected'}
+                type="success"
               />
             )}
 
-            {network?.ipv4dns && (
+            {/* Interface Name */}
+            {(activeConnectionData.friendlyName || activeConnectionData.interfaceName) && (
               <Stat 
-                label="DNS Server" 
-                value={network.ipv4dns} 
-                isMono 
-              />
-            )}
-
-            {/* Advanced Network Info */}
-            {network?.activemtu && (
-              <Stat 
-                label="MTU" 
-                value={network.activemtu.toString()} 
-              />
-            )}
-
-            {network?.externalip && (
-              <Stat 
-                label="External IP" 
-                value={network.externalip} 
-                isMono 
+                label="Interface" 
+                value={activeConnectionData.friendlyName || activeConnectionData.interfaceName} 
               />
             )}
           </>
+        ) : (
+          <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded">
+            Network connection information not available
+          </div>
         )}
       </div>
     </StatBlock>

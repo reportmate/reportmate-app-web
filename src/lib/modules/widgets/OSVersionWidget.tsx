@@ -7,7 +7,8 @@ import React from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier
   name: string
   model?: string
   os?: string
@@ -15,7 +16,6 @@ interface Device {
   status: 'online' | 'offline' | 'warning' | 'error'
   uptime?: string
   location?: string
-  serialNumber?: string
   ipAddress?: string
   ipAddressV4?: string
   ipAddressV6?: string

@@ -8,7 +8,8 @@ import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 
 interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier
   name: string
   model?: string
   os?: string
@@ -16,7 +17,6 @@ interface Device {
   status: 'online' | 'offline' | 'warning' | 'error'
   uptime?: string
   location?: string
-  serialNumber?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
@@ -89,8 +89,8 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {devices.slice(0, 10).map((device) => (
               <Link
-                key={device.id}
-                href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
+                key={device.deviceId}
+                href={`/device/${encodeURIComponent(device.serialNumber)}`}
                 className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-start gap-3">

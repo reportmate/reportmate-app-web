@@ -113,7 +113,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const mappedDevice: ProcessedDeviceInfo = {
     deviceId: rawDevice.deviceId,                                    // Internal UUID
     serialNumber: rawDevice.serialNumber,                           // Human-readable ID  
-    name: rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
+    name: rawDevice.name || rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
     
     // All other data comes from modules - no more duplication
     model: rawDevice.modules?.hardware?.model,

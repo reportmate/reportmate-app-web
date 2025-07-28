@@ -441,8 +441,8 @@ export default function DeviceDetailPage() {
           // Use device data directly without mapper for now
           const directDevice = {
             ...deviceData.device,
-            id: deviceData.device.deviceId || deviceData.device.serialNumber,
-            name: deviceData.device.modules?.inventory?.deviceName || deviceData.device.displayName || 'Unknown Device',
+            id: deviceData.device.deviceId,  // Use deviceId as the primary identifier
+            name: deviceData.device.modules?.inventory?.deviceName || deviceData.device.serialNumber || 'Unknown Device',
             totalEvents: 0,
             lastEventTime: deviceData.device.lastSeen || new Date().toISOString()
           };
