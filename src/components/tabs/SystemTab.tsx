@@ -3,6 +3,7 @@
  * Detailed system information and operating system details
  */
 
+import { formatExactTime } from '../../lib/time'
 import React from 'react'
 import { SystemWidget } from '../widgets/System'
 import { processSystemTabData } from '../../lib/data-processing/component-data'
@@ -55,7 +56,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
           {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' && (
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Boot Time</label>
-              <p className="text-gray-900 dark:text-white">{new Date(systemTabData.bootTime).toLocaleString()}</p>
+              <p className="text-gray-900 dark:text-white">{formatExactTime(systemTabData.bootTime)}</p>
             </div>
           )}
           {operatingSystem.installDate && (

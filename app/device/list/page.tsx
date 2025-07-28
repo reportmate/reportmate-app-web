@@ -4,7 +4,8 @@
 export const dynamic = 'force-dynamic'
 
 import Link from "next/link"
-import { useEffect, useState } from "react"
+import { formatExactTime } from '../../../src/lib/time'
+import React, { useEffect, useState } from 'react'
 
 interface Device {
   deviceId: string      // Internal UUID (unique)
@@ -197,14 +198,14 @@ export default function DeviceListPage() {
                       </p>
                       {device.lastSeen && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">
-                          Last seen: {new Date(device.lastSeen).toLocaleString()}
+                          Last seen: {formatExactTime(device.lastSeen)}
                         </p>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
                       {device.status && (
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          device.status === 'online' 
+                          device.status === 'active' 
                             ? 'bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400'
                             : 'bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400'
                         }`}>

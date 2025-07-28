@@ -63,12 +63,12 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Device Name</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.name}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules?.inventory?.deviceName || device.name}</dd>
             </div>
-            {device.assetTag && (
+            {(device.modules?.inventory?.assetTag || device.assetTag) && (
               <div>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Asset Tag</dt>
-                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.assetTag}</dd>
+                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.modules?.inventory?.assetTag || device.assetTag}</dd>
               </div>
             )}
             <div>
@@ -89,7 +89,7 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</dt>
               <dd className="mt-1">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                  device.status === 'online' 
+                  device.status === 'active' 
                     ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                     : device.status === 'warning'
                     ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
@@ -261,8 +261,8 @@ const DeviceInfoWidget: React.FC = () => {
             const devices = data
             const stats = {
               total: devices.length,
-              online: devices.filter((d: any) => d.status === 'online').length,
-              offline: devices.filter((d: any) => d.status === 'offline').length,
+              active: devices.filter((d: any) => d.status === 'active').length,
+              stale: devices.filter((d: any) => d.status === 'stale').length,
               warning: devices.filter((d: any) => d.status === 'warning').length,
               error: devices.filter((d: any) => d.status === 'error').length,
             }

@@ -11,7 +11,7 @@ export interface ProcessedDeviceInfo {
   os?: string
   platform?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error'
   uptime?: string
   location?: string
   assetTag?: string
@@ -77,17 +77,18 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     return path.split('.').reduce((current, key) => current?.[key], obj)
   }
 
-  // Determine device status based on last_seen timestamp
-  const getDeviceStatus = (lastSeen: string): 'online' | 'offline' | 'warning' | 'error' => {
-    if (!lastSeen) return 'offline'
+  // Determine device status based on last_seen timestamp - updated timing logic
+  const getDeviceStatus = (lastSeen: string): 'active' | 'stale' | 'warning' | 'error' => {
+    if (!lastSeen) return 'stale'
     
     const lastSeenDate = new Date(lastSeen)
     const now = new Date()
     const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60)
     
-    if (diffMinutes < 5) return 'online'
-    if (diffMinutes < 60) return 'warning'
-    return 'offline'
+    // Updated timing: active if seen within 15 minutes, warning if within 2 hours, stale after that
+    if (diffMinutes < 15) return 'active'
+    if (diffMinutes < 120) return 'warning'
+    return 'stale'
   }
 
   // Extract basic device information with robust lastSeen handling
@@ -113,7 +114,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const mappedDevice: ProcessedDeviceInfo = {
     deviceId: rawDevice.deviceId,                                    // Internal UUID
     serialNumber: rawDevice.serialNumber,                           // Human-readable ID  
-    name: rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
+    name: rawDevice.name || rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
     
     // All other data comes from modules - no more duplication
     model: rawDevice.modules?.hardware?.model,

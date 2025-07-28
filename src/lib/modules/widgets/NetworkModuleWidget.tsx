@@ -1,3 +1,4 @@
+import { formatExactTime } from '../../time'
 import React from 'react';
 import { ExtendedModuleManifest, DeviceWidget, DeviceWidgetProps, ModuleConfigSchema } from '../EnhancedModule';
 
@@ -657,7 +658,7 @@ const VpnDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
                   {vpn.connectedAt && (
                     <div>
                       <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Connected Since</label>
-                      <p className="text-gray-900 dark:text-white">{new Date(vpn.connectedAt).toLocaleString()}</p>
+                      <p className="text-gray-900 dark:text-white">{formatExactTime(vpn.connectedAt)}</p>
                     </div>
                   )}
                   

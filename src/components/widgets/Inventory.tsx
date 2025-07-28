@@ -15,7 +15,7 @@ interface Device {
   model?: string
   lastSeen?: string
   createdAt?: string
-  status?: 'online' | 'offline' | 'warning' | 'error'
+  status?: 'active' | 'stale' | 'warning' | 'error'
   // Inventory specific fields from the inventory module
   inventory?: {
     deviceName?: string
@@ -95,14 +95,14 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             {/* Device Name */}
             <Stat 
               label="Device Name" 
-              value={inventory.deviceName || device.name} 
+              value={inventory.deviceName || device.modules?.inventory?.deviceName || device.name} 
             />
             
             {/* Asset Tag */}
-            {(inventory.assetTag || device.assetTag) && (
+            {(inventory.assetTag || device.modules?.inventory?.assetTag || device.assetTag) && (
               <Stat 
                 label="Asset Tag" 
-                value={inventory.assetTag || device.assetTag} 
+                value={inventory.assetTag || device.modules?.inventory?.assetTag || device.assetTag} 
                 isMono 
               />
             )}

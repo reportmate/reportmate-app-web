@@ -12,15 +12,22 @@ interface Device {
   deviceId: string      // Internal UUID (unique)
   serialNumber: string  // Human-readable unique identifier
   name: string
-  model?: string
+  assetTag?: string     // Asset tag from inventory
   os?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error' | 'unknown'
+  status: 'active' | 'stale' | 'warning' | 'error' | 'unknown'
   uptime?: string
   location?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
+  modules?: {
+    inventory?: {
+      assetTag?: string
+      deviceName?: string
+      location?: string
+    }
+  }
 }
 
 function DevicesPageContent() {
@@ -125,7 +132,7 @@ function DevicesPageContent() {
         try {
           return (
             device?.name?.toLowerCase().includes(query) ||
-            device?.model?.toLowerCase().includes(query) ||
+            device?.assetTag?.toLowerCase().includes(query) ||
             device?.os?.toLowerCase().includes(query) ||
             device?.serialNumber?.toLowerCase().includes(query) ||
             device?.ipAddress?.toLowerCase().includes(query) ||
@@ -144,10 +151,10 @@ function DevicesPageContent() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
+      case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
       case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
-      case 'offline': return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
+      case 'stale': return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
       case 'unknown': return 'text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900'
       default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
     }
@@ -155,7 +162,7 @@ function DevicesPageContent() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online':
+      case 'active':
         return (
           <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -387,7 +394,7 @@ function DevicesPageContent() {
                 No devices found
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                No devices have been registered in your fleet yet.
+                No devices have been registered in fleet yet.
               </p>
             </div>
           </div>
@@ -422,11 +429,11 @@ function DevicesPageContent() {
                     Endpoints Fleet
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Manage and monitor all devices in your fleet
+                    Manage and monitor all devices in fleet
                   </p>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {filteredDevices.filter(d => d.status === 'online').length} online • {filteredDevices.filter(d => d.status === 'warning').length} warnings • {filteredDevices.filter(d => d.status === 'error').length} errors • {filteredDevices.filter(d => d.status === 'unknown').length} unknown
+                  {filteredDevices.filter(d => d.status === 'active').length} active • {filteredDevices.filter(d => d.status === 'warning').length} warnings • {filteredDevices.filter(d => d.status === 'error').length} errors • {filteredDevices.filter(d => d.status === 'unknown').length} unknown
                 </div>
               </div>
             </div>
@@ -442,10 +449,10 @@ function DevicesPageContent() {
                       Device
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Model
+                      Asset Tag
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Operating System
+                      Serial Number
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Last Seen
@@ -472,27 +479,21 @@ function DevicesPageContent() {
                           <div className="font-medium text-gray-900 dark:text-white">
                             {device.name || device.serialNumber}
                           </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-                            {device.serialNumber}
-                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {device.model || 'Unknown'}
+                          {device.modules?.inventory?.assetTag || device.assetTag || '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {device.os || 'Unknown'}
+                        <div className="text-sm text-gray-900 dark:text-white font-mono">
+                          {device.serialNumber}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {formatRelativeTime(device.lastSeen)}
-                        </div>
-                        <div className="text-sm text-gray-600 dark:text-gray-400">
-                          Uptime: {device.uptime || 'Unknown'}
                         </div>
                       </td>
                     </Link>

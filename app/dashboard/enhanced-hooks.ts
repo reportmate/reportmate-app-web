@@ -141,6 +141,27 @@ export function useEnhancedLiveEvents() {
       }
       if (typeof payload !== 'object') return { value: String(payload).substring(0, 200) }
       
+      // Check if this is a modular data payload and preserve essential fields for formatting
+      if (payload.modules_processed && typeof payload.modules_processed === 'number') {
+        const essentialData = {
+          modules_processed: payload.modules_processed,
+          collection_type: payload.collection_type,
+          enabled_modules: Array.isArray(payload.enabled_modules) ? payload.enabled_modules.slice(0, 15) : undefined,
+          device_name: payload.device_name,
+          client_version: payload.client_version
+        }
+        
+        // Test if this small essential data can be safely stringified
+        try {
+          const test = JSON.stringify(essentialData)
+          if (test.length < 500) {
+            return essentialData
+          }
+        } catch (error) {
+          // Fallback if essential data fails
+        }
+      }
+      
       const safePayload = createSafeDisplayPayload(payload)
       const test = JSON.stringify(safePayload)
       
@@ -150,7 +171,13 @@ export function useEnhancedLiveEvents() {
           dataSize: test.length,
           keys: Object.keys(payload).slice(0, 3),
           type: String(payload.type || 'unknown').substring(0, 20),
-          truncated: true
+          truncated: true,
+          // Preserve key fields for message formatting
+          ...(payload.modules_processed && { modules_processed: payload.modules_processed }),
+          ...(payload.collection_type && { collection_type: payload.collection_type }),
+          ...(payload.enabled_modules && Array.isArray(payload.enabled_modules) && { 
+            enabled_modules: payload.enabled_modules.slice(0, 3) 
+          })
         }
       }
       

@@ -66,7 +66,7 @@ interface DeviceInfo {
   os?: string
   platform?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error'
   uptime?: string
   location?: string
   serialNumber?: string
@@ -588,7 +588,7 @@ export default function DeviceDetailPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
+      case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
       case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
       default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'

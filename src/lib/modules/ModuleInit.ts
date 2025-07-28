@@ -222,7 +222,7 @@ export async function getModuleMarketplace(): Promise<any[]> {
       id: 'software-updates',
       name: 'Software Updates',
       version: '2.1.0',
-      description: 'Track and manage software updates across your fleet',
+      description: 'Track and manage software updates across fleet',
       author: 'Community',
       downloadUrl: 'https://example.com/modules/software-updates.js',
       installed: false,
