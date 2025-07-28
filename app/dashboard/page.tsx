@@ -1,8 +1,5 @@
 "use client"
 
-// Force dynamic rendering and disable caching for dashboard
-export const dynamic = 'force-dynamic'
-
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -31,12 +28,31 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error'
   uptime?: string
   location?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
+  assetTag?: string     // Asset tag for primary display
+  // Modular structure from API
+  modules?: {
+    inventory?: {
+      uuid?: string
+      owner?: string
+      usage?: string
+      catalog?: string
+      version?: string
+      assetTag?: string
+      deviceId?: string
+      location?: string
+      moduleId?: string
+      department?: string
+      deviceName?: string
+      collectedAt?: string
+      serialNumber?: string
+    }
+  }
 }
 
 // Reuse the live events hook from the original dashboard
@@ -67,15 +83,25 @@ export default function DashboardPage() {
           const data = await response.json()
           // Handle both response formats: {success: true, devices: [...]} or direct array
           if (Array.isArray(data)) {
+            // Process devices to extract inventory data
+            const processedDevices = data.map((device: any) => {
+              const inventory = device.modules?.inventory || {}
+              return {
+                ...device,
+                assetTag: inventory.assetTag,
+                name: inventory.deviceName || device.name || device.hostname || 'Unknown Device'
+              }
+            })
+            
             // Sort devices by lastSeen descending (newest first)
-            const sortedDevices = data.sort((a: Device, b: Device) => 
+            const sortedDevices = processedDevices.sort((a: Device, b: Device) => 
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )
             setDevices(sortedDevices)
             
             // Build device name mapping (serial -> name)
             const nameMap: Record<string, string> = {}
-            data.forEach((device: Device) => {
+            processedDevices.forEach((device: Device) => {
               if (device.serialNumber && device.name) {
                 nameMap[device.serialNumber] = device.name
               }
@@ -84,15 +110,25 @@ export default function DashboardPage() {
             })
             setDeviceNameMap(nameMap)
           } else if (data.success && data.devices) {
+            // Process devices to extract inventory data
+            const processedDevices = data.devices.map((device: any) => {
+              const inventory = device.modules?.inventory || {}
+              return {
+                ...device,
+                assetTag: inventory.assetTag,
+                name: inventory.deviceName || device.name || device.hostname || 'Unknown Device'
+              }
+            })
+            
             // Sort devices by lastSeen descending (newest first)
-            const sortedDevices = data.devices.sort((a: Device, b: Device) => 
+            const sortedDevices = processedDevices.sort((a: Device, b: Device) => 
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )
             setDevices(sortedDevices)
             
             // Build device name mapping (serial -> name)
             const nameMap: Record<string, string> = {}
-            data.devices.forEach((device: Device) => {
+            processedDevices.forEach((device: Device) => {
               if (device.serialNumber && device.name) {
                 nameMap[device.serialNumber] = device.name
               }

@@ -92,7 +92,7 @@ export interface HardwareData {
 }
 
 export function processHardwareData(rawDevice: any): HardwareData {
-  console.log('Processing hardware data for device:', rawDevice.name || rawDevice.id)
+  console.log('Processing hardware data for device:', rawDevice.modules?.inventory?.deviceName || rawDevice.name || rawDevice.id)
   console.log('Hardware data structure:', {
     hasHardware: !!rawDevice.hardware,
     hardwareKeys: rawDevice.hardware ? Object.keys(rawDevice.hardware) : [],
@@ -217,7 +217,7 @@ export interface NetworkRoute {
 }
 
 export function processNetworkData(rawDevice: any): NetworkData {
-  console.log('Processing network data for device:', rawDevice.name || rawDevice.id)
+  console.log('Processing network data for device:', rawDevice.modules?.inventory?.deviceName || rawDevice.name || rawDevice.id)
   console.log('Raw device structure:', {
     hasNetwork: !!rawDevice.network,
     hasModules: !!rawDevice.modules,
@@ -237,7 +237,7 @@ export function processNetworkData(rawDevice: any): NetworkData {
     networkModuleSample: JSON.stringify(networkModule).substring(0, 500)
   })
   
-  const hostname = rawDevice.name || rawDevice.hostname || 'Unknown'
+  const hostname = rawDevice.modules?.inventory?.deviceName || rawDevice.name || rawDevice.hostname || 'Unknown'
   
   // Use real network data from the new modular network module
   const interfaces = (networkModule.interfaces || []).map((iface: any) => ({

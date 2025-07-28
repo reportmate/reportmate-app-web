@@ -50,7 +50,7 @@ const getConnectionStatus = (connectionStatus: string) => {
     case 'polling':
       return { text: 'Polling', color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' }
     default:
-      return { text: 'Offline', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400' }
+      return { text: 'Stale', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400' }
   }
 }
 
@@ -64,30 +64,108 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
   const status = getConnectionStatus(connectionStatus)
 
   const getDeviceName = (deviceId: string) => {
+    // Use device display name from inventory if available, otherwise fall back to serial
     return deviceNameMap[deviceId] || deviceId
   }
 
+  // Helper function to safely display payload - enhanced with device name logic
   const formatPayloadPreview = (payload: Record<string, unknown> | string) => {
     try {
+      if (!payload) return 'No payload'
+      
+      // Handle summarized payloads (from our new API structure)
+      if (typeof payload === 'object' && payload.summary) {
+        return payload.summary
+      }
+      
+      // Handle message-based payloads
+      if (typeof payload === 'object' && (payload as any).message) {
+        return (payload as any).message
+      }
+      
+      // Handle module count payloads
+      if (typeof payload === 'object' && (payload as any).moduleCount && (payload as any).modules) {
+        const moduleCount = (payload as any).moduleCount
+        const modules = (payload as any).modules
+        if (moduleCount === 1) {
+          return `${modules[0]} data reported`
+        } else if (moduleCount <= 3) {
+          return `${modules.join(', ')} data reported`
+        } else {
+          return `All modules reported`
+        }
+      }
+      
+      // Handle string payloads
       if (typeof payload === 'string') {
-        return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
+        return payload.length > 80 ? payload.substring(0, 80) + '...' : payload
       }
       
-      if (payload && typeof payload === 'object') {
-        // Show key information from payload
-        const entries = Object.entries(payload).slice(0, 3)
-        if (entries.length === 0) return 'Empty payload'
+      // For other objects, try to find a meaningful representation
+      if (typeof payload === 'object') {
+        // Check if this is a full device report (contains multiple modules)
+        if ((payload as any).modules && typeof (payload as any).modules === 'object') {
+          const moduleCount = Object.keys((payload as any).modules).length
+          const moduleNames = Object.keys((payload as any).modules).slice(0, 3)
+          
+          if (moduleCount > 3) {
+            return `All modules reported`
+          } else {
+            return `${moduleNames.join(', ')} data reported`
+          }
+        }
         
-        return entries.map(([key, value]) => {
-          const valueStr = String(value)
-          const truncatedValue = valueStr.length > 30 ? valueStr.substring(0, 30) + '...' : valueStr
-          return `${key}: ${truncatedValue}`
-        }).join(', ')
+        // Check for new structure with modules_processed
+        if ((payload as any).modules_processed && typeof (payload as any).modules_processed === 'number') {
+          const modulesProcessed = (payload as any).modules_processed
+          if (modulesProcessed === 1) {
+            return `Single module reported`
+          } else if (modulesProcessed <= 3) {
+            return `${modulesProcessed} modules reported`
+          } else {
+            return `All modules reported`
+          }
+        }
+        
+        // Check for common event types
+        if ((payload as any).component || (payload as any).moduleType || (payload as any).clientVersion) {
+          const parts = []
+          if ((payload as any).message) parts.push((payload as any).message)
+          
+          const summary = parts.join(' • ')
+          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary || 'System event'
+        }
+        
+        // Check if it's a large data payload summary (from sanitization)
+        if ((payload as any).message && (payload as any).dataSize && (payload as any).truncated) {
+          // This is a sanitized large payload, try to create a better summary
+          if ((payload as any).keys && Array.isArray((payload as any).keys)) {
+            const keys = (payload as any).keys
+            if (keys.includes('modules') || keys.includes('device_name') || keys.includes('client_version')) {
+              return 'All modules reported'
+            }
+          }
+          return 'Data collection completed'
+        }
+        
+        // Fallback for complex objects
+        const keys = Object.keys(payload)
+        if (keys.length === 0) return 'Empty payload'
+        if (keys.length > 3) {
+          return `Data collection completed`
+        }
+        
+        // Try to stringify, but with strict size limit
+        const stringified = JSON.stringify(payload)
+        if (stringified.length > 80) {
+          return `Data collection completed`
+        }
+        return stringified.substring(0, 80)
       }
       
-      return 'No payload data'
+      return String(payload).substring(0, 80)
     } catch (error) {
-      return 'Invalid payload data'
+      return 'Complex payload'
     }
   }
 
@@ -138,7 +216,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
               Recent Events
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Live activity from your fleet
+              Live activity from fleet
             </p>
           </div>
           <div className="flex items-center gap-4">
@@ -218,35 +296,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                         </td>
                         <td className="px-3 py-2.5 hidden md:table-cell">
                           <div className="text-sm text-gray-900 dark:text-white truncate">
-                            {(() => {
-                              try {
-                                if (!event.payload) return 'No payload'
-                                if (typeof event.payload === 'string') {
-                                  const str = event.payload
-                                  return str.substring(0, 80) + (str.length > 80 ? '...' : '')
-                                }
-                                if (typeof event.payload !== 'object') return String(event.payload).substring(0, 80)
-                                
-                                // Check if payload has a message property
-                                if ((event.payload as any).message) return String((event.payload as any).message).substring(0, 80)
-                                
-                                // For objects, show a safe summary instead of stringifying
-                                const keys = Object.keys(event.payload)
-                                if (keys.length === 0) return 'Empty payload'
-                                if (keys.length > 3) {
-                                  return `Large object (${keys.length} fields): ${keys.slice(0, 2).join(', ')}...`
-                                }
-                                
-                                // For very small objects, try to show them
-                                const str = JSON.stringify(event.payload)
-                                if (str.length > 80) {
-                                  return `Data (${str.length} chars): ${keys.slice(0, 2).join(', ')}`
-                                }
-                                return str.substring(0, 80)
-                              } catch (error) {
-                                return 'Complex payload'
-                              }
-                            })()}
+                            {formatPayloadPreview(event.payload)}
                           </div>
                         </td>
                         <td className="w-44 px-3 py-2.5">

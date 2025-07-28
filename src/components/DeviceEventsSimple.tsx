@@ -90,45 +90,99 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     }
   };
 
-  // Helper function to extract message from event data
+  // Helper function to extract message from event data - using simplified logic
   const getEventMessage = (ev: EventDto): string => {
-    // Try to extract message from raw payload
-    if (typeof ev.raw === 'object' && ev.raw !== null) {
-      const payload = ev.raw as Record<string, unknown>;
-      if (payload.message && typeof payload.message === 'string') {
-        return payload.message;
-      }
-      if (payload.description && typeof payload.description === 'string') {
-        return payload.description;
-      }
-      if (payload.summary && typeof payload.summary === 'string') {
-        return payload.summary;
-      }
-    }
-    
-    // If raw is a string, show a preview of it
-    if (typeof ev.raw === 'string') {
-      return ev.raw.substring(0, 100) + (ev.raw.length > 100 ? '...' : '');
-    }
-    
-    // For complex objects, show a meaningful summary
-    if (typeof ev.raw === 'object' && ev.raw !== null) {
-      const payload = ev.raw as Record<string, unknown>;
-      const keys = Object.keys(payload);
+    try {
+      const payload = ev.raw
       
-      if (keys.length > 0) {
+      if (!payload) return 'No payload'
+      
+      // Handle string payloads
+      if (typeof payload === 'string') {
+        return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
+      }
+      
+      // Handle object payloads
+      if (typeof payload === 'object') {
+        // Handle summarized payloads
+        if ((payload as any).summary) {
+          return (payload as any).summary
+        }
+        
+        // Handle message-based payloads
+        if ((payload as any).message) {
+          return (payload as any).message
+        }
+        
+        // Handle module count payloads
+        if ((payload as any).moduleCount && (payload as any).modules) {
+          const moduleCount = (payload as any).moduleCount
+          const modules = (payload as any).modules
+          if (moduleCount === 1) {
+            return `${modules[0]} data reported`
+          } else if (moduleCount <= 3) {
+            return `${modules.join(', ')} data reported`
+          } else {
+            return `All modules reported`
+          }
+        }
+        
+        // Handle full device reports (contains multiple modules)
+        if ((payload as any).modules && typeof (payload as any).modules === 'object') {
+          const moduleCount = Object.keys((payload as any).modules).length
+          const moduleNames = Object.keys((payload as any).modules).slice(0, 3)
+          
+          if (moduleCount > 3) {
+            return `All modules reported`
+          } else {
+            return `${moduleNames.join(', ')} data reported`
+          }
+        }
+        
+        // Handle new structure with modules_processed
+        if ((payload as any).modules_processed && typeof (payload as any).modules_processed === 'number') {
+          const modulesProcessed = (payload as any).modules_processed
+          if (modulesProcessed === 1) {
+            return `Single module reported`
+          } else if (modulesProcessed <= 3) {
+            return `${modulesProcessed} modules reported`
+          } else {
+            return `All modules reported`
+          }
+        }
+        
+        // Handle common event types
+        if ((payload as any).component || (payload as any).moduleType || (payload as any).clientVersion) {
+          const parts = []
+          if ((payload as any).message) parts.push((payload as any).message)
+          
+          const summary = parts.join(' • ')
+          return summary.length > 100 ? summary.substring(0, 100) + '...' : summary || 'System event'
+        }
+        
+        // Fallback for complex objects
+        const keys = Object.keys(payload)
+        if (keys.length === 0) return 'Empty payload'
+        if (keys.length > 5) {
+          return `Complex data (${keys.length} properties)`
+        }
+        
         try {
-          const stringified = JSON.stringify(payload);
-          return `Data (${stringified.length} chars): ${keys.slice(0, 3).join(', ')}`;
-        } catch (error) {
-          return `Complex data: ${keys.slice(0, 3).join(', ')}`;
+          const stringified = JSON.stringify(payload)
+          if (stringified.length > 150) {
+            return `Data collection completed`
+          }
+          return stringified.substring(0, 150)
+        } catch {
+          return 'Complex data object'
         }
       }
+      
+      return String(payload).substring(0, 100)
+    } catch (error) {
+      return 'System event'
     }
-    
-    // Fallback to event name
-    return ev.name || 'No message';
-  };
+  }
 
   // Helper function to copy payload to clipboard
   const copyToClipboard = async (text: string, eventId: string) => {

@@ -23,7 +23,7 @@ export const ConnectionStatusWidget: React.FC<ConnectionStatusWidgetProps> = ({
       case 'error':
       case 'disconnected':
       default:
-        return { text: 'Offline', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400' }
+        return { text: 'Stale', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400' }
     }
   }
 
