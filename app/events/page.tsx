@@ -66,9 +66,13 @@ const safeDisplayPayload = (payload: any): string => {
       // Check for new structure with modules_processed
       if (payload.modules_processed && typeof payload.modules_processed === 'number') {
         const parts = []
-        if (payload.collection_type) parts.push(`Collection: ${payload.collection_type}`)
+        // Simplify collection type to just "report" format
+        if (payload.collection_type) {
+          const reportType = payload.collection_type.toLowerCase() === 'full' ? 'Full report' : `${payload.collection_type} report`
+          parts.push(reportType)
+        }
         if (payload.modules_processed) parts.push(`${payload.modules_processed} modules`)
-        if (payload.client_version) parts.push(`Client: ${payload.client_version}`)
+        // Remove client version from the display
         
         return parts.length > 0 ? parts.join(' • ') : `Data collection completed`
       }
@@ -624,27 +628,28 @@ function EventsPageContent() {
           </div>
         ) : (
           <>
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            {/* Desktop Table View (lg and up) */}
+            <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-64 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Message
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-44 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -657,46 +662,46 @@ function EventsPageContent() {
                       return (
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
+                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400 truncate">
                                 {event.id}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
                               <div className="flex items-center gap-2">
-                                <div className={`w-4 h-4 ${statusConfig.text}`}>
+                                <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
                                   {statusConfig.icon}
                                 </div>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge} truncate`}>
                                   {event.kind}
                                 </span>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
                               <Link
                                 href={`/device/${encodeURIComponent(event.device)}`}
-                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                 title={deviceNameMap[event.device] || event.device}
                               >
                                 {deviceNameMap[event.device] || event.device}
                               </Link>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900 dark:text-white">
+                            <td className="px-6 py-4 overflow-hidden">
+                              <div className="text-sm text-gray-900 dark:text-white truncate">
                                 {safeDisplayPayload(event.payload)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
+                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                <div className="font-medium">
+                                <div className="font-medium truncate">
                                   {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                                 </div>
-                                <div className="text-xs opacity-75" title={event.ts ? formatExactTime(event.ts) : 'No timestamp'}>
+                                <div className="text-xs opacity-75 truncate" title={event.ts ? formatExactTime(event.ts) : 'No timestamp'}>
                                   {event.ts ? formatExactTime(event.ts) : 'No timestamp'}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium overflow-hidden">
                               <button
                                 onClick={async (e) => {
                                   e.preventDefault()
@@ -708,7 +713,7 @@ function EventsPageContent() {
                                     await fetchFullPayload(event.id)
                                   }
                                 }}
-                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 truncate"
                                 disabled={loadingPayloads.has(event.id)}
                               >
                                 {loadingPayloads.has(event.id) ? (
@@ -792,6 +797,236 @@ function EventsPageContent() {
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Tablet Table View (md to lg) - Horizontally scrollable */}
+            <div className="hidden md:block lg:hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        Device
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        Message
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        Time
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {currentEvents.map((event) => {
+                      const statusConfig = getStatusConfig(event.kind)
+                      const isExpanded = expandedEvent === event.id
+                      
+                      return (
+                        <React.Fragment key={event.id}>
+                          <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                                {event.id}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="flex items-center gap-2">
+                                <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
+                                  {statusConfig.icon}
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                                  {event.kind}
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <Link
+                                href={`/device/${encodeURIComponent(event.device)}`}
+                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                                title={deviceNameMap[event.device] || event.device}
+                              >
+                                {deviceNameMap[event.device] || event.device}
+                              </Link>
+                            </td>
+                            <td className="px-4 py-3 max-w-xs">
+                              <div className="text-sm text-gray-900 dark:text-white truncate">
+                                {safeDisplayPayload(event.payload)}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <div className="font-medium">
+                                  {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
+                                </div>
+                                <div className="text-xs opacity-75">
+                                  {event.ts ? formatExactTime(event.ts).split(' ')[1] : 'No timestamp'}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                              <button
+                                onClick={async (e) => {
+                                  e.preventDefault()
+                                  if (isExpanded) {
+                                    setExpandedEvent(null)
+                                  } else {
+                                    setExpandedEvent(event.id)
+                                    await fetchFullPayload(event.id)
+                                  }
+                                }}
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                                disabled={loadingPayloads.has(event.id)}
+                              >
+                                {loadingPayloads.has(event.id) ? (
+                                  <span className="text-xs">Loading...</span>
+                                ) : (
+                                  <span className="text-xs">{isExpanded ? 'Hide' : 'Show'}</span>
+                                )}
+                              </button>
+                            </td>
+                          </tr>
+                          {isExpanded && (
+                            <tr>
+                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                                <div className="px-4 py-3">
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                        Raw Payload
+                                      </h4>
+                                      <button
+                                        onClick={() => {
+                                          const payloadToShow = fullPayloads[event.id] || event.payload
+                                          copyToClipboard(formatFullPayload(payloadToShow), event.id)
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                                      >
+                                        {copiedEventId === event.id ? 'Copied!' : 'Copy'}
+                                      </button>
+                                    </div>
+                                    <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 overflow-auto">
+                                      <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
+                                        <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                                      </pre>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Mobile Card View (sm and below) */}
+            <div className="block md:hidden space-y-4">
+              {currentEvents.map((event) => {
+                const statusConfig = getStatusConfig(event.kind)
+                const isExpanded = expandedEvent === event.id
+                
+                return (
+                  <div key={event.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                    {/* Card Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
+                          {statusConfig.icon}
+                        </div>
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                          {event.kind}
+                        </span>
+                      </div>
+                      <div className="text-xs font-mono text-gray-500 dark:text-gray-400">
+                        #{event.id}
+                      </div>
+                    </div>
+
+                    {/* Device */}
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</div>
+                      <Link
+                        href={`/device/${encodeURIComponent(event.device)}`}
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm"
+                      >
+                        {deviceNameMap[event.device] || event.device}
+                      </Link>
+                    </div>
+
+                    {/* Message */}
+                    <div className="mb-3">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
+                      <div className="text-sm text-gray-900 dark:text-white break-words">
+                        {safeDisplayPayload(event.payload)}
+                      </div>
+                    </div>
+
+                    {/* Time and Actions */}
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                          {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-500">
+                          {event.ts ? formatExactTime(event.ts) : 'No timestamp'}
+                        </div>
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.preventDefault()
+                          if (isExpanded) {
+                            setExpandedEvent(null)
+                          } else {
+                            setExpandedEvent(event.id)
+                            await fetchFullPayload(event.id)
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                        disabled={loadingPayloads.has(event.id)}
+                      >
+                        {loadingPayloads.has(event.id) ? 'Loading...' : (isExpanded ? 'Hide Payload' : 'Show Payload')}
+                      </button>
+                    </div>
+
+                    {/* Expanded Payload */}
+                    {isExpanded && (
+                      <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                            Raw Payload
+                          </h4>
+                          <button
+                            onClick={() => {
+                              const payloadToShow = fullPayloads[event.id] || event.payload
+                              copyToClipboard(formatFullPayload(payloadToShow), event.id)
+                            }}
+                            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                          >
+                            {copiedEventId === event.id ? 'Copied!' : 'Copy'}
+                          </button>
+                        </div>
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto max-h-64">
+                          <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
+                            <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                          </pre>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* Pagination */}
