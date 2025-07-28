@@ -7,13 +7,13 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 
 interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier
   name: string
   model: string
   os: string
   lastSeen?: string
   status?: string
-  serialNumber?: string
 }
 
 export default function DeviceListPage() {
@@ -180,20 +180,20 @@ export default function DeviceListPage() {
             <div className="divide-y divide-gray-200 dark:divide-gray-700">
               {devices.map((device) => (
                 <Link
-                  key={device.id}
-                  href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
+                  key={device.deviceId}
+                  href={`/device/${encodeURIComponent(device.serialNumber)}`}
                   className="block px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                        {device.name || device.id}
+                        {device.name || device.serialNumber}
                       </h3>
                       <p className="text-sm text-gray-500 dark:text-gray-400">
                         {device.model || 'Unknown Model'}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {device.os || 'Unknown OS'} • ID: {device.id}
+                        {device.os || 'Unknown OS'} • Serial: {device.serialNumber}
                       </p>
                       {device.lastSeen && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">

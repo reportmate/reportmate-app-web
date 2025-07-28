@@ -9,7 +9,8 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 
 interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier
   name: string
   model?: string
   os?: string
@@ -17,7 +18,6 @@ interface Device {
   status: 'online' | 'offline' | 'warning' | 'error' | 'unknown'
   uptime?: string
   location?: string
-  serialNumber?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
@@ -129,7 +129,7 @@ function DevicesPageContent() {
             device?.os?.toLowerCase().includes(query) ||
             device?.serialNumber?.toLowerCase().includes(query) ||
             device?.ipAddress?.toLowerCase().includes(query) ||
-            device?.id?.toLowerCase().includes(query)
+            device?.deviceId?.toLowerCase().includes(query)
           )
         } catch (e) {
           console.warn('Error filtering device:', device, e)
@@ -455,8 +455,8 @@ function DevicesPageContent() {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredDevices.map((device) => (
                     <Link
-                      key={device.id}
-                      href={`/device/${encodeURIComponent(device.serialNumber || device.id)}`}
+                      key={device.deviceId}
+                      href={`/device/${encodeURIComponent(device.serialNumber)}`}
                       className="table-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                     >
                       <td className="px-6 py-4 whitespace-nowrap">

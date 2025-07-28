@@ -101,9 +101,15 @@ const NetworkOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
   // Use active connection info if available, fall back to legacy fields
   const connectionType = network?.activeConnection?.connectionType || network?.connectionType || 'Unknown';
   const activeIpAddress = network?.activeConnection?.ipAddress || ipAddress;
-  const activeMacAddress = macAddress;
   const wifiInfo = network?.activeConnection?.activeWifiSsid;
   const isVpnActive = network?.activeConnection?.isVpnActive;
+  
+  // Get MAC address from the active interface
+  const activeInterfaceName = network?.activeConnection?.interfaceName;
+  const activeInterface = device?.modules?.network?.interfaces?.find((iface: any) => 
+    iface.name === activeInterfaceName || iface.isActive
+  );
+  const activeMacAddress = activeInterface?.macAddress || macAddress;
 
   return (
     <div className="p-6">
@@ -230,6 +236,21 @@ const NetworkDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
               </div>
             </div>
 
+            {/* MAC Address row */}
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">MAC Address</label>
+              <p className="text-gray-900 dark:text-white font-mono">
+                {(() => {
+                  // Get MAC address from the active interface
+                  const activeInterfaceName = network.activeConnection.interfaceName;
+                  const activeInterface = device?.modules?.network?.interfaces?.find((iface: any) => 
+                    iface.name === activeInterfaceName || iface.isActive
+                  );
+                  return activeInterface?.macAddress || device.macAddress || 'N/A';
+                })()}
+              </p>
+            </div>
+
             {network.activeConnection.isVpnActive && network.activeConnection.vpnName && (
               <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
                 <div className="flex items-center">
@@ -247,61 +268,7 @@ const NetworkDetailsWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
         </div>
       )}
 
-      {/* Network Interfaces */}
-      {device?.modules?.network?.interfaces && device.modules.network.interfaces.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Interfaces</h3>
-          </div>
-          <div className="p-6 space-y-4">
-            {device.modules.network.interfaces.map((iface: any, index: number) => (
-              <div key={index} className={`p-4 border border-gray-200 dark:border-gray-700 rounded-lg ${iface.isActive ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-700' : ''}`}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full mr-3 ${iface.isActive ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                    <h4 className="font-medium text-gray-900 dark:text-white">
-                      {iface.friendlyName || iface.name} ({iface.type})
-                    </h4>
-                  </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                    iface.isActive ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100' : 
-                    iface.status === 'Up' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100' :
-                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                  }`}>
-                    {iface.isActive ? 'Active' : iface.status}
-                  </span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                  <div>
-                    <label className="text-gray-600 dark:text-gray-400">MAC Address</label>
-                    <p className="font-mono text-gray-900 dark:text-white">{iface.macAddress}</p>
-                  </div>
-                  <div>
-                    <label className="text-gray-600 dark:text-gray-400">IP Addresses</label>
-                    <div className="font-mono text-gray-900 dark:text-white">
-                      {iface.ipAddresses && iface.ipAddresses.length > 0 ? (
-                        iface.ipAddresses.map((ip: string, ipIndex: number) => (
-                          <div key={ipIndex} className={ip.includes(':') ? 'text-xs text-gray-500' : ''}>{ip}</div>
-                        ))
-                      ) : (
-                        <span className="text-gray-500">None assigned</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                {iface.mtu && (
-                  <div className="mt-2 text-sm">
-                    <label className="text-gray-600 dark:text-gray-400">MTU</label>
-                    <p className="text-gray-900 dark:text-white">{iface.mtu}</p>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Basic Network Info */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
