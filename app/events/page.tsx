@@ -626,7 +626,7 @@ function EventsPageContent() {
           <>
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -676,12 +676,13 @@ function EventsPageContent() {
                               <Link
                                 href={`/device/${encodeURIComponent(event.device)}`}
                                 className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
+                                title={deviceNameMap[event.device] || event.device}
                               >
                                 {deviceNameMap[event.device] || event.device}
                               </Link>
                             </td>
                             <td className="px-6 py-4">
-                              <div className="text-sm text-gray-900 dark:text-white max-w-md">
+                              <div className="text-sm text-gray-900 dark:text-white">
                                 {safeDisplayPayload(event.payload)}
                               </div>
                             </td>
@@ -730,53 +731,57 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-900">
-                                <div className="space-y-3">
-                                  <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                      {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
-                                    </h4>
-                                    <button
-                                      onClick={() => {
-                                        const payloadToShow = fullPayloads[event.id] || event.payload
-                                        copyToClipboard(formatFullPayload(payloadToShow), event.id)
-                                      }}
-                                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                      title="Copy payload to clipboard"
-                                    >
-                                      {copiedEventId === event.id ? (
-                                        <>
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                                <div className="px-6 py-4">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                        {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                                      </h4>
+                                      <button
+                                        onClick={() => {
+                                          const payloadToShow = fullPayloads[event.id] || event.payload
+                                          copyToClipboard(formatFullPayload(payloadToShow), event.id)
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                                        title="Copy payload to clipboard"
+                                      >
+                                        {copiedEventId === event.id ? (
+                                          <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            Copied!
+                                          </>
+                                        ) : (
+                                          <>
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                            </svg>
+                                            Copy
+                                          </>
+                                        )}
+                                      </button>
+                                    </div>
+                                    {loadingPayloads.has(event.id) ? (
+                                      <div className="flex items-center justify-center py-8">
+                                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                           </svg>
-                                          Copied!
-                                        </>
-                                      ) : (
-                                        <>
-                                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                          </svg>
-                                          Copy
-                                        </>
-                                      )}
-                                    </button>
-                                  </div>
-                                  {loadingPayloads.has(event.id) ? (
-                                    <div className="flex items-center justify-center py-8">
-                                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
-                                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                        </svg>
-                                        Loading full payload...
+                                          Loading full payload...
+                                        </div>
                                       </div>
-                                    </div>
-                                  ) : (
-                                    <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
-                                      <pre className="overflow-x-auto p-4 text-sm text-gray-100 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                                        <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
-                                      </pre>
-                                    </div>
-                                  )}
+                                    ) : (
+                                      <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
+                                        <div className="overflow-auto max-h-96">
+                                          <pre className="p-4 text-sm text-gray-100 whitespace-pre-wrap break-all min-w-0">
+                                            <code className="block break-all min-w-0">{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                                          </pre>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
