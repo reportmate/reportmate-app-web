@@ -194,7 +194,7 @@ export async function GET() {
               serialNumber: sourceData.metadata?.serialNumber || device.serial_number, // Human-readable unique ID
               name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serial_number,
               lastSeen: sourceData.metadata?.collectedAt || device.last_seen,
-              status: (sourceData.status === 'active' || sourceData.status === 'online' || device.status === 'online') ? 'active' : 'offline',
+              status: sourceData.status || device.status || 'offline', // Use actual status from Azure Functions API
               clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
               assetTag: sourceData.inventory?.assetTag, // Asset tag from inventory module
               location: sourceData.inventory?.location, // Location from inventory module

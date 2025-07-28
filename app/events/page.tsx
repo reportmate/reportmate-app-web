@@ -483,35 +483,38 @@ function EventsPageContent() {
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4">
+            {/* Left side - Logo and Title */}
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
               <Link
                 href="/dashboard"
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                <span className="text-sm font-medium">Dashboard</span>
+                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
               </Link>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
+              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
                   <img 
                     src="/reportmate-logo.png" 
                     alt="ReportMate Logo" 
                     className="w-full h-full object-contain"
                   />
                 </div>
-                <div>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                <div className="min-w-0">
+                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                     All Events
                   </h1>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-4">
-              {/* Navigation */}
-              <nav className="flex items-center gap-4">
+
+            {/* Right side - Navigation, Search, Settings */}
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Navigation - Hidden on small screens */}
+              <nav className="hidden lg:flex items-center gap-4">
                 <Link
                   href="/devices"
                   className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
@@ -523,26 +526,39 @@ function EventsPageContent() {
                   <span className="text-sm font-medium">Devices</span>
                 </Link>
               </nav>
-              {/* Search */}
+
+              {/* Search - Priority item, scales down but stays visible */}
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className="absolute inset-y-0 left-0 pl-2 sm:pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
                 <input
                   type="text"
-                  placeholder="Search events..."
-                  className="block w-80 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Search"
+                  className="block w-32 sm:w-48 md:w-64 lg:w-80 pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
+
+              {/* Navigation link for small screens */}
+              <Link
+                href="/devices"
+                className="lg:hidden p-1.5 sm:p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                title="Devices"
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </Link>
+
               {/* Settings */}
               <Link
                 href="/settings"
-                className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                className="p-1.5 sm:p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                 title="Settings"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
@@ -553,11 +569,12 @@ function EventsPageContent() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Filter Tabs */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
-            <nav className="-mb-px flex space-x-8">
+            {/* Desktop filter tabs */}
+            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto hide-scrollbar">
               {[
                 { key: 'all', label: 'All Events', count: filterCounts.all },
                 { key: 'success', label: 'Success', count: filterCounts.success },
@@ -577,25 +594,55 @@ function EventsPageContent() {
                       isActive
                         ? 'border-blue-500 text-blue-600 dark:text-blue-400'
                         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
+                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors flex-shrink-0`}
                   >
                     {statusConfig && (
                       <div className={`w-4 h-4 ${statusConfig.text}`}>
                         {statusConfig.icon}
                       </div>
                     )}
-                    {filter.label}
+                    <span className="hidden md:inline">{filter.label}</span>
+                    <span className="md:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
                     <span className={`${
                       isActive 
                         ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
                         : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                    } inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium`}>
+                    } inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium`}>
                       {filter.count}
                     </span>
                   </button>
                 )
               })}
             </nav>
+
+            {/* Mobile filter dropdown */}
+            <div className="sm:hidden pb-4">
+              <div className="relative">
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="appearance-none block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
+                >
+                  {[
+                    { key: 'all', label: 'All Events', count: filterCounts.all },
+                    { key: 'success', label: 'Success Events', count: filterCounts.success },
+                    { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
+                    { key: 'error', label: 'Error Events', count: filterCounts.error },
+                    { key: 'info', label: 'Info Events', count: filterCounts.info },
+                    { key: 'system', label: 'System Events', count: filterCounts.system },
+                  ].map((filter) => (
+                    <option key={filter.key} value={filter.key}>
+                      {filter.label} ({filter.count})
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
