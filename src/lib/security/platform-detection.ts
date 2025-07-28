@@ -6,7 +6,8 @@
 export type Platform = 'windows' | 'macos' | 'linux' | 'unknown'
 
 export interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier  
   name?: string
   hostname?: string
   osName?: string

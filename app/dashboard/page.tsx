@@ -25,7 +25,8 @@ interface FleetEvent {
 }
 
 interface Device {
-  id: string
+  deviceId: string      // Internal UUID (unique)
+  serialNumber: string  // Human-readable unique identifier
   name: string
   model?: string
   os?: string
@@ -33,7 +34,6 @@ interface Device {
   status: 'online' | 'offline' | 'warning' | 'error'
   uptime?: string
   location?: string
-  serialNumber?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
@@ -79,8 +79,8 @@ export default function DashboardPage() {
               if (device.serialNumber && device.name) {
                 nameMap[device.serialNumber] = device.name
               }
-              // Also map by ID in case that's used
-              nameMap[device.id] = device.name
+              // Also map by deviceId in case that's used
+              nameMap[device.deviceId] = device.name
             })
             setDeviceNameMap(nameMap)
           } else if (data.success && data.devices) {
@@ -96,8 +96,8 @@ export default function DashboardPage() {
               if (device.serialNumber && device.name) {
                 nameMap[device.serialNumber] = device.name
               }
-              // Also map by ID in case that's used
-              nameMap[device.id] = device.name
+              // Also map by deviceId in case that's used
+              nameMap[device.deviceId] = device.name
             })
             setDeviceNameMap(nameMap)
           }

@@ -149,7 +149,7 @@ export async function GET() {
       const transformedDevices = devicesArray
         .filter((device: any) => {
           // Filter out test devices - only include devices with real serial numbers
-          const serialNumber = device.serial_number || device.id
+          const serialNumber = device.serial_number
           return serialNumber && 
                  !serialNumber.startsWith('TEST-') && 
                  !serialNumber.includes('test-device') &&
@@ -157,18 +157,11 @@ export async function GET() {
                  !serialNumber.includes('{"serial_number"')
         })
         .map((device: any) => ({
-          id: device.serial_number || device.id, // Use serial number as the primary ID
-          serialNumber: device.serial_number,
-          name: device.name || device.serial_number || 'Unknown Device',
-          model: device.model || 'Unknown',
-          os: device.os_name || device.os || 'Unknown',
+          deviceId: device.device_id,                    // Internal UUID
+          serialNumber: device.serial_number,           // Human-readable unique ID
           lastSeen: device.last_seen,
           status: device.status === 'active' ? 'online' : 'offline',
-          uptime: device.uptime || '0h 0m',
-          location: device.location || 'Unknown',
-          ipAddress: device.ip_address || 'N/A',
-          totalEvents: device.total_events || 0,
-          lastEventTime: device.last_event_time || device.last_seen
+          clientVersion: device.client_version || '1.0.0'
         }))
       
       // Always return a direct array for the frontend
