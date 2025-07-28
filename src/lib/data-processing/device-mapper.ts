@@ -77,18 +77,27 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     return path.split('.').reduce((current, key) => current?.[key], obj)
   }
 
-  // Determine device status based on last_seen timestamp - updated timing logic
-  const getDeviceStatus = (lastSeen: string): 'active' | 'stale' | 'warning' | 'error' => {
-    if (!lastSeen) return 'stale'
+  // Determine device status - prefer API-provided status, fallback to calculation
+  const getDeviceStatus = (rawDevice: any): 'active' | 'stale' | 'warning' | 'error' => {
+    // Use API-provided status if available and valid
+    const apiStatus = rawDevice.status
+    if (apiStatus && ['active', 'stale', 'warning', 'error'].includes(apiStatus)) {
+      return apiStatus as 'active' | 'stale' | 'warning' | 'error'
+    }
+    
+    // Fallback to calculation based on lastSeen (aligned with backend logic)
+    const lastSeen = rawDevice.lastSeen
+    if (!lastSeen) return 'error'
     
     const lastSeenDate = new Date(lastSeen)
     const now = new Date()
-    const diffMinutes = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60)
+    const diffHours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
     
-    // Updated timing: active if seen within 15 minutes, warning if within 2 hours, stale after that
-    if (diffMinutes < 15) return 'active'
-    if (diffMinutes < 120) return 'warning'
-    return 'stale'
+    // Match backend logic: 4h/24h/7d thresholds
+    if (diffHours < 4) return 'active'
+    if (diffHours < 24) return 'warning'
+    if (diffHours < 24 * 7) return 'stale'
+    return 'error'
   }
 
   // Extract basic device information with robust lastSeen handling
