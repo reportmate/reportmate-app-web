@@ -85,6 +85,27 @@ export function useLiveEvents() {
       if (typeof payload === 'string') return { message: payload.substring(0, 200) }
       if (typeof payload !== 'object') return { value: String(payload).substring(0, 200) }
       
+      // Check if this is a modular data payload and preserve essential fields for formatting
+      if (payload.modules_processed && typeof payload.modules_processed === 'number') {
+        const essentialData = {
+          modules_processed: payload.modules_processed,
+          collection_type: payload.collection_type,
+          enabled_modules: Array.isArray(payload.enabled_modules) ? payload.enabled_modules.slice(0, 15) : undefined,
+          device_name: payload.device_name,
+          client_version: payload.client_version
+        }
+        
+        // Test if this small essential data can be safely stringified
+        try {
+          const test = JSON.stringify(essentialData)
+          if (test.length < 300) {
+            return essentialData
+          }
+        } catch (error) {
+          // Fallback if essential data fails
+        }
+      }
+      
       // Create a safer version with limited depth
       const safePayload = createSafeDisplayPayload(payload)
       
@@ -99,6 +120,12 @@ export function useLiveEvents() {
           keys: Object.keys(payload).slice(0, 2), // Reduced from 3 to 2
           type: String(payload.type || 'unknown').substring(0, 15), // Reduced from 20 to 15
           truncated: true,
+          // Preserve key fields for message formatting
+          ...(payload.modules_processed && { modules_processed: payload.modules_processed }),
+          ...(payload.collection_type && { collection_type: payload.collection_type }),
+          ...(payload.enabled_modules && Array.isArray(payload.enabled_modules) && { 
+            enabled_modules: payload.enabled_modules.slice(0, 3) 
+          }),
           // Only preserve essential fields
           ...(payload.message && { 
             originalMessage: String(payload.message).substring(0, 30) // Reduced from 50 to 30

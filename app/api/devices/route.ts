@@ -146,23 +146,71 @@ export async function GET() {
       }
       
       // Transform field names from snake_case to camelCase for frontend compatibility
-      const transformedDevices = devicesArray
-        .filter((device: any) => {
-          // Filter out test devices - only include devices with real serial numbers
-          const serialNumber = device.serial_number
-          return serialNumber && 
-                 !serialNumber.startsWith('TEST-') && 
-                 !serialNumber.includes('test-device') &&
-                 serialNumber !== 'localhost' &&
-                 !serialNumber.includes('{"serial_number"')
-        })
-        .map((device: any) => ({
-          deviceId: device.device_id,                    // Internal UUID
-          serialNumber: device.serial_number,           // Human-readable unique ID
-          lastSeen: device.last_seen,
-          status: device.status === 'active' ? 'online' : 'offline',
-          clientVersion: device.client_version || '1.0.0'
-        }))
+      // ENHANCED: Fetch full device details with modules for each device
+      const transformedDevices = await Promise.all(
+        devicesArray
+          .filter((device: any) => {
+            // Filter out test devices - only include devices with real serial numbers
+            const serialNumber = device.serial_number
+            return serialNumber && 
+                   !serialNumber.startsWith('TEST-') && 
+                   !serialNumber.includes('test-device') &&
+                   serialNumber !== 'localhost' &&
+                   !serialNumber.includes('{"serial_number"')
+          })
+          .map(async (device: any) => {
+            console.log('[DEVICES API] 🔍 Processing device:', device.serial_number)
+            
+            // Fetch full device details with modules from individual device endpoint
+            let fullDeviceData = null
+            try {
+              const deviceDetailResponse = await fetch(`${apiBaseUrl}/api/device/${device.serial_number}`, {
+                cache: 'no-store',
+                headers: {
+                  'Cache-Control': 'no-cache',
+                  'Pragma': 'no-cache',
+                  'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+                }
+              })
+              
+              if (deviceDetailResponse.ok) {
+                const deviceDetailData = await deviceDetailResponse.json()
+                // Check if response has device modules (indicating a successful detailed response)
+                if (deviceDetailData && (deviceDetailData.metadata || deviceDetailData.inventory || deviceDetailData.applications)) {
+                  fullDeviceData = deviceDetailData
+                  console.log('[DEVICES API] ✅ Got full device data with modules for:', device.serial_number)
+                  console.log('[DEVICES API]   Available modules:', Object.keys(deviceDetailData).filter(key => key !== 'metadata'))
+                }
+              }
+            } catch (error) {
+              console.warn('[DEVICES API] ⚠️ Failed to fetch full device data for:', device.serial_number, error)
+            }
+            
+            // Use full device data if available, otherwise fall back to basic data
+            const sourceData = fullDeviceData || device
+            
+            const transformed = {
+              deviceId: sourceData.metadata?.deviceId || device.id,     // Internal UUID
+              serialNumber: sourceData.metadata?.serialNumber || device.serial_number, // Human-readable unique ID
+              name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serial_number,
+              lastSeen: sourceData.metadata?.collectedAt || device.last_seen,
+              status: (sourceData.status === 'active' || sourceData.status === 'online' || device.status === 'online') ? 'active' : 'offline',
+              clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
+              assetTag: sourceData.inventory?.assetTag, // Asset tag from inventory module
+              location: sourceData.inventory?.location, // Location from inventory module
+              modules: {
+                inventory: sourceData.inventory,
+                applications: sourceData.applications,
+                security: sourceData.security,
+                services: sourceData.services
+              },
+              totalEvents: 0,                                // Default for compatibility
+              lastEventTime: sourceData.metadata?.collectedAt || device.last_seen // Use collectedAt as placeholder
+            }
+            
+            return transformed
+          })
+      )
       
       // Always return a direct array for the frontend
       console.log(`[DEVICES API] ${timestamp} - Returning filtered devices array with ${transformedDevices.length} items (filtered from ${devicesArray.length})`)

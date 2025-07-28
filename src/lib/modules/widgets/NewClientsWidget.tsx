@@ -14,13 +14,31 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error'
   uptime?: string
   location?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
-  assetTag?: string
+  assetTag?: string     // Asset tag for primary display
+  // Modular structure from API
+  modules?: {
+    inventory?: {
+      uuid?: string
+      owner?: string
+      usage?: string
+      catalog?: string
+      version?: string
+      assetTag?: string
+      deviceId?: string
+      location?: string
+      moduleId?: string
+      department?: string
+      deviceName?: string
+      collectedAt?: string
+      serialNumber?: string
+    }
+  }
 }
 
 interface NewClientsWidgetProps {
@@ -31,7 +49,7 @@ interface NewClientsWidgetProps {
 export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }: NewClientsWidgetProps) => {
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'bg-green-500'
+      case 'active': return 'bg-green-500'
       case 'warning': return 'bg-yellow-500'
       case 'error': return 'bg-red-400'
       default: return 'bg-gray-500'
@@ -99,24 +117,21 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
                   
                   {/* Device Info */}
                   <div className="flex-1 min-w-0">
-                    {/* Device Name */}
+                    {/* Primary - Device Name (Rod Christiansen) */}
                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
                       {device.name}
                     </div>
                     
-                    {/* Serial Number */}
-                    {device.serialNumber && (
-                      <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                        Serial: {device.serialNumber}
-                      </div>
-                    )}
-                    
-                    {/* Asset Tag */}
-                    {device.assetTag && (
-                      <div className="text-xs text-gray-600 dark:text-gray-400">
-                        Asset: {device.assetTag}
-                      </div>
-                    )}
+                    {/* Secondary - Asset Tag and Serial Number */}
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      {(device.modules?.inventory?.assetTag || device.assetTag) && device.serialNumber ? (
+                        `${device.modules?.inventory?.assetTag || device.assetTag} | ${device.serialNumber}`
+                      ) : device.serialNumber ? (
+                        device.serialNumber
+                      ) : (
+                        'No identifier available'
+                      )}
+                    </div>
                     
                     {/* Last Seen */}
                     <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">

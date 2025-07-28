@@ -13,7 +13,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'online' | 'offline' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error' | 'unknown'
   uptime?: string
   location?: string
   serialNumber?: string
@@ -62,7 +62,7 @@ export default function DevicesPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'online': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
+      case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
       case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
       default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
@@ -71,7 +71,7 @@ export default function DevicesPage() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'online':
+      case 'active':
         return (
           <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -232,7 +232,7 @@ export default function DevicesPage() {
                 No devices found
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
-                No devices have been registered in your fleet yet.
+                No devices have been registered in fleet yet.
               </p>
             </div>
           </div>
@@ -245,11 +245,11 @@ export default function DevicesPage() {
                     Fleet Devices
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Manage and monitor all devices in your fleet
+                    Manage and monitor all devices in fleet
                   </p>
                 </div>
                 <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {devices.filter(d => d.status === 'online').length} online • {devices.filter(d => d.status === 'warning').length} warnings • {devices.filter(d => d.status === 'error').length} errors
+                  {devices.filter(d => d.status === 'active').length} active • {devices.filter(d => d.status === 'warning').length} warnings • {devices.filter(d => d.status === 'error').length} errors
                 </div>
               </div>
             </div>

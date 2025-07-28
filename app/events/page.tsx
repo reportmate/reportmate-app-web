@@ -6,6 +6,7 @@ export const dynamic = 'force-dynamic'
 import React, { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
+import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
@@ -21,23 +22,85 @@ interface Event {
 const safeDisplayPayload = (payload: any): string => {
   try {
     if (!payload) return 'No payload'
-    if (typeof payload === 'string') return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
-    if (typeof payload !== 'object') return String(payload).substring(0, 100)
     
-    // Check if payload has a message property
-    if (payload.message) return String(payload.message).substring(0, 100)
-    
-    // For large or complex objects, show summary instead of stringifying
-    const keys = Object.keys(payload)
-    if (keys.length === 0) return 'Empty payload'
-    if (keys.length > 5) return `Large object (${keys.length} fields): ${keys.slice(0, 3).join(', ')}...`
-    
-    // Try to stringify, but with strict size limit
-    const stringified = JSON.stringify(payload)
-    if (stringified.length > 150) {
-      return `Large payload (${stringified.length} chars) - ${keys.slice(0, 3).join(', ')}...`
+    // Handle summarized payloads (from our new API structure)
+    if (payload.summary) {
+      return payload.summary
     }
-    return stringified.substring(0, 150)
+    
+    // Handle message-based payloads
+    if (payload.message) {
+      return payload.message
+    }
+    
+    // Handle module count payloads
+    if (payload.moduleCount && payload.modules) {
+      if (payload.moduleCount === 1) {
+        return `Reported ${payload.modules[0]} module data`
+      } else if (payload.moduleCount <= 3) {
+        return `Reported ${payload.modules.join(', ')} modules data`
+      } else {
+        return `Reported ${payload.moduleCount} modules data`
+      }
+    }
+    
+    // Handle string payloads
+    if (typeof payload === 'string') {
+      return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
+    }
+    
+    // For other objects, try to find a meaningful representation
+    if (typeof payload === 'object') {
+      // Check if this is a full device report (contains multiple modules)
+      if (payload.modules && typeof payload.modules === 'object') {
+        const moduleCount = Object.keys(payload.modules).length
+        const moduleNames = Object.keys(payload.modules).slice(0, 3)
+        
+        if (moduleCount > 3) {
+          return `Reported ${moduleCount} modules data (${moduleNames.join(', ')}, +${moduleCount - 3} more)`
+        } else {
+          return `Reported ${moduleNames.join(', ')} module${moduleCount > 1 ? 's' : ''} data`
+        }
+      }
+      
+      // Check for new structure with modules_processed
+      if (payload.modules_processed && typeof payload.modules_processed === 'number') {
+        const parts = []
+        if (payload.collection_type) parts.push(`Collection: ${payload.collection_type}`)
+        if (payload.modules_processed) parts.push(`${payload.modules_processed} modules`)
+        if (payload.client_version) parts.push(`Client: ${payload.client_version}`)
+        
+        return parts.length > 0 ? parts.join(' • ') : `Data collection completed`
+      }
+      
+      // Check for common event types
+      if (payload.component || payload.moduleType || payload.clientVersion) {
+        const parts = []
+        if (payload.message) parts.push(payload.message)
+        if (payload.component) parts.push(`Component: ${payload.component}`)
+        if (payload.moduleType) parts.push(`Module: ${payload.moduleType}`)
+        if (payload.clientVersion) parts.push(`Client: ${payload.clientVersion}`)
+        
+        const summary = parts.join(' • ')
+        return summary.length > 100 ? summary.substring(0, 100) + '...' : summary
+      }
+      
+      // Fallback for complex objects - show a more descriptive summary
+      const keys = Object.keys(payload)
+      if (keys.length === 0) return 'Empty payload'
+      if (keys.length > 5) {
+        return `Large data object (${keys.length} properties): ${keys.slice(0, 3).join(', ')}...`
+      }
+      
+      // Try to stringify, but with strict size limit
+      const stringified = JSON.stringify(payload)
+      if (stringified.length > 150) {
+        return `Complex data (${stringified.length} chars) - Properties: ${keys.slice(0, 3).join(', ')}...`
+      }
+      return stringified.substring(0, 150)
+    }
+    
+    return String(payload).substring(0, 100)
   } catch (error) {
     return 'Complex payload (non-serializable)'
   }
@@ -51,24 +114,64 @@ function EventsPageContent() {
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
+  const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
+  const [fullPayloads, setFullPayloads] = useState<Record<string, any>>({})
+  const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
   const searchParams = useSearchParams()
   
   const EVENTS_PER_PAGE = 10
   
   // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
+  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
   // Initialize filter from URL parameters
   useEffect(() => {
     const urlFilter = searchParams.get('filter')
-    if (urlFilter && ['success', 'warning', 'error', 'info', 'system'].includes(urlFilter)) {
+    if (urlFilter && ['success', 'warning', 'error', 'info', 'system', 'data_collection'].includes(urlFilter)) {
       setFilterType(urlFilter)
     }
   }, [searchParams])
 
+  // Fetch device name mappings
+  useEffect(() => {
+    const fetchDeviceNames = async () => {
+      try {
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        if (response.ok) {
+          const data = await response.json()
+          // Handle both response formats: direct array or {success: true, devices: [...]}
+          const devices = Array.isArray(data) ? data : (data.devices || [])
+          
+          // Build device name mapping (serial -> name)
+          const nameMap: Record<string, string> = {}
+          devices.forEach((device: any) => {
+            if (device.serialNumber) {
+              // Use inventory deviceName if available, otherwise fall back to name or serialNumber
+              const deviceName = device.modules?.inventory?.deviceName || device.name || device.serialNumber
+              nameMap[device.serialNumber] = deviceName
+            }
+          })
+          setDeviceNameMap(nameMap)
+        }
+      } catch (error) {
+        console.error('Failed to fetch device names:', error)
+        // Continue without device name mapping
+      }
+    }
+
+    fetchDeviceNames()
+  }, [])
+
   useEffect(() => {
     const fetchEvents = async () => {
       try {
+        console.log('[EVENTS PAGE] Fetching events...')
         // Use Next.js API route
         const response = await fetch('/api/events')
         if (!response.ok) {
@@ -76,14 +179,21 @@ function EventsPageContent() {
         }
         
         const data = await response.json()
+        console.log('[EVENTS PAGE] Raw API response:', data)
+        
         // API returns: {success: true, events: [...]}
         if (data.success && Array.isArray(data.events)) {
+          console.log('[EVENTS PAGE] Sample event structure:', data.events[0])
+          console.log('[EVENTS PAGE] Event timestamps:', data.events.map((e: any) => ({ id: e.id, ts: e.ts, timestamp: e.timestamp })).slice(0, 3))
+          
           // Filter events to only include valid categories
           const filteredEvents = data.events.filter((event: Event) => 
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           )
+          console.log('[EVENTS PAGE] Filtered events count:', filteredEvents.length)
           setEvents(filteredEvents)
         } else {
+          console.error('[EVENTS PAGE] Invalid events data received:', data)
           setError('Invalid events data received from API')
         }
       } catch (error) {
@@ -125,6 +235,56 @@ function EventsPageContent() {
     }
   }
 
+  // Function to fetch full payload lazily from dedicated endpoint
+  const fetchFullPayload = async (eventId: string) => {
+    if (fullPayloads[eventId] || loadingPayloads.has(eventId)) {
+      return // Already loaded or loading
+    }
+
+    setLoadingPayloads(prev => new Set(prev).add(eventId))
+    
+    try {
+      console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventId}`)
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`[EVENTS PAGE] Successfully fetched full payload for ${eventId}`)
+        
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: data.payload
+        }))
+      } else {
+        console.error(`[EVENTS PAGE] Failed to fetch payload for ${eventId}:`, response.status)
+        // Fallback to the existing payload from events list
+        const event = events.find(e => e.id === eventId)
+        if (event) {
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventId]: event.payload
+          }))
+        }
+      }
+    } catch (error) {
+      console.error(`[EVENTS PAGE] Error fetching payload for ${eventId}:`, error)
+      // Fallback to the existing payload from events list
+      const event = events.find(e => e.id === eventId)
+      if (event) {
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: event.payload
+        }))
+      }
+    } finally {
+      setLoadingPayloads(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(eventId)
+        return newSet
+      })
+    }
+  }
+
   // Helper function to copy payload to clipboard
   const copyToClipboard = async (text: string, eventId: string) => {
     try {
@@ -145,42 +305,6 @@ function EventsPageContent() {
       setTimeout(() => setCopiedEventId(null), 2000);
     }
   };
-
-  // Helper function to format relative time
-  const formatRelativeTime = (timestamp: string): string => {
-    try {
-      const date = new Date(timestamp)
-      const now = new Date()
-      const diffInMs = now.getTime() - date.getTime()
-      const diffInSeconds = Math.floor(diffInMs / 1000)
-      const diffInMinutes = Math.floor(diffInSeconds / 60)
-      const diffInHours = Math.floor(diffInMinutes / 60)
-      const diffInDays = Math.floor(diffInHours / 24)
-      
-      if (diffInSeconds < 60) {
-        return 'just now'
-      } else if (diffInMinutes < 60) {
-        return `${diffInMinutes}m ago`
-      } else if (diffInHours < 24) {
-        return `${diffInHours}h ago`
-      } else if (diffInDays < 7) {
-        return `${diffInDays}d ago`
-      } else {
-        return date.toLocaleDateString()
-      }
-    } catch (error) {
-      return 'Invalid date'
-    }
-  }
-
-  // Helper function to format exact time
-  const formatExactTime = (timestamp: string): string => {
-    try {
-      return new Date(timestamp).toLocaleString()
-    } catch (error) {
-      return 'Invalid date'
-    }
-  }
 
   const getStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
@@ -485,7 +609,7 @@ function EventsPageContent() {
               </h3>
               <p className="text-gray-600 dark:text-gray-400 mb-6">
                 {filterType === 'all' 
-                  ? 'No events have been received yet from your fleet.'
+                  ? 'No events have been received yet from fleet.'
                   : `No ${filterType} events match your current filter.`}
               </p>
               {filterType !== 'all' && (
@@ -505,6 +629,9 @@ function EventsPageContent() {
                 <table className="w-full">
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        ID
+                      </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
@@ -531,6 +658,11 @@ function EventsPageContent() {
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                             <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
+                                {event.id}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className={`w-4 h-4 ${statusConfig.text}`}>
                                   {statusConfig.icon}
@@ -545,7 +677,7 @@ function EventsPageContent() {
                                 href={`/device/${encodeURIComponent(event.device)}`}
                                 className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                               >
-                                {event.device}
+                                {deviceNameMap[event.device] || event.device}
                               </Link>
                             </td>
                             <td className="px-6 py-4">
@@ -556,33 +688,59 @@ function EventsPageContent() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <div className="font-medium">
-                                  {formatRelativeTime(event.ts)}
+                                  {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                                 </div>
-                                <div className="text-xs opacity-75" title={formatExactTime(event.ts)}>
-                                  {formatExactTime(event.ts)}
+                                <div className="text-xs opacity-75" title={event.ts ? formatExactTime(event.ts) : 'No timestamp'}>
+                                  {event.ts ? formatExactTime(event.ts) : 'No timestamp'}
                                 </div>
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
-                                onClick={() => setExpandedEvent(isExpanded ? null : event.id)}
+                                onClick={async (e) => {
+                                  e.preventDefault()
+                                  if (isExpanded) {
+                                    setExpandedEvent(null)
+                                  } else {
+                                    setExpandedEvent(event.id)
+                                    // Fetch full payload when expanding
+                                    await fetchFullPayload(event.id)
+                                  }
+                                }}
                                 className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                                disabled={loadingPayloads.has(event.id)}
                               >
-                                {isExpanded ? 'Hide' : 'Show'} Payload
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
-                                </svg>
+                                {loadingPayloads.has(event.id) ? (
+                                  <>
+                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                    Loading...
+                                  </>
+                                ) : (
+                                  <>
+                                    {isExpanded ? 'Hide' : 'Show'} Payload
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                                    </svg>
+                                  </>
+                                )}
                               </button>
                             </td>
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={5} className="px-6 py-4 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={6} className="px-6 py-4 bg-gray-50 dark:bg-gray-900">
                                 <div className="space-y-3">
                                   <div className="flex items-center justify-between">
-                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">Raw Payload</h4>
+                                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                                    </h4>
                                     <button
-                                      onClick={() => copyToClipboard(formatFullPayload(event.payload), event.id)}
+                                      onClick={() => {
+                                        const payloadToShow = fullPayloads[event.id] || event.payload
+                                        copyToClipboard(formatFullPayload(payloadToShow), event.id)
+                                      }}
                                       className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                                       title="Copy payload to clipboard"
                                     >
@@ -603,11 +761,22 @@ function EventsPageContent() {
                                       )}
                                     </button>
                                   </div>
-                                  <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
-                                    <pre className="overflow-x-auto p-4 text-sm text-gray-100 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                                      <code>{formatFullPayload(event.payload)}</code>
-                                    </pre>
-                                  </div>
+                                  {loadingPayloads.has(event.id) ? (
+                                    <div className="flex items-center justify-center py-8">
+                                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                                        <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                        </svg>
+                                        Loading full payload...
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
+                                      <pre className="overflow-x-auto p-4 text-sm text-gray-100 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                        <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                                      </pre>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
                             </tr>
