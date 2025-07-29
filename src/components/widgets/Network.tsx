@@ -109,7 +109,8 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     macAddress: (network as any)?.activeConnection?.macAddress || (network as any)?.macAddress || device.macAddress,
     isVpnActive: (network as any)?.isVpnActive || false,
     vpnName: (network as any)?.vpnName || '',
-    activeWifiSsid: (network as any)?.activeConnection?.activeWifiSsid
+    activeWifiSsid: (network as any)?.activeConnection?.activeWifiSsid,
+    wifiSignalStrength: (network as any)?.activeConnection?.wifiSignalStrength || (network as any)?.signalStrength
   }
   
   // Get DNS servers - handle both array and string formats
@@ -178,12 +179,21 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
               value={activeConnectionData.connectionType} 
             />
 
+            {/* WiFi SSID */}
+            {activeConnectionData.activeWifiSsid && (
+              <Stat 
+                label="WiFi Network" 
+                value={activeConnectionData.activeWifiSsid} 
+              />
+            )}
+
             {/* IP Address */}
             {activeConnectionData.ipAddress && (
               <Stat 
                 label="IP Address" 
                 value={activeConnectionData.ipAddress} 
                 isMono 
+                showCopyButton
               />
             )}
 
@@ -211,14 +221,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                 label="MAC Address" 
                 value={activeConnectionData.macAddress} 
                 isMono 
-              />
-            )}
-
-            {/* WiFi SSID */}
-            {activeConnectionData.activeWifiSsid && (
-              <Stat 
-                label="WiFi Network" 
-                value={activeConnectionData.activeWifiSsid} 
+                showCopyButton
               />
             )}
 
@@ -228,6 +231,14 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                 label="VPN Active"
                 status={activeConnectionData.vpnName || 'Connected'}
                 type="success"
+              />
+            )}
+
+            {/* WiFi Signal Strength */}
+            {activeConnectionData.wifiSignalStrength && activeConnectionData.connectionType === 'Wireless' && (
+              <Stat 
+                label="Signal Strength" 
+                value={`${activeConnectionData.wifiSignalStrength}%`} 
               />
             )}
 

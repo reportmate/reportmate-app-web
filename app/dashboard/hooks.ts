@@ -57,14 +57,15 @@ export function useLiveEvents() {
   }, [])
 
   // Helper function to sanitize events for safe display
-  const sanitizeEventForDisplay = (event: any): FleetEvent => {
+  const sanitizeEventForDisplay = (event: unknown): FleetEvent => {
     try {
+      const eventObj = event as Record<string, unknown>
       return {
-        id: String(event.id || `event-${Date.now()}`),
-        device: String(event.device || 'unknown'),
-        kind: String(event.kind || 'info'),
-        ts: String(event.ts || new Date().toISOString()),
-        payload: sanitizePayloadForDisplay(event.payload)
+        id: String(eventObj.id || `event-${Date.now()}`),
+        device: String(eventObj.device || 'unknown'),
+        kind: String(eventObj.kind || 'info'),
+        ts: String(eventObj.ts || new Date().toISOString()),
+        payload: sanitizePayloadForDisplay(eventObj.payload)
       }
     } catch (error) {
       console.error("Error sanitizing event:", error)
@@ -79,20 +80,22 @@ export function useLiveEvents() {
   }
 
   // Helper function to sanitize payload for safe display
-  const sanitizePayloadForDisplay = (payload: any): Record<string, unknown> => {
+  const sanitizePayloadForDisplay = (payload: unknown): Record<string, unknown> => {
     try {
       if (!payload) return {}
       if (typeof payload === 'string') return { message: payload.substring(0, 200) }
       if (typeof payload !== 'object') return { value: String(payload).substring(0, 200) }
       
+      const payloadObj = payload as Record<string, unknown>
+      
       // Check if this is a modular data payload and preserve essential fields for formatting
-      if (payload.modules_processed && typeof payload.modules_processed === 'number') {
+      if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
         const essentialData = {
-          modules_processed: payload.modules_processed,
-          collection_type: payload.collection_type,
-          enabled_modules: Array.isArray(payload.enabled_modules) ? payload.enabled_modules.slice(0, 15) : undefined,
-          device_name: payload.device_name,
-          client_version: payload.client_version
+          modules_processed: payloadObj.modules_processed,
+          collection_type: payloadObj.collection_type,
+          enabled_modules: Array.isArray(payloadObj.enabled_modules) ? payloadObj.enabled_modules.slice(0, 15) : undefined,
+          device_name: payloadObj.device_name,
+          client_version: payloadObj.client_version
         }
         
         // Test if this small essential data can be safely stringified
@@ -101,7 +104,7 @@ export function useLiveEvents() {
           if (test.length < 300) {
             return essentialData
           }
-        } catch (error) {
+        } catch {
           // Fallback if essential data fails
         }
       }
@@ -114,26 +117,33 @@ export function useLiveEvents() {
       
       // If payload is still too large, summarize it more aggressively
       if (test.length > 500) { // Reduced from 1000 to 500 bytes
-        return {
+        const summary: Record<string, unknown> = {
           message: 'Large data payload (summarized)',
           dataSize: test.length,
-          keys: Object.keys(payload).slice(0, 2), // Reduced from 3 to 2
-          type: String(payload.type || 'unknown').substring(0, 15), // Reduced from 20 to 15
-          truncated: true,
-          // Preserve key fields for message formatting
-          ...(payload.modules_processed && { modules_processed: payload.modules_processed }),
-          ...(payload.collection_type && { collection_type: payload.collection_type }),
-          ...(payload.enabled_modules && Array.isArray(payload.enabled_modules) && { 
-            enabled_modules: payload.enabled_modules.slice(0, 3) 
-          }),
-          // Only preserve essential fields
-          ...(payload.message && { 
-            originalMessage: String(payload.message).substring(0, 30) // Reduced from 50 to 30
-          })
+          keys: Object.keys(payloadObj).slice(0, 2), // Reduced from 3 to 2
+          type: String(payloadObj.type || 'unknown').substring(0, 15), // Reduced from 20 to 15
+          truncated: true
         }
+        
+        // Preserve key fields for message formatting
+        if (payloadObj.modules_processed) {
+          summary.modules_processed = payloadObj.modules_processed
+        }
+        if (payloadObj.collection_type) {
+          summary.collection_type = payloadObj.collection_type
+        }
+        if (payloadObj.enabled_modules && Array.isArray(payloadObj.enabled_modules)) {
+          summary.enabled_modules = payloadObj.enabled_modules.slice(0, 3)
+        }
+        // Only preserve essential fields
+        if (payloadObj.message) {
+          summary.originalMessage = String(payloadObj.message).substring(0, 30) // Reduced from 50 to 30
+        }
+        
+        return summary
       }
       
-      return safePayload
+      return safePayload as Record<string, unknown>
     } catch (error) {
       console.warn("Payload contains non-serializable data, creating safe version:", error)
       return {
@@ -147,7 +157,7 @@ export function useLiveEvents() {
   }
 
   // Helper function to create safe payload for display with strict limits
-  const createSafeDisplayPayload = (obj: any, depth = 0): any => {
+  const createSafeDisplayPayload = (obj: unknown, depth = 0): Record<string, unknown> | string | unknown => {
     const maxDepth = 1 // Keep reduced max depth for display
     
     if (depth > maxDepth) {
@@ -169,13 +179,14 @@ export function useLiveEvents() {
     }
     
     // For objects, be very selective about what we include
-    const result: any = {}
-    const keys = Object.keys(obj).slice(0, 3) // Reduced from 5 to 3 keys max
+    const result: Record<string, unknown> = {}
+    const objRecord = obj as Record<string, unknown>
+    const keys = Object.keys(objRecord).slice(0, 3) // Reduced from 5 to 3 keys max
     
     for (const key of keys) {
       if (key.length > 20) continue // Skip long keys
       try {
-        result[key] = createSafeDisplayPayload(obj[key], depth + 1)
+        result[key] = createSafeDisplayPayload(objRecord[key], depth + 1)
       } catch {
         result[key] = '[Error]'
       }

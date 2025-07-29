@@ -3,26 +3,86 @@
  * Common components used across all device widgets for consistent formatting
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 
 export interface StatProps {
   label: string
   value: string | number | undefined
   isMono?: boolean
   sublabel?: string
+  showCopyButton?: boolean
 }
 
-export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublabel }) => (
-  <div>
-    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-    <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''}`}>
-      {value || 'Unknown'}
-    </dd>
-    {sublabel && (
-      <dd className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sublabel}</dd>
-    )}
-  </div>
-)
+export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublabel, showCopyButton = false }) => {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    if (!value) return
+    
+    try {
+      // Check if clipboard API is available
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(String(value))
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // Fallback for browsers that don't support clipboard API
+        const textArea = document.createElement('textarea')
+        textArea.value = String(value)
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr)
+        } finally {
+          document.body.removeChild(textArea)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+      // Show error feedback to user
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
+  return (
+    <div>
+      <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
+      <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''} ${showCopyButton ? 'flex items-center' : ''}`}>
+        <span>{value || 'Unknown'}</span>
+        {showCopyButton && value && (
+          <button
+            onClick={handleCopy}
+            className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+            title={copied ? 'Copied!' : 'Copy to clipboard'}
+          >
+            {copied ? (
+              <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+            )}
+          </button>
+        )}
+      </dd>
+      {sublabel && (
+        <dd className="text-xs text-gray-500 dark:text-gray-400 mt-1">{sublabel}</dd>
+      )}
+    </div>
+  )
+}
 
 export interface StatusBadgeProps {
   label: string

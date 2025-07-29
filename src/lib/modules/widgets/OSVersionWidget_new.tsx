@@ -13,7 +13,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: 'active' | 'stale' | 'warning' | 'error'
   uptime?: string
   location?: string
   ipAddress?: string

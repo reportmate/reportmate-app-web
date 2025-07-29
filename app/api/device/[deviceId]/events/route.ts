@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+interface DeviceEvent {
+  kind?: string
+  [key: string]: unknown
+}
+
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -46,8 +51,8 @@ export async function GET(
         
         // Filter events to only include valid categories
         if (data.success && Array.isArray(data.events)) {
-          const filteredEvents = data.events.filter((event: any) => 
-            VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+          const filteredEvents = data.events.filter((event: DeviceEvent) => 
+            VALID_EVENT_KINDS.includes(event.kind?.toLowerCase() ?? '')
           )
           const filteredData = {
             ...data,
