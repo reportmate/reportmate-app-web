@@ -23,6 +23,7 @@ import {
   InstallsTab,
   ProfilesTab,
   ApplicationsTab,
+  ManagementTab,
   SystemTab,
   HardwareTab,
   NetworkTab,
@@ -273,13 +274,14 @@ interface ManagedPackage {
   category?: string
 }
 
-type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'system' | 'hardware' | 'network' | 'security' | 'events'
+type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string }[] = [
   { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Device information, management status, and system details' },
   { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates' },
   { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', description: 'MDM configuration profiles and settings' },
   { id: 'applications', label: 'Applications', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', description: 'Installed applications and packages' },
+  { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', description: 'Device management and enrollment status' },
   { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', description: 'Operating system and system information' },
   { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance' },
   { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', description: 'Network connectivity and settings' },
@@ -480,30 +482,35 @@ export default function DeviceDetailPage() {
             console.log('    - ❌ NO modules found on directDevice');
           }
           
-          setDeviceInfo(directDevice)
+          // Process the raw device data through our mapper
+          console.log('About to call mapDeviceData with:', {
+            deviceData: !!deviceData.device,
+            mapDeviceDataType: typeof mapDeviceData,
+            mapDeviceDataExists: !!mapDeviceData
+          });
           
-          // ORIGINAL CODE (commented out):
-          // // Add debug logging before using mapDeviceData
-          // console.log('About to call mapDeviceData with:', {
-          //   deviceData: !!deviceData.device,
-          //   mapDeviceDataType: typeof mapDeviceData,
-          //   mapDeviceDataExists: !!mapDeviceData
-          // });
-          // 
-          // // Test if the function is available
-          // if (typeof mapDeviceData !== 'function') {
-          //   console.error('mapDeviceData is not a function!', { mapDeviceData });
-          //   throw new Error('mapDeviceData is not available');
-          // }
-          // 
-          // try {
-          //   // Process the raw device data through our mapper
-          //   const processedDevice = mapDeviceData(deviceData.device)
-          //   setDeviceInfo(processedDevice)
-          // } catch (mappingError) {
-          //   console.error('Error in mapDeviceData:', mappingError);
-          //   throw mappingError;
-          // }
+          // Test if the function is available
+          if (typeof mapDeviceData !== 'function') {
+            console.error('mapDeviceData is not a function!', { mapDeviceData });
+            // Fallback to direct device if mapper not available
+            setDeviceInfo(directDevice)
+          } else {
+            try {
+              // Process the raw device data through our mapper
+              const processedDevice = mapDeviceData(deviceData.device)
+              console.log('🎯 Processed device with mapDeviceData:', {
+                hasApplications: !!processedDevice.applications,
+                applicationsLength: processedDevice.applications?.length,
+                originalModules: !!deviceData.device?.modules?.applications,
+                processedKeys: Object.keys(processedDevice)
+              });
+              setDeviceInfo(processedDevice)
+            } catch (mappingError) {
+              console.error('Error in mapDeviceData:', mappingError);
+              // Fallback to direct device if mapping fails
+              setDeviceInfo(directDevice)
+            }
+          }
           
           // Process component-specific data
           const componentData = {
@@ -679,7 +686,7 @@ export default function DeviceDetailPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop tabs */}
-            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto hide-scrollbar">
+            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto overlay-scrollbar">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -731,6 +738,7 @@ export default function DeviceDetailPage() {
         {activeTab === 'installs' && <InstallsTab device={deviceInfo} data={processedData.installs} />}
         {activeTab === 'profiles' && <ProfilesTab device={deviceInfo} data={processedData.profiles} />}
         {activeTab === 'applications' && <ApplicationsTab device={deviceInfo} data={processedData.applications} />}
+        {activeTab === 'management' && <ManagementTab device={deviceInfo} />}
         {activeTab === 'system' && <SystemTab device={deviceInfo} data={processedData.system} />}
         {activeTab === 'hardware' && <HardwareTab device={deviceInfo} data={processedData.hardware} />}
         {activeTab === 'network' && <NetworkTab device={deviceInfo} data={processedData.network} />}

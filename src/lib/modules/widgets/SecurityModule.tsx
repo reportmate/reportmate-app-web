@@ -587,7 +587,7 @@ const SecurityTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Security Updates</h3>
           </div>
           
-          <div className="space-y-3 max-h-64 overflow-y-auto">
+          <div className="space-y-3 max-h-64 overflow-y-auto overlay-scrollbar">
             {security.securityUpdates && security.securityUpdates.length > 0 ? (
               security.securityUpdates.map((update, index) => (
                 <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
@@ -628,7 +628,7 @@ const SecurityTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Security Events</h3>
           </div>
           
-          <div className="space-y-2 max-h-64 overflow-y-auto">
+          <div className="space-y-2 max-h-64 overflow-y-auto overlay-scrollbar">
             {security.securityEvents.map((event, index) => (
               <div key={index} className="border border-gray-200 dark:border-gray-600 rounded-lg p-3">
                 <div className="flex justify-between items-start">
