@@ -4,7 +4,7 @@
  */
 
 import { formatExactTime } from '../../lib/time'
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { processSystemTabData } from '../../lib/data-processing/component-data'
 
 interface SystemTabProps {
@@ -19,6 +19,42 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Handle scrollbar visibility for services table
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    let scrollTimeout: NodeJS.Timeout;
+    
+    const handleScroll = () => {
+      container.classList.add('scrolling');
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        container.classList.remove('scrolling');
+      }, 1000);
+    };
+
+    const handleMouseEnter = () => {
+      container.classList.add('scrolling');
+    };
+
+    const handleMouseLeave = () => {
+      container.classList.remove('scrolling');
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('mouseenter', handleMouseEnter);
+    container.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      container.removeEventListener('mouseenter', handleMouseEnter);
+      container.removeEventListener('mouseleave', handleMouseLeave);
+      clearTimeout(scrollTimeout);
+    };
+  }, []);
   
   // Get operating system information (same logic as SystemWidget)
   let osInfo = null
@@ -110,10 +146,6 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
           
           {/* Right Column */}
           <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.architecture || device.architecture || 'Unknown'}</p>
-            </div>
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
@@ -250,9 +282,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
             </div>
           </div>
           <div className="overflow-hidden">
-            <div className="max-h-96 overflow-y-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+            <div 
+              ref={scrollContainerRef}
+              className="max-h-96 overflow-auto overlay-scrollbar"
+            >
+              <table className="w-full min-w-full">
+                <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>

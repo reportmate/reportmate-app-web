@@ -312,7 +312,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     </button>
                   </div>
                   <div className="relative bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 overflow-hidden">
-                    <pre className="overflow-x-auto overflow-y-auto max-h-96 p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                    <pre className="overflow-x-auto overflow-y-auto max-h-96 overlay-scrollbar p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                       <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                         {formatPayload(ev.raw)}
                       </code>

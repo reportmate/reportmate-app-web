@@ -254,7 +254,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <div className="overflow-x-auto hide-scrollbar h-full">
+          <div className="overflow-x-auto overlay-scrollbar h-full">
             <table className="w-full table-fixed min-w-full">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                 <tr>
@@ -273,7 +273,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                 </tr>
               </thead>
             </table>
-            <div className="overflow-y-auto hide-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
+            <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
               <table className="w-full table-fixed min-w-full">
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {events.slice(0, 50).map((event) => {

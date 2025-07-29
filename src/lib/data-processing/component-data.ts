@@ -718,48 +718,162 @@ export interface ProfilesData {
 export interface ProfileInfo {
   id: string
   name: string
-  identifier: string
-  type: 'System' | 'User'
-  installDate: string
-  organization?: string
+  displayName: string
   description?: string
-  payloads: Array<{
+  organization?: string
+  uuid: string
+  identifier: string
+  type: 'Device' | 'User'
+  installDate: string
+  payloads?: Array<{
     type?: string
     displayName?: string
     identifier?: string
-  }>
-  removable: boolean
-  encrypted: boolean
+  }> | null
+  isRemovable: boolean
+  hasRemovalPasscode: boolean
+  isEncrypted: boolean
 }
 
 export function processProfilesData(rawDevice: any): ProfilesData {
-  // Extract profile data from API response only - NO FAKE DATA
-  const mdm = rawDevice.management || rawDevice.mdm || rawDevice.modules?.mdm || {}
-  const profiles = mdm.profiles || []
+  // Extract profiles data from API response only - NO FAKE DATA
+  let profiles: any[] = []
+  
+  console.log('🔧 processProfilesData DEBUG:', {
+    hasRawDevice: !!rawDevice,
+    rawDeviceKeys: rawDevice ? Object.keys(rawDevice) : [],
+    hasModules: !!rawDevice?.modules,
+    moduleKeys: rawDevice?.modules ? Object.keys(rawDevice.modules) : [],
+    hasProfilesModule: !!rawDevice?.modules?.profiles,
+    profilesModuleKeys: rawDevice?.modules?.profiles ? Object.keys(rawDevice.modules.profiles) : [],
+    // Check for various profile field variations
+    hasConfigurationProfiles: !!rawDevice?.modules?.profiles?.configurationProfiles,
+    configurationProfilesLength: rawDevice?.modules?.profiles?.configurationProfiles?.length || 0,
+    hasIntunePolicies: !!rawDevice?.modules?.profiles?.intunePolicies,
+    intunePoliciesLength: rawDevice?.modules?.profiles?.intunePolicies?.length || 0,
+    hasRegistryPolicies: !!rawDevice?.modules?.profiles?.registryPolicies,
+    registryPoliciesLength: rawDevice?.modules?.profiles?.registryPolicies?.length || 0,
+    sampleRawDevice: JSON.stringify(rawDevice).substring(0, 1000)
+  })
+  
+  // Look in various locations for profiles data from API - check both camelCase and PascalCase
+  if (rawDevice.modules?.profiles?.configurationProfiles?.length > 0) {
+    profiles = rawDevice.modules.profiles.configurationProfiles
+    console.log('✅ Found profiles in rawDevice.modules.profiles.configurationProfiles:', profiles.length)
+  } else if (rawDevice.modules?.profiles?.intunePolicies?.length > 0) {
+    // Group Intune policies by policy area instead of showing each setting as a separate profile
+    const groupedPolicies = groupIntunePoliciesByArea(rawDevice.modules.profiles.intunePolicies)
+    profiles = Object.values(groupedPolicies)
+    console.log('✅ Found profiles in rawDevice.modules.profiles.intunePolicies (grouped by area):', profiles.length)
+  } else if (rawDevice.modules?.profiles?.registryPolicies?.length > 0) {
+    // Group Registry policies by source and category
+    const groupedPolicies = groupRegistryPoliciesBySource(rawDevice.modules.profiles.registryPolicies)
+    profiles = Object.values(groupedPolicies)
+    console.log('✅ Found profiles in rawDevice.modules.profiles.registryPolicies (grouped by source):', profiles.length)  
+  } else if (rawDevice.management?.profiles) {
+    profiles = rawDevice.management.profiles
+    console.log('✅ Found profiles in rawDevice.management.profiles:', profiles.length)
+  } else if (rawDevice.mdm?.profiles) {
+    profiles = rawDevice.mdm.profiles
+    console.log('✅ Found profiles in rawDevice.mdm.profiles:', profiles.length)
+  } else if (rawDevice.profiles) {
+    profiles = rawDevice.profiles
+    console.log('✅ Found profiles in rawDevice.profiles:', profiles.length)
+  } else {
+    console.log('❌ No profiles found in any expected location')
+  }
   
   // Process only real profiles from API - NO FAKE DATA
-  const processedProfiles: ProfileInfo[] = profiles.map((profile: any) => ({
-    id: profile.id || profile.identifier || 'unknown',
-    name: profile.name || profile.displayName || 'Unknown Profile',
-    identifier: profile.identifier || 'unknown',
-    type: profile.type || 'System',
-    installDate: profile.installDate || profile.dateInstalled || '',
-    organization: profile.organization || mdm.organization || 'Unknown',
-    description: profile.description || '',
-    payloads: Array.isArray(profile.payloads) ? profile.payloads : [],
-    removable: Boolean(profile.removable),
-    encrypted: Boolean(profile.encrypted)
+  const processedProfiles: ProfileInfo[] = profiles.map((profile: any, index: number) => ({
+    id: profile.id || profile.identifier || profile.policyId || `profile-${index}`,
+    name: profile.name || profile.displayName || profile.policyName || 'Unknown Profile',
+    displayName: profile.displayName || profile.name || profile.policyName || 'Unknown Profile',
+    uuid: profile.uuid || profile.identifier || profile.policyId || profile.id || `profile-${index}`,
+    identifier: profile.identifier || profile.policyId || profile.id || `profile-${index}`,
+    type: (profile.type === 'User' ? 'User' : 'Device') as 'Device' | 'User',
+    installDate: profile.installDate || profile.dateInstalled || profile.assignedDate || profile.lastSync || profile.lastModified || '',
+    organization: profile.organization || profile.source || 'Unknown',
+    description: profile.description || profile.policyType || profile.category || '',
+    payloads: Array.isArray(profile.payloads) ? profile.payloads : (Array.isArray(profile.settings) ? profile.settings : []),
+    isRemovable: Boolean(profile.removable) || (profile.enforcementState ? profile.enforcementState !== 'Enforced' : true),
+    hasRemovalPasscode: Boolean(profile.hasRemovalPasscode),
+    isEncrypted: Boolean(profile.encrypted)
   }))
   
-  const systemProfiles = processedProfiles.filter(p => p.type === 'System').length
+  const systemProfiles = processedProfiles.filter(p => p.type === 'Device').length
   const userProfiles = processedProfiles.filter(p => p.type === 'User').length
   
   return {
     totalProfiles: processedProfiles.length,
-    systemProfiles,
+    systemProfiles: systemProfiles, // Device profiles count as system profiles
     userProfiles,
     profiles: processedProfiles
   }
+}
+
+// Helper function to group Intune policies by policy area
+function groupIntunePoliciesByArea(intunePolicies: any[]): Record<string, any> {
+  const grouped: Record<string, any> = {}
+  
+  intunePolicies.forEach(policy => {
+    const policyArea = policy.policyType || policy.policyName || 'Unknown'
+    
+    if (!grouped[policyArea]) {
+      grouped[policyArea] = {
+        id: policy.policyId || policyArea,
+        name: policyArea,
+        displayName: policyArea,
+        policyType: policy.policyType,
+        organization: 'Microsoft Intune',
+        assignedDate: policy.assignedDate,
+        lastSync: policy.lastSync,
+        status: policy.status,
+        enforcementState: policy.enforcementState,
+        settings: []
+      }
+    }
+    
+    // Combine settings from all policies in this area
+    if (Array.isArray(policy.settings)) {
+      grouped[policyArea].settings.push(...policy.settings)
+    }
+  })
+  
+  return grouped
+}
+
+// Helper function to group Registry policies by source
+function groupRegistryPoliciesBySource(registryPolicies: any[]): Record<string, any> {
+  const grouped: Record<string, any> = {}
+  
+  registryPolicies.forEach(policy => {
+    const source = policy.source || 'Group Policy'
+    const category = policy.category || 'General'
+    const groupKey = `${source}-${category}`
+    
+    if (!grouped[groupKey]) {
+      grouped[groupKey] = {
+        id: groupKey,
+        name: `${source} - ${category}`,
+        displayName: `${source} - ${category}`,
+        source: policy.source,
+        category: policy.category,
+        lastModified: policy.lastModified,
+        settings: []
+      }
+    }
+    
+    // Add this policy as a setting
+    grouped[groupKey].settings.push({
+      name: policy.valueName,
+      value: policy.value,
+      type: policy.type,
+      keyPath: policy.keyPath,
+      description: `Registry setting: ${policy.valueName}`
+    })
+  })
+  
+  return grouped
 }
 
 // Export all processors

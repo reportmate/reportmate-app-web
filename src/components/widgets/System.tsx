@@ -170,11 +170,6 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
         {/* Right Column */}
         <div className="space-y-4">
           <Stat 
-            label="Architecture" 
-            value={operatingSystem?.architecture || device.architecture || 'Unknown'} 
-          />
-          
-          <Stat 
             label="Uptime" 
             value={uptimeString || 'Unknown'} 
           />

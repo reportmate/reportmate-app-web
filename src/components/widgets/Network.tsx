@@ -197,24 +197,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
               />
             )}
 
-            {/* Gateway */}
-            {activeConnectionData.gateway && (
-              <Stat 
-                label="Gateway" 
-                value={activeConnectionData.gateway} 
-                isMono 
-              />
-            )}
-
-            {/* DNS Server */}
-            {primaryDns && (
-              <Stat 
-                label="DNS Server" 
-                value={primaryDns} 
-                isMono 
-              />
-            )}
-
             {/* MAC Address */}
             {activeConnectionData.macAddress && (
               <Stat 
@@ -242,13 +224,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
               />
             )}
 
-            {/* Interface Name */}
-            {(activeConnectionData.friendlyName || activeConnectionData.interfaceName) && (
-              <Stat 
-                label="Interface" 
-                value={activeConnectionData.friendlyName || activeConnectionData.interfaceName} 
-              />
-            )}
           </>
         ) : (
           <div className="text-xs text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400 p-2 rounded">
