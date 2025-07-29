@@ -44,13 +44,13 @@ const getStatusConfig = (kind: string) => {
 const getConnectionStatus = (connectionStatus: string) => {
   switch (connectionStatus) {
     case 'connected':
-      return { text: 'Live', color: 'text-green-600 dark:text-green-400', dot: 'bg-green-500' }
+      return { text: 'Live', color: 'text-green-600 dark:text-green-400', dot: 'bg-green-500', show: true }
     case 'connecting':
-      return { text: 'Connecting', color: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-500' }
+      return { text: 'Connecting', color: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-500', show: true }
     case 'polling':
-      return { text: 'Polling', color: 'text-blue-600 dark:text-blue-400', dot: 'bg-blue-500' }
+      return { text: '', color: '', dot: '', show: false } // Hide polling status
     default:
-      return { text: 'Stale', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400' }
+      return { text: 'Stale', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400', show: true }
   }
 }
 
@@ -220,13 +220,15 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-4">
-            {/* Connection status */}
-            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700">
-              <div className={`w-2 h-2 rounded-full ${status.dot} animate-pulse`}></div>
-              <span className={`text-sm font-medium ${status.color}`}>
-                {status.text}
-              </span>
-            </div>
+            {/* Connection status - only show if not polling */}
+            {status.show && (
+              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700">
+                <div className={`w-2 h-2 rounded-full ${status.dot} animate-pulse`}></div>
+                <span className={`text-sm font-medium ${status.color}`}>
+                  {status.text}
+                </span>
+              </div>
+            )}
             <div className="text-sm text-gray-500 dark:text-gray-400">
               Last update: {mounted && lastUpdateTime ? formatRelativeTime(lastUpdateTime.toISOString()) : 'Loading...'}
             </div>
@@ -303,9 +305,6 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                           <div className="text-sm text-gray-600 dark:text-gray-400">
                             <div className="font-medium truncate">
                               {formatRelativeTime(event.ts)}
-                            </div>
-                            <div className="text-xs opacity-75 truncate" title={formatExactTime(event.ts)}>
-                              {formatExactTime(event.ts)}
                             </div>
                           </div>
                         </td>

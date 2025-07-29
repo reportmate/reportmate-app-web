@@ -183,7 +183,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           <Stat 
             label="Processor" 
             value={hardwareInfo.processor}
-            sublabel={hardwareInfo.cores ? `${hardwareInfo.cores} cores` : undefined}
+            // sublabel={hardwareInfo.cores ? `${hardwareInfo.cores} cores` : undefined}
           />
           
           <Stat 

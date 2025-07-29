@@ -2,18 +2,21 @@
 
 import { useState, useEffect } from 'react'
 
+interface ApiResponse {
+  metadata?: Record<string, unknown>
+  [key: string]: unknown
+}
+
 export default function ApiTestPage() {
-  const [apiResponse, setApiResponse] = useState<any>(null)
+  const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [timestamp, setTimestamp] = useState<string>('')
 
   const fetchData = async () => {
     try {
       setLoading(true)
       setError(null)
       const fetchTime = new Date().toISOString()
-      setTimestamp(fetchTime)
       
       console.log(`${fetchTime} - Testing API endpoint`)
       
@@ -105,11 +108,11 @@ export default function ApiTestPage() {
               <div className="bg-gray-100 dark:bg-gray-700 p-4 rounded-lg">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Data Summary:</h3>
                 <div className="text-sm text-gray-700 dark:text-gray-300">
-                  <p>Type: {apiResponse.metadata.dataType}</p>
-                  <p>Is Array: {String(apiResponse.metadata.isArray)}</p>
-                  <p>Length: {apiResponse.metadata.length}</p>
-                  <p>Fetched At: {apiResponse.metadata.fetchedAt}</p>
-                  <p>Test Timestamp: {apiResponse.metadata.timestamp}</p>
+                  <p>Type: {String(apiResponse.metadata?.dataType || 'unknown')}</p>
+                  <p>Is Array: {String(apiResponse.metadata?.isArray || false)}</p>
+                  <p>Length: {String(apiResponse.metadata?.length || 0)}</p>
+                  <p>Fetched At: {String(apiResponse.metadata?.fetchedAt || 'unknown')}</p>
+                  <p>Test Timestamp: {String(apiResponse.metadata?.timestamp || 'unknown')}</p>
                 </div>
               </div>
               

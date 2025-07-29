@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import path from 'path'
+import fs from 'fs'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -41,8 +43,6 @@ export async function GET(
       
       try {
         // Read sample data from file
-        const path = require('path')
-        const fs = require('fs')
         const workingDir = process.cwd()
         console.log('[DEVICE API] Working directory:', workingDir)
         
@@ -133,7 +133,7 @@ export async function GET(
       console.log('[DEVICE API] Clean modular response - deviceId:', metadata.deviceId, 'serialNumber:', metadata.serialNumber)
       
       // Build clean modules object with proper ordering: inventory, system, hardware, management, then alphabetical
-      const modules: Record<string, any> = {}
+      const modules: Record<string, unknown> = {}
       const moduleOrder = ['inventory', 'system', 'hardware', 'management']
       
       // Add priority modules first

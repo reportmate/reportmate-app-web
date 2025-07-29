@@ -1,5 +1,10 @@
 import { NextResponse } from 'next/server'
 
+interface RawDevice {
+  serial_number?: string
+  [key: string]: unknown
+}
+
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -149,7 +154,7 @@ export async function GET() {
       // ENHANCED: Fetch full device details with modules for each device
       const transformedDevices = await Promise.all(
         devicesArray
-          .filter((device: any) => {
+          .filter((device: RawDevice) => {
             // Filter out test devices - only include devices with real serial numbers
             const serialNumber = device.serial_number
             return serialNumber && 
@@ -158,7 +163,7 @@ export async function GET() {
                    serialNumber !== 'localhost' &&
                    !serialNumber.includes('{"serial_number"')
           })
-          .map(async (device: any) => {
+          .map(async (device: RawDevice) => {
             console.log('[DEVICES API] 🔍 Processing device:', device.serial_number)
             
             // Fetch full device details with modules from individual device endpoint
@@ -202,7 +207,15 @@ export async function GET() {
                 inventory: sourceData.inventory,
                 applications: sourceData.applications,
                 security: sourceData.security,
-                services: sourceData.services
+                services: sourceData.services,
+                system: sourceData.system,           // Add system module for OS data
+                hardware: sourceData.hardware,       // Add hardware module
+                network: sourceData.network,         // Add network module
+                displays: sourceData.displays,       // Add displays module
+                printers: sourceData.printers,       // Add printers module
+                profiles: sourceData.profiles,       // Add profiles module
+                management: sourceData.management,   // Add management module
+                installs: sourceData.installs        // Add installs module
               },
               totalEvents: 0,                                // Default for compatibility
               lastEventTime: sourceData.metadata?.collectedAt || device.last_seen // Use collectedAt as placeholder

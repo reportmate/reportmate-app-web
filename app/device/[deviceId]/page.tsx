@@ -279,8 +279,8 @@ const tabs: { id: TabType; label: string; icon: string; description: string }[] 
   { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Device information, management status, and system details' },
   { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates' },
   { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', description: 'MDM configuration profiles and settings' },
-  { id: 'applications', label: 'Applications', icon: 'M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z', description: 'Installed applications and packages' },
-  { id: 'system', label: 'System', icon: 'M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.56.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.893.149c-.425.07-.765.383-.93.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.397.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.505-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.107-1.204l-.527-.738a1.125 1.125 0 01.12-1.45l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894z', description: 'Operating system and system information' },
+  { id: 'applications', label: 'Applications', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', description: 'Installed applications and packages' },
+  { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', description: 'Operating system and system information' },
   { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance' },
   { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', description: 'Network connectivity and settings' },
   { id: 'security', label: 'Security', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', description: 'Security status and compliance' },
@@ -458,6 +458,17 @@ export default function DeviceDetailPage() {
           console.log('  🧪 Module analysis:');
           if (directDevice.modules) {
             console.log('    - modules keys:', Object.keys(directDevice.modules));
+            // FIXED: Check specifically for hardware module
+            if (directDevice.modules.hardware) {
+              console.log('    - ✅ HARDWARE module present:', !!directDevice.modules.hardware);
+              console.log('    - hardware keys:', Object.keys(directDevice.modules.hardware));
+              console.log('    - hardware processor:', directDevice.modules.hardware.processor?.name);
+              console.log('    - hardware memory:', directDevice.modules.hardware.memory?.totalPhysical);
+              console.log('    - hardware storage count:', directDevice.modules.hardware.storage?.length);
+              console.log('  🔧 Full hardware data (first 1000 chars):', JSON.stringify(directDevice.modules.hardware, null, 2).substring(0, 1000));
+            } else {
+              console.log('    - ❌ NO hardware module found');
+            }
             if (directDevice.modules.inventory) {
               console.log('    - inventory module present:', !!directDevice.modules.inventory);
               console.log('    - inventory deviceName:', directDevice.modules.inventory.deviceName);
@@ -621,31 +632,41 @@ export default function DeviceDetailPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
+                {/* Dashboard back button - hidden on mobile */}
                 <Link
                   href="/dashboard"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                  className="hidden sm:flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
                   <span className="text-sm font-medium">Dashboard</span>
                 </Link>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <div className="flex items-center gap-3">
+                <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
                   <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
                     {deviceInfo.name}
                   </h1>
-                  <div className="flex items-center gap-2">
-                    {(deviceInfo.assetTag || deviceInfo.inventory?.assetTag) && (
+                  
+                  {/* Asset tag and serial - below device name on mobile, inline on desktop */}
+                  <div className="flex items-center gap-2 mt-1 sm:mt-0">
+                    {(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) && (
                       <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
-                        {deviceInfo.assetTag || deviceInfo.inventory?.assetTag}
+                        {deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}
+                      </span>
+                    )}
+                    {(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber) && (
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
+                        {deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber}
                       </span>
                     )}
                   </div>
                 </div>
               </div>
               
-              <div className="flex items-center gap-4">
+              {/* Last seen - hidden on mobile */}
+              <div className="hidden sm:flex items-center gap-4">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Last seen {formatRelativeTime(deviceInfo.lastSeen)}
                 </div>
@@ -656,25 +677,51 @@ export default function DeviceDetailPage() {
 
         {/* Navigation Tabs */}
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex space-x-8 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                }`}
-                title={tab.description}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
-                </svg>
-                <span className="hidden sm:inline">{tab.label}</span>
-              </button>
-            ))}
-          </nav>
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            {/* Desktop tabs */}
+            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto hide-scrollbar">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`flex items-center gap-2 py-4 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap flex-shrink-0 ${
+                    activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+                  }`}
+                  title={tab.description}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
+                  </svg>
+                  <span className="hidden md:inline">{tab.label}</span>
+                  <span className="md:hidden">{tab.label.split(' ')[0]}</span>
+                </button>
+              ))}
+            </nav>
+
+            {/* Mobile dropdown */}
+            <div className="sm:hidden pt-4 pb-4">
+              <div className="relative">
+                <select
+                  value={activeTab}
+                  onChange={(e) => handleTabChange(e.target.value as TabType)}
+                  className="appearance-none block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
+                >
+                  {tabs.map((tab) => (
+                    <option key={tab.id} value={tab.id}>
+                      {tab.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

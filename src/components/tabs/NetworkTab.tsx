@@ -3,12 +3,82 @@
  * Detailed network configuration and connectivity information with enhanced active connection detection
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import { NetworkTable } from '../tables'
 
 interface NetworkTabProps {
   device: any
   data?: any
+}
+
+// CopyableValue component for consistent copy functionality - inline style like widgets
+const CopyableValue: React.FC<{ 
+  value: string | undefined, 
+  showCopy?: boolean,
+  className?: string,
+  placeholder?: string 
+}> = ({ value, showCopy = true, className = "", placeholder = "N/A" }) => {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    if (!value || value === placeholder) return
+    
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(value)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 2000)
+      } else {
+        // Fallback for browsers that don't support clipboard API
+        const textArea = document.createElement('textarea')
+        textArea.value = value
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+        document.body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
+        
+        try {
+          document.execCommand('copy')
+          setCopied(true)
+          setTimeout(() => setCopied(false), 2000)
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr)
+        } finally {
+          document.body.removeChild(textArea)
+        }
+      }
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err)
+    }
+  }
+
+  const displayValue = value || placeholder
+  const shouldShowCopyButton = showCopy && value && value !== placeholder
+
+  return (
+    <span className={`flex items-center ${className}`}>
+      <span>{displayValue}</span>
+      {shouldShowCopyButton && (
+        <button
+          onClick={handleCopy}
+          className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+          title={copied ? 'Copied!' : 'Copy to clipboard'}
+        >
+          {copied ? (
+            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+          )}
+        </button>
+      )}
+    </span>
+  )
 }
 
 export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
@@ -35,30 +105,12 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
       {/* Active Connection Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Active Connection</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {networkData.connectionType || 'Unknown'}
             </div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Connection Type</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.ipAddress || 'N/A'}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">IP Address</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.dns || 'N/A'}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">DNS Servers</div>
-          </div>
-          <div className="text-center">
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.macAddress || 'N/A'}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">MAC Address</div>
           </div>
           {networkData.ssid && (
             <div className="text-center">
@@ -68,6 +120,32 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <div className="text-sm text-gray-600 dark:text-gray-400">WiFi Network</div>
             </div>
           )}
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
+              <CopyableValue 
+                value={networkData.ipAddress} 
+                className="justify-center" 
+                placeholder="N/A"
+              />
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">IP Address</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {networkData.hostname || 'N/A'}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Hostname</div>
+          </div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
+              <CopyableValue 
+                value={networkData.macAddress} 
+                className="justify-center" 
+                placeholder="N/A"
+                />
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">MAC Address</div>
+          </div>
           {networkData.signalStrength && (
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -76,14 +154,16 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <div className="text-sm text-gray-600 dark:text-gray-400">Signal Strength</div>
             </div>
           )}
-          {networkData.vpnActive && (
-            <div className="text-center">
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                Active
-              </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">VPN Status</div>
+          <div className="text-center">
+            <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
+              <CopyableValue 
+                value={networkData.dns} 
+                className="justify-center" 
+                placeholder="N/A"
+              />
             </div>
-          )}
+            <div className="text-sm text-gray-600 dark:text-gray-400">DNS Servers</div>
+          </div>
           {networkData.vpnName && (
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -92,24 +172,6 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <div className="text-sm text-gray-600 dark:text-gray-400">VPN Connection</div>
             </div>
           )}
-        </div>
-        
-        {/* Additional Connection Details */}
-        <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div className="text-center">
-              <div className="text-gray-600 dark:text-gray-400">Hostname</div>
-              <div className="font-medium text-gray-900 dark:text-white">{networkData.hostname || 'N/A'}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-gray-600 dark:text-gray-400">Gateway</div>
-              <div className="font-medium text-gray-900 dark:text-white">{networkData.gateway || 'N/A'}</div>
-            </div>
-            <div className="text-center">
-              <div className="text-gray-600 dark:text-gray-400">Interface</div>
-              <div className="font-mono text-gray-900 dark:text-white">{networkData.friendlyName || networkData.interfaceName || 'N/A'}</div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -123,14 +185,14 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <h4 className="font-medium text-gray-900 dark:text-white mb-2">Interface Summary</h4>
               <dl className="space-y-2">
                 <div className="flex justify-between">
-                  <dt className="text-sm text-gray-600 dark:text-gray-400">Total Interfaces:</dt>
-                  <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.interfaces?.length || 0}</dd>
-                </div>
-                <div className="flex justify-between">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Active Interfaces:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-white">
                     {networkData.interfaces?.filter((iface: any) => iface.status === 'Connected').length || 0}
                   </dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-sm text-gray-600 dark:text-gray-400">Total Interfaces:</dt>
+                  <dd className="text-sm font-medium text-gray-900 dark:text-white">{networkData.interfaces?.length || 0}</dd>
                 </div>
               </dl>
             </div>
@@ -175,7 +237,16 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {networkData.wifiNetworks.map((network: any, index: number) => (
+                  {networkData.wifiNetworks
+                    .sort((a: any, b: any) => {
+                      // Sort by connection status first (connected networks first)
+                      if (a.isConnected !== b.isConnected) {
+                        return b.isConnected ? 1 : -1;
+                      }
+                      // Then sort alphabetically by SSID
+                      return (a.ssid || '').localeCompare(b.ssid || '');
+                    })
+                    .map((network: any, index: number) => (
                     <tr key={network.ssid || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{network.ssid}</div>
@@ -278,10 +349,18 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                      {iface.ipAddress || 'N/A'}
+                      <CopyableValue 
+                        value={iface.ipAddress} 
+                        className="font-mono" 
+                        placeholder="N/A"
+                      />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                      {iface.macAddress || 'N/A'}
+                      <CopyableValue 
+                        value={iface.macAddress} 
+                        className="font-mono" 
+                        placeholder="N/A"
+                      />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {iface.mtu || 'N/A'}

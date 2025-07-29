@@ -30,7 +30,10 @@ export function processApplicationsData(rawDevice: any): ApplicationsData {
   let apps: any[] = []
   
   // Look in various locations for applications data from API
-  if (rawDevice.modules?.osQuery?.system?.[0]?.apps) {
+  // NEW: Check the correct modular structure first
+  if (rawDevice.modules?.applications?.installed_applications) {
+    apps = rawDevice.modules.applications.installed_applications
+  } else if (rawDevice.modules?.osQuery?.system?.[0]?.apps) {
     apps = rawDevice.modules.osQuery.system[0].apps
   } else if (rawDevice.modules?.osQuery?.system?.[0]?.applications) {
     apps = rawDevice.modules.osQuery.system[0].applications
@@ -50,9 +53,9 @@ export function processApplicationsData(rawDevice: any): ApplicationsData {
     version: app.version || app.bundle_version || 'Unknown',
     publisher: app.publisher || app.signed_by || 'Unknown',
     category: app.category || 'Uncategorized',
-    installDate: app.installDate || app.last_modified,
+    installDate: app.installDate || app.install_date || app.last_modified,
     size: app.size,
-    path: app.path
+    path: app.path || app.install_location
   }))
 
   // Calculate recently updated (last 30 days)
@@ -97,13 +100,20 @@ export function processHardwareData(rawDevice: any): HardwareData {
     hasHardware: !!rawDevice.hardware,
     hardwareKeys: rawDevice.hardware ? Object.keys(rawDevice.hardware) : [],
     hasModules: !!rawDevice.modules,
+    hasModulesHardware: !!rawDevice.modules?.hardware,
+    modulesHardwareKeys: rawDevice.modules?.hardware ? Object.keys(rawDevice.modules.hardware) : [],
     rawDeviceKeys: Object.keys(rawDevice),
     rawDeviceSample: JSON.stringify(rawDevice).substring(0, 1000)
   })
   
-  // Extract hardware data from the new unified structure first
-  const hardwareModule = rawDevice.hardware || {}
+  // Extract hardware data from the new modular structure first, then fallback to old structure
+  const hardwareModule = rawDevice.modules?.hardware || rawDevice.hardware || {}
   console.log('Hardware module data:', JSON.stringify(hardwareModule, null, 2))
+  console.log('Hardware module keys:', Object.keys(hardwareModule))
+  console.log('Hardware module has processor:', !!hardwareModule.processor)
+  console.log('Hardware module has memory:', !!hardwareModule.memory)
+  console.log('Hardware module has storage:', !!hardwareModule.storage)
+  console.log('Hardware module has graphics:', !!hardwareModule.graphics)
   
   // Fallback to old module structure if new structure not found
   const deviceModule = rawDevice.modules?.device || {}

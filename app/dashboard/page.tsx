@@ -2,24 +2,17 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { ThemeToggle } from "../../src/components/theme-toggle"
 import { SuccessStatsWidget, WarningStatsWidget, ErrorStatsWidget, DevicesStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
+import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { ConnectionStatusWidget } from "../../src/lib/modules/widgets/ConnectionStatusWidget"
 import { useLiveEvents } from "./hooks"
 
 // Import the same hooks and types from the original dashboard
-interface FleetEvent {
-  id: string
-  device: string
-  kind: string
-  ts: string
-  payload: Record<string, unknown>
-}
 
 interface Device {
   deviceId: string      // Internal UUID (unique)
@@ -28,7 +21,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'active' | 'stale' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
   uptime?: string
   location?: string
   ipAddress?: string
@@ -58,19 +51,19 @@ interface Device {
 // Reuse the live events hook from the original dashboard
 
 export default function DashboardPage() {
-  const { events, connectionStatus, lastUpdateTime, mounted, addEvent } = useLiveEvents()
-  const [timeUpdateCounter, setTimeUpdateCounter] = useState(0)
+  const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
-  const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
+  const [, setTimeUpdateCounter] = useState(0)
 
   // Fetch devices data (same as original dashboard)
   useEffect(() => {
     const fetchDevices = async () => {
+      console.log('[DASHBOARD] 🚀 Starting fetchDevices...')
+      console.log('[DASHBOARD] Current state - devices.length:', devices.length, 'devicesLoading:', devicesLoading)
       try {
-        setError(null)
+        console.log('[DASHBOARD] Fetching from /api/devices...')
         // Use Next.js API route
         const response = await fetch('/api/devices', {
           cache: 'no-store',
@@ -79,17 +72,38 @@ export default function DashboardPage() {
             'Pragma': 'no-cache'
           }
         })
+        console.log('[DASHBOARD] Response status:', response.status, response.statusText)
+        console.log('[DASHBOARD] Response ok:', response.ok)
+        
         if (response.ok) {
+          console.log('[DASHBOARD] Response OK, parsing JSON...')
           const data = await response.json()
+          
+          console.log('[DASHBOARD] Received device data:', data)
+          console.log('[DASHBOARD] Is array?', Array.isArray(data))
+          console.log('[DASHBOARD] Data length:', Array.isArray(data) ? data.length : 'N/A')
+          
           // Handle both response formats: {success: true, devices: [...]} or direct array
           if (Array.isArray(data)) {
-            // Process devices to extract inventory data
-            const processedDevices = data.map((device: any) => {
+            console.log('[DASHBOARD] Processing array format...')
+            // Process devices to extract inventory data while preserving ALL modules
+            const processedDevices = data.map((device: Device) => {
               const inventory = device.modules?.inventory || {}
+              const modules = device.modules as any
+              
+              console.log('[DASHBOARD] Device modules available:', Object.keys(device.modules || {}))
+              console.log('[DASHBOARD] System module present:', !!modules?.system)
+              if (modules?.system) {
+                console.log('[DASHBOARD] System module OS data:', !!modules.system.operatingSystem)
+              }
+              
               return {
                 ...device,
+                // Preserve all modules (including system) by copying as-is
+                modules: { ...device.modules },
+                // Extract inventory fields for backwards compatibility
                 assetTag: inventory.assetTag,
-                name: inventory.deviceName || device.name || device.hostname || 'Unknown Device'
+                name: inventory.deviceName || device.name || 'Unknown Device'
               }
             })
             
@@ -97,7 +111,24 @@ export default function DashboardPage() {
             const sortedDevices = processedDevices.sort((a: Device, b: Device) => 
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )
-            setDevices(sortedDevices)
+            
+            console.log('[DASHBOARD] Setting devices:', sortedDevices.length, 'devices')
+            console.log('[DASHBOARD] First device:', sortedDevices[0])
+            console.log('[DASHBOARD] Devices being set:', sortedDevices.map(d => ({ 
+              name: d.name, 
+              status: d.status, 
+              serialNumber: d.serialNumber,
+              deviceId: d.deviceId,
+              hasStatus: !!d.status
+            })))
+            
+            try {
+              setDevices(sortedDevices)
+              setDevicesLoading(false)
+              console.log('[DASHBOARD] Successfully called setDevices and setDevicesLoading(false)')
+            } catch (error) {
+              console.error('[DASHBOARD] Error setting devices:', error)
+            }
             
             // Build device name mapping (serial -> name)
             const nameMap: Record<string, string> = {}
@@ -110,13 +141,16 @@ export default function DashboardPage() {
             })
             setDeviceNameMap(nameMap)
           } else if (data.success && data.devices) {
-            // Process devices to extract inventory data
-            const processedDevices = data.devices.map((device: any) => {
+            console.log('[DASHBOARD] Processing wrapped format...')
+            // Process devices to extract inventory data while preserving ALL modules
+            const processedDevices = data.devices.map((device: Device) => {
               const inventory = device.modules?.inventory || {}
               return {
                 ...device,
+                // Preserve all modules (including system)
+                modules: { ...device.modules },
                 assetTag: inventory.assetTag,
-                name: inventory.deviceName || device.name || device.hostname || 'Unknown Device'
+                name: inventory.deviceName || device.name || 'Unknown Device'
               }
             })
             
@@ -125,6 +159,7 @@ export default function DashboardPage() {
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )
             setDevices(sortedDevices)
+            setDevicesLoading(false)
             
             // Build device name mapping (serial -> name)
             const nameMap: Record<string, string> = {}
@@ -136,17 +171,45 @@ export default function DashboardPage() {
               nameMap[device.deviceId] = device.name
             })
             setDeviceNameMap(nameMap)
+          } else {
+            console.log('[DASHBOARD] Unrecognized data format:', data)
+            setDevicesLoading(false)
           }
+        } else {
+          console.error('[DASHBOARD] ❌ Response not OK:', response.status, response.statusText)
+          console.log('[DASHBOARD] Setting devicesLoading(false) due to failed response')
+          setDevicesLoading(false)
         }
       } catch (error) {
-        console.error('Failed to fetch devices:', error)
-        setError(`Failed to load devices: ${error instanceof Error ? error.message : 'Unknown error'}`)
-      } finally {
+        console.error('[DASHBOARD] ❌ Error in fetchDevices:', error)
+        console.log('[DASHBOARD] Setting devicesLoading(false) due to error')
         setDevicesLoading(false)
       }
     }
 
+    console.log('[DASHBOARD] useEffect triggered, calling fetchDevices()...')
     fetchDevices()
+    
+    // TEMPORARY FIX: Direct API call to ensure devices data is loaded
+    const loadDevicesDirectly = async () => {
+      try {
+        const response = await fetch('/api/devices')
+        if (response.ok) {
+          const data = await response.json()
+          console.log('[DASHBOARD] Direct API: Got devices:', data.length, 'devices')
+          if (data && data.length > 0) {
+            setDevices(data)
+            setDevicesLoading(false)
+            console.log('[DASHBOARD] Direct API: Successfully set devices state')
+          }
+        }
+      } catch (error) {
+        console.error('[DASHBOARD] Direct API error:', error)
+      }
+    }
+    
+    // Call direct API after a short delay
+    setTimeout(loadDevicesDirectly, 1000)
   }, [])
 
   // Update relative times every 30 seconds
@@ -156,6 +219,16 @@ export default function DashboardPage() {
     }, 30000)
     return () => clearInterval(interval)
   }, [])
+
+  // Debug: Log devices state changes
+  useEffect(() => {
+    console.log('[DASHBOARD] Devices state changed:', devices.length, 'devices loaded:', !devicesLoading)
+    console.log('[DASHBOARD] Current devices:', devices.map(d => ({ 
+      name: d.name, 
+      status: d.status, 
+      serialNumber: d.serialNumber 
+    })))
+  }, [devices, devicesLoading])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -167,10 +240,12 @@ export default function DashboardPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                  <img 
+                  <Image 
                     src="/reportmate-logo.png" 
                     alt="ReportMate" 
-                    className="w-full h-full object-contain"
+                    width={40}
+                    height={40}
+                    className="object-contain"
                   />
                 </div>
                 <div>
@@ -208,20 +283,24 @@ export default function DashboardPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Two-column layout: Column A (67%) + Column B (33%) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Column A (67% width) - 3 Stats Cards + Events Table */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Stats Cards - 3 widgets in a row */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <SuccessStatsWidget events={events} />
-                <WarningStatsWidget events={events} />
-                <ErrorStatsWidget events={events} />
-              </div>
+        {/* Two-column layout: Column A (30%) + Column B (70%) */}
+        <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
+          {/* Column A (30% width) - Status Widget + New Clients Table */}
+          <div className="lg:col-span-3 space-y-8">
+            {/* Device Status Widget */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
+              <StatusWidget devices={devices} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* Events Table */}
+            {/* New Clients Table */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
+              <NewClientsWidget devices={devices} loading={devicesLoading} />
+            </ErrorBoundary>
+          </div>
+
+          {/* Column B (70% width) - Recent Events + 3 Stats Cards */}
+          <div className="lg:col-span-7 space-y-8">
+            {/* Recent Events Table - moved above stats cards */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
               <RecentEventsWidget
                 events={events}
@@ -231,18 +310,14 @@ export default function DashboardPage() {
                 deviceNameMap={deviceNameMap}
               />
             </ErrorBoundary>
-          </div>
 
-          {/* Column B (33% width) - Total Devices Widget + New Clients Table */}
-          <div className="lg:col-span-1 space-y-8">
-            {/* Total Devices Widget */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices stats</div>}>
-              <DevicesStatsWidget devices={devices} />
-            </ErrorBoundary>
-
-            {/* New Clients Table */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
-              <NewClientsWidget devices={devices} loading={devicesLoading} />
+            {/* Stats Cards - 3 widgets in a row (reordered: Error, Warning, Success) */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <ErrorStatsWidget events={events} />
+                <WarningStatsWidget events={events} />
+                <SuccessStatsWidget events={events} />
+              </div>
             </ErrorBoundary>
           </div>
         </div>

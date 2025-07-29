@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
             try {
                 const errorBody = await response.json();
                 errorDetails = errorBody.message || errorBody.error || JSON.stringify(errorBody);
-            } catch (e) {
+            } catch {
                 errorDetails = await response.text() || errorDetails;
             }
             
