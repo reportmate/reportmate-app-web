@@ -37,6 +37,24 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const isMacOS = platform.includes('mac') || platform.includes('darwin')
   const isLinux = platform.includes('linux')
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return 'Unknown'
+    try {
+      const date = new Date(dateStr)
+      if (isNaN(date.getTime())) return dateStr
+      
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return dateStr
+    }
+  }
+
   const getStatusType = (enabled?: boolean, status?: string): 'success' | 'error' | 'warning' => {
     if (enabled === true || status === 'Enabled' || status === 'Current' || status === 'Protected' || status === 'Active') {
       return 'success'
@@ -144,11 +162,35 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
     >
       <div className="space-y-4">
         {/* Antivirus Protection */}
-        <StatusBadge
-          label="Antivirus"
-          status={security.antivirus?.statusDisplay || antivirusInfo.status}
-          type={getStatusType(security.antivirus?.isEnabled, antivirusInfo.status)}
-        />
+        <div>
+          <StatusBadge
+            label="Antivirus"
+            status={security.antivirus?.statusDisplay || antivirusInfo.status}
+            type={getStatusType(security.antivirus?.isEnabled, antivirusInfo.status)}
+          />
+          {security.antivirus && (
+            <div className="ml-4 mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
+              <div className="text-gray-900 dark:text-white">
+                {security.antivirus.name || 'Unknown Antivirus'}
+              </div>
+              {security.antivirus.version && (
+                <div>Version: {security.antivirus.version}</div>
+              )}
+              {security.antivirus.isUpToDate !== undefined && (
+                <div>Status: {security.antivirus.isUpToDate ? 'Up to date' : 'Needs update'}</div>
+              )}
+              {security.antivirus.lastUpdate && (
+                <div>Updated: {formatDate(security.antivirus.lastUpdate)}</div>
+              )}
+              {security.antivirus.lastScan && (
+                <div>
+                  Last Scan: {formatDate(security.antivirus.lastScan)}
+                  {security.antivirus.scanType && ` (${security.antivirus.scanType})`}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Firewall Protection */}
         <StatusBadge
@@ -159,7 +201,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
 
         {/* Disk Encryption */}
         <StatusBadge
-          label="Encryption"
+          label={isWindows ? "BitLocker" : isMacOS ? "FileVault" : "Encryption"}
           status={security.encryption?.statusDisplay || encryptionInfo.status}
           type={getStatusType(
             isWindows ? security.encryption?.bitLocker?.isEnabled :
@@ -170,27 +212,35 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
           )}
         />
 
-        {/* TPM Security (Windows only) */}
-        {tpmInfo && (
-          <StatusBadge
-            label="Tamper Protection"
-            status={security.tpm?.statusDisplay || tpmInfo.status}
-            type={getStatusType(security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated, tpmInfo.status)}
-          />
-        )}
-
         {/* Windows Hello Authentication (Windows only) */}
         {isWindows && security?.windowsHello && (
-          <StatusBadge
-            label="Windows Hello"
-            status={security.windowsHello.statusDisplay || 'Unknown'}
-            type={getStatusType(
-              security.windowsHello.credentialProviders?.pinEnabled || 
-              security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-              security.windowsHello.credentialProviders?.fingerprintEnabled,
-              security.windowsHello.statusDisplay
-            )}
-          />
+          <div className="space-y-2">
+            <div className="text-sm font-bold text-gray-900 dark:text-white">Windows Hello</div>
+            <div className="ml-4 space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 dark:text-gray-400">PIN Status:</span>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  security.windowsHello.credentialProviders?.pinEnabled 
+                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                }`}>
+                  {security.windowsHello.credentialProviders?.pinEnabled ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-gray-600 dark:text-gray-400">Biometric Status:</span>
+                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                  (security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
+                   security.windowsHello.credentialProviders?.fingerprintEnabled)
+                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                }`}>
+                  {(security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
+                    security.windowsHello.credentialProviders?.fingerprintEnabled) ? 'Enabled' : 'Disabled'}
+                </span>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </StatBlock>

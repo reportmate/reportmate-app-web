@@ -172,7 +172,7 @@ const EventsListWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
         <p className="text-sm text-gray-600 dark:text-gray-400">Complete list of device events</p>
       </div>
       {events.length > 0 ? (
-        <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-gray-200 dark:divide-gray-700 max-h-96 overflow-y-auto overlay-scrollbar">
           {events.map((event: FleetEvent) => {
             const statusConfig = getEventStatusConfig(event.kind)
             return (

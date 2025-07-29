@@ -123,7 +123,7 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
           </div>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overlay-scrollbar">
           <table className="w-full">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>

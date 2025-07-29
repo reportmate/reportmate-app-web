@@ -263,7 +263,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                 </div>
               </div>
             </div>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overlay-scrollbar">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>

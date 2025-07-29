@@ -574,7 +574,7 @@ function EventsPageContent() {
         <div className="mb-6 sm:mb-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop filter tabs */}
-            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto hide-scrollbar">
+            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto overlay-scrollbar">
               {[
                 { key: 'all', label: 'All Events', count: filterCounts.all },
                 { key: 'success', label: 'Success', count: filterCounts.success },

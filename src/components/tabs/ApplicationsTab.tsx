@@ -3,7 +3,7 @@
  * Installed applications and software inventory
  */
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { ApplicationsTable } from '../tables'
 import { processApplicationsData } from '../../lib/data-processing/component-data'
 
@@ -16,10 +16,28 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   // Process applications data from the modular device structure
   const applicationsModuleData = processApplicationsData(device)
   
-  // Check if we have applications data from the modules
-  const hasApplicationsData = device?.modules?.applications?.installed_applications?.length > 0 || 
+  // Check if we have applications data - prioritize data prop, then processed device data
+  const hasApplicationsData = data?.installedApps?.length > 0 ||
                               device?.applications?.installedApps?.length > 0 ||
+                              device?.modules?.applications?.installed_applications?.length > 0 || 
+                              device?.modules?.applications?.installedApplications?.length > 0 || 
                               applicationsModuleData?.installedApps?.length > 0
+
+  console.log('🔍 ApplicationsTab Debug:', {
+    hasDataProp: !!data,
+    dataInstalledAppsLength: data?.installedApps?.length,
+    hasDeviceApplications: !!device?.applications,
+    deviceApplicationsLength: device?.applications?.installedApps?.length,
+    hasModuleApplications: !!device?.modules?.applications,
+    moduleApplicationsLength: device?.modules?.applications?.installed_applications?.length,
+    moduleApplicationsLengthCamelCase: device?.modules?.applications?.installedApplications?.length,
+    hasProcessedData: !!applicationsModuleData?.installedApps?.length,
+    hasApplicationsData,
+    // More detailed debugging
+    fullDevice: JSON.stringify(device).substring(0, 1000),
+    deviceModuleKeys: device?.modules ? Object.keys(device.modules) : 'NO_MODULES',
+    applicationsModuleData: JSON.stringify(applicationsModuleData).substring(0, 500)
+  });
 
   // If no applications data, show empty state with proper message
   if (!hasApplicationsData) {
@@ -38,12 +56,41 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   // Transform applications data for the table component
   let installedApps = []
   
-  // Try different data sources for applications
-  if (device?.modules?.applications?.installed_applications) {
-    installedApps = device.modules.applications.installed_applications
+  console.log('🔍 ApplicationsTab Data Sources Debug:', {
+    hasDataProp: !!data?.installedApps?.length,
+    dataPropsAppsCount: data?.installedApps?.length || 0,
+    hasDeviceApplications: !!device?.applications?.installedApps,
+    deviceApplicationsCount: device?.applications?.installedApps?.length || 0,
+    hasRawModuleSnakeCase: !!device?.modules?.applications?.installed_applications,
+    rawModuleSnakeCaseCount: device?.modules?.applications?.installed_applications?.length || 0,
+    hasRawModuleCamelCase: !!device?.modules?.applications?.installedApplications,
+    rawModuleCamelCaseCount: device?.modules?.applications?.installedApplications?.length || 0,
+    hasProcessedModuleData: !!applicationsModuleData?.installedApps,
+    processedModuleDataCount: applicationsModuleData?.installedApps?.length || 0,
+    // Check for the actual Windows client field name
+    hasWindowsClientField: !!device?.modules?.applications?.InstalledApplications,
+    windowsClientFieldCount: device?.modules?.applications?.InstalledApplications?.length || 0,
+    applicationModuleKeys: device?.modules?.applications ? Object.keys(device.modules.applications) : []
+  });
+  
+  // Prioritize data prop, then processed device data, then fallback to raw module data
+  if (data?.installedApps?.length > 0) {
+    console.log('✅ Using data prop (processedData.applications)');
+    installedApps = data.installedApps
   } else if (device?.applications?.installedApps) {
+    console.log('✅ Using processed device.applications data');
     installedApps = device.applications.installedApps
+  } else if (device?.modules?.applications?.installedApplications) {
+    console.log('⚠️ Falling back to raw module data (camelCase)');
+    installedApps = device.modules.applications.installedApplications
+  } else if (device?.modules?.applications?.InstalledApplications) {
+    console.log('⚠️ Falling back to raw module data (PascalCase - Windows Client)');
+    installedApps = device.modules.applications.InstalledApplications
+  } else if (device?.modules?.applications?.installed_applications) {
+    console.log('⚠️ Falling back to raw module data (snake_case)');
+    installedApps = device.modules.applications.installed_applications
   } else if (applicationsModuleData?.installedApps) {
+    console.log('⚠️ Using processed module data');
     installedApps = applicationsModuleData.installedApps
   }
 
@@ -76,16 +123,30 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     return installDate > thirtyDaysAgo
   }).length
 
-  const applicationsData = {
+  const applicationsData = useMemo(() => ({
     totalApps,
     signedApps,
     recentApps,
     installedApps: processedApps
-  }
+  }), [totalApps, signedApps, recentApps, processedApps]);
+
+  console.log('🔍 ApplicationsTab Final Data Debug:', {
+    totalApps,
+    signedApps,
+    recentApps,
+    processedAppsCount: processedApps.length,
+    sampleProcessedApp: processedApps[0] ? {
+      id: processedApps[0].id,
+      name: processedApps[0].name,
+      displayName: processedApps[0].displayName,
+      publisher: processedApps[0].publisher,
+      version: processedApps[0].version
+    } : null
+  });
 
   return (
     <div className="space-y-8">
-      <ApplicationsTable data={applicationsData} />
+      <ApplicationsTable key="applications-table" data={applicationsData} />
     </div>
   )
 }

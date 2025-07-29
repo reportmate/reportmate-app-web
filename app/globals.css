@@ -47,40 +47,198 @@
   --ring: 224.3 76.3% 94.1%;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - macOS style overlay scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 0; /* Completely hide scrollbar but keep functionality */
+  height: 0;
+  background: transparent;
+  display: none; /* Force hide completely */
 }
 
 ::-webkit-scrollbar-track {
-  background: rgb(241 245 249);
-}
-
-.dark ::-webkit-scrollbar-track {
-  background: rgb(0 0 0);
+  background: transparent;
+  width: 0;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgb(203 213 225);
-  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  width: 0;
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: rgb(71 85 105);
+  background: rgba(255, 255, 255, 0.3);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgb(148 163 184);
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 1;
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: rgb(100 116 139);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Show scrollbar on hover or scroll */
+*:hover::-webkit-scrollbar-thumb,
+*:active::-webkit-scrollbar-thumb,
+*:focus::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+/* Overlay scrollbar behavior */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Base overlay scrollbar styles - apply to all elements */
+* {
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  scrollbar-color: transparent transparent;
+}
+
+/* Enhanced overlay scrollbar for specific containers */
+.overlay-scrollbar {
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  scrollbar-color: transparent transparent;
+  position: relative;
+}
+
+/* Show actual scrollbar on webkit browsers when needed */
+.overlay-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.overlay-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  width: 8px;
+}
+
+.overlay-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border: none;
+  background-clip: padding-box;
+  width: 8px;
+}
+
+.dark .overlay-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Show scrollbar when hovering over container or actively scrolling */
+.overlay-scrollbar:hover::-webkit-scrollbar-thumb,
+.overlay-scrollbar:active::-webkit-scrollbar-thumb,
+.overlay-scrollbar.scrolling::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+.overlay-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 1;
+}
+
+.dark .overlay-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Show scrollbar when container has overflow and user is interacting */
+.overlay-scrollbar.has-overflow:hover::-webkit-scrollbar-thumb,
+.overlay-scrollbar.has-overflow.scrolling::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+/* Ensure scrollbar corner is transparent */
+.overlay-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Custom table scrollbar without gap - improved overlay behavior */
+.table-scrollbar {
+  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  scrollbar-color: transparent transparent;
+  position: relative;
+}
+
+.table-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+  background: transparent;
+}
+
+.table-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  border: none;
+  background-clip: padding-box;
+}
+
+.dark .table-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Show scrollbar when hovering over container or actively scrolling */
+.table-scrollbar:hover::-webkit-scrollbar-thumb,
+.table-scrollbar:active::-webkit-scrollbar-thumb,
+.table-scrollbar.scrolling::-webkit-scrollbar-thumb {
+  opacity: 1;
+}
+
+.table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 1;
+}
+
+.dark .table-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Ensure scrollbar corner is transparent */
+.table-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* Base styles */
 * {
   border-color: hsl(var(--border));
+}
+
+/* Completely remove scrollbars for elements that should have none */
+.no-scrollbar {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* Internet Explorer 10+ */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none; /* Safari and Chrome */
+  width: 0;
+  height: 0;
+}
+
+/* Ensure no scrollbar gaps in containers */
+.scrollbar-none {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 body {
@@ -115,14 +273,4 @@ body {
 
 .animate-slide-up {
   animation: slideUp 0.3s ease-out;
-}
-
-/* Hide scrollbars on tables while maintaining functionality */
-.hide-scrollbar {
-  -ms-overflow-style: none;  /* Internet Explorer 10+ */
-  scrollbar-width: none;  /* Firefox */
-}
-
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;  /* Safari and Chrome */
 }

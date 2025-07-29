@@ -103,7 +103,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
           </div>
         </div>
       ) : (
-        <div className="flex-1 overflow-auto hide-scrollbar">
+        <div className="flex-1 overflow-auto overlay-scrollbar">
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {devices.slice(0, 10).map((device) => (
               <Link

@@ -202,37 +202,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
             value={hardwareInfo.memory}
           />
         </div>
-
-        {/* Battery Info (if available) */}
-        {(hardwareInfo.batteryLevel !== undefined || hardwareInfo.batteryHealth) && (
-          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="space-y-2">
-              {hardwareInfo.batteryLevel !== undefined && (
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Battery</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {hardwareInfo.batteryLevel}%
-                    </span>
-                    {hardwareInfo.isCharging && (
-                      <svg className="w-4 h-4 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              )}
-              {hardwareInfo.batteryHealth && (
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Health</span>
-                  <span className="text-sm text-gray-900 dark:text-white">
-                    {hardwareInfo.batteryHealth}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </StatBlock>
   )
