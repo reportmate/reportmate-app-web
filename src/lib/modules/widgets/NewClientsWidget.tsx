@@ -14,7 +14,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
-  status: 'active' | 'stale' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
   uptime?: string
   location?: string
   ipAddress?: string

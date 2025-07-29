@@ -104,6 +104,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
                 label="Asset Tag" 
                 value={inventory.assetTag || device.modules?.inventory?.assetTag || device.assetTag} 
                 isMono 
+                showCopyButton
               />
             )}
             
@@ -112,6 +113,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
               label="Serial Number" 
               value={inventory.serialNumber || device.serialNumber} 
               isMono 
+              showCopyButton
             />
             
             {/* Registration Date */}

@@ -4,8 +4,7 @@
  */
 
 import { formatExactTime } from '../../lib/time'
-import React from 'react'
-import { SystemWidget } from '../widgets/System'
+import React, { useState, useMemo } from 'react'
 import { processSystemTabData } from '../../lib/data-processing/component-data'
 
 interface SystemTabProps {
@@ -18,166 +17,135 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   const systemTabData = processSystemTabData(device)
   const { services, environment, updates, runningServices, operatingSystem } = systemTabData
   
+  // State for services search
+  const [servicesSearch, setServicesSearch] = useState('')
+  
+  // Get operating system information (same logic as SystemWidget)
+  let osInfo = null
+  let uptimeString = null
+
+  // Try multiple data paths to find the operating system data
+  if (device.system?.operatingSystem) {
+    osInfo = device.system.operatingSystem
+    uptimeString = device.system.uptimeString || device.uptime
+  } else if (device.modules?.system?.operatingSystem) {
+    osInfo = device.modules.system.operatingSystem
+    uptimeString = device.modules.system.uptimeString || device.uptime
+  } else {
+    osInfo = {
+      name: device.osName,
+      edition: device.osEdition,
+      version: device.osVersion,
+      displayVersion: device.osDisplayVersion,
+      build: device.osVersion?.split('.').pop(),
+      architecture: device.architecture,
+      locale: device.osLocale,
+      timeZone: device.osTimeZone,
+      activeKeyboardLayout: device.keyboardLayouts?.[0],
+      featureUpdate: device.osFeatureUpdate
+    }
+    uptimeString = device.uptime
+  }
+
+  // Filter services based on search
+  const filteredServices = useMemo(() => {
+    if (!servicesSearch.trim()) return services
+    
+    const searchLower = servicesSearch.toLowerCase()
+    return services.filter((service: any) => 
+      service.name?.toLowerCase().includes(searchLower) ||
+      service.displayName?.toLowerCase().includes(searchLower) ||
+      service.description?.toLowerCase().includes(searchLower) ||
+      service.status?.toLowerCase().includes(searchLower)
+    )
+  }, [services, servicesSearch])
+  
   return (
     <div className="space-y-8">
-      {/* System Overview Widget */}
-      <SystemWidget device={device} />
-      
-      {/* System Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{services.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Services</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{runningServices}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Running Services</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{updates.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Windows Updates</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{environment.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Environment Variables</div>
-        </div>
-      </div>
-      
-      {/* Detailed System Information */}
+      {/* Detailed System Information - Now the top card with info from SystemWidget */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Detailed System Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {systemTabData.uptime && systemTabData.uptime !== 'Unknown' && (
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">System Information</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Operating System</label>
+              <p className="text-gray-900 dark:text-white">
+                {osInfo?.name ? osInfo.name.replace('Microsoft ', '') : device.os || 'Unknown'}
+              </p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.edition || operatingSystem.edition || 'Unknown'}</p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
+              <p className="text-gray-900 dark:text-white">
+                {osInfo?.version ? 
+                  `${osInfo.version}${osInfo.build ? ` (Build ${osInfo.build})` : ''}` : 
+                  'Unknown'
+                }
+              </p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Version</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.displayVersion || 'Unknown'}</p>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Feature Update</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.featureUpdate || 'Unknown'}</p>
+            </div>
+            
+            {operatingSystem.installDate && (
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">OS Install Date</label>
+                <p className="text-gray-900 dark:text-white">{new Date(operatingSystem.installDate).toLocaleDateString()}</p>
+              </div>
+            )}
+          </div>
+          
+          {/* Right Column */}
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Architecture</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.architecture || device.architecture || 'Unknown'}</p>
+            </div>
+            
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
-              <p className="text-gray-900 dark:text-white">{systemTabData.uptime}</p>
+              <p className="text-gray-900 dark:text-white">{uptimeString || systemTabData.uptime || 'Unknown'}</p>
             </div>
-          )}
-          {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' && (
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Boot Time</label>
-              <p className="text-gray-900 dark:text-white">{formatExactTime(systemTabData.bootTime)}</p>
-            </div>
-          )}
-          {operatingSystem.installDate && (
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">OS Install Date</label>
-              <p className="text-gray-900 dark:text-white">{new Date(operatingSystem.installDate).toLocaleDateString()}</p>
-            </div>
-          )}
-          {operatingSystem.locale && (
+            
+            {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' && (
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Boot Time</label>
+                <p className="text-gray-900 dark:text-white">{formatExactTime(systemTabData.bootTime)}</p>
+              </div>
+            )}
+            
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Locale</label>
-              <p className="text-gray-900 dark:text-white">{operatingSystem.locale}</p>
+              <p className="text-gray-900 dark:text-white">{osInfo?.locale || operatingSystem.locale || 'Unknown'}</p>
             </div>
-          )}
-          {operatingSystem.timeZone && (
+            
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Zone</label>
-              <p className="text-gray-900 dark:text-white">{operatingSystem.timeZone}</p>
+              <p className="text-gray-900 dark:text-white">{osInfo?.timeZone || operatingSystem.timeZone || 'Unknown'}</p>
             </div>
-          )}
-          {operatingSystem.edition && (
+            
             <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Windows Edition</label>
-              <p className="text-gray-900 dark:text-white">{operatingSystem.edition}</p>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Keyboard Layout</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.activeKeyboardLayout || 'Unknown'}</p>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* Services Table */}
-      {services.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Windows Services</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">System services and their status</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {services.slice(0, 10).map((service: any, index: number) => (
-                  <tr key={service.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {service.displayName || service.name}
-                        </div>
-                        {service.displayName && service.name && service.displayName !== service.name && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                            {service.name}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        (service.status === 'RUNNING' || service.status === 'Running') 
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {service.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {service.startType || service.start_type || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                      {service.description || 'No description available'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Environment Variables Table */}
-      {environment.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Environment Variables</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">System environment variables</p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Variable</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {environment.slice(0, 10).map((env: any, index: number) => (
-                  <tr key={env.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">
-                        {env.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white font-mono max-w-md truncate">
-                        {env.value}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Recent Windows Updates */}
+      {/* Recent Windows Updates - Second from top */}
       {updates.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -225,6 +193,146 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
                       }`}>
                         {update.requiresRestart ? 'Required' : 'No'}
                       </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+      
+      {/* System Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{services.length}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Total Services</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{runningServices}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Running Services</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{updates.length}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Windows Updates</div>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{environment.length}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Environment Variables</div>
+        </div>
+      </div>
+
+      {/* Services Table */}
+      {services.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Windows Services</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  System services and their status ({filteredServices.length} of {services.length} services)
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Search services..."
+                  value={servicesSearch}
+                  onChange={(e) => setServicesSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-hidden">
+            <div className="max-h-96 overflow-y-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredServices.map((service: any, index: number) => (
+                    <tr key={service.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4">
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">
+                            {service.displayName || service.name}
+                          </div>
+                          {service.displayName && service.name && service.displayName !== service.name && (
+                            <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                              {service.name}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          (service.status === 'RUNNING' || service.status === 'Running') 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {service.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {service.startType || service.start_type || 'Unknown'}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        {service.description || 'No description available'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filteredServices.length === 0 && servicesSearch && (
+                <div className="px-6 py-8 text-center">
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No services found matching "{servicesSearch}"
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Environment Variables Table */}
+      {environment.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Environment Variables</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">System environment variables</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Variable</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {environment.slice(0, 10).map((env: any, index: number) => (
+                  <tr key={env.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">
+                        {env.name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-white font-mono max-w-md truncate">
+                        {env.value}
+                      </div>
                     </td>
                   </tr>
                 ))}

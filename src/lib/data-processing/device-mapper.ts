@@ -3,6 +3,8 @@
  * NEW CLEAN VERSION - modules are the source of truth, no duplicate data
  */
 
+import { processApplicationsData } from './component-data'
+
 export interface ProcessedDeviceInfo {
   deviceId: string     // Internal UUID (unique)
   serialNumber: string // Human-readable unique identifier
@@ -11,7 +13,7 @@ export interface ProcessedDeviceInfo {
   os?: string
   platform?: string
   lastSeen: string
-  status: 'active' | 'stale' | 'warning' | 'error'
+  status: 'active' | 'stale' | 'warning' | 'error' | 'missing'
   uptime?: string
   location?: string
   assetTag?: string
@@ -78,26 +80,25 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   }
 
   // Determine device status - prefer API-provided status, fallback to calculation
-  const getDeviceStatus = (rawDevice: any): 'active' | 'stale' | 'warning' | 'error' => {
+  const getDeviceStatus = (rawDevice: any): 'active' | 'stale' | 'warning' | 'error' | 'missing' => {
     // Use API-provided status if available and valid
     const apiStatus = rawDevice.status
-    if (apiStatus && ['active', 'stale', 'warning', 'error'].includes(apiStatus)) {
-      return apiStatus as 'active' | 'stale' | 'warning' | 'error'
+    if (apiStatus && ['active', 'stale', 'warning', 'error', 'missing'].includes(apiStatus)) {
+      return apiStatus as 'active' | 'stale' | 'warning' | 'error' | 'missing'
     }
     
     // Fallback to calculation based on lastSeen (aligned with backend logic)
     const lastSeen = rawDevice.lastSeen
-    if (!lastSeen) return 'error'
+    if (!lastSeen) return 'missing'
     
     const lastSeenDate = new Date(lastSeen)
     const now = new Date()
     const diffHours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
     
-    // Match backend logic: 4h/24h/7d thresholds
-    if (diffHours < 4) return 'active'
-    if (diffHours < 24) return 'warning'
-    if (diffHours < 24 * 7) return 'stale'
-    return 'error'
+    // Match backend logic: 24h/7d thresholds
+    if (diffHours < 24) return 'active'      // < 24 hours
+    if (diffHours < 24 * 7) return 'stale'  // 24 hours - 7 days
+    return 'missing'                         // 7+ days
   }
 
   // Extract basic device information with robust lastSeen handling
@@ -166,6 +167,13 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   // Pass through the modules as-is - they are the source of truth
   if (rawDevice.modules) {
     ;(mappedDevice as any).modules = rawDevice.modules
+  }
+
+  // Process modular data into widget-friendly format
+  // Applications data processing
+  if (rawDevice.modules?.applications?.installed_applications) {
+    const applicationsData = processApplicationsData(rawDevice);
+    ;(mappedDevice as any).applications = applicationsData
   }
 
   console.log('DeviceMapper DEBUG - Clean mapped device:', {

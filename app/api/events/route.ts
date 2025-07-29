@@ -1,8 +1,26 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+
+interface RawEvent {
+  id: string
+  device?: string
+  device_id?: string
+  kind?: string
+  ts?: string
+  timestamp?: string
+  payload?: Record<string, unknown>
+}
+
+interface NormalizedEvent {
+  id: string
+  device: string
+  kind: string
+  ts: string
+  payload: Record<string, unknown>
+}
 
 const AZURE_FUNCTIONS_BASE_URL = process.env.AZURE_FUNCTIONS_BASE_URL || 'https://reportmate-api.azurewebsites.net';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     console.log('[EVENTS API] Fetching events from Azure Functions API');
     console.log('[EVENTS API] Using API base URL:', AZURE_FUNCTIONS_BASE_URL);
@@ -40,15 +58,15 @@ export async function GET(request: NextRequest) {
         
         // Filter events to only include valid categories and normalize field names
         if (data.success && Array.isArray(data.events)) {
-          const normalizedEvents = data.events.map((event: any) => ({
+          const normalizedEvents = data.events.map((event: RawEvent): NormalizedEvent => ({
             id: event.id,
-            device: event.device || event.device_id,  // Handle both field names
-            kind: event.kind,
-            ts: event.ts || event.timestamp,          // Handle both field names
+            device: event.device || event.device_id || 'unknown',  // Handle both field names
+            kind: event.kind || 'unknown',
+            ts: event.ts || event.timestamp || new Date().toISOString(),          // Handle both field names
             payload: event.payload || {}              // Preserve the original payload structure
           }));
           
-          const filteredEvents = normalizedEvents.filter((event: any) => 
+          const filteredEvents = normalizedEvents.filter((event: NormalizedEvent) => 
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           );
           
