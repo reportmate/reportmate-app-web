@@ -46,7 +46,7 @@ async function validateModularArchitecture() {
         }
         
         // 3. Check event type validation
-        console.log("\n3️⃣  Event Type Validation (strict: success, warning, error, info, system):");
+        console.log("\n3️⃣  Event Type Validation (strict: success, warning, error, info):");
         const events = await client.query(`
             SELECT 
                 event_type,
@@ -58,7 +58,7 @@ async function validateModularArchitecture() {
         `);
         
         events.rows.forEach(event => {
-            const isValid = ['success', 'warning', 'error', 'info', 'system'].includes(event.event_type);
+            const isValid = ['success', 'warning', 'error', 'info'].includes(event.event_type);
             const icon = isValid ? '✅' : '❌';
             console.log(`   ${icon} ${event.event_type}: ${event.count} events`);
         });

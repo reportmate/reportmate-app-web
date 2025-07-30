@@ -24,13 +24,13 @@ async function simpleFixEventsTable() {
       UPDATE events 
       SET 
         event_type = CASE 
-          WHEN kind = 'data_collection' THEN 'system'
-          WHEN kind IN ('success', 'warning', 'error', 'info', 'system') THEN kind
+          WHEN kind = 'data_collection' THEN 'info'
+          WHEN kind IN ('success', 'warning', 'error', 'info') THEN kind
           ELSE 'info'
         END,
         message = CASE 
           WHEN kind = 'data_collection' THEN 'Data collection completed'
-          WHEN kind = 'system' THEN 'System event'
+          WHEN kind = 'system' THEN 'Info event'
           ELSE 'Event logged'
         END,
         details = COALESCE(payload, '{}'),
@@ -46,7 +46,7 @@ async function simpleFixEventsTable() {
     await pool.query(`
       ALTER TABLE events 
       ADD CONSTRAINT events_event_type_check 
-      CHECK (event_type IN ('success', 'warning', 'error', 'info', 'system'))
+      CHECK (event_type IN ('success', 'warning', 'error', 'info'))
     `);
     
     console.log('✅ Constraint added');
