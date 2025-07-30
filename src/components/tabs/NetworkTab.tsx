@@ -131,13 +131,14 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {networkData.ssid && (
             <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">WiFi Network</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {networkData.ssid}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">WiFi Network</div>
             </div>
           )}
           <div className="text-center">
+            <div className="text-sm text-gray-500 dark:text-gray-500">IP Address</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
                 value={networkData.ipAddress} 
@@ -145,15 +146,9 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 placeholder="N/A"
               />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">IP Address</div>
           </div>
           <div className="text-center">
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.hostname || 'N/A'}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Hostname</div>
-          </div>
-          <div className="text-center">
+            <div className="text-sm text-gray-500 dark:text-gray-500">MAC Address</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
                 value={networkData.macAddress} 
@@ -161,17 +156,23 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 placeholder="N/A"
                 />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">MAC Address</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-500 dark:text-gray-500">Hostname</div>
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {networkData.hostname || 'N/A'}
+            </div>
           </div>
           {networkData.signalStrength && (
             <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Signal Strength</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {networkData.signalStrength}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">Signal Strength</div>
             </div>
           )}
           <div className="text-center">
+            <div className="text-sm text-gray-500 dark:text-gray-500">DNS Servers</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
                 value={networkData.dns} 
@@ -179,14 +180,21 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 placeholder="N/A"
               />
             </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">DNS Servers</div>
           </div>
+          {networkData.interfaceName && (
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Interface</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {networkData.interfaceName}
+              </div>
+            </div>
+          )}
           {networkData.vpnName && (
             <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">VPN Connection</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {networkData.vpnName}
               </div>
-              <div className="text-sm text-gray-600 dark:text-gray-400">VPN Connection</div>
             </div>
           )}
         </div>
