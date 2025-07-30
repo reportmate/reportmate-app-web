@@ -131,7 +131,7 @@ function EventsPageContent() {
   // Initialize filter from URL parameters
   useEffect(() => {
     const urlFilter = searchParams.get('filter')
-    if (urlFilter && ['success', 'warning', 'error', 'info', 'system', 'data_collection'].includes(urlFilter)) {
+    if (urlFilter && ['success', 'warning', 'error', 'info', 'data_collection'].includes(urlFilter)) {
       setFilterType(urlFilter)
     }
   }, [searchParams])

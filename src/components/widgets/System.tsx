@@ -150,10 +150,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
           
           <Stat 
             label="Version" 
-            value={operatingSystem?.version ? 
-              `${operatingSystem.version}${operatingSystem.build ? ` (Build ${operatingSystem.build})` : ''}` : 
-              'Unknown'
-            } 
+            value={operatingSystem?.version || 'Unknown'} 
           />
           
           <Stat 

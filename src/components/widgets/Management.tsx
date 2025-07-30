@@ -133,29 +133,28 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const isEnrolled = management.mdmEnrollment?.isEnrolled || false
   const provider = management.mdmEnrollment?.provider
   const enrollmentType = management.mdmEnrollment?.enrollmentType
-  const deviceStatus = management.deviceState?.status
   const tenantName = management.tenantDetails?.tenantName
   const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
-  const certificateCount = management.metadata?.Certificates?.length || 0
 
-  // Helper functions
-  const formatExpiryDate = (dateString?: string) => {
-    if (!dateString) return 'Unknown'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    } catch {
-      return dateString
+  // Helper function to get enrollment type color
+  const getEnrollmentTypeColor = (type?: string) => {
+    if (!type) return 'info'
+    
+    switch (type.toLowerCase()) {
+      case 'entra join':
+      case 'entra joined':
+      case 'azure ad join':
+        return 'success'
+      case 'domain join':
+      case 'domain joined':
+        return 'info'
+      case 'workplace join':
+      case 'workplace joined':
+        return 'warning'
+      default:
+        return 'info'
     }
-  }
-
-  const getConnectionStatusColor = (status: boolean) => {
-    return status ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
   }
 
   return (
@@ -165,6 +164,14 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
       icon={Icons.management}
       iconColor={WidgetColors.green}
     >
+      {/* Provider prominently displayed first - made smaller */}
+      {provider && (
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-sm text-gray-600 dark:text-gray-400">Provider</span>
+          <span className="text-base font-semibold text-gray-900 dark:text-white">{provider}</span>
+        </div>
+      )}
+
       {/* Primary Enrollment Status */}
       <StatusBadge
         label="Enrollment"
@@ -172,32 +179,27 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
         type={isEnrolled ? 'success' : 'error'}
       />
 
-      {/* Device Status */}
-      {deviceStatus && (
+      {/* Enrollment Type (replaces Device Status) - with colors */}
+      {enrollmentType && (
         <StatusBadge
-          label="Device Status"
-          status={deviceStatus}
-          type={deviceStatus.includes('Joined') ? 'success' : 'warning'}
+          label="Enrollment Type"
+          status={enrollmentType}
+          type={getEnrollmentTypeColor(enrollmentType)}
         />
       )}
 
       {isEnrolled && (
         <>
-          {/* Core Management Info */}
-          {provider && (
-            <Stat 
-              label="Provider" 
-              value={provider} 
+          {/* Device Authentication Status - moved up */}
+          {deviceAuthStatus && (
+            <StatusBadge
+              label="Device Auth"
+              status={deviceAuthStatus === 'SUCCESS' ? 'Success' : deviceAuthStatus}
+              type={deviceAuthStatus === 'SUCCESS' ? 'success' : 'error'}
             />
           )}
 
-          {enrollmentType && (
-            <Stat 
-              label="Enrollment Type" 
-              value={enrollmentType} 
-            />
-          )}
-
+          {/* Organization */}
           {tenantName && (
             <Stat 
               label="Organization" 
@@ -205,117 +207,12 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
             />
           )}
 
-          {/* Device Authentication Status */}
-          {deviceAuthStatus && (
-            <StatusBadge
-              label="Device Auth"
-              status={deviceAuthStatus}
-              type={deviceAuthStatus === 'SUCCESS' ? 'success' : 'error'}
-            />
-          )}
-
-          {/* Compliance Status */}
-          {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
+          {/* Profiles count only */}
+          {profileCount > 0 && (
             <Stat 
-              label="Compliance Policies" 
-              value={`${management.compliancePolicies.length} policies`} 
+              label="Profiles" 
+              value={profileCount.toString()} 
             />
-          ) : (
-            <StatusBadge
-              label="Compliance"
-              status="No policies applied"
-              type="info"
-            />
-          )}
-
-          {/* Resource Counts */}
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            {profileCount > 0 && (
-              <Stat 
-                label="Profiles" 
-                value={profileCount.toString()} 
-              />
-            )}
-
-            {certificateCount > 0 && (
-              <Stat 
-                label="Certificates" 
-                value={certificateCount.toString()} 
-              />
-            )}
-          </div>
-
-          {/* Identity & Authentication Details */}
-          <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              Identity & Authentication
-            </div>
-            <div className="space-y-2">
-              {/* Domain Status */}
-              {management.deviceState?.entraJoined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Entra Joined:</span>
-                  <span className="text-green-600 dark:text-green-400 font-medium">✓ Yes</span>
-                </div>
-              )}
-              
-              {management.deviceState?.domainJoined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Domain Joined:</span>
-                  <span className="text-green-600 dark:text-green-400 font-medium">✓ Yes</span>
-                </div>
-              )}
-
-              {/* SSO Authentication State */}
-              {management.ssoState?.entraPrt !== undefined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Entra PRT:</span>
-                  <span className={`font-medium ${getConnectionStatusColor(management.ssoState.entraPrt)}`}>
-                    {management.ssoState.entraPrt ? '✓ Active' : '✗ Inactive'}
-                  </span>
-                </div>
-              )}
-
-              {management.ssoState?.cloudTgt !== undefined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Cloud TGT:</span>
-                  <span className={`font-medium ${getConnectionStatusColor(management.ssoState.cloudTgt)}`}>
-                    {management.ssoState.cloudTgt ? '✓ Active' : '✗ Inactive'}
-                  </span>
-                </div>
-              )}
-
-              {/* Windows Hello Status */}
-              {management.userState?.ngcSet !== undefined && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">Windows Hello:</span>
-                  <span className={`font-medium ${getConnectionStatusColor(management.userState.ngcSet)}`}>
-                    {management.userState.ngcSet ? '✓ Configured' : '✗ Not Set'}
-                  </span>
-                </div>
-              )}
-
-              {/* PRT Expiry */}
-              {management.ssoState?.entraPrtExpiryTime && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600 dark:text-gray-400">PRT Expires:</span>
-                  <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">
-                    {formatExpiryDate(management.ssoState.entraPrtExpiryTime)}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Management URLs */}
-          {management.mdmEnrollment?.managementUrl && (
-            <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <Stat 
-                label="Management URL" 
-                value={management.mdmEnrollment.managementUrl} 
-                isMono 
-              />
-            </div>
           )}
         </>
       )}
