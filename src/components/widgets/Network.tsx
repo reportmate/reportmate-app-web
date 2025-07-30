@@ -155,7 +155,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
         title="Network" 
         subtitle="Connectivity and configuration"
         icon={Icons.network}
-        iconColor={WidgetColors.indigo}
+        iconColor={WidgetColors.teal}
       >
         <EmptyState message="Network information not available" />
       </StatBlock>
@@ -167,7 +167,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
       title="Network" 
       subtitle="Connectivity and configuration"
       icon={Icons.network}
-      iconColor={WidgetColors.indigo}
+      iconColor={WidgetColors.teal}
     >
       <div className="space-y-4">
         {/* Active Connection - Priority Display */}

@@ -215,7 +215,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
         {/* Windows Hello Authentication (Windows only) */}
         {isWindows && security?.windowsHello && (
           <div className="space-y-2">
-            <div className="text-sm font-bold text-gray-900 dark:text-white">Windows Hello</div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Windows Hello</div>
             <div className="ml-4 space-y-1">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">PIN Status:</span>
