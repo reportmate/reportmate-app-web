@@ -67,7 +67,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Events</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reporting Events</h1>
               <p className="text-base text-gray-600 dark:text-gray-400">Device activity and event monitoring</p>
             </div>
           </div>
@@ -171,7 +171,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Events</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reporting Events</h1>
             <p className="text-base text-gray-600 dark:text-gray-400">Device activity and event monitoring</p>
           </div>
         </div>

@@ -134,9 +134,9 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
     return (
       <StatBlock 
         title="Management" 
-        subtitle="Enrollment and MDM status"
+        subtitle="Device Management Services Status"
         icon={Icons.management}
-        iconColor={WidgetColors.green}
+        iconColor={WidgetColors.yellow}
       >
         <EmptyState message="Management information not available" />
       </StatBlock>
@@ -178,9 +178,9 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   return (
     <StatBlock 
       title="Management" 
-      subtitle="Enrollment and MDM status"
+      subtitle="Device Management Services Status"
       icon={Icons.management}
-      iconColor={WidgetColors.green}
+      iconColor={WidgetColors.yellow}
     >
       {/* Provider prominently displayed first - made smaller */}
       {provider && (

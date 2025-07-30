@@ -180,7 +180,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
               <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
             </div>
           </div>
@@ -252,7 +252,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
             <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
           </div>
         </div>
@@ -270,18 +270,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       {/* Profiles Table - Single unified table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Configuration Profiles</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Device configuration profiles and policies</p>
-              </div>
-            </div>
+          <div className="flex items-center justify-end">
             {/* Search Field */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

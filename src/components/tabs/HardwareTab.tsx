@@ -74,7 +74,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
               <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
             </div>
           </div>
@@ -128,7 +128,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
             <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
           </div>
         </div>
@@ -168,15 +168,29 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           </div>
         </div>
 
-        {/* Battery */}
+        {/* Battery or Memory Usage */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
-          <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-            {hardwareData.battery?.cycleCount || 'N/A'}
-          </div>
-          <div className="text-base text-gray-500 dark:text-gray-400">Battery Cycles</div>
-          <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-            {hardwareData.battery?.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
-          </div>
+          {hardwareData.battery ? (
+            <>
+              <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                {hardwareData.battery.cycleCount || 'N/A'}
+              </div>
+              <div className="text-base text-gray-500 dark:text-gray-400">Battery Cycles</div>
+              <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                {hardwareData.battery.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                {memoryUsagePercent}%
+              </div>
+              <div className="text-base text-gray-500 dark:text-gray-400">Memory Used</div>
+              <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+                {formatBytes(usedMemory)} / {formatBytes(totalMemory)}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
@@ -187,6 +201,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-base">
+          {/* Row 1: CPU, GPU, NPU (if available) */}
           {/* 1. CPU */}
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -213,7 +228,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
           </div>
           
-          {/* 3. NPU */}
+          {/* 3. NPU - Only show if available */}
           {hardwareData.npu && (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -228,6 +243,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
           )}
           
+          {/* Row 2: Memory, Storage, Battery (if available) */}
           {/* 4. Memory */}
           <div>
             <div className="flex items-center gap-2 mb-2">
@@ -256,7 +272,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
           </div>
           
-          {/* 6. Battery */}
+          {/* 6. Battery - Only show if available */}
           {hardwareData.battery && (
             <div>
               <div className="flex items-center gap-2 mb-2">
