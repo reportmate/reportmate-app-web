@@ -132,12 +132,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
           </div>
         </div>
-        {/* Processor - Top Right */}
-        {hardwareData.processor?.name && (
+        {/* Architecture - Top Right */}
+        {hardwareData.processor?.architecture && (
           <div className="text-right">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Processor</div>
-            <div className="text-lg font-semibold text-orange-600 dark:text-orange-400 max-w-xs truncate">
-              {safeProcessorName(hardwareData.processor)}
+            <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 max-w-xs truncate">
+              {safeString(hardwareData.processor.architecture)}
             </div>
           </div>
         )}
@@ -145,46 +145,36 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
       {/* Hardware Overview Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Architecture */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-            {safeString(hardwareData.processor?.architecture)}
+        {/* Model - Takes 50% width */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 md:col-span-2">
+          <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Model</div>
+          <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            {hardwareData.model || 'Unknown'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)} cores @ {safeNumber(hardwareData.processor?.maxSpeed)}GHz
-          </div>
-        </div>
-
-        {/* Memory Usage */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-            {memoryUsagePercent}%
-          </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Memory Used</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-            {formatBytes(usedMemory)} / {formatBytes(totalMemory)}
+          <div className="text-sm text-gray-500 dark:text-gray-400">Manufacturer</div>
+          <div className="text-sm text-gray-900 dark:text-white font-medium">
+            {hardwareData.manufacturer || 'Unknown Manufacturer'}
           </div>
         </div>
 
         {/* Storage Usage */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
+          <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
             {storageUsagePercent}%
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Storage Used</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          <div className="text-base text-gray-500 dark:text-gray-400">Storage Used</div>
+          <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {formatBytes(usedStorage)} / {formatBytes(totalStorage)}
           </div>
         </div>
 
         {/* Battery */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
+          <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
             {hardwareData.battery?.cycleCount || 'N/A'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Battery Cycles</div>
-          <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+          <div className="text-base text-gray-500 dark:text-gray-400">Battery Cycles</div>
+          <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {hardwareData.battery?.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
           </div>
         </div>
@@ -193,14 +183,17 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {/* Detailed Hardware Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
         <div className="mb-8">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">{hardwareData.model || 'Unknown Model'}</h3>
-          <p className="text-xl text-gray-600 dark:text-gray-400 mt-2">Manufacturer: {hardwareData.manufacturer}</p>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Hardware Specifications</h3>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-base">
           {/* 1. CPU */}
           <div>
-            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">CPU</div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="px-3 py-1 bg-red-100 dark:bg-red-900 rounded-lg">
+                <div className="font-semibold text-lg text-red-600 dark:text-red-400">CPU</div>
+              </div>
+            </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{safeProcessorName(hardwareData.processor)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
               {safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)} cores @ {safeNumber(hardwareData.processor?.maxSpeed)}GHz
@@ -209,7 +202,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           
           {/* 2. GPU */}
           <div>
-            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">GPU</div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="px-3 py-1 bg-purple-100 dark:bg-purple-900 rounded-lg">
+                <div className="font-semibold text-lg text-purple-600 dark:text-purple-400">GPU</div>
+              </div>
+            </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.graphics?.name || 'Unknown'}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
               {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
@@ -219,7 +216,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           {/* 3. NPU */}
           {hardwareData.npu && (
             <div>
-              <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">NPU</div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <div className="font-semibold text-lg text-blue-600 dark:text-blue-400">NPU</div>
+                </div>
+              </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.npu.name || 'Unknown'}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
                 {hardwareData.npu.manufacturer} • {hardwareData.npu.computeUnits || hardwareData.npu.compute_units || 0} TOPS
@@ -229,7 +230,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           
           {/* 4. Memory */}
           <div>
-            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Memory</div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="px-3 py-1 bg-yellow-100 dark:bg-yellow-900 rounded-lg">
+                <div className="font-semibold text-lg text-yellow-600 dark:text-yellow-400">Memory</div>
+              </div>
+            </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{formatBytes(totalMemory)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
               {hardwareData.memory?.modules?.[0]?.type || 'Unknown'} • {hardwareData.memory?.modules?.[0]?.manufacturer || 'Unknown'}
@@ -238,7 +243,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           
           {/* 5. Storage */}
           <div>
-            <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Storage</div>
+            <div className="flex items-center gap-2 mb-2">
+              <div className="px-3 py-1 bg-orange-100 dark:bg-orange-900 rounded-lg">
+                <div className="font-semibold text-lg text-orange-600 dark:text-orange-400">Storage</div>
+              </div>
+            </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">
               {storageDevices[0] ? formatBytes(storageDevices[0].capacity) : 'Unknown'}
             </div>
@@ -250,7 +259,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           {/* 6. Battery */}
           {hardwareData.battery && (
             <div>
-              <div className="font-semibold text-lg text-gray-900 dark:text-white mb-2">Battery</div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-green-100 dark:bg-green-900 rounded-lg">
+                  <div className="font-semibold text-lg text-green-600 dark:text-green-400">Battery</div>
+                </div>
+              </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">
                 {hardwareData.battery.chargePercent}% • {hardwareData.battery.health}
               </div>
