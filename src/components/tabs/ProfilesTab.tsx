@@ -170,14 +170,31 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
 
   if (!hasProfilesData || profiles.length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
+            </div>
+          </div>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Configuration Profiles</h3>
-        <p className="text-gray-600 dark:text-gray-400">This device does not have any managed configuration installed.</p>
+        
+        <div className="text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Configuration Profiles</h3>
+          <p className="text-gray-600 dark:text-gray-400">This device does not have any managed configuration installed.</p>
+        </div>
       </div>
     )
   }
@@ -225,7 +242,31 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with other tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
+          </div>
+        </div>
+        {/* Total Profiles - Top Right */}
+        {profiles.length > 0 && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Total Profiles</div>
+            <div className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+              {profiles.length.toLocaleString()}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Profiles Table - Single unified table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">

@@ -23,6 +23,9 @@ interface Management {
     keyContainerId?: string
     deviceAuthStatus?: string
     deviceCertificateValidity?: string
+    // Enhanced device identification
+    intuneDeviceId?: string
+    entraObjectId?: string
   }
   mdmEnrollment?: {
     provider?: string
@@ -116,6 +119,17 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   // Access management data from modular structure or fallback to device level
   const management = device.modules?.management || device.management
 
+  // Debug logging to see what data we're getting
+  console.log('ManagementWidget DEBUG:', {
+    hasModules: !!device.modules,
+    hasManagement: !!management,
+    managementKeys: management ? Object.keys(management) : [],
+    hasDeviceDetails: !!management?.deviceDetails,
+    deviceDetailsKeys: management?.deviceDetails ? Object.keys(management.deviceDetails) : [],
+    intuneDeviceId: management?.deviceDetails?.intuneDeviceId,
+    entraObjectId: management?.deviceDetails?.entraObjectId
+  })
+
   if (!management) {
     return (
       <StatBlock 
@@ -136,6 +150,10 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const tenantName = management.tenantDetails?.tenantName
   const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
+
+  // Device identification information
+  const intuneDeviceId = management.deviceDetails?.intuneDeviceId
+  const entraObjectId = management.deviceDetails?.entraObjectId
 
   // Helper function to get enrollment type color
   const getEnrollmentTypeColor = (type?: string) => {
@@ -168,7 +186,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
       {provider && (
         <div className="flex justify-between items-center mb-4">
           <span className="text-sm text-gray-600 dark:text-gray-400">Provider</span>
-          <span className="text-base font-semibold text-gray-900 dark:text-white">{provider}</span>
+          <span className="text-base font-medium text-gray-900 dark:text-white">{provider}</span>
         </div>
       )}
 
@@ -196,6 +214,26 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
               label="Device Auth"
               status={deviceAuthStatus === 'SUCCESS' ? 'Success' : deviceAuthStatus}
               type={deviceAuthStatus === 'SUCCESS' ? 'success' : 'error'}
+            />
+          )}
+
+          {/* Intune Device ID with copy button */}
+          {intuneDeviceId && (
+            <Stat 
+              label="Intune ID" 
+              value={intuneDeviceId} 
+              isMono 
+              showCopyButton
+            />
+          )}
+
+          {/* Entra Object ID with copy button */}
+          {entraObjectId && (
+            <Stat 
+              label="Object ID" 
+              value={entraObjectId} 
+              isMono 
+              showCopyButton
             />
           )}
 

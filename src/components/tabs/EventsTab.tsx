@@ -57,7 +57,31 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
 
   if (!filteredEvents || filteredEvents.length === 0) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Events</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">Device activity and event monitoring</p>
+            </div>
+          </div>
+          {/* System Processes - Top Right */}
+          {processes.length > 0 && (
+            <div className="text-right">
+              <div className="text-sm text-gray-500 dark:text-gray-400">Active Processes</div>
+              <div className="text-xl font-semibold text-gray-600 dark:text-gray-400">
+                {processes.length.toLocaleString()}
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Event Statistics - even when no events */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
@@ -137,7 +161,31 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with other tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Events</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">Device activity and event monitoring</p>
+          </div>
+        </div>
+        {/* Total Events - Top Right */}
+        {filteredEvents.length > 0 && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Total Events</div>
+            <div className="text-xl font-semibold text-gray-600 dark:text-gray-400">
+              {filteredEvents.length.toLocaleString()}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Event Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">

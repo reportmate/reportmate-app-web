@@ -101,17 +101,35 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
   })
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with other tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Network Status</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">Network connectivity and configuration details</p>
+          </div>
+        </div>
+        {/* Connection Type - Top Right */}
+        {networkData.connectionType && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Connection</div>
+            <div className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
+              {networkData.connectionType}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Active Connection Overview */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Active Connection</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              {networkData.connectionType || 'Unknown'}
-            </div>
-            <div className="text-sm text-gray-600 dark:text-gray-400">Connection Type</div>
-          </div>
           {networkData.ssid && (
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-900 dark:text-white">

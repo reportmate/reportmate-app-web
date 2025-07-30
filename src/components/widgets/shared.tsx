@@ -109,7 +109,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ label, status, type = 
 
   return (
     <div className="flex justify-between items-center">
-      <label className="text-sm font-bold text-gray-900 dark:text-white">{label}</label>
+      <label className="text-sm text-gray-600 dark:text-gray-400">{label}</label>
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor()}`}>
         {displayStatus}
       </span>
