@@ -19,8 +19,6 @@ const getEventTypeConfig = (kind?: string) => {
       return { bg: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', dot: 'bg-green-500' }
     case 'info': 
       return { bg: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', dot: 'bg-blue-500' }
-    case 'system': 
-      return { bg: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', dot: 'bg-purple-500' }
     default: 
       return { bg: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', dot: 'bg-gray-500' }
   }
@@ -64,7 +62,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const eventsPerPage = 10;
 
   // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success'];
+  const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success'];
   
   // Filter events to only include valid categories
   const filteredEvents = events.filter(event => 

@@ -72,7 +72,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
       name: device.osName,
       edition: device.osEdition,
       version: device.osVersion,
-      displayVersion: device.osDisplayVersion,
+      displayVersion: device.osVersion, // Use clean version instead of displayVersion
       build: device.osVersion?.split('.').pop(),
       architecture: device.architecture,
       locale: device.osLocale,
@@ -97,10 +97,34 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   }, [services, servicesSearch])
   
   return (
-    <div className="space-y-8">
-      {/* Detailed System Information - Now the top card with info from SystemWidget */}
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with Management and Security Tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">System Information</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">Operating system and hardware details</p>
+          </div>
+        </div>
+        {/* Operating System - Top Right */}
+        {osInfo?.name && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Operating System</div>
+            <div className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+              {osInfo.name}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Detailed System Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">System Information</h3>
+        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Operating System Details</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column */}
           <div className="space-y-4">
@@ -119,10 +143,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
               <p className="text-gray-900 dark:text-white">
-                {osInfo?.version ? 
-                  `${osInfo.version}${osInfo.build ? ` (Build ${osInfo.build})` : ''}` : 
-                  'Unknown'
-                }
+                {osInfo?.version || 'Unknown'}
               </p>
             </div>
             

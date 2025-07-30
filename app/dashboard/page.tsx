@@ -285,11 +285,19 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Two-column layout: Column A (30%) + Column B (70%) */}
         <div className="grid grid-cols-1 lg:grid-cols-10 gap-8">
-          {/* Column A (30% width) - Status Widget + New Clients Table */}
+          {/* Column A (30% width) - Status Widget + Error/Warning Stats + New Clients Table */}
           <div className="lg:col-span-3 space-y-8">
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
               <StatusWidget devices={devices} loading={devicesLoading} />
+            </ErrorBoundary>
+
+            {/* Error and Warning Stats Cards */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
+              <div className="grid grid-cols-1 gap-4">
+                <ErrorStatsWidget events={events} />
+                <WarningStatsWidget events={events} />
+              </div>
             </ErrorBoundary>
 
             {/* New Clients Table */}
@@ -298,9 +306,9 @@ export default function DashboardPage() {
             </ErrorBoundary>
           </div>
 
-          {/* Column B (70% width) - Recent Events + 3 Stats Cards */}
+          {/* Column B (70% width) - Recent Events + OS Version Charts */}
           <div className="lg:col-span-7 space-y-8">
-            {/* Recent Events Table - moved above stats cards */}
+            {/* Recent Events Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
               <RecentEventsWidget
                 events={events}
@@ -311,28 +319,17 @@ export default function DashboardPage() {
               />
             </ErrorBoundary>
 
-            {/* Stats Cards - 3 widgets in a row (reordered: Error, Warning, Success) */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ErrorStatsWidget events={events} />
-                <WarningStatsWidget events={events} />
-                <SuccessStatsWidget events={events} />
+            {/* OS Version Tracking - 50/50 Split */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* macOS Versions */}
+                <OSVersionWidget devices={devices} loading={devicesLoading} osType="macOS" />
+                
+                {/* Windows Versions */}
+                <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
               </div>
             </ErrorBoundary>
           </div>
-        </div>
-
-        {/* OS Version Tracking - 50/50 Split */}
-        <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* macOS Versions */}
-          <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading macOS stats</div>}>
-            <OSVersionWidget devices={devices} loading={devicesLoading} osType="macOS" />
-          </ErrorBoundary>
-
-          {/* Windows Versions */}
-          <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading Windows stats</div>}>
-            <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
-          </ErrorBoundary>
         </div>
       </div>
     </div>
