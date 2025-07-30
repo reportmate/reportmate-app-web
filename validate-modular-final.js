@@ -42,8 +42,8 @@ async function validateModularArchitecture() {
       }
     }
     
-    // 3. Event Type Validation (strict: success, warning, error, info, system)
-    console.log('\n3️⃣  Event Type Validation (strict: success, warning, error, info, system):');
+    // 3. Event Type Validation (strict: success, warning, error, info)
+    console.log('\n3️⃣  Event Type Validation (strict: success, warning, error, info):');
     const eventsResult = await client.query(`
       SELECT severity, COUNT(*) as count 
       FROM events 
@@ -53,7 +53,7 @@ async function validateModularArchitecture() {
     
     if (eventsResult.rows.length > 0) {
       eventsResult.rows.forEach(event => {
-        const validTypes = ['success', 'warning', 'error', 'info', 'system'];
+        const validTypes = ['success', 'warning', 'error', 'info'];
         const icon = validTypes.includes(event.severity) ? '✅' : '❌';
         console.log(`   ${icon} ${event.severity}: ${event.count} events`);
       });

@@ -80,8 +80,8 @@ async function migrateToModularSchema() {
                 await client.query(`
                     UPDATE events 
                     SET event_type = CASE 
-                        WHEN LOWER(kind) IN ('success', 'warning', 'error', 'info', 'system') THEN LOWER(kind)
-                        WHEN LOWER(severity) IN ('success', 'warning', 'error', 'info', 'system') THEN LOWER(severity)
+                        WHEN LOWER(kind) IN ('success', 'warning', 'error', 'info') THEN LOWER(kind)
+                        WHEN LOWER(severity) IN ('success', 'warning', 'error', 'info') THEN LOWER(severity)
                         ELSE 'info'
                     END
                 `);
@@ -96,7 +96,7 @@ async function migrateToModularSchema() {
                 await client.query(`
                     ALTER TABLE events 
                     ADD CONSTRAINT events_event_type_check 
-                    CHECK (event_type IN ('success', 'warning', 'error', 'info', 'system'))
+                    CHECK (event_type IN ('success', 'warning', 'error', 'info'))
                 `);
                 console.log("   ✅ Added event type validation constraint");
             } catch (error) {
@@ -285,7 +285,7 @@ async function migrateToModularSchema() {
             console.log("📊 Database now supports the clean modular architecture:");
             console.log("   • 1 table per JSON module from Windows client");
             console.log("   • Serial number + Device ID uniqueness enforced");
-            console.log("   • Event type validation in place (success, warning, error, info, system)");
+            console.log("   • Event type validation in place (success, warning, error, info)");
             console.log("   • JSONB storage for flexible module data");
             console.log("   • Performance indexes created");
 

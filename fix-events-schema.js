@@ -20,8 +20,8 @@ async function fixEventsTable() {
       SET 
         event_type = COALESCE(event_type, 
           CASE 
-            WHEN kind = 'data_collection' THEN 'system'
-            WHEN kind IN ('success', 'warning', 'error', 'info', 'system') THEN kind
+            WHEN kind = 'data_collection' THEN 'info'
+            WHEN kind IN ('success', 'warning', 'error', 'info') THEN kind
             ELSE 'info'
           END, 'info'),
         message = COALESCE(message, 'Event logged'),
@@ -58,7 +58,7 @@ async function fixEventsTable() {
       await client.query(`
         ALTER TABLE events 
         ADD CONSTRAINT events_event_type_check 
-        CHECK (event_type IN ('success', 'warning', 'error', 'info', 'system'))
+        CHECK (event_type IN ('success', 'warning', 'error', 'info'))
       `);
       console.log('✅ Event type constraint added');
     } catch (error) {
