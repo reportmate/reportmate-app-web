@@ -28,13 +28,13 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Managed Installs</h1>
-            <p className="text-base text-gray-600 dark:text-gray-400">Software installation management and configuration</p>
+            <p className="text-base text-gray-600 dark:text-gray-400">Software Deployment System Report</p>
           </div>
         </div>
         {/* Total Packages - Top Right */}
         {installsData.totalPackages > 0 && (
           <div className="text-right">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Total Packages</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Total Managed Installs</div>
             <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">
               {installsData.totalPackages.toLocaleString()}
             </div>
