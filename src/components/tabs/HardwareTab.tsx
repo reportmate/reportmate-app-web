@@ -44,6 +44,30 @@ const safeNumber = (value: any): number => {
   return 0
 }
 
+// Helper function to format battery runtime
+const formatRuntime = (runtime: string): string => {
+  if (!runtime) return 'Unknown'
+  
+  // Handle Windows TimeSpan format (HH:MM:SS.FFFFFFF)
+  const match = runtime.match(/^(\d{1,2}):(\d{2}):(\d{2})/)
+  if (match) {
+    const [, hours, minutes, seconds] = match
+    const h = parseInt(hours, 10)
+    const m = parseInt(minutes, 10)
+    const s = parseInt(seconds, 10)
+    
+    if (h > 0) {
+      return `${h}h ${m}m`
+    } else if (m > 0) {
+      return `${m}m ${s}s`
+    } else {
+      return `${s}s`
+    }
+  }
+  
+  return runtime
+}
+
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Extract hardware data from the unified structure - check modular structure first
   // FIXED: Ensure we're correctly accessing the hardware module from the new structure
@@ -363,6 +387,77 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     </tr>
                   )
                 })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Battery Information - Only show for laptops (devices with battery data) */}
+      {hardwareData.battery && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Battery Information</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Current battery status and health information
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Charge Level</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Health</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle Count</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Estimated Runtime</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tr>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      hardwareData.battery.isCharging ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full mr-1.5 ${
+                        hardwareData.battery.isCharging ? 'bg-green-400' : 'bg-gray-400'
+                      }`}></div>
+                      {hardwareData.battery.isCharging ? 'Charging' : 'Not Charging'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    <div className="flex items-center">
+                      <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
+                        <div 
+                          className={`h-2 rounded-full ${
+                            (hardwareData.battery.chargePercent || 0) >= 80 ? 'bg-green-500' :
+                            (hardwareData.battery.chargePercent || 0) >= 20 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.min(hardwareData.battery.chargePercent || 0, 100)}%` }}
+                        ></div>
+                      </div>
+                      <span className="text-sm font-medium">{hardwareData.battery.chargePercent || 0}%</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      hardwareData.battery.health === 'Good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      hardwareData.battery.health === 'Fair' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      hardwareData.battery.health === 'Poor' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                      'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      {hardwareData.battery.health || 'Unknown'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    {hardwareData.battery.cycleCount || 0} cycles
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
+                    {hardwareData.battery.estimatedRuntime ? formatRuntime(hardwareData.battery.estimatedRuntime) : 'Unknown'}
+                  </td>
+                </tr>
               </tbody>
             </table>
           </div>
