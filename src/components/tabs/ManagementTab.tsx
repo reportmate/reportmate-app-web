@@ -4,7 +4,7 @@
  * Based on the rich Management widget with enhanced tab layout
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import { StatusBadge, Icons } from '../widgets/shared'
 
 interface ManagementTabProps {
@@ -14,6 +14,48 @@ interface ManagementTabProps {
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
   const management = device.modules?.management || device.management
+  const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // Debug logging to see what data we're getting
+  console.log('ManagementTab DEBUG:', {
+    hasModules: !!device.modules,
+    hasManagement: !!management,
+    managementKeys: management ? Object.keys(management) : [],
+    hasDeviceDetails: !!management?.deviceDetails,
+    deviceDetailsKeys: management?.deviceDetails ? Object.keys(management.deviceDetails) : [],
+    intuneDeviceId: management?.deviceDetails?.intuneDeviceId,
+    entraObjectId: management?.deviceDetails?.entraObjectId
+  })
+
+  // Copy to clipboard function
+  const copyToClipboard = async (text: string, fieldName: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedField(fieldName)
+      setTimeout(() => setCopiedField(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-999999px'
+      textArea.style.top = '-999999px'
+      document.body.appendChild(textArea)
+      textArea.focus()
+      textArea.select()
+      
+      try {
+        document.execCommand('copy')
+        setCopiedField(fieldName)
+        setTimeout(() => setCopiedField(null), 2000)
+      } catch (fallbackErr) {
+        console.error('Fallback copy failed:', fallbackErr)
+      } finally {
+        document.body.removeChild(textArea)
+      }
+    }
+  }
 
   if (!management) {
     return (
@@ -27,6 +69,18 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
         <p className="text-sm text-gray-600 dark:text-gray-400">
           This device does not have management enrollment information.
         </p>
+        {/* DEBUG INFO */}
+        <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg text-left max-w-2xl mx-auto">
+          <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">Debug Info:</h4>
+          <pre className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 overflow-auto">
+            {JSON.stringify({
+              hasModules: !!device.modules,
+              moduleKeys: device.modules ? Object.keys(device.modules) : [],
+              hasManagement: !!management,
+              management: management ? JSON.stringify(management).substring(0, 500) + '...' : null
+            }, null, 2)}
+          </pre>
+        </div>
       </div>
     )
   }
@@ -94,7 +148,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           <div className="space-y-4">
             {/* Primary Enrollment Status with pill on right */}
             <div className="flex items-center justify-between">
-              <span className="text-lg font-semibold text-gray-900 dark:text-white">Enrollment Status</span>
+              <span className="text-base font-medium text-gray-900 dark:text-white">Enrollment Status</span>
               <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                 isEnrolled 
                   ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
@@ -107,7 +161,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             {/* Enrollment Type with green pill on right */}
             {enrollmentType && (
               <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">Enrollment Type</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white">Enrollment Type</span>
                 <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
                   {enrollmentType}
                 </span>
@@ -117,7 +171,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             {/* Device Auth Status with pill on right */}
             {deviceAuthStatus && (
               <div className="flex items-center justify-between">
-                <span className="text-lg font-semibold text-gray-900 dark:text-white">Device Authentication</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white">Device Authentication</span>
                 <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                   deviceAuthStatus === 'SUCCESS' 
                     ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
@@ -129,19 +183,75 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             )}
           </div>
 
-          {/* Organization - Move to Device Details section */}
+          {/* Organization */}
           {isEnrolled && tenantName && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Details</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between">
+              <div className="space-y-4">
+
+                <div className="flex items-start">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Organization:</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{tenantName}</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white ml-4">{tenantName}</span>
                 </div>
+
+                {/* Intune Device ID with copy button */}
+                {management.deviceDetails?.intuneDeviceId && (
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Intune ID:</span>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                        {management.deviceDetails.intuneDeviceId}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(management.deviceDetails!.intuneDeviceId!, 'intuneId')}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                        title={copiedField === 'intuneId' ? 'Copied!' : 'Copy Intune ID to clipboard'}
+                      >
+                        {copiedField === 'intuneId' ? (
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Entra Object ID with copy button */}
+                {management.deviceDetails?.entraObjectId && (
+                  <div className="flex items-center">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Object ID:</span>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
+                        {management.deviceDetails.entraObjectId}
+                      </span>
+                      <button
+                        onClick={() => copyToClipboard(management.deviceDetails!.entraObjectId!, 'objectId')}
+                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+                        title={copiedField === 'objectId' ? 'Copied!' : 'Copy Object ID to clipboard'}
+                      >
+                        {copiedField === 'objectId' ? (
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {profileCount > 0 && (
-                  <div className="flex justify-between">
+                  <div className="flex items-start">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Profiles:</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{profileCount}</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-4">{profileCount}</span>
                   </div>
                 )}
               </div>

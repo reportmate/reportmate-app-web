@@ -158,6 +158,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
               label="Hardware UUID" 
               value={inventory.uuid || device.deviceId} 
               isMono 
+              showCopyButton
             />
           </div>
         )}

@@ -64,14 +64,31 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   
   if (!hardwareData || Object.keys(hardwareData).length === 0) {
     return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 002 2v10a2 2 0 002 2z" />
-          </svg>
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
+            </div>
+          </div>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Hardware Information</h3>
-        <p className="text-gray-600 dark:text-gray-400">Hardware data is not available for this device.</p>
+        
+        <div className="text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 002 2v10a2 2 0 002 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Hardware Information</h3>
+          <p className="text-gray-600 dark:text-gray-400">Hardware data is not available for this device.</p>
+        </div>
       </div>
     )
   }
@@ -101,7 +118,30 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with other tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Hardware Overview</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
+          </div>
+        </div>
+        {/* Processor - Top Right */}
+        {hardwareData.processor?.name && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Processor</div>
+            <div className="text-lg font-semibold text-orange-600 dark:text-orange-400 max-w-xs truncate">
+              {safeProcessorName(hardwareData.processor)}
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Hardware Overview Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
