@@ -14,7 +14,7 @@ interface EventsTabProps {
 
 export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) => {
   // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
+  const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success']
   
   const getEventStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
@@ -26,8 +26,6 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
         return { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', icon: '✗' }
       case 'info':
         return { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200', icon: 'ℹ' }
-      case 'system':
-        return { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200', icon: '⚙' }
       default:
         return { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200', icon: '•' }
     }

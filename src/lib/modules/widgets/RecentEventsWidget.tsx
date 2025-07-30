@@ -34,8 +34,6 @@ const getStatusConfig = (kind: string) => {
       return { bg: 'bg-green-500', text: 'text-green-700 dark:text-green-300', badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
     case 'info': 
       return { bg: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' }
-    case 'system': 
-      return { bg: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-300', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' }
     default: 
       return { bg: 'bg-gray-500', text: 'text-gray-700 dark:text-gray-300', badge: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' }
   }
@@ -133,7 +131,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
           if ((payload as any).message) parts.push((payload as any).message)
           
           const summary = parts.join(' • ')
-          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary || 'System event'
+          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary || 'Info event'
         }
         
         // Check if it's a large data payload summary (from sanitization)
@@ -189,12 +187,6 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
         )
-      case 'system':
-        return (
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-          </svg>
-        )
       default:
         return (
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -205,8 +197,8 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[600px] flex flex-col">
-      <Link 
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[632px] flex flex-col">
+      <Link
         href="/events"
         className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 block hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
       >
@@ -229,9 +221,11 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                 </span>
               </div>
             )}
-            <div className="text-sm text-gray-500 dark:text-gray-400">
-              Last update: {mounted && lastUpdateTime ? formatRelativeTime(lastUpdateTime.toISOString()) : 'Loading...'}
-            </div>
+            {mounted && lastUpdateTime && (
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                Last update: {formatRelativeTime(lastUpdateTime.toISOString())}
+              </div>
+            )}
           </div>
         </div>
       </Link>
@@ -285,7 +279,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                       >
                         <td className="w-20 px-3 py-2.5">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                            {event.kind}
+                            {event.kind === 'system' ? 'info' : event.kind}
                           </span>
                         </td>
                         <td className="w-56 px-3 py-2.5">

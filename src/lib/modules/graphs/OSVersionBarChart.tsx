@@ -52,7 +52,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     return []
   }
   
-  const versions: { [key: string]: number } = {}
+  const versions: { [key: string]: { count: number; displayName: string } } = {}
 
   devices.forEach(device => {
     // Get OS data from modular structure first, fallback to legacy field
@@ -82,55 +82,62 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           }
         }
         
-        versions[version] = (versions[version] || 0) + 1
+        if (!versions[version]) {
+          versions[version] = { count: 0, displayName: version }
+        }
+        versions[version].count += 1
       }
     } else {
       // Windows detection and parsing
       const osLower = osString.toLowerCase()
       if (osLower.includes('windows') || osLower.includes('microsoft windows')) {
-        let version = 'Unknown'
+        let displayVersion = 'Unknown'
+        let groupingKey = 'Unknown'
         
-        if (osVersion && osBuild) {
-          // Use structured data to build version string
-          if (osDisplayVersion) {
-            version = `Windows ${osDisplayVersion} (${osVersion}.${osBuild})`
-          } else {
-            version = `${osVersion}.${osBuild}`
-          }
+        if (osInfo?.name && osInfo?.build) {
+          // Extract version number from name (e.g., "Windows 11" -> "11")
+          const nameMatch = osInfo.name.match(/Windows\s+(\d+)/)
+          const versionNumber = nameMatch ? nameMatch[1] : osInfo.name
+          // For display: version number + build (e.g., "11 - 26100")
+          displayVersion = `${versionNumber} - ${osInfo.build}`
+          // For grouping: use the clean version number (e.g., "10.0.26100")
+          groupingKey = osInfo.version || displayVersion
+        } else if (osInfo?.name) {
+          // Just OS name if no build available
+          displayVersion = osInfo.name
+          groupingKey = osInfo.version || displayVersion
+        } else if (osVersion) {
+          // Fallback to version field
+          displayVersion = osVersion
+          groupingKey = osVersion
         } else if (osString) {
-          // Parse Windows version from OS string for legacy compatibility
-          const buildMatch = osString.match(/build\s+(\d+)/)
-          const versionMatch = osString.match(/(\d+\.\d+\.\d+\.\d+)/)
-          
-          if (buildMatch && versionMatch) {
-            const buildNumber = buildMatch[1]
-            const [major, minor, , revision] = versionMatch[1].split('.').map(Number)
-            
-            if (major === 10 && parseInt(buildNumber) >= 22000) {
-              // Windows 11
-              version = `11.0.${buildNumber}.${revision}`
-            } else if (major === 10) {
-              // Windows 10
-              version = `10.0.${buildNumber}.${revision}`
-            } else {
-              version = `${major}.${minor}.${buildNumber}.${revision}`
-            }
-          } else {
-            // Fallback for devices without build info - use legacy detection
-            const osLower = osString.toLowerCase()
-            if (osLower.includes('windows 11') || osLower.includes('win 11')) {
-              version = '11.0.22000.0'
-            } else if (osLower.includes('windows 10') || osLower.includes('win 10')) {
-              version = '10.0.19041.0'
-            } else if (osLower.includes('windows 8') || osLower.includes('win 8')) {
-              version = '8.0.9200.0'
-            } else if (osLower.includes('windows 7') || osLower.includes('win 7')) {
-              version = '7.0.7600.0'
-            }
+          // Legacy fallback for old data format
+          const osLower = osString.toLowerCase()
+          if (osLower.includes('windows 11') || osLower.includes('win 11')) {
+            displayVersion = 'Windows 11'
+            groupingKey = 'Windows 11'
+          } else if (osLower.includes('windows 10') || osLower.includes('win 10')) {
+            displayVersion = 'Windows 10'
+            groupingKey = 'Windows 10'
+          } else if (osLower.includes('windows 8') || osLower.includes('win 8')) {
+            displayVersion = 'Windows 8'
+            groupingKey = 'Windows 8'
+          } else if (osLower.includes('windows 7') || osLower.includes('win 7')) {
+            displayVersion = 'Windows 7'
+            groupingKey = 'Windows 7'
           }
         }
         
-        versions[version] = (versions[version] || 0) + 1
+        // Group by version number for chart bars, but display the full name with build
+        if (!versions[groupingKey]) {
+          versions[groupingKey] = { count: 0, displayName: displayVersion }
+        } else {
+          // If we already have this version, make sure we use the most detailed display name
+          if (displayVersion.includes(' - ') && !versions[groupingKey].displayName.includes(' - ')) {
+            versions[groupingKey].displayName = displayVersion
+          }
+        }
+        versions[groupingKey].count += 1
       }
     }
   })
@@ -138,7 +145,10 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
   // Sort versions appropriately
   if (osType === 'macOS') {
     return Object.entries(versions)
-      .map(([version, count]) => ({ version, count }))
+      .map(([version, versionData]) => ({ 
+        version: versionData.displayName, 
+        count: versionData.count 
+      }))
       .sort((a, b) => {
         if (a.version === 'Unknown') return 1
         if (b.version === 'Unknown') return -1
@@ -146,48 +156,31 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
       })
   } else {
     return Object.entries(versions)
-      .map(([version, count]) => ({ version, count }))
+      .map(([version, versionData]) => ({ 
+        version: versionData.displayName, 
+        count: versionData.count 
+      }))
       .sort((a, b) => {
         if (a.version === 'Unknown') return 1
         if (b.version === 'Unknown') return -1
         
-        // Parse versions in format major.minor.build.revision
-        const parseVersion = (ver: string) => {
-          const parts = ver.replace('Windows ', '').replace(/\([^)]*\)/, '').trim().split('.').map(num => parseInt(num) || 0)
-          return {
-            major: parts[0] || 0,
-            minor: parts[1] || 0,
-            build: parts[2] || 0,
-            revision: parts[3] || 0
-          }
+        // Simple version comparison for clean version strings
+        // Extract version numbers for comparison
+        const extractVersionNumber = (ver: string) => {
+          const match = ver.match(/Windows\s+(\d+)/)
+          return match ? parseInt(match[1]) : 0
         }
         
-        const versionA = parseVersion(a.version)
-        const versionB = parseVersion(b.version)
+        const versionA = extractVersionNumber(a.version)
+        const versionB = extractVersionNumber(b.version)
         
-        // Compare major version first
-        if (versionA.major !== versionB.major) {
-          return versionB.major - versionA.major
-        }
-        
-        // Then minor version
-        if (versionA.minor !== versionB.minor) {
-          return versionB.minor - versionA.minor
-        }
-        
-        // Then build number
-        if (versionA.build !== versionB.build) {
-          return versionB.build - versionA.build
-        }
-        
-        // Finally revision
-        return versionB.revision - versionA.revision
+        // Sort by Windows version number (11, 10, 8, 7, etc.)
+        return versionB - versionA
       })
   }
 }
 
 export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, loading, osType }) => {
-  const router = useRouter()
   const [localDevices, setLocalDevices] = useState<Device[]>([])
   const [localLoading, setLocalLoading] = useState(true)
   
@@ -254,7 +247,7 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   return (
     <div className="space-y-3">
       {versionData.map((item, index) => {
-        const percentage = Math.round((item.count / devices.length) * 100)
+        const percentage = Math.round((item.count / effectiveDevices.length) * 100)
         const barWidth = (item.count / maxCount) * 100
         const color = colors[index % colors.length]
         
@@ -262,11 +255,6 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
           <div 
             key={item.version}
             className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer transition-colors"
-            onClick={() => {
-              const params = new URLSearchParams()
-              params.set('osVersion', item.version)
-              router.push(`/devices?${params.toString()}`)
-            }}
           >
             <div className="w-32 text-sm font-medium text-gray-700 dark:text-gray-300 truncate" title={item.version}>
               {item.version}
