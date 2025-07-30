@@ -176,19 +176,14 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           />
           
           <Stat 
-            label="Manufacturer" 
-            value={hardwareInfo.manufacturer} 
+            label="Architecture" 
+            value={hardwareInfo.architecture} 
           />
           
           <Stat 
             label="Processor" 
             value={hardwareInfo.processor}
             // sublabel={hardwareInfo.cores ? `${hardwareInfo.cores} cores` : undefined}
-          />
-          
-          <Stat 
-            label="Architecture" 
-            value={hardwareInfo.architecture} 
           />
           
           <Stat 
@@ -200,6 +195,11 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           <Stat 
             label="Memory" 
             value={hardwareInfo.memory}
+          />
+
+          <Stat 
+            label="Storage" 
+            value={hardwareInfo.storage}
           />
         </div>
       </div>

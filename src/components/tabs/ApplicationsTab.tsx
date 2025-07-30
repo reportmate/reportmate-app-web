@@ -47,7 +47,22 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     }
     
     return (
-      <div className="space-y-8">
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Applications</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">Installed application inventory and details</p>
+            </div>
+          </div>
+        </div>
+
         <ApplicationsTable data={applicationsData} />
       </div>
     )
@@ -145,7 +160,31 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Header with Icon - Consistent with other tabs */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Applications</h1>
+            <p className="text-base text-gray-600 dark:text-gray-400">Installed application inventory and details</p>
+          </div>
+        </div>
+        {/* Total Apps - Top Right */}
+        {totalApps > 0 && (
+          <div className="text-right">
+            <div className="text-sm text-gray-500 dark:text-gray-400">Total Applications</div>
+            <div className="text-xl font-semibold text-indigo-600 dark:text-indigo-400">
+              {totalApps.toLocaleString()}
+            </div>
+          </div>
+        )}
+      </div>
+
       <ApplicationsTable key="applications-table" data={applicationsData} />
     </div>
   )
