@@ -16,7 +16,7 @@ const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, lab
     return (
       <div className="text-left">
         <div className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-3">{label}</div>
-        <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
           Status Unknown
         </div>
       </div>
@@ -26,7 +26,7 @@ const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, lab
   return (
     <div className="text-left">
       <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{label}</div>
-      <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
         enabled 
           ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
           : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
@@ -212,15 +212,15 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
             <div className="space-y-6">
               <div className="text-left">
                 <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Hello</div>
-                <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
                   Enabled
                 </div>
               </div>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">PIN Status:</span>
-                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     security.windowsHello.credentialProviders?.pinEnabled 
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
@@ -229,9 +229,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Biometric Status:</span>
-                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     (security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
                      security.windowsHello.credentialProviders?.fingerprintEnabled)
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
@@ -245,9 +245,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                 {/* Policy Information */}
                 {security.windowsHello.policies && (
                   <>
-                                        <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                                        <div className="flex items-center justify-between py-2">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">Domain PIN Logon:</span>
-                      <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         security.windowsHello.policies.allowDomainPinLogon
                           ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
@@ -256,9 +256,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                       </span>
                     </div>
                     
-                    <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                    <div className="flex items-center justify-between py-2">
                       <span className="text-sm font-medium text-gray-900 dark:text-white">Biometric Logon:</span>
-                      <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         security.windowsHello.policies.biometricLogonEnabled
                           ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
@@ -287,7 +287,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
           ) : (
                         <div className="text-left py-8">
               <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Hello</div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
+              <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
                 Not Available
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
@@ -310,7 +310,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
             <div className="space-y-6">
               <div className="text-left">
                 <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Trusted Platform Module</div>
-                <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                   (security.tpm.isPresent && security.tpm.isEnabled && security.tpm.isActivated)
                     ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                     : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
@@ -320,9 +320,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
               </div>
               
               <div className="space-y-4">
-                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Present:</span>
-                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     security.tpm.isPresent 
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                       : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
@@ -331,9 +331,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Enabled:</span>
-                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     security.tpm.isEnabled 
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                       : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
@@ -342,9 +342,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                   </span>
                 </div>
                 
-                <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                <div className="flex items-center justify-between py-2">
                   <span className="text-sm font-medium text-gray-900 dark:text-white">Activated:</span>
-                  <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     security.tpm.isActivated 
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
                       : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
@@ -354,7 +354,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
                 </div>
 
                 {security.tpm.version && (
-                  <div className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+                  <div className="flex items-center justify-between py-2">
                     <span className="text-sm font-medium text-gray-900 dark:text-white">Version:</span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">{security.tpm.version}</span>
                   </div>
@@ -371,7 +371,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
           ) : (
             <div className="text-left py-8">
               <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Trusted Platform Module</div>
-              <div className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
+              <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
                 Not Available
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
