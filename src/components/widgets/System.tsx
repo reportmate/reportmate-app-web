@@ -118,7 +118,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
         title="System" 
         subtitle="Operating system details"
         icon={Icons.system}
-        iconColor={WidgetColors.blue}
+        iconColor={WidgetColors.purple}
       >
         <EmptyState message="System information not available" />
       </StatBlock>
@@ -130,7 +130,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
       title="System" 
       subtitle="Operating system details"
       icon={Icons.system}
-      iconColor={WidgetColors.blue}
+      iconColor={WidgetColors.purple}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left Column */}

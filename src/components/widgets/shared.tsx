@@ -254,5 +254,7 @@ export const WidgetColors = {
   red: "bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-400",
   green: "bg-green-100 dark:bg-green-900 text-green-600 dark:text-green-400",
   purple: "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400",
-  indigo: "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400"
+  indigo: "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400",
+  yellow: "bg-yellow-200 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-300",
+  teal: "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400"
 }

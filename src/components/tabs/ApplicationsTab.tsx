@@ -57,7 +57,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Applications</h1>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
               <p className="text-base text-gray-600 dark:text-gray-400">Installed application inventory and details</p>
             </div>
           </div>
@@ -170,7 +170,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
             </svg>
           </div>
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Applications</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
             <p className="text-base text-gray-600 dark:text-gray-400">Installed application inventory and details</p>
           </div>
         </div>
