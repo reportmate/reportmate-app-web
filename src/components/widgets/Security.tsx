@@ -176,9 +176,6 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               {security.antivirus.version && (
                 <div>Version: {security.antivirus.version}</div>
               )}
-              {security.antivirus.isUpToDate !== undefined && (
-                <div>Status: {security.antivirus.isUpToDate ? 'Up to date' : 'Needs update'}</div>
-              )}
               {security.antivirus.lastUpdate && (
                 <div>Updated: {formatDate(security.antivirus.lastUpdate)}</div>
               )}
@@ -216,28 +213,26 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
         {isWindows && security?.windowsHello && (
           <div className="space-y-2">
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Windows Hello</div>
-            <div className="ml-4 space-y-1">
+            <div className="ml-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">PIN Status:</span>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  security.windowsHello.credentialProviders?.pinEnabled 
-                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                }`}>
-                  {security.windowsHello.credentialProviders?.pinEnabled ? 'Enabled' : 'Disabled'}
-                </span>
+                <StatusBadge
+                  label=""
+                  status={security.windowsHello.credentialProviders?.pinEnabled ? 'Enabled' : 'Disabled'}
+                  type={getStatusType(security.windowsHello.credentialProviders?.pinEnabled)}
+                />
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-600 dark:text-gray-400">Biometric Status:</span>
-                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                  (security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                   security.windowsHello.credentialProviders?.fingerprintEnabled)
-                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                }`}>
-                  {(security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                    security.windowsHello.credentialProviders?.fingerprintEnabled) ? 'Enabled' : 'Disabled'}
-                </span>
+                <StatusBadge
+                  label=""
+                  status={(security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
+                           security.windowsHello.credentialProviders?.fingerprintEnabled) ? 'Enabled' : 'Disabled'}
+                  type={getStatusType(
+                    security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
+                    security.windowsHello.credentialProviders?.fingerprintEnabled
+                  )}
+                />
               </div>
             </div>
           </div>
