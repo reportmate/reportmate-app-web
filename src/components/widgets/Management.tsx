@@ -237,14 +237,6 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
             />
           )}
 
-          {/* Organization */}
-          {tenantName && (
-            <Stat 
-              label="Organization" 
-              value={tenantName} 
-            />
-          )}
-
           {/* Profiles count only */}
           {profileCount > 0 && (
             <Stat 
