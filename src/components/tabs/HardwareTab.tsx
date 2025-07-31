@@ -158,7 +158,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
         {/* Architecture - Top Right */}
         {hardwareData.processor?.architecture && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 max-w-xs truncate">
               {safeString(hardwareData.processor.architecture)}
