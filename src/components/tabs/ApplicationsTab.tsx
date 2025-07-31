@@ -176,9 +176,9 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
         </div>
         {/* Total Apps - Top Right */}
         {totalApps > 0 && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Total Applications</div>
-            <div className="text-xl font-semibold text-blue-600 dark:text-blue-400">
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
               {totalApps.toLocaleString()}
             </div>
           </div>

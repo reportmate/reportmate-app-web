@@ -131,9 +131,9 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
         </div>
         {/* Provider - Top Right, Smaller Size */}
         {provider && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Provider</div>
-            <div className="text-xl font-bold text-yellow-700 dark:text-yellow-400">
+            <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">
               {provider}
             </div>
           </div>

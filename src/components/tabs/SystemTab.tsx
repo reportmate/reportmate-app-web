@@ -114,9 +114,9 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
         </div>
         {/* Operating System - Top Right */}
         {osInfo?.name && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Operating System</div>
-            <div className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
               {osInfo.name}
             </div>
           </div>
