@@ -117,9 +117,9 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
         </div>
         {/* Connection Type - Top Right */}
         {networkData.connectionType && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Active Connection</div>
-            <div className="text-xl font-semibold text-teal-600 dark:text-teal-400">
+            <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
               {networkData.connectionType}
             </div>
           </div>

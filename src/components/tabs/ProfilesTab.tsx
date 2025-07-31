@@ -258,9 +258,9 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
         </div>
         {/* Total Profiles - Top Right */}
         {profiles.length > 0 && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Total Profiles</div>
-            <div className="text-xl font-semibold text-purple-600 dark:text-purple-400">
+            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
               {profiles.length.toLocaleString()}
             </div>
           </div>

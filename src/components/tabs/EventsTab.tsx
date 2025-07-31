@@ -73,9 +73,9 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
           </div>
           {/* System Processes - Top Right */}
           {processes.length > 0 && (
-            <div className="text-right">
+            <div className="text-right mr-8">
               <div className="text-sm text-gray-500 dark:text-gray-400">Active Processes</div>
-              <div className="text-xl font-semibold text-gray-600 dark:text-gray-400">
+              <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
                 {processes.length.toLocaleString()}
               </div>
             </div>
@@ -177,9 +177,9 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
         </div>
         {/* Total Events - Top Right */}
         {filteredEvents.length > 0 && (
-          <div className="text-right">
+          <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Total Events</div>
-            <div className="text-xl font-semibold text-gray-600 dark:text-gray-400">
+            <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
               {filteredEvents.length.toLocaleString()}
             </div>
           </div>
