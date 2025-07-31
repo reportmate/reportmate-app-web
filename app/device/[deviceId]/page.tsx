@@ -950,29 +950,28 @@ export default function DeviceDetailPage() {
                 {/* Dashboard back button - hidden on mobile */}
                 <Link
                   href="/dashboard"
-                  className="hidden sm:flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+                  className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  <span className="text-sm font-medium">Dashboard</span>
                 </Link>
                 <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
                 
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">
                     {deviceInfo.name}
                   </h1>
                   
                   {/* Asset tag and serial - below device name on mobile, inline on desktop */}
                   <div className="flex items-center gap-2 mt-1 sm:mt-0">
                     {(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
                         {deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}
                       </span>
                     )}
                     {(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber) && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
                         {deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber}
                       </span>
                     )}
@@ -981,8 +980,8 @@ export default function DeviceDetailPage() {
               </div>
               
               {/* Last seen - hidden on mobile */}
-              <div className="hidden sm:flex items-center gap-4">
-                <div className="text-sm text-gray-600 dark:text-gray-400">
+              <div className="hidden sm:flex items-center gap-4 pr-4">
+                <div className="text-2sm text-gray-600 dark:text-gray-400">
                   Last seen {formatRelativeTime(deviceInfo.lastSeen)}
                 </div>
               </div>
