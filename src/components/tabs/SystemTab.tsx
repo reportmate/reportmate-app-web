@@ -126,14 +126,9 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
       {/* Detailed System Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Operating System Details</h3>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* First Column */}
           <div className="space-y-4">
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.edition || operatingSystem.edition || 'Unknown'}</p>
-            </div>
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Version</label>
@@ -151,17 +146,15 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Feature Update</label>
               <p className="text-gray-900 dark:text-white">{osInfo?.featureUpdate || 'Unknown'}</p>
             </div>
-            
-            {operatingSystem.installDate && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">OS Install Date</label>
-                <p className="text-gray-900 dark:text-white">{new Date(operatingSystem.installDate).toLocaleDateString()}</p>
-              </div>
-            )}
           </div>
           
-          {/* Right Column */}
+          {/* Second Column */}
           <div className="space-y-4">
+            
+            <div>
+              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
+              <p className="text-gray-900 dark:text-white">{osInfo?.edition || operatingSystem.edition || 'Unknown'}</p>
+            </div>
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
@@ -174,6 +167,11 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
                 <p className="text-gray-900 dark:text-white">{formatExactTime(systemTabData.bootTime)}</p>
               </div>
             )}
+            
+          </div>
+          
+          {/* Third Column */}
+          <div className="space-y-4">
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Locale</label>
