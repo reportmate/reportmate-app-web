@@ -39,16 +39,41 @@ const getStatusConfig = (kind: string) => {
   }
 }
 
+// Helper function to get connection status configuration
 const getConnectionStatus = (connectionStatus: string) => {
   switch (connectionStatus) {
     case 'connected':
-      return { text: 'Live', color: 'text-green-600 dark:text-green-400', dot: 'bg-green-500', show: true }
-    case 'connecting':
-      return { text: 'Connecting', color: 'text-yellow-600 dark:text-yellow-400', dot: 'bg-yellow-500', show: true }
+      return { 
+        text: 'Live', 
+        color: 'text-green-600 dark:text-green-400', 
+        dot: 'bg-green-500',
+        show: true
+      }
     case 'polling':
-      return { text: '', color: '', dot: '', show: false } // Hide polling status
+      return { 
+        text: 'Polling', 
+        color: 'text-blue-600 dark:text-blue-400', 
+        dot: 'bg-blue-500',
+        show: true
+      }
+    case 'connecting':
+    case 'reconnecting':
+      // Don't show "Connecting" pill since top of page already has one
+      return { 
+        text: 'Connecting', 
+        color: 'text-yellow-600 dark:text-yellow-400', 
+        dot: 'bg-yellow-500',
+        show: false  // Hide this status as requested by user
+      }
+    case 'error':
+    case 'disconnected':
     default:
-      return { text: 'Stale', color: 'text-red-500 dark:text-red-300', dot: 'bg-red-400', show: true }
+      return { 
+        text: 'Offline', 
+        color: 'text-red-600 dark:text-red-400', 
+        dot: 'bg-red-500',
+        show: true
+      }
   }
 }
 

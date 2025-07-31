@@ -134,7 +134,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
     return (
       <StatBlock 
         title="Management" 
-        subtitle="Device Management Services Status"
+        subtitle="Device Management Services"
         icon={Icons.management}
         iconColor={WidgetColors.yellow}
       >
@@ -178,7 +178,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   return (
     <StatBlock 
       title="Management" 
-      subtitle="Device Management Services Status"
+      subtitle="Device Management Services"
       icon={Icons.management}
       iconColor={WidgetColors.yellow}
     >
