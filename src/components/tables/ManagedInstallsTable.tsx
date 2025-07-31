@@ -192,13 +192,14 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
           {/* Configuration Section */}
           {data.config && (
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="px-4 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center gap-2">
+              <div className="px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between min-h-[2rem]">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       {data.config.type === 'cimian' ? 'Cimian' : 'Munki'} Config
                     </h3>
                   </div>
+                  <div></div>
                 </div>
               </div>
               <div className="p-4">
