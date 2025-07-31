@@ -274,3 +274,20 @@ body {
 .animate-slide-up {
   animation: slideUp 0.3s ease-out;
 }
+
+/* Enhanced tab navigation styles */
+.tab-label-transition {
+  transition: max-width 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              margin 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ensure smooth text expansion */
+.tab-button {
+  min-width: 3rem; /* Minimum size for icon + padding */
+}
+
+.tab-button:hover .tab-label-transition,
+.tab-button.active .tab-label-transition {
+  transition-delay: 0.1s; /* Slight delay for smoother feel */
+}
