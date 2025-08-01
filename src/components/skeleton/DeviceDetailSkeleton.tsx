@@ -228,55 +228,119 @@ function InfoTabSkeleton() {
   const fieldWidths = ['w-20', 'w-24', 'w-28', 'w-32', 'w-36', 'w-40']
   const valueWidths = ['w-24', 'w-28', 'w-32', 'w-36', 'w-40', 'w-44']
   
+  // Widget data with specific heights to match actual widgets
+  const widgets = [
+    { 
+      title: 'Inventory', 
+      subtitle: 'Device identity and assignment details',
+      icon: 'information',
+      rows: 6, // Device Name, Asset Tag, Serial, Registration, Usage, Location etc.
+      twoColumn: true
+    },
+    { 
+      title: 'System', 
+      subtitle: 'Operating system information',
+      icon: 'desktop',
+      rows: 5, // OS, Version, Build, Architecture, Install Date
+      twoColumn: false
+    },
+    { 
+      title: 'Hardware', 
+      subtitle: 'Hardware specifications',
+      icon: 'chip',
+      rows: 5, // Model, Processor, Memory, Storage, Graphics
+      twoColumn: false
+    },
+    { 
+      title: 'Management', 
+      subtitle: 'Device management status',
+      icon: 'shield',
+      rows: 4, // MDM Status, Enrollment, Profiles, Compliance
+      twoColumn: false
+    },
+    { 
+      title: 'Security', 
+      subtitle: 'Security and compliance status',
+      icon: 'lock',
+      rows: 4, // Firewall, Encryption, Updates, Antivirus
+      twoColumn: false
+    },
+    { 
+      title: 'Network', 
+      subtitle: 'Network connectivity information',
+      icon: 'wifi',
+      rows: 5, // IP Address, MAC, WiFi, DNS, Gateway
+      twoColumn: false
+    }
+  ]
+  
   return (
-    <div className="space-y-6">
-      {/* Status cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
-              <div className="ml-4">
-                <div className={`h-4 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2`} style={{ animationDelay: `${i * 0.1}s` }}></div>
-                <div className={`h-6 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+      {widgets.map((widget, widgetIndex) => (
+        <div key={widgetIndex} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {/* Widget Header */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              {/* Icon */}
+              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center animate-pulse" 
+                   style={{ animationDelay: `${widgetIndex * 0.1}s` }}>
+                <div className="w-5 h-5 bg-blue-200 dark:bg-blue-700 rounded animate-pulse"></div>
+              </div>
+              <div className="flex-1">
+                {/* Title */}
+                <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" 
+                     style={{ animationDelay: `${widgetIndex * 0.1 + 0.05}s` }}></div>
+                {/* Subtitle */}
+                <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+                     style={{ animationDelay: `${widgetIndex * 0.1 + 0.1}s` }}></div>
               </div>
             </div>
           </div>
-        ))}
-      </div>
-
-      {/* Device details grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Basic info card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex justify-between items-center">
-                <div className={`h-4 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{ animationDelay: `${i * 0.1}s` }}></div>
-                <div className={`h-4 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{ animationDelay: `${i * 0.1}s` }}></div>
-              </div>
-            ))}
+          
+          {/* Widget Content */}
+          <div className="px-6 py-4">
+            <div className="space-y-4">
+              {widget.twoColumn ? (
+                // Two-column layout for Inventory widget
+                <div className="grid grid-cols-2 gap-6">
+                  {/* Left column */}
+                  <div className="space-y-4">
+                    {Array.from({ length: Math.ceil(widget.rows / 2) }).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                        <div className={`h-3 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                             style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05}s` }}></div>
+                        <div className={`h-4 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                             style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05 + 0.025}s` }}></div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Right column */}
+                  <div className="space-y-4">
+                    {Array.from({ length: Math.floor(widget.rows / 2) }).map((_, i) => (
+                      <div key={i} className="space-y-2">
+                        <div className={`h-3 ${fieldWidths[(i + 3) % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                             style={{ animationDelay: `${widgetIndex * 0.1 + (i + 3) * 0.05}s` }}></div>
+                        <div className={`h-4 ${valueWidths[(i + 3) % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                             style={{ animationDelay: `${widgetIndex * 0.1 + (i + 3) * 0.05 + 0.025}s` }}></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                // Single column layout for other widgets
+                Array.from({ length: widget.rows }).map((_, i) => (
+                  <div key={i} className="flex justify-between items-center">
+                    <div className={`h-4 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                         style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05}s` }}></div>
+                    <div className={`h-4 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                         style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05 + 0.025}s` }}></div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
-
-        {/* Hardware summary card */}
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="h-6 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: '0.1s' }}></div>
-          </div>
-          <div className="p-6 space-y-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex justify-between items-center">
-                <div className={`h-4 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{ animationDelay: `${i * 0.1}s` }}></div>
-                <div className={`h-4 ${valueWidths[(i + 2) % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      ))}
     </div>
   )
 }
