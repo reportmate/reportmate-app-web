@@ -9,7 +9,7 @@ interface ManagedPackage {
   installedVersion?: string;
   size?: number;
   type: 'munki' | 'cimian';
-  status: 'installed' | 'pending_install' | 'pending_removal' | 'install_failed' | 'install_succeeded' | 'uninstalled' | 'uninstall_failed' | 'removed' | 'Pending Update' | 'Installed' | 'Failed';
+  status: 'Installed' | 'Pending' | 'Warning' | 'Error' | 'Removed';
   lastUpdate: string;
   description?: string;
   publisher?: string;
@@ -57,7 +57,7 @@ interface ManagedInstallsTableProps {
 }
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'pending' | 'failed' | 'removed'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warning' | 'error' | 'removed'>('all');
   const [expandedErrors, setExpandedErrors] = useState(false);
   const [expandedWarnings, setExpandedWarnings] = useState(false);
 
@@ -86,20 +86,15 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'installed':
       case 'Installed':
-      case 'install_succeeded':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'pending_install':
-      case 'Pending Update':
-      case 'pending_removal':
+      case 'Pending':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'install_failed':
-      case 'Failed':
-      case 'uninstall_failed':
+      case 'Warning':
+        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+      case 'Error':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'removed':
-      case 'uninstalled':
+      case 'Removed':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
@@ -111,16 +106,18 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     if (statusFilter === 'all') return data.packages;
     
     return data.packages.filter(pkg => {
-      const status = pkg.status.toLowerCase();
+      const status = pkg.status;
       switch (statusFilter) {
         case 'installed':
-          return status === 'installed' || status === 'install_succeeded';
+          return status === 'Installed';
         case 'pending':
-          return status === 'pending_install' || status === 'pending update' || status === 'pending_removal';
-        case 'failed':
-          return status === 'install_failed' || status === 'failed' || status === 'uninstall_failed';
+          return status === 'Pending';
+        case 'warning':
+          return status === 'Warning'; 
+        case 'error':
+          return status === 'Error';
         case 'removed':
-          return status === 'removed' || status === 'uninstalled';
+          return status === 'Removed';
         default:
           return true;
       }
@@ -129,11 +126,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   const filteredPackages = getFilteredPackages();
 
-  // Calculate removed count
-  const removedCount = data.packages.filter(pkg => {
-    const status = pkg.status.toLowerCase();
-    return status === 'removed' || status === 'uninstalled';
-  }).length;
+  // Calculate counts for each status
+  const installedCount = data.packages.filter(pkg => pkg.status === 'Installed').length;
+  const pendingCount = data.packages.filter(pkg => pkg.status === 'Pending').length;
+  const warningCount = data.packages.filter(pkg => pkg.status === 'Warning').length;
+  const errorCount = data.packages.filter(pkg => pkg.status === 'Error').length;
+  const removedCount = data.packages.filter(pkg => pkg.status === 'Removed').length;
 
   return (
     <div className="space-y-6">
@@ -279,7 +277,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           <div key={error.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center justify-between mb-1">
                                   <span className="text-sm font-semibold text-red-800 dark:text-red-200">
                                     {error.package || 'System'}
                                   </span>
@@ -293,34 +291,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                   {error.message}
                                 </p>
                                 
-                                {/* Enhanced Context Information */}
-                                <div className="space-y-2">
-                                  {error.context && (
-                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
-                                      {error.context.runType && (
-                                        <div><span className="font-medium">Run Type:</span> {error.context.runType}</div>
-                                      )}
-                                      {error.context.user && (
-                                        <div><span className="font-medium">User:</span> {error.context.user}</div>
-                                      )}
-                                      {error.context.hostname && (
-                                        <div><span className="font-medium">Host:</span> {error.context.hostname}</div>
-                                      )}
-                                      {error.sessionId && error.sessionId !== 'Unknown' && (
-                                        <div><span className="font-medium">Session:</span> {error.sessionId}</div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {error.logFile && error.logFile.includes('ProgramData') && (
-                                    <div className="mt-2">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Log File Location:</p>
-                                      <code className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                                        {error.logFile}
-                                      </code>
-                                    </div>
-                                  )}
-                                </div>
+                                {/* Simplified Context Information - Only Run Type */}
+                                {error.context && error.context.runType && (
+                                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium">Run Type:</span> {error.context.runType}
+                                  </div>
+                                )}
                                 
                                 {error.details && (
                                   <div className="mt-3">
@@ -392,7 +368,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           <div key={warning.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-1">
+                                <div className="flex items-center justify-between mb-1">
                                   <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
                                     {warning.package || 'System'}
                                   </span>
@@ -406,34 +382,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                   {warning.message}
                                 </p>
                                 
-                                {/* Enhanced Context Information */}
-                                <div className="space-y-2">
-                                  {warning.context && (
-                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600 dark:text-gray-400">
-                                      {warning.context.runType && (
-                                        <div><span className="font-medium">Run Type:</span> {warning.context.runType}</div>
-                                      )}
-                                      {warning.context.user && (
-                                        <div><span className="font-medium">User:</span> {warning.context.user}</div>
-                                      )}
-                                      {warning.context.hostname && (
-                                        <div><span className="font-medium">Host:</span> {warning.context.hostname}</div>
-                                      )}
-                                      {warning.sessionId && warning.sessionId !== 'Unknown' && (
-                                        <div><span className="font-medium">Session:</span> {warning.sessionId}</div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {warning.logFile && warning.logFile.includes('ProgramData') && (
-                                    <div className="mt-2">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Log File Location:</p>
-                                      <code className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900 px-2 py-1 rounded">
-                                        {warning.logFile}
-                                      </code>
-                                    </div>
-                                  )}
-                                </div>
+                                {/* Simplified Context Information - Only Run Type */}
+                                {warning.context && warning.context.runType && (
+                                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                                    <span className="font-medium">Run Type:</span> {warning.context.runType}
+                                  </div>
+                                )}
                                 
                                 {warning.details && (
                                   <div className="mt-3">
@@ -488,7 +442,37 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
-                    Installed - {data.installed}
+                    Installed - {installedCount}
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('pending')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      statusFilter === 'pending'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Pending - {pendingCount}
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('warning')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      statusFilter === 'warning'
+                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Warning - {warningCount}
+                  </button>
+                  <button
+                    onClick={() => setStatusFilter('error')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                      statusFilter === 'error'
+                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    Error - {errorCount}
                   </button>
                   <button
                     onClick={() => setStatusFilter('removed')}
@@ -499,26 +483,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     }`}
                   >
                     Removed - {removedCount}
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('pending')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Pending - {data.pending}
-                  </button>
-                  <button
-                    onClick={() => setStatusFilter('failed')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'failed'
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Failed - {data.failed}
                   </button>
                 </div>
               </div>
