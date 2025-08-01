@@ -10,6 +10,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { ConnectionStatusWidget } from "../../src/lib/modules/widgets/ConnectionStatusWidget"
+import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { useLiveEvents } from "./hooks"
 
 // Import the same hooks and types from the original dashboard
@@ -229,6 +230,11 @@ export default function DashboardPage() {
       serialNumber: d.serialNumber 
     })))
   }, [devices, devicesLoading])
+
+  // Show skeleton while data is loading
+  if (devicesLoading) {
+    return <DashboardSkeleton />
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>

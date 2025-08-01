@@ -7,6 +7,7 @@ import React, { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
+import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
@@ -395,38 +396,7 @@ function EventsPageContent() {
   const filterCounts = getFilterCounts()
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="text-sm font-medium">Dashboard</span>
-                </Link>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  All Events
-                </h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <div className="w-8 h-8 mx-auto mb-4 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading events...</p>
-          </div>
-        </div>
-      </div>
-    )
+    return <EventsPageSkeleton />
   }
 
   if (error) {
@@ -1167,38 +1137,7 @@ function EventsPageContent() {
 
 export default function EventsPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-4">
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="text-sm font-medium">Dashboard</span>
-                </Link>
-                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  All Events
-                </h1>
-              </div>
-            </div>
-          </div>
-        </header>
-        
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <div className="w-8 h-8 mx-auto mb-4 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-            <p className="text-gray-600 dark:text-gray-400">Loading events...</p>
-          </div>
-        </div>
-      </div>
-    }>
+    <Suspense fallback={<EventsPageSkeleton />}>
       <EventsPageContent />
     </Suspense>
   )
