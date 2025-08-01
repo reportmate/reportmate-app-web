@@ -132,59 +132,74 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
       icon={Icons.system}
       iconColor={WidgetColors.purple}
     >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Column */}
-        <div className="space-y-4">
-          <Stat 
-            label="Operating System" 
-            value={operatingSystem?.name ? 
-              operatingSystem.name.replace('Microsoft ', '') : 
-              device.os || 'Unknown'
-            } 
-          />
+      <div className="space-y-6">
+        {/* First Section - Main System Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Left Column */}
+          <div className="space-y-4">
+            <Stat 
+              label="Operating System" 
+              value={operatingSystem?.name ? 
+                operatingSystem.name.replace('Microsoft ', '') : 
+                device.os || 'Unknown'
+              } 
+            />          
+            
+            <Stat 
+              label="Version" 
+              value={operatingSystem?.version || 'Unknown'} 
+            />
+
+            <Stat 
+              label="Display Version" 
+              value={operatingSystem?.displayVersion || 'Unknown'} 
+            />
+
+          </div>
           
-          <Stat 
-            label="Edition" 
-            value={operatingSystem?.edition || 'Unknown'} 
-          />
-          
-          <Stat 
-            label="Version" 
-            value={operatingSystem?.version || 'Unknown'} 
-          />
-          
-          <Stat 
-            label="Display Version" 
-            value={operatingSystem?.displayVersion || 'Unknown'} 
-          />
-          
-          <Stat 
-            label="Feature Update" 
-            value={operatingSystem?.featureUpdate || 'Unknown'} 
-          />
+          {/* Right Column */}
+          <div className="space-y-4">
+            <Stat 
+              label="Edition" 
+              value={operatingSystem?.edition || 'Unknown'} 
+            />
+            
+            <Stat 
+              label="Feature Update" 
+              value={operatingSystem?.featureUpdate || 'Unknown'} 
+            />
+          </div>
         </div>
-        
-        {/* Right Column */}
-        <div className="space-y-4">
-          <Stat 
-            label="Uptime" 
-            value={uptimeString || 'Unknown'} 
-          />
+
+        {/* Invisible separator */}
+        <div className="h-0"></div>
+
+        {/* Second Section - Localization Info */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            
+            <Stat 
+              label="Uptime" 
+              value={uptimeString || 'Unknown'} 
+            />
+
+            <Stat 
+              label="Locale" 
+              value={operatingSystem?.locale || 'Unknown'} 
+            />
+          </div>
           
-          <Stat 
-            label="Locale" 
-            value={operatingSystem?.locale || 'Unknown'} 
-          />
-          
-          <Stat 
-            label="Time Zone" 
-            value={operatingSystem?.timeZone || 'Unknown'} 
-          />
-          
-          <Stat 
-            label="Keyboard Layout" 
-            value={operatingSystem?.activeKeyboardLayout || 'Unknown'} 
-          />
+          <div className="space-y-4">
+            <Stat 
+              label="Keyboard Layout" 
+              value={operatingSystem?.activeKeyboardLayout || 'Unknown'} 
+            />
+            
+            <Stat 
+              label="Time Zone" 
+              value={operatingSystem?.timeZone || 'Unknown'} 
+            />
+          </div>
         </div>
       </div>
     </StatBlock>
