@@ -126,12 +126,55 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const fetchSessions = async () => {
+    const processDeviceSessions = () => {
+      try {
+        // Use session data directly from device if available
+        const installsData = device?.installs
+        const recentSessions = installsData?.recent_sessions || installsData?.recentSessions || []
+        
+        if (recentSessions.length > 0) {
+          // Convert the enhanced Cimian session data to the expected format
+          const processedSessions: InstallSession[] = recentSessions.map((session: any, index: number) => ({
+            id: `session-${deviceId}-${index}`,
+            deviceId,
+            sessionId: session.session_id || session.sessionId || session.SessionId || `session-${index}`,
+            startTime: session.start_time || session.startTime || session.StartTime || new Date().toISOString(),
+            endTime: session.end_time || session.endTime || session.EndTime,
+            status: (session.status || session.Status || 'unknown').toLowerCase() as 'running' | 'completed' | 'failed' | 'interrupted',
+            runType: (session.run_type || session.runType || session.RunType || 'unknown').toLowerCase() as 'auto' | 'manual' | 'bootstrap' | 'ondemand',
+            totalActions: session.total_actions || session.totalActions || session.TotalActions || 0,
+            installs: session.installs || session.Installs || 0,
+            updates: session.updates || session.Updates || 0,
+            removals: session.removals || session.Removals || 0,
+            successes: session.successes || session.Successes || 0,
+            failures: session.failures || session.Failures || 0,
+            duration: session.duration_seconds || session.durationSeconds || session.DurationSeconds || undefined,
+            hostname: session.hostname || session.Hostname || session.hostname || '',
+            user: session.user || session.User || session.user || '',
+            events: []
+          }))
+          
+          setSessions(processedSessions)
+          console.log(`[InstallsModule] Processed ${processedSessions.length} sessions from device data`)
+        } else {
+          console.log('[InstallsModule] No session data found in device object, falling back to API call')
+          fetchSessionsFromAPI()
+        }
+      } catch (err) {
+        console.error('[InstallsModule] Error processing device sessions:', err)
+        fetchSessionsFromAPI()
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    const fetchSessionsFromAPI = async () => {
       try {
         const response = await fetch(`/api/device/${deviceId}/install-sessions?limit=10`)
         if (response.ok) {
           const data = await response.json()
           setSessions(data.sessions || [])
+          console.log('[InstallsModule] Fetched sessions from API fallback')
         } else {
           setError('Failed to fetch install sessions')
         }
@@ -142,8 +185,9 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
       }
     }
 
-    fetchSessions()
-  }, [deviceId])
+    // Try to use device data first, fallback to API if needed
+    processDeviceSessions()
+  }, [deviceId, device])
 
   if (loading) {
     return (

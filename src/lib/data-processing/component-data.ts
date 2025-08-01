@@ -646,6 +646,46 @@ export interface InstallsData {
     lastRun: string
     duration: string
   }
+  messages?: {
+    errors: Array<{
+      id: string
+      timestamp: string
+      package: string
+      message: string
+      details: string
+      sessionId?: string
+      source?: string
+      logFile?: string
+      level?: string
+      category?: string
+      context?: {
+        runType?: string
+        duration?: string
+        processId?: string
+        user?: string
+        hostname?: string
+      }
+    }>
+    warnings: Array<{
+      id: string
+      timestamp: string
+      package: string
+      message: string
+      details: string
+      sessionId?: string
+      source?: string
+      logFile?: string
+      level?: string
+      category?: string
+      context?: {
+        runType?: string
+        duration?: string
+        processId?: string
+        user?: string
+        hostname?: string
+      }
+    }>
+  }
 }
 
 export interface InstallPackage {
@@ -656,55 +696,283 @@ export interface InstallPackage {
   status: string
   type: string
   lastUpdate: string
+  // Additional fields for ManagedInstallsTable compatibility
+  installedVersion?: string
+  size?: number
+  description?: string
+  publisher?: string
+  category?: string
 }
 
 export function processInstallsData(rawDevice: any): InstallsData {
-  // Extract managed installs data from API response only
-  const installs = rawDevice.managedInstalls || rawDevice.modules?.installs || rawDevice.modules?.managedInstalls || {}
-  const cimianData = installs.cimian || installs.Cimian || {}
-  const packages = installs.packages || installs.recentInstalls || []
+  console.log('🔍 Processing installs data for device:', rawDevice.id || rawDevice.deviceId)
+  console.log('🔍 Raw device structure:', {
+    hasInstalls: !!rawDevice.installs,
+    hasManagedInstalls: !!rawDevice.managedInstalls,
+    hasModules: !!rawDevice.modules,
+    hasModulesInstalls: !!rawDevice.modules?.installs,
+    topLevelKeys: rawDevice ? Object.keys(rawDevice) : [],
+    installsKeys: rawDevice.installs ? Object.keys(rawDevice.installs) : [],
+    modulesKeys: rawDevice.modules ? Object.keys(rawDevice.modules) : [],
+    modulesInstallsKeys: rawDevice.modules?.installs ? Object.keys(rawDevice.modules.installs) : []
+  })
   
-  // Check if managed installs system is Cimian from API data
-  const managedInstallsSystem = rawDevice.modules?.managedInstallsSystem
+  // Extract managed installs data from API response - enhanced for Cimian support
+  // Check multiple possible locations for installs data
+  const installs = rawDevice.installs || rawDevice.managedInstalls || rawDevice.modules?.installs || rawDevice.modules?.managedInstalls || {}
+  console.log('🔍 Found installs data at location:', {
+    foundAt: rawDevice.installs ? 'rawDevice.installs' : 
+             rawDevice.managedInstalls ? 'rawDevice.managedInstalls' :
+             rawDevice.modules?.installs ? 'rawDevice.modules.installs' :
+             rawDevice.modules?.managedInstalls ? 'rawDevice.modules.managedInstalls' : 'none',
+    installsDataKeys: installs ? Object.keys(installs) : [],
+    hasCimian: !!installs.cimian,
+    hasRecentInstalls: !!installs.recentInstalls,
+    hasRecentEvents: !!installs.recentEvents,
+    cimianKeys: installs.cimian ? Object.keys(installs.cimian) : []
+  })
   
-  // Extract Cimian configuration from API data only - NO FAKE DATA
+  // Handle NEW Cimian API structure (current) - using correct field names from API
+  const cimianData = installs.cimian || {}
+  const recentInstalls = installs.recentInstalls || []
+  const pendingInstalls = cimianData.pendingPackages || []
+  const installsRecentEvents = installs.recentEvents || []
+  const allPackages = [...recentInstalls, ...pendingInstalls]
+  
+  console.log('🔍 Extracted Cimian data:', {
+    cimianInstalled: cimianData.isInstalled,
+    cimianVersion: cimianData.version,
+    registryConfigExists: !!cimianData.registryConfig,
+    configExists: !!cimianData.config,
+    configData: cimianData.config,
+    registryConfigData: cimianData.registryConfig,
+    recentInstallsCount: recentInstalls.length,
+    recentInstallsFirst3: recentInstalls.slice(0, 3),
+    pendingInstallsCount: pendingInstalls.length,
+    recentEventsCount: installsRecentEvents.length,
+    hasCimianConfig: !!cimianData.registryConfig || !!cimianData.config,
+    cimianStatus: cimianData.status,
+    sampleRecentInstall: recentInstalls[0],
+    sampleEvent: installsRecentEvents[0]
+  })
+  
+  // Check if managed installs system is Cimian from API data - using camelCase
+  const managedInstallsSystem = cimianData.isInstalled ? 'Cimian' : 'Unknown'
+  
+  // Extract Cimian configuration from NEW API data structure - using correct field names
   let config = undefined
-  if (cimianData.isInstalled || managedInstallsSystem === 'Cimian') {
+  if (cimianData.isInstalled) {
+    // Primary: Use config.yaml data (preferred)
+    const configData = cimianData.config || {}
+    // Fallback: Use registry config data (legacy)
+    const registryConfig = cimianData.registryConfig || {}
+    
+    // Extract Cimian executable version from cimianData.version
+    const cimianExecutableVersion = cimianData.version || 'Unknown'
+    
+    // Extract duration and runType from most recent session
+    const recentSessions = installs.recentSessions || []
+    const mostRecentSession = recentSessions.length > 0 ? recentSessions[0] : null
+    // Enhanced duration extraction for API format - handle different duration formats
+    let sessionDuration = 'Unknown'
+    if (mostRecentSession?.durationSeconds) {
+      // If we have duration in seconds, convert to readable format
+      const totalSeconds = mostRecentSession.durationSeconds
+      const minutes = Math.floor(totalSeconds / 60)
+      const seconds = totalSeconds % 60
+      sessionDuration = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`
+    } else if (mostRecentSession?.duration) {
+      // Handle string formats like "00:00:06" or "108 seconds"
+      const duration = String(mostRecentSession.duration)
+      if (duration.includes(':')) {
+        // Handle HH:MM:SS format
+        const parts = duration.split(':')
+        if (parts.length === 3) {
+          const hours = parseInt(parts[0], 10)
+          const minutes = parseInt(parts[1], 10)
+          const seconds = parseInt(parts[2], 10)
+          if (hours > 0) {
+            sessionDuration = `${hours}h ${minutes}m ${seconds}s`
+          } else if (minutes > 0) {
+            sessionDuration = `${minutes}m ${seconds}s`
+          } else {
+            sessionDuration = `${seconds}s`
+          }
+        }
+      } else {
+        // Use as-is for other formats
+        sessionDuration = duration
+      }
+    }
+    const sessionRunType = mostRecentSession?.runType || 'manual'
+    const sessionLastRun = mostRecentSession?.startTime || 
+                           installs.lastCheckIn || rawDevice.lastSeen || 'Unknown'
+    
     config = {
       type: 'cimian' as const,
-      version: cimianData.version || 'Unknown',
-      softwareRepoURL: cimianData.softwareRepoURL || 'Unknown',
-      manifest: cimianData.manifest || rawDevice.serialNumber || rawDevice.deviceId || 'Unknown',
-      runType: cimianData.runType || 'Unknown',
-      lastRun: cimianData.lastRun || rawDevice.lastSeen || 'Unknown',
-      duration: cimianData.duration || 'Unknown'
+      version: cimianExecutableVersion,
+      softwareRepoURL: configData.SoftwareRepoURL || configData.software_repo_url || 'Unknown',
+      manifest: configData.ClientIdentifier || rawDevice.serialNumber || rawDevice.deviceId || 'Unknown',
+      runType: sessionRunType,
+      lastRun: sessionLastRun,
+      duration: sessionDuration
     }
   }
   
-  // Process only real packages from API - NO FAKE DATA
-  const processedPackages: InstallPackage[] = packages.map((pkg: any) => ({
-    id: pkg.id || pkg.name || 'unknown',
-    name: pkg.name || 'Unknown Package',
-    displayName: pkg.displayName || pkg.name || 'Unknown Package',
-    version: pkg.version || pkg.installedVersion || 'Unknown',
-    status: pkg.status || 'unknown',
-    type: pkg.type || (managedInstallsSystem === 'Cimian' ? 'cimian' : 'munki'),
-    lastUpdate: pkg.lastUpdate || installs.lastUpdate || ''
-  }))
+  // Process packages from NEW API structure - recentInstalls array
+  const processedPackages: InstallPackage[] = recentInstalls.map((pkg: any, index: number) => {
+    console.log('🔍 Processing package:', { 
+      name: pkg.name, 
+      displayName: pkg.displayName, 
+      version: pkg.version, 
+      status: pkg.status,
+      lastAttemptStatus: pkg.lastAttemptStatus,
+      recentAttemptsLength: pkg.recentAttempts?.length || 0,
+      firstAttempt: pkg.recentAttempts?.[0],
+      allKeys: Object.keys(pkg) 
+    })
+    
+    // Extract data from most recent attempt if top-level fields are empty
+    const mostRecentAttempt = pkg.recentAttempts?.[0] || {}
+    
+    // Since most fields are empty, use available data with reasonable fallbacks
+    const displayName = pkg.displayName || pkg.name || mostRecentAttempt.displayName || mostRecentAttempt.name || 'Unknown Package'
+    
+    // DON'T assign fake versions - keep Unknown if truly unknown
+    const version = pkg.version || mostRecentAttempt.version || mostRecentAttempt.installedVersion || 'Unknown'
+    
+    // For status, check multiple sources and provide reasonable defaults based on package presence
+    let status = pkg.status || pkg.lastAttemptStatus || mostRecentAttempt.status || mostRecentAttempt.result
+    if (!status || status === '') {
+      // If no status available, assume installed since it's in recentInstalls
+      status = pkg.installCount > 0 ? 'Installed' : 'Unknown'
+    }
+    
+    console.log('🔍 Final package data:', {
+      name: pkg.name,
+      displayName,
+      version,
+      status,
+      fallbackUsed: {
+        displayName: !pkg.displayName,
+        version: !pkg.version,
+        status: !pkg.status && !pkg.lastAttemptStatus
+      }
+    })
+    
+    return {
+      id: pkg.id || pkg.name || `pkg-${index}`,
+      name: pkg.name || displayName,
+      displayName,
+      version,
+      status,
+      type: 'cimian',
+      lastUpdate: pkg.lastUpdate || pkg.lastAttemptTime || mostRecentAttempt.timestamp || pkg.installDate || installs.lastCheckIn || '',
+      // Additional fields for table compatibility
+      installedVersion: pkg.installedVersion || mostRecentAttempt.installedVersion || version,
+      size: undefined,
+      description: undefined,
+      publisher: pkg.publisher || pkg.source || mostRecentAttempt.publisher || 'Cimian',
+      category: undefined,
+      // Enhanced fields from new API
+      source: pkg.source || 'Cimian',
+      installCount: pkg.installCount || 0,
+      failureCount: pkg.failureCount || 0,
+      hasInstallLoop: pkg.hasInstallLoop || false,
+      installLocation: pkg.installLocation || mostRecentAttempt.installLocation || undefined,
+      installDate: pkg.installDate || mostRecentAttempt.installDate || undefined
+    }
+  })
   
-  const installed = processedPackages.filter(p => p.status === 'installed').length
-  const pending = processedPackages.filter(p => p.status?.includes('pending')).length
-  const failed = processedPackages.filter(p => p.status?.includes('failed')).length
+  const installed = processedPackages.filter(p => {
+    const status = p.status?.toLowerCase() || ''
+    return status === 'installed' || status === 'success' || status === 'completed' || !p.status || p.status === ''
+  }).length
   
-  return {
+  const pending = processedPackages.filter(p => {
+    const status = p.status?.toLowerCase() || ''
+    return status.includes('pending') || status.includes('install loop') || status.includes('loop')
+  }).length
+  
+  const failed = processedPackages.filter(p => {
+    const status = p.status?.toLowerCase() || ''
+    return status.includes('failed') || status.includes('error')
+  }).length
+  
+  // Extract error and warning messages from NEW recentEvents structure - using camelCase field names
+  // Enhanced with Cimian session context and log file paths
+  const messages = {
+    errors: installsRecentEvents
+      .filter((event: any) => event.level === 'ERROR')
+      .map((event: any, index: number) => ({
+        id: event.eventId || event.event_id || `error-${index}`,
+        timestamp: event.timestamp || '',
+        package: event.package || event.packageName || 'System',
+        message: event.message || 'Unknown error',
+        details: event.error || event.details || '',
+        // Additional Cimian context
+        sessionId: event.sessionId || event.session_id || 'Unknown',
+        source: event.source || 'Cimian',
+        logFile: event.logFile || event.log_file || `C:\\ProgramData\\ManagedInstalls\\logs\\${event.sessionId || 'unknown'}\\events.jsonl`,
+        level: event.level || 'ERROR',
+        category: event.category || event.type || 'installation',
+        context: {
+          runType: cimianData.lastRunType || config?.runType || 'manual',
+          duration: event.duration || 'unknown',
+          processId: event.processId || event.process_id || 'unknown',
+          user: event.user || cimianData.user || 'system',
+          hostname: event.hostname || rawDevice.hostname || rawDevice.name || 'unknown'
+        }
+      })),
+    warnings: installsRecentEvents
+      .filter((event: any) => event.level === 'WARN')
+      .map((event: any, index: number) => ({
+        id: event.eventId || event.event_id || `warning-${index}`,
+        timestamp: event.timestamp || '',
+        package: event.package || event.packageName || 'System',
+        message: event.message || 'Unknown warning',
+        details: event.error || event.details || '',
+        // Additional Cimian context
+        sessionId: event.sessionId || event.session_id || 'Unknown',
+        source: event.source || 'Cimian',
+        logFile: event.logFile || event.log_file || `C:\\ProgramData\\ManagedInstalls\\logs\\${event.sessionId || 'unknown'}\\events.jsonl`,
+        level: event.level || 'WARN',
+        category: event.category || event.type || 'installation',
+        context: {
+          runType: cimianData.lastRunType || config?.runType || 'manual',
+          duration: event.duration || 'unknown',
+          processId: event.processId || event.process_id || 'unknown',
+          user: event.user || cimianData.user || 'system',
+          hostname: event.hostname || rawDevice.hostname || rawDevice.name || 'unknown'
+        }
+      }))
+  }
+  
+  const result = {
     totalPackages: processedPackages.length,
     installed,
     pending,
     failed,
-    lastUpdate: installs.lastUpdate || rawDevice.lastSeen || '',
+    lastUpdate: installs.lastCheckIn || installs.last_check_in || installs.LastCheckIn || installs.lastUpdate || rawDevice.lastSeen || '',
     packages: processedPackages,
-    config: config
+    config: config,
+    messages: messages.errors.length > 0 || messages.warnings.length > 0 ? messages : undefined
   }
+  
+  console.log('🔍 Final processed installs data:', {
+    totalPackages: result.totalPackages,
+    installed: result.installed,
+    pending: result.pending,
+    failed: result.failed,
+    hasConfig: !!result.config,
+    configType: result.config?.type,
+    hasMessages: !!result.messages,
+    errorCount: result.messages?.errors.length || 0,
+    warningCount: result.messages?.warnings.length || 0,
+    samplePackage: result.packages[0]
+  })
+  
+  return result
 }
 
 // Profiles Data Processing
