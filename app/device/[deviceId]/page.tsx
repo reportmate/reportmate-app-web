@@ -30,6 +30,7 @@ import {
   SecurityTab,
   EventsTab
 } from "../../../src/components/tabs"
+import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -460,7 +461,7 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
   { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance', accentColor: 'orange' },
   { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', description: 'Operating system and system information', accentColor: 'purple' },
   { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', description: 'Device management and enrollment status', accentColor: 'yellow' },
-  { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates', accentColor: 'cyan' },
+  { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', description: 'Managed software installations and updates', accentColor: 'blue' },
   { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', description: 'MDM configuration profiles and settings', accentColor: 'indigo' },
   { id: 'applications', label: 'Applications', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', description: 'Installed applications and packages', accentColor: 'blue' },
   { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', description: 'Security status and compliance', accentColor: 'red' },
@@ -820,17 +821,43 @@ export default function DeviceDetailPage() {
             }
           }
           
-          // Process component-specific data
-          const componentData = {
-            applications: processApplicationsData(deviceData.device),
-            hardware: processHardwareData(deviceData.device),
-            network: processNetworkData(deviceData.device),
-            security: processSecurityData(deviceData.device),
-            system: processSystemData(deviceData.device),
-            installs: processInstallsData(deviceData.device),
-            profiles: processProfilesData(deviceData.device)
+          // Process component-specific data with error handling
+          try {
+            console.log('[COMPONENT DATA] About to process device data:', {
+              hasDevice: !!deviceData.device,
+              deviceKeys: Object.keys(deviceData.device || {}),
+              hasInstalls: !!deviceData.device?.installs,
+              installsKeys: deviceData.device?.installs ? Object.keys(deviceData.device.installs) : [],
+              installsData: deviceData.device?.installs
+            })
+            
+            console.log('[COMPONENT DATA] Processing installs data...')
+            const installsData = processInstallsData(deviceData.device)
+            console.log('[COMPONENT DATA] Processed installs result:', installsData)
+            
+            const componentData = {
+              applications: processApplicationsData(deviceData.device),
+              hardware: processHardwareData(deviceData.device),
+              network: processNetworkData(deviceData.device),
+              security: processSecurityData(deviceData.device),
+              system: processSystemData(deviceData.device),
+              installs: installsData,
+              profiles: processProfilesData(deviceData.device)
+            }
+            setProcessedData(componentData)
+          } catch (dataProcessingError) {
+            console.error('Error processing component data:', dataProcessingError);
+            // Set empty defaults if processing fails
+            setProcessedData({
+              applications: { totalApps: 0, installedApps: [], recentlyUpdated: 0, categoryBreakdown: {} },
+              hardware: { processor: 'Unknown', memory: 'Unknown', storage: 'Unknown' },
+              network: { interfaces: [] },
+              security: { status: 'unknown', issues: [] },
+              system: { osVersion: 'Unknown', uptime: 'Unknown' },
+              installs: { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] },
+              profiles: { totalProfiles: 0, systemProfiles: 0, userProfiles: 0, profiles: [] }
+            })
           }
-          setProcessedData(componentData)
         } else {
           console.error('Invalid device data structure:', deviceData)
           setError('Invalid device data received')
@@ -874,14 +901,7 @@ export default function DeviceDetailPage() {
   }, [deviceId])
   
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 mx-auto mb-4 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-          <p className="text-gray-600 dark:text-gray-400">Loading device information...</p>
-        </div>
-      </div>
-    )
+    return <DeviceDetailSkeleton activeTab={activeTab} />
   }
   
   if (error || !deviceInfo) {
@@ -1045,7 +1065,7 @@ export default function DeviceDetailPage() {
                     </option>
                   ))}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-blue-500 dark:text-blue-400">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
