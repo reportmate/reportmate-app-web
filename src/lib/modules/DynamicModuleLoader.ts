@@ -403,25 +403,16 @@ export class DynamicModuleLoader {
    * Execute module code in isolated context
    */
   private async executeModuleCode(code: string, manifest: ModuleManifest): Promise<any> {
-    // Create a safe execution environment
-    const moduleGlobals = {
-      React: (await import('react')),
-      console: console,
-      fetch: fetch,
-      // Add other safe globals as needed
+    try {
+      console.warn('[MODULE LOADER] Dynamic module execution temporarily disabled for stability')
+      // Return a minimal module object to prevent errors
+      return {
+        default: null,
+        manifest: manifest
+      }
+    } catch (error) {
+      throw new Error(`Failed to execute module code: ${error}`)
     }
-
-    // Use Function constructor for safer eval alternative
-    const moduleFunction = new Function(
-      'globals', 
-      `
-        const { React, console, fetch } = globals;
-        ${code}
-        return typeof module !== 'undefined' ? module.exports : exports;
-      `
-    )
-
-    return moduleFunction(moduleGlobals)
   }
 
   /**

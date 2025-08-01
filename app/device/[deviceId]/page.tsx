@@ -4,10 +4,11 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, useRef } from "react"
-import { useParams } from "next/navigation"
+import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
 import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing/device-mapper"
+import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
 import { 
   processApplicationsData,
   processHardwareData,
@@ -471,6 +472,7 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
 
 export default function DeviceDetailPage() {
   const params = useParams()
+  const router = useRouter()
   const deviceId = params.deviceId as string
   const [activeTab, setActiveTab] = useState<TabType>('info')
   const [events, setEvents] = useState<FleetEvent[]>([])
@@ -479,6 +481,8 @@ export default function DeviceDetailPage() {
   const [error, setError] = useState<string | null>(null)
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length) // Show all tabs by default
   const tabsContainerRef = useRef<HTMLElement>(null)
+  const [isResolving, setIsResolving] = useState(false) // Track if we're resolving a device identifier
+  const [copySuccess, setCopySuccess] = useState(false) // Copy shareable link functionality
   
   // Processed component data
   const [processedData, setProcessedData] = useState<{
@@ -566,9 +570,11 @@ export default function DeviceDetailPage() {
   // Handle URL hash navigation
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#', '') as TabType
-      if (hash && tabs.some(tab => tab.id === hash)) {
-        setActiveTab(hash)
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash.replace('#', '') as TabType
+        if (hash && tabs.some(tab => tab.id === hash)) {
+          setActiveTab(hash)
+        }
       }
     }
     
@@ -576,8 +582,10 @@ export default function DeviceDetailPage() {
     handleHashChange()
     
     // Listen for hash changes
-    window.addEventListener('hashchange', handleHashChange)
-    return () => window.removeEventListener('hashchange', handleHashChange)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', handleHashChange)
+      return () => window.removeEventListener('hashchange', handleHashChange)
+    }
   }, [])
 
   // Dynamic overflow detection based on container width
@@ -632,8 +640,10 @@ export default function DeviceDetailPage() {
       setTimeout(calculateVisibleTabs, 100) // Debounce slightly
     }
     
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    if (typeof window !== 'undefined') {
+      window.addEventListener('resize', handleResize)
+      return () => window.removeEventListener('resize', handleResize)
+    }
   }, []) // Remove visibleTabsCount dependency to avoid infinite loops
   
   // Update URL when tab changes
@@ -710,10 +720,67 @@ export default function DeviceDetailPage() {
 
   const handleTabChange = (tabId: TabType) => {
     setActiveTab(tabId)
-    window.history.pushState(null, '', `#${tabId}`)
+    if (typeof window !== 'undefined') {
+      window.history.pushState(null, '', `#${tabId}`)
+    }
   }
   
+  // Device identifier resolution effect
   useEffect(() => {
+    const resolveAndRedirect = async () => {
+      console.log('[DEVICE DETAIL] Checking device identifier:', deviceId)
+      
+      // Check if this is already a serial number
+      const identifierType = identifyDeviceIdentifierType(deviceId)
+      console.log('[DEVICE DETAIL] Identifier type:', identifierType)
+      
+      if (identifierType === 'serialNumber') {
+        console.log('[DEVICE DETAIL] Already a serial number, proceeding normally')
+        return // This is already a serial number, no need to resolve
+      }
+      
+      // This is a UUID or Asset Tag, we need to resolve it
+      console.log(`[DEVICE DETAIL] Resolving ${identifierType}: ${deviceId}`)
+      setIsResolving(true)
+      
+      try {
+        const result = await resolveDeviceIdentifier(deviceId)
+        
+        if (result.found && result.serialNumber) {
+          console.log(`[DEVICE DETAIL] ✅ Resolved to serial number: ${result.serialNumber}`)
+          // Redirect to the serial number-based URL
+          router.replace(`/device/${encodeURIComponent(result.serialNumber)}`)
+          return
+        } else {
+          console.log(`[DEVICE DETAIL] ❌ Could not resolve ${identifierType}: ${deviceId}`)
+          setError(`Device not found for ${identifierType}: ${deviceId}`)
+          setLoading(false)
+          setIsResolving(false)
+          return
+        }
+      } catch (error) {
+        console.error('[DEVICE DETAIL] Error resolving device identifier:', error)
+        setError(`Failed to resolve device identifier: ${error}`)
+        setLoading(false)
+        setIsResolving(false)
+        return
+      }
+    }
+    
+    resolveAndRedirect()
+  }, [deviceId, router])
+  
+  useEffect(() => {
+    // Don't fetch device data if we're still resolving the identifier
+    if (isResolving) {
+      return
+    }
+    
+    // Only fetch if this is a serial number (resolved identifiers will redirect)
+    const identifierType = identifyDeviceIdentifierType(deviceId)
+    if (identifierType !== 'serialNumber') {
+      return // Let the resolution effect handle this
+    }
     const fetchDeviceData = async () => {
       try {
         setLoading(true)
@@ -898,9 +965,9 @@ export default function DeviceDetailPage() {
     }
     
     fetchDeviceData()
-  }, [deviceId])
+  }, [deviceId, isResolving])
   
-  if (loading) {
+  if (loading || isResolving) {
     return <DeviceDetailSkeleton activeTab={activeTab} />
   }
   
@@ -919,7 +986,9 @@ export default function DeviceDetailPage() {
           <p className="text-gray-600 dark:text-gray-400 mb-6">
             {error === 'Device not found' 
               ? `The device "${deviceId}" could not be found.` 
-              : `Failed to load device information: ${error}`}
+              : error?.includes('resolve') || error?.includes('UUID') || error?.includes('Asset Tag')
+                ? `${error} You can access devices using their serial number, UUID, or asset tag.`
+                : `Failed to load device information: ${error}`}
           </p>
           <Link
             href="/dashboard"
@@ -955,6 +1024,35 @@ export default function DeviceDetailPage() {
         return { bg: 'bg-purple-500', text: 'text-purple-700 dark:text-purple-300', badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' }
       default: 
         return { bg: 'bg-gray-500', text: 'text-gray-700 dark:text-gray-300', badge: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' }
+    }
+  }
+
+  const handleCopyShareableLink = async () => {
+    try {
+      // Get the preferred identifier (asset tag first, then serial number)
+      const assetTag = deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag
+      const serialNumber = deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber
+      const preferredIdentifier = assetTag || serialNumber
+      
+      if (!preferredIdentifier) {
+        console.warn('No asset tag or serial number available for sharing')
+        return
+      }
+      
+      // Build the shareable URL using the current origin/domain
+      const currentUrl = window.location
+      const shareableUrl = `${currentUrl.protocol}//${currentUrl.host}/device/${encodeURIComponent(preferredIdentifier)}`
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(shareableUrl)
+      
+      // Show success feedback
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+      
+      console.log('Copied shareable link:', shareableUrl)
+    } catch (error) {
+      console.error('Failed to copy link:', error)
     }
   }
 
@@ -999,11 +1097,38 @@ export default function DeviceDetailPage() {
                 </div>
               </div>
               
-              {/* Last seen - hidden on mobile */}
+              {/* Last seen and copy link button - hidden on mobile */}
               <div className="hidden sm:flex items-center gap-4 pr-4">
                 <div className="text-2sm text-gray-600 dark:text-gray-400">
                   Last seen {formatRelativeTime(deviceInfo.lastSeen)}
                 </div>
+                
+                {/* Copy shareable link button */}
+                <button
+                  onClick={handleCopyShareableLink}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    copySuccess 
+                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                  }`}
+                  title={`Copy shareable link using ${(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) ? 'asset tag' : 'serial number'}`}
+                >
+                  {copySuccess ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      <span>Link</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -1078,16 +1203,36 @@ export default function DeviceDetailPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'info' && <InfoTab device={deviceInfo} />}
-        {activeTab === 'installs' && <InstallsTab device={deviceInfo} data={processedData.installs} />}
-        {activeTab === 'profiles' && <ProfilesTab device={deviceInfo} data={processedData.profiles} />}
-        {activeTab === 'applications' && <ApplicationsTab device={deviceInfo} data={processedData.applications} />}
-        {activeTab === 'management' && <ManagementTab device={deviceInfo} />}
-        {activeTab === 'system' && <SystemTab device={deviceInfo} data={processedData.system} />}
-        {activeTab === 'hardware' && <HardwareTab device={deviceInfo} data={processedData.hardware} />}
-        {activeTab === 'network' && <NetworkTab device={deviceInfo} data={processedData.network} />}
-        {activeTab === 'security' && <SecurityTab device={deviceInfo} data={processedData.security} />}
-        {activeTab === 'events' && <EventsTab device={deviceInfo} events={events} data={processedData.events} />}
+        <div className={activeTab === 'info' ? 'block' : 'hidden'}>
+          <InfoTab device={deviceInfo} />
+        </div>
+        <div className={activeTab === 'installs' ? 'block' : 'hidden'}>
+          <InstallsTab device={deviceInfo} data={processedData.installs} />
+        </div>
+        <div className={activeTab === 'profiles' ? 'block' : 'hidden'}>
+          <ProfilesTab device={deviceInfo} data={processedData.profiles} />
+        </div>
+        <div className={activeTab === 'applications' ? 'block' : 'hidden'}>
+          <ApplicationsTab device={deviceInfo} data={processedData.applications} />
+        </div>
+        <div className={activeTab === 'management' ? 'block' : 'hidden'}>
+          <ManagementTab device={deviceInfo} />
+        </div>
+        <div className={activeTab === 'system' ? 'block' : 'hidden'}>
+          <SystemTab device={deviceInfo} data={processedData.system} />
+        </div>
+        <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
+          <HardwareTab device={deviceInfo} data={processedData.hardware} />
+        </div>
+        <div className={activeTab === 'network' ? 'block' : 'hidden'}>
+          <NetworkTab device={deviceInfo} data={processedData.network} />
+        </div>
+        <div className={activeTab === 'security' ? 'block' : 'hidden'}>
+          <SecurityTab device={deviceInfo} data={processedData.security} />
+        </div>
+        <div className={activeTab === 'events' ? 'block' : 'hidden'}>
+          <EventsTab device={deviceInfo} events={events} data={processedData.events} />
+        </div>
       </div>
     </div>
   )

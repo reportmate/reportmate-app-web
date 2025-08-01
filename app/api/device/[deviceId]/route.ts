@@ -168,6 +168,53 @@ export async function GET(
         }
       }
       
+      // Debug installs module specifically
+      console.log('[DEVICE API] 🔍 Installs module debug:', {
+        hasInstallsModule: !!modules.installs,
+        installsKeys: modules.installs ? Object.keys(modules.installs) : [],
+        hasCimian: !!(modules.installs as any)?.cimian,
+        hasRecentInstalls: !!(modules.installs as any)?.recentInstalls,
+        recentInstallsCount: (modules.installs as any)?.recentInstalls?.length || 0,
+        sampleRecentInstall: (modules.installs as any)?.recentInstalls?.[0],
+        first3Installs: (modules.installs as any)?.recentInstalls?.slice(0, 3).map((pkg: any) => ({
+          name: pkg.name,
+          displayName: pkg.displayName,
+          version: pkg.version,
+          status: pkg.status,
+          lastAttemptStatus: pkg.lastAttemptStatus,
+          installedVersion: pkg.installedVersion,
+          allKeys: Object.keys(pkg),
+          recentAttemptsLength: pkg.recentAttempts?.length || 0,
+          firstAttempt: pkg.recentAttempts?.[0],
+          firstAttemptKeys: pkg.recentAttempts?.[0] ? Object.keys(pkg.recentAttempts[0]) : [],
+          firstAttemptDetails: pkg.recentAttempts?.[0] ? {
+            version: pkg.recentAttempts[0].version,
+            status: pkg.recentAttempts[0].status,
+            result: pkg.recentAttempts[0].result,
+            installedVersion: pkg.recentAttempts[0].installedVersion,
+            timestamp: pkg.recentAttempts[0].timestamp,
+            // DEEP DIVE - Look for ANY field that might contain version info
+            allVersionFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
+              key.toLowerCase().includes('version')).reduce((acc: any, key: string) => {
+              acc[key] = pkg.recentAttempts[0][key];
+              return acc;
+            }, {}),
+            // Also check for fields that might contain status/state info
+            allStatusFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
+              key.toLowerCase().includes('status') || key.toLowerCase().includes('state') || 
+              key.toLowerCase().includes('result')).reduce((acc: any, key: string) => {
+              acc[key] = pkg.recentAttempts[0][key];
+              return acc;
+            }, {}),
+            // Show first few fields of the attempt to see structure
+            sampleFields: Object.keys(pkg.recentAttempts[0]).slice(0, 10).reduce((acc: any, key: string) => {
+              acc[key] = pkg.recentAttempts[0][key];
+              return acc;
+            }, {})
+          } : null
+        }))
+      })
+      
       console.log('[DEVICE API] Returning CLEAN modular structure with', Object.keys(modules).length, 'modules')
       return NextResponse.json(responseData, {
         headers: {

@@ -13,25 +13,9 @@ export default {
   
   // Webpack configuration to prevent module loading issues
   webpack: (config, { isServer }) => {
-    // Prevent webpack module loading issues in API routes
+    // Fix export/import issues in server-side code
     if (isServer) {
-      config.optimization = {
-        ...config.optimization,
-        splitChunks: {
-          ...config.optimization.splitChunks,
-          cacheGroups: {
-            ...config.optimization.splitChunks?.cacheGroups,
-            // Ensure API routes are bundled properly
-            api: {
-              name: 'api',
-              chunks: 'all',
-              test: /[\\/]api[\\/]/,
-              priority: 10,
-              reuseExistingChunk: true,
-            },
-          },
-        },
-      }
+      config.externals = [...(config.externals || []), 'canvas', 'jsdom']
     }
     
     return config
