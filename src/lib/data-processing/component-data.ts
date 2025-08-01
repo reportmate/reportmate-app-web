@@ -629,6 +629,64 @@ export function processEventsData(rawDevice: any, events: any[]): EventsData {
   }
 }
 
+/**
+ * Maps Cimian's detailed status values to ReportMate's simplified dashboard statuses
+ * Uses only: Installed, Pending, Warning, Error, Removed
+ */
+function mapCimianStatusToReportMate(cimianStatus: string): string {
+  if (!cimianStatus) {
+    return "Pending";  // Default unknown to Pending
+  }
+  
+  const statusLower = cimianStatus.toLowerCase();
+  
+  // ReportMate simplified status mapping - Only 5 status types
+  const statusMapping: Record<string, string> = {
+    // Installed - Successfully installed and working
+    "installed": "Installed",
+    "success": "Installed",
+    "install loop": "Installed",  // Technically installed despite issues
+    "install_loop": "Installed",
+    
+    // Pending - Needs action or in progress
+    "available": "Pending",
+    "pending": "Pending",
+    "update available": "Pending",
+    "update_available": "Pending", 
+    "downloading": "Pending",
+    "installing": "Pending",
+    
+    // Warning - Installed but with issues
+    "warning": "Warning",
+    
+    // Error - Failed installation or critical issues
+    "error": "Error",
+    "failed": "Error",
+    "fail": "Error",
+    
+    // Removed - Uninstalled or removed
+    "removed": "Removed",
+    "uninstalled": "Removed"
+  };
+  
+  const mappedStatus = statusMapping[statusLower] || "Pending";
+  
+  // Apply heuristics for unmapped status values
+  if (mappedStatus === "Pending" && !(statusLower in statusMapping)) {
+    if (statusLower.includes("loop") || statusLower.includes("success") || statusLower.includes("ok")) {
+      return "Installed";
+    } else if (statusLower.includes("fail") || statusLower.includes("error")) {
+      return "Error";
+    } else if (statusLower.includes("warn")) {
+      return "Warning";
+    } else if (statusLower.includes("remov") || statusLower.includes("uninstall")) {
+      return "Removed";
+    }
+  }
+  
+  return mappedStatus;  // Return original if no mapping found
+}
+
 // Installs Data Processing
 export interface InstallsData {
   totalPackages: number
@@ -693,7 +751,7 @@ export interface InstallPackage {
   name: string
   displayName: string
   version: string
-  status: string
+  status: string // Mapped ReportMate status
   type: string
   lastUpdate: string
   // Additional fields for ManagedInstallsTable compatibility
@@ -702,6 +760,14 @@ export interface InstallPackage {
   description?: string
   publisher?: string
   category?: string
+  // Enhanced Cimian fields
+  source?: string
+  installCount?: number
+  failureCount?: number
+  hasInstallLoop?: boolean
+  installLocation?: string
+  installDate?: string
+  originalStatus?: string // Original Cimian status for reference
 }
 
 export function processInstallsData(rawDevice: any): InstallsData {
@@ -848,11 +914,15 @@ export function processInstallsData(rawDevice: any): InstallsData {
       status = pkg.installCount > 0 ? 'Installed' : 'Unknown'
     }
     
+    // Map Cimian status to ReportMate status for consistent dashboard display
+    const mappedStatus = mapCimianStatusToReportMate(status);
+    
     console.log('🔍 Final package data:', {
       name: pkg.name,
       displayName,
       version,
-      status,
+      originalStatus: status,
+      mappedStatus,
       fallbackUsed: {
         displayName: !pkg.displayName,
         version: !pkg.version,
@@ -865,7 +935,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
       name: pkg.name || displayName,
       displayName,
       version,
-      status,
+      status: mappedStatus, // Use mapped ReportMate status instead of raw Cimian status
       type: 'cimian',
       lastUpdate: pkg.lastUpdate || pkg.lastAttemptTime || mostRecentAttempt.timestamp || pkg.installDate || installs.lastCheckIn || '',
       // Additional fields for table compatibility
@@ -880,23 +950,25 @@ export function processInstallsData(rawDevice: any): InstallsData {
       failureCount: pkg.failureCount || 0,
       hasInstallLoop: pkg.hasInstallLoop || false,
       installLocation: pkg.installLocation || mostRecentAttempt.installLocation || undefined,
-      installDate: pkg.installDate || mostRecentAttempt.installDate || undefined
+      installDate: pkg.installDate || mostRecentAttempt.installDate || undefined,
+      // Store original Cimian status for reference
+      originalStatus: status
     }
   })
   
   const installed = processedPackages.filter(p => {
     const status = p.status?.toLowerCase() || ''
-    return status === 'installed' || status === 'success' || status === 'completed' || !p.status || p.status === ''
+    return status === 'installed'
   }).length
   
   const pending = processedPackages.filter(p => {
     const status = p.status?.toLowerCase() || ''
-    return status.includes('pending') || status.includes('install loop') || status.includes('loop')
+    return status === 'pending'
   }).length
   
   const failed = processedPackages.filter(p => {
     const status = p.status?.toLowerCase() || ''
-    return status.includes('failed') || status.includes('error')
+    return status === 'error' || status === 'warning' || status === 'removed'
   }).length
   
   // Extract error and warning messages from NEW recentEvents structure - using camelCase field names
