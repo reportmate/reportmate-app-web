@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { DevicesPageSkeleton } from "../../src/components/skeleton/DevicesPageSkeleton"
@@ -354,9 +355,11 @@ function DevicesPageContent() {
               <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
                 <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <img 
+                  <Image 
                     src="/reportmate-logo.png" 
                     alt="ReportMate Logo" 
+                    width={40}
+                    height={40}
                     className="w-full h-full object-contain"
                   />
                 </div>

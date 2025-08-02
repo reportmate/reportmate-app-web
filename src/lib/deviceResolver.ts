@@ -15,13 +15,13 @@ interface DeviceResolutionResult {
   found: boolean
   serialNumber?: string
   originalIdentifier: string
-  identifierType: 'uuid' | 'assetTag' | 'serialNumber'
+  identifierType: 'uuid' | 'assetTag' | 'serialNumber' | 'deviceName'
 }
 
 /**
  * Determines the type of device identifier based on its format
  */
-export function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' | 'serialNumber' {
+export function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' | 'serialNumber' | 'deviceName' {
   // UUID pattern: 8-4-4-4-12 hexadecimal characters
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   
@@ -30,11 +30,18 @@ export function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'asse
   }
   
   // Asset Tag pattern: typically starts with letters and contains numbers
-  // Common patterns: A004733, AT123456, etc.
-  const assetTagPattern = /^[A-Z][0-9A-Z]{3,}$/i
+  // Common patterns: A004733, AT123456, etc. - must contain at least one digit
+  const assetTagPattern = /^[A-Z][0-9A-Z]*[0-9][0-9A-Z]*$/i
   
   if (assetTagPattern.test(identifier)) {
     return 'assetTag'
+  }
+  
+  // Device Name pattern: contains letters, may have spaces or special characters
+  const deviceNamePattern = /^[A-Za-z][A-Za-z0-9\s\-_.]*$/
+  
+  if (deviceNamePattern.test(identifier) && !identifier.match(/^[0-9A-F]{10,}$/i)) {
+    return 'deviceName'
   }
   
   // Assume everything else is a serial number
@@ -174,8 +181,8 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
       }
     }
     
-    // If not found by simple lookup, we need to check individual device records for asset tags
-    if (identifierType === 'assetTag' || identifierType === 'uuid') {
+    // If not found by simple lookup, we need to check individual device records for asset tags and device names
+    if (identifierType === 'assetTag' || identifierType === 'uuid' || identifierType === 'deviceName') {
       console.log(`[DEVICE RESOLVER SERVER] Performing detailed search for ${identifierType}: ${identifier}`)
       
       // Check each device's detailed data for matching identifiers
@@ -210,6 +217,22 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
             } else if (identifierType === 'assetTag') {
               if (deviceData.inventory?.assetTag === identifier) {
                 console.log(`[DEVICE RESOLVER SERVER] ✅ Found Asset Tag ${identifier} in device ${device.serial_number}`)
+                return {
+                  found: true,
+                  serialNumber: device.serial_number,
+                  originalIdentifier: identifier,
+                  identifierType
+                }
+              }
+            } else if (identifierType === 'deviceName') {
+              // Check multiple possible device name fields
+              const deviceName = deviceData.inventory?.deviceName || deviceData.inventory?.device_name || deviceData.name
+              const computerName = deviceData.inventory?.computerName || deviceData.inventory?.computer_name
+              
+              if (deviceName === identifier || computerName === identifier ||
+                  deviceName?.toLowerCase() === identifier.toLowerCase() ||
+                  computerName?.toLowerCase() === identifier.toLowerCase()) {
+                console.log(`[DEVICE RESOLVER SERVER] ✅ Found Device Name ${identifier} in device ${device.serial_number}`)
                 return {
                   found: true,
                   serialNumber: device.serial_number,

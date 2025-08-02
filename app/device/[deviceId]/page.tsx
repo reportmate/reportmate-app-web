@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
-import { formatRelativeTime, formatExactTime } from "../../../src/lib/time"
+import { formatRelativeTime } from "../../../src/lib/time"
 import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing/device-mapper"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
 import { 
@@ -17,7 +17,15 @@ import {
   processSystemData,
   processEventsData,
   processInstallsData,
-  processProfilesData
+  processProfilesData,
+  ApplicationsData,
+  HardwareData,
+  NetworkData,
+  SecurityData,
+  SystemData,
+  EventsData,
+  InstallsData,
+  ProfilesData
 } from "../../../src/lib/data-processing/component-data"
 import { 
   InfoTab,
@@ -49,7 +57,7 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
   const activeAccentColor = activeTabInOverflow?.accentColor || 'blue'
   
   // Helper function to get overflow dropdown accent colors
-  const getDropdownAccentColors = (accentColor: string, isActive: boolean) => {
+  const getDropdownAccentColors = (accentColor: string, _isActive: boolean) => {
     const colorMap = {
       blue: {
         active: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20',
@@ -239,7 +247,7 @@ interface ApplicationInfo {
   bundleId?: string
 }
 
-interface DeviceInfo {
+interface _DeviceInfo {
   id: string
   deviceId?: string
   name: string
@@ -486,14 +494,14 @@ export default function DeviceDetailPage() {
   
   // Processed component data
   const [processedData, setProcessedData] = useState<{
-    applications?: any
-    hardware?: any
-    network?: any
-    security?: any
-    system?: any
-    events?: any
-    installs?: any
-    profiles?: any
+    applications?: ApplicationsData
+    hardware?: HardwareData
+    network?: NetworkData
+    security?: SecurityData
+    system?: SystemData
+    events?: EventsData
+    installs?: InstallsData
+    profiles?: ProfilesData
   }>({});
   
   // Helper function to get accent color classes for tabs
@@ -647,7 +655,7 @@ export default function DeviceDetailPage() {
   }, []) // Remove visibleTabsCount dependency to avoid infinite loops
   
   // Update URL when tab changes
-  const renderConfigurationFields = (config: any) => {
+  const _renderConfigurationFields = (config: Record<string, unknown>) => {
     // Define the core fields to display in order
     const coreFields = [
       {
@@ -1001,7 +1009,7 @@ export default function DeviceDetailPage() {
     )
   }
 
-  const getStatusColor = (status: string) => {
+  const _getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
@@ -1010,7 +1018,7 @@ export default function DeviceDetailPage() {
     }
   }
 
-  const getEventStatusConfig = (kind: string) => {
+  const _getEventStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'error': 
         return { bg: 'bg-red-500', text: 'text-red-700 dark:text-red-300', badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
@@ -1219,7 +1227,7 @@ export default function DeviceDetailPage() {
           <ManagementTab device={deviceInfo} />
         </div>
         <div className={activeTab === 'system' ? 'block' : 'hidden'}>
-          <SystemTab device={deviceInfo} data={processedData.system} />
+          <SystemTab device={deviceInfo} data={processedData.system as unknown as Record<string, unknown>} />
         </div>
         <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
           <HardwareTab device={deviceInfo} data={processedData.hardware} />

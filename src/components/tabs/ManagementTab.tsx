@@ -5,10 +5,10 @@
  */
 
 import React, { useState } from 'react'
-import { StatusBadge, Icons } from '../widgets/shared'
+import { Icons } from '../widgets/shared'
 
 interface ManagementTabProps {
-  device: any
+  device: Record<string, unknown>
 }
 
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {

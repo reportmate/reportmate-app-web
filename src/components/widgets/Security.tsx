@@ -4,7 +4,7 @@
  */
 
 import React from 'react'
-import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
+import { StatBlock, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
 
 interface Device {
   id: string

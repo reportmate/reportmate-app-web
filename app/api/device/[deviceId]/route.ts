@@ -6,6 +6,33 @@ import fs from 'fs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+// Type definitions
+interface RecentAttempt {
+  version?: string;
+  status?: string;
+  result?: string;
+  installedVersion?: string;
+  timestamp?: string;
+  [key: string]: unknown;
+}
+
+interface InstallPackage {
+  name: string;
+  displayName?: string;
+  version?: string;
+  status?: string;
+  lastAttemptStatus?: string;
+  installedVersion?: string;
+  recentAttempts?: RecentAttempt[];
+  [key: string]: unknown;
+}
+
+interface InstallsModule {
+  cimian?: unknown;
+  recentInstalls?: InstallPackage[];
+  [key: string]: unknown;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
@@ -172,11 +199,11 @@ export async function GET(
       console.log('[DEVICE API] 🔍 Installs module debug:', {
         hasInstallsModule: !!modules.installs,
         installsKeys: modules.installs ? Object.keys(modules.installs) : [],
-        hasCimian: !!(modules.installs as any)?.cimian,
-        hasRecentInstalls: !!(modules.installs as any)?.recentInstalls,
-        recentInstallsCount: (modules.installs as any)?.recentInstalls?.length || 0,
-        sampleRecentInstall: (modules.installs as any)?.recentInstalls?.[0],
-        first3Installs: (modules.installs as any)?.recentInstalls?.slice(0, 3).map((pkg: any) => ({
+        hasCimian: !!(modules.installs as InstallsModule)?.cimian,
+        hasRecentInstalls: !!(modules.installs as InstallsModule)?.recentInstalls,
+        recentInstallsCount: (modules.installs as InstallsModule)?.recentInstalls?.length || 0,
+        sampleRecentInstall: (modules.installs as InstallsModule)?.recentInstalls?.[0],
+        first3Installs: (modules.installs as InstallsModule)?.recentInstalls?.slice(0, 3).map((pkg: InstallPackage) => ({
           name: pkg.name,
           displayName: pkg.displayName,
           version: pkg.version,
@@ -195,20 +222,29 @@ export async function GET(
             timestamp: pkg.recentAttempts[0].timestamp,
             // DEEP DIVE - Look for ANY field that might contain version info
             allVersionFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
-              key.toLowerCase().includes('version')).reduce((acc: any, key: string) => {
-              acc[key] = pkg.recentAttempts[0][key];
+              key.toLowerCase().includes('version')).reduce((acc: Record<string, unknown>, key: string) => {
+              const firstAttempt = pkg.recentAttempts?.[0];
+              if (firstAttempt) {
+                acc[key] = firstAttempt[key];
+              }
               return acc;
             }, {}),
             // Also check for fields that might contain status/state info
             allStatusFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
               key.toLowerCase().includes('status') || key.toLowerCase().includes('state') || 
-              key.toLowerCase().includes('result')).reduce((acc: any, key: string) => {
-              acc[key] = pkg.recentAttempts[0][key];
+              key.toLowerCase().includes('result')).reduce((acc: Record<string, unknown>, key: string) => {
+              const firstAttempt = pkg.recentAttempts?.[0];
+              if (firstAttempt) {
+                acc[key] = firstAttempt[key];
+              }
               return acc;
             }, {}),
             // Show first few fields of the attempt to see structure
-            sampleFields: Object.keys(pkg.recentAttempts[0]).slice(0, 10).reduce((acc: any, key: string) => {
-              acc[key] = pkg.recentAttempts[0][key];
+            sampleFields: Object.keys(pkg.recentAttempts[0]).slice(0, 10).reduce((acc: Record<string, unknown>, key: string) => {
+              const firstAttempt = pkg.recentAttempts?.[0];
+              if (firstAttempt) {
+                acc[key] = firstAttempt[key];
+              }
               return acc;
             }, {})
           } : null

@@ -19,39 +19,49 @@ interface Event {
   payload: Record<string, unknown> | string
 }
 
+// Interface for payload data
+interface EventPayload {
+  summary?: string;
+  message?: string;
+  moduleCount?: number;
+  modules?: string[] | Record<string, unknown>;
+  modules_processed?: number;
+  collection_type?: string;
+  [key: string]: unknown;
+}
+
 // Helper function to safely display payload
-const safeDisplayPayload = (payload: any): string => {
+const safeDisplayPayload = (payload: EventPayload | string | null | undefined): string => {
   try {
     if (!payload) return 'No payload'
     
-    // Handle summarized payloads (from our new API structure)
-    if (payload.summary) {
-      return payload.summary
-    }
-    
-    // Handle message-based payloads
-    if (payload.message) {
-      return payload.message
-    }
-    
-    // Handle module count payloads
-    if (payload.moduleCount && payload.modules) {
-      if (payload.moduleCount === 1) {
-        return `Reported ${payload.modules[0]} module data`
-      } else if (payload.moduleCount <= 3) {
-        return `Reported ${payload.modules.join(', ')} modules data`
-      } else {
-        return `Reported ${payload.moduleCount} modules data`
-      }
-    }
-    
-    // Handle string payloads
+    // Handle string payloads first
     if (typeof payload === 'string') {
       return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
     }
     
-    // For other objects, try to find a meaningful representation
+    // Now handle object payloads
     if (typeof payload === 'object') {
+      // Handle summarized payloads (from our new API structure)
+      if (payload.summary) {
+        return payload.summary
+      }
+      
+      // Handle message-based payloads
+      if (payload.message) {
+        return payload.message
+      }
+      
+      // Handle module count payloads
+      if (payload.moduleCount && payload.modules && Array.isArray(payload.modules)) {
+        if (payload.moduleCount === 1) {
+          return `Reported ${payload.modules[0]} module data`
+        } else if (payload.moduleCount <= 3) {
+          return `Reported ${payload.modules.join(', ')} modules data`
+        } else {
+          return `Reported ${payload.moduleCount} modules data`
+        }
+      }
       // Check if this is a full device report (contains multiple modules)
       if (payload.modules && typeof payload.modules === 'object') {
         const moduleCount = Object.keys(payload.modules).length
@@ -106,7 +116,7 @@ const safeDisplayPayload = (payload: any): string => {
     }
     
     return String(payload).substring(0, 100)
-  } catch (error) {
+  } catch (_error) {
     return 'Complex payload (non-serializable)'
   }
 }
@@ -120,7 +130,7 @@ function EventsPageContent() {
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
-  const [fullPayloads, setFullPayloads] = useState<Record<string, any>>({})
+  const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
   const searchParams = useSearchParams()
   
@@ -155,7 +165,7 @@ function EventsPageContent() {
           
           // Build device name mapping (serial -> name)
           const nameMap: Record<string, string> = {}
-          devices.forEach((device: any) => {
+          devices.forEach((device: Record<string, unknown>) => {
             if (device.serialNumber) {
               // Use inventory deviceName if available, otherwise fall back to name or serialNumber
               const deviceName = device.modules?.inventory?.deviceName || device.name || device.serialNumber

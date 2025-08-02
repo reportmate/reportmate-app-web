@@ -1,59 +1,9 @@
 import React, { useState } from 'react';
 import { formatRelativeTime } from '../../lib/time';
-
-interface ManagedPackage {
-  id: string;
-  name: string;
-  displayName: string;
-  version: string;
-  installedVersion?: string;
-  size?: number;
-  type: 'munki' | 'cimian';
-  status: 'Installed' | 'Pending' | 'Warning' | 'Error' | 'Removed';
-  lastUpdate: string;
-  description?: string;
-  publisher?: string;
-  category?: string;
-}
-
-interface ManagedInstallsData {
-  totalPackages: number;
-  installed: number;
-  pending: number;
-  failed: number;
-  lastUpdate: string;
-  config?: {
-    type: 'munki' | 'cimian';
-    version: string;
-    softwareRepoURL: string;
-    appleCatalogURL?: string | null;
-    manifest: string;
-    localOnlyManifest?: string | null;
-    runType: string;
-    lastRun: string;
-    duration: string;
-  };
-  messages?: {
-    errors: Array<{
-      id: string;
-      timestamp: string;
-      package: string;
-      message: string;
-      details: string;
-    }>;
-    warnings: Array<{
-      id: string;
-      timestamp: string;
-      package: string;
-      message: string;
-      details: string;
-    }>;
-  };
-  packages: ManagedPackage[];
-}
+import { InstallsData } from '../../lib/data-processing/component-data';
 
 interface ManagedInstallsTableProps {
-  data: ManagedInstallsData;
+  data: InstallsData;
 }
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
@@ -85,16 +35,17 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Installed':
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'installed':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'Pending':
+      case 'pending':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'Warning':
+      case 'warning':
         return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-      case 'Error':
+      case 'error':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'Removed':
+      case 'removed':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
@@ -106,18 +57,18 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     if (statusFilter === 'all') return data.packages;
     
     return data.packages.filter(pkg => {
-      const status = pkg.status;
+      const status = pkg.status?.toLowerCase() || '';
       switch (statusFilter) {
         case 'installed':
-          return status === 'Installed';
+          return status === 'installed';
         case 'pending':
-          return status === 'Pending';
+          return status === 'pending';
         case 'warning':
-          return status === 'Warning'; 
+          return status === 'warning'; 
         case 'error':
-          return status === 'Error';
+          return status === 'error';
         case 'removed':
-          return status === 'Removed';
+          return status === 'removed';
         default:
           return true;
       }
@@ -127,11 +78,11 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const filteredPackages = getFilteredPackages();
 
   // Calculate counts for each status
-  const installedCount = data.packages.filter(pkg => pkg.status === 'Installed').length;
-  const pendingCount = data.packages.filter(pkg => pkg.status === 'Pending').length;
-  const warningCount = data.packages.filter(pkg => pkg.status === 'Warning').length;
-  const errorCount = data.packages.filter(pkg => pkg.status === 'Error').length;
-  const removedCount = data.packages.filter(pkg => pkg.status === 'Removed').length;
+  const installedCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'installed').length;
+  const pendingCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'pending').length;
+  const warningCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'warning').length;
+  const errorCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'error').length;
+  const removedCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'removed').length;
 
   return (
     <div className="space-y-6">
@@ -189,7 +140,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           const seconds = String(date.getSeconds()).padStart(2, '0');
                           
                           return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-                        } catch (error) {
+                        } catch {
                           return 'Invalid date';
                         }
                       })()}
@@ -273,7 +224,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   {expandedErrors && (
                     <div className="border-t border-red-200 dark:border-red-800 p-4 bg-red-25 dark:bg-red-900/10">
                       <div className="space-y-4">
-                        {data.messages.errors.map((error: any, index: number) => (
+                        {data.messages.errors.map((error: { id: string; package?: string; message: string; timestamp?: string; context?: { runType?: string }; details?: string }) => (
                           <div key={error.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -364,7 +315,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   {expandedWarnings && (
                     <div className="border-t border-yellow-200 dark:border-yellow-800 p-4 bg-yellow-25 dark:bg-yellow-900/10">
                       <div className="space-y-4">
-                        {data.messages.warnings.map((warning: any, index: number) => (
+                        {data.messages.warnings.map((warning: { id: string; package?: string; message: string; timestamp?: string; context?: { runType?: string }; details?: string }) => (
                           <div key={warning.id} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
                             <div className="flex items-start justify-between mb-2">
                               <div className="flex-1">
@@ -513,21 +464,21 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   ).map((pkg) => (
                     <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName}</div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName || pkg.name || 'Unknown Package'}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {pkg.version}
+                          {pkg.version || 'Unknown'}
                           {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">
-                              (installed: {pkg.installedVersion})
+                              {pkg.installedVersion} installed
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status)}`}>
-                          {pkg.status.replace(/_/g, ' ')}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
+                          {(pkg.status || 'Unknown').replace(/_/g, ' ')}
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

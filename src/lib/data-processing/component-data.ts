@@ -633,7 +633,12 @@ export function processEventsData(rawDevice: any, events: any[]): EventsData {
  * Maps Cimian's detailed status values to ReportMate's simplified dashboard statuses
  * Uses only: Installed, Pending, Warning, Error, Removed
  */
-function mapCimianStatusToReportMate(cimianStatus: string): string {
+function mapCimianStatusToReportMate(cimianStatus: string, latestVersion?: string): string {
+  // CRITICAL: Override to Error if version is Unknown (matches Windows client logic)
+  if (latestVersion === "Unknown") {
+    return "Error";
+  }
+  
   if (!cimianStatus) {
     return "Pending";  // Default unknown to Pending
   }
@@ -800,7 +805,8 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   // Handle NEW Cimian API structure (current) - using correct field names from API
   const cimianData = installs.cimian || {}
-  const recentInstalls = installs.recentInstalls || []
+  // Check both old and new API structures for recent installs
+  const recentInstalls = installs.recentInstalls || cimianData.items || []
   const pendingInstalls = cimianData.pendingPackages || []
   const installsRecentEvents = installs.recentEvents || []
   const allPackages = [...recentInstalls, ...pendingInstalls]
@@ -813,6 +819,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
     configData: cimianData.config,
     registryConfigData: cimianData.registryConfig,
     recentInstallsCount: recentInstalls.length,
+    recentInstallsSource: installs.recentInstalls ? 'installs.recentInstalls' : 'cimianData.items',
     recentInstallsFirst3: recentInstalls.slice(0, 3),
     pendingInstallsCount: pendingInstalls.length,
     recentEventsCount: installsRecentEvents.length,
@@ -887,25 +894,47 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   // Process packages from NEW API structure - recentInstalls array
   const processedPackages: InstallPackage[] = recentInstalls.map((pkg: any, index: number) => {
+    // Extract data from most recent attempt if top-level fields are empty
+    const mostRecentAttempt = pkg.recentAttempts?.[0] || {}
+    
     console.log('🔍 Processing package:', { 
       name: pkg.name, 
       displayName: pkg.displayName, 
       version: pkg.version, 
+      latestVersion: pkg.latestVersion,
+      installedVersion: pkg.installedVersion,
       status: pkg.status,
       lastAttemptStatus: pkg.lastAttemptStatus,
       recentAttemptsLength: pkg.recentAttempts?.length || 0,
       firstAttempt: pkg.recentAttempts?.[0],
-      allKeys: Object.keys(pkg) 
+      allKeys: Object.keys(pkg),
+      versionDebug: {
+        pkgVersion: JSON.stringify(pkg.version),
+        pkgLatestVersion: JSON.stringify(pkg.latestVersion),
+        pkgInstalledVersion: JSON.stringify(pkg.installedVersion),
+        attemptVersion: JSON.stringify(mostRecentAttempt.version),
+        attemptInstalledVersion: JSON.stringify(mostRecentAttempt.installedVersion)
+      }
     })
-    
-    // Extract data from most recent attempt if top-level fields are empty
-    const mostRecentAttempt = pkg.recentAttempts?.[0] || {}
     
     // Since most fields are empty, use available data with reasonable fallbacks
     const displayName = pkg.displayName || pkg.name || mostRecentAttempt.displayName || mostRecentAttempt.name || 'Unknown Package'
     
-    // DON'T assign fake versions - keep Unknown if truly unknown
-    const version = pkg.version || mostRecentAttempt.version || mostRecentAttempt.installedVersion || 'Unknown'
+    // Enhanced version extraction with proper empty string handling
+    let version = 'Unknown'
+    
+    // Check all possible version sources, treating empty strings as falsy
+    if (pkg.version && pkg.version.trim() !== '') {
+      version = pkg.version.trim()
+    } else if (pkg.latestVersion && pkg.latestVersion.trim() !== '') {
+      version = pkg.latestVersion.trim()
+    } else if (pkg.installedVersion && pkg.installedVersion.trim() !== '') {
+      version = pkg.installedVersion.trim()
+    } else if (mostRecentAttempt.version && mostRecentAttempt.version.trim() !== '') {
+      version = mostRecentAttempt.version.trim()
+    } else if (mostRecentAttempt.installedVersion && mostRecentAttempt.installedVersion.trim() !== '') {
+      version = mostRecentAttempt.installedVersion.trim()
+    }
     
     // For status, check multiple sources and provide reasonable defaults based on package presence
     let status = pkg.status || pkg.lastAttemptStatus || mostRecentAttempt.status || mostRecentAttempt.result
@@ -914,8 +943,8 @@ export function processInstallsData(rawDevice: any): InstallsData {
       status = pkg.installCount > 0 ? 'Installed' : 'Unknown'
     }
     
-    // Map Cimian status to ReportMate status for consistent dashboard display
-    const mappedStatus = mapCimianStatusToReportMate(status);
+    // Map Cimian status to ReportMate status with Unknown version override for consistent dashboard display
+    const mappedStatus = mapCimianStatusToReportMate(status, version);
     
     console.log('🔍 Final package data:', {
       name: pkg.name,

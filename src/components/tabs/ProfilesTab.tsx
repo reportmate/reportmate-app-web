@@ -112,7 +112,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   });
 
   // Prioritize data prop, then processed device data, then fallback to raw module data
-  let profiles = []
+  let profiles: ProfileInfo[] = []
   if (data?.profiles?.length > 0) {
     console.log('✅ Using data prop (processedData.profiles)');
     profiles = data.profiles
@@ -125,7 +125,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       id: policy.policyId || 'unknown',
       displayName: policy.policyName || 'Unknown Policy',
       uuid: policy.policyId || 'unknown',
-      type: 'Device',
+      type: 'Device' as const,
       installDate: policy.assignedDate || policy.lastSync || '',
       organization: 'Microsoft Intune',
       description: policy.policyType || '',
@@ -140,7 +140,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       ...profile,
       displayName: profile.Name || profile.name || 'Unknown',
       uuid: profile.id || profile.identifier || 'unknown',
-      type: 'Device',
+      type: 'Device' as const,
       isRemovable: true,
       hasRemovalPasscode: false,
       isEncrypted: false
@@ -151,7 +151,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       id: policy.PolicyId || 'unknown',
       displayName: policy.PolicyName || 'Unknown Policy',
       uuid: policy.PolicyId || 'unknown',
-      type: 'Device',
+      type: 'Device' as const,
       installDate: policy.AssignedDate || policy.LastSync || '',
       organization: 'Microsoft Intune',
       description: policy.PolicyType || '',
@@ -166,37 +166,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   } else {
     console.log('❌ No profiles data found');
     profiles = []
-  }
-
-  if (!hasProfilesData || profiles.length === 0) {
-    return (
-      <div className="space-y-6">
-        {/* Header with Icon - Consistent with other tabs */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
-              <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="text-center py-16">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Configuration Profiles</h3>
-          <p className="text-gray-600 dark:text-gray-400">This device does not have any managed configuration installed.</p>
-        </div>
-      </div>
-    )
   }
 
   const deviceProfiles = profiles.filter((p: ProfileInfo) => p.type === 'Device')
@@ -230,11 +199,46 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     if (!payloads || payloads.length === 0) return 'No payload details';
     
     try {
-      return JSON.stringify(payloads, null, 2);
+      return payloads.map((payload, index) => {
+        const key = payload.type || payload.displayName || payload.name || `payload-${index}`;
+        const value = payload.value || payload.description || '';
+        return `${key}: ${value}`;
+      }).join(', ');
     } catch (error) {
-      return 'Error displaying payload details';
+      return 'Error loading payload details';
     }
   };
+
+  if (!hasProfilesData || profiles.length === 0) {
+    return (
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Configuration Profiles</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">MDM configuration profiles and policies</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="text-center py-16">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Configuration Profiles</h3>
+          <p className="text-gray-600 dark:text-gray-400">This device does not have any managed configuration installed.</p>
+        </div>
+      </div>
+    )
+  }
 
   // Toggle profile expansion
   const toggleProfileExpansion = (profileId: string) => {

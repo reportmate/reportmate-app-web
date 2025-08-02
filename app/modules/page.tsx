@@ -8,11 +8,24 @@ import Link from "next/link"
 import { useModules } from "../../src/lib/modules/ModuleRegistry"
 import { initializeModules, installModule, uninstallModule, toggleModule, getModuleMarketplace } from "../../src/lib/modules/ModuleInit"
 
+interface MarketplaceModule {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  author: string;
+  status: string;
+  installed?: boolean;
+  rating?: number;
+  downloads?: number;
+  downloadUrl?: string;
+}
+
 export default function ModulesManagementPage() {
-  const { registry, modules, enabledModules } = useModules()
-  const [initialized, setInitialized] = useState(false)
+  const { registry, modules } = useModules()
+  const [_initialized, setInitialized] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [marketplace, setMarketplace] = useState<any[]>([])
+  const [marketplace, setMarketplace] = useState<MarketplaceModule[]>([])
   const [activeTab, setActiveTab] = useState<'installed' | 'marketplace'>('installed')
 
   useEffect(() => {
@@ -269,7 +282,7 @@ export default function ModulesManagementPage() {
                 Module Marketplace
               </h2>
               <p className="text-gray-600 dark:text-gray-400">
-                Discover and install new modules to extend ReportMate's functionality.
+                Discover and install new modules to extend ReportMate&apos;s functionality.
               </p>
             </div>
 
@@ -310,7 +323,7 @@ export default function ModulesManagementPage() {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
                       </svg>
-                      {module.downloads.toLocaleString()}
+                      {module.downloads?.toLocaleString() || '0'}
                     </div>
                   </div>
 
@@ -325,7 +338,7 @@ export default function ModulesManagementPage() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => handleInstallModule(module.downloadUrl)}
+                        onClick={() => module.downloadUrl && handleInstallModule(module.downloadUrl)}
                         className="flex-1 px-3 py-2 rounded-md text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white"
                       >
                         Install

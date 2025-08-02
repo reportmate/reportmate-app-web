@@ -116,7 +116,7 @@ export default function DeviceForwardingTestPage() {
                   <li>Serial number links should load directly without redirection</li>
                   <li>UUID and Asset Tag links should automatically redirect to the serial number URL</li>
                   <li>The API endpoints return JSON with resolution information</li>
-                  <li>Check the browser's network tab to see the redirect behavior</li>
+                  <li>Check the browser&apos;s network tab to see the redirect behavior</li>
                 </ul>
               </div>
             </div>

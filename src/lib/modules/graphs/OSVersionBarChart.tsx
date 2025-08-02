@@ -4,7 +4,6 @@
  */
 
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 
 interface Device {
   deviceId: string
@@ -59,8 +58,8 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     const osInfo = device.modules?.system?.operatingSystem
     const osString = osInfo?.name || device.os || 'Unknown'
     const osVersion = osInfo?.version || ''
-    const osDisplayVersion = osInfo?.displayVersion || ''
-    const osBuild = osInfo?.build || ''
+    const _osDisplayVersion = osInfo?.displayVersion || ''
+    const _osBuild = osInfo?.build || ''
     
     if (osType === 'macOS') {
       // macOS detection and parsing

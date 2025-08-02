@@ -1,17 +1,25 @@
 /**
  * Hardware Widget
- * Displays comprehensive hardware information for devices
+ * Displays comprehensive hardware information for   // Legacy hardware properties (fallback)
+  hardware?: Record<string, unknown>vices
  */
 
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
+
+interface ProcessorInfo {
+  name?: string;
+  speed?: string;
+  cores?: number;
+  architecture?: string;
+}
 
 interface Device {
   id: string
   name: string
   model?: string
   manufacturer?: string
-  processor?: string | any
+  processor?: string | ProcessorInfo
   cores?: number
   memory?: string
   storage?: string
@@ -75,13 +83,14 @@ interface HardwareWidgetProps {
   device: Device
 }
 
-// Helper function to safely render any value as a string
-const safeString = (value: any): string => {
+// Helper function to safely render unknown values as a string
+const safeString = (value: unknown): string => {
   if (value === null || value === undefined) return 'Unknown'
   if (typeof value === 'object') {
     // If it's an object, try to extract meaningful properties
-    if (value.name) return String(value.name)
-    if (value.value) return String(value.value)
+    const obj = value as Record<string, unknown>;
+    if (obj.name) return String(obj.name)
+    if (obj.value) return String(obj.value)
     // Otherwise, just return a placeholder instead of trying to render the object
     return 'Complex Value'
   }
@@ -89,17 +98,18 @@ const safeString = (value: any): string => {
 }
 
 // Helper function specifically for processor objects
-const safeProcessorString = (processor: any): string => {
+const safeProcessorString = (processor: string | ProcessorInfo | unknown): string => {
   if (!processor) return 'Unknown'
   if (typeof processor === 'string') return processor
   if (typeof processor === 'object') {
+    const proc = processor as Record<string, unknown>;
     // Try to extract the processor name from various possible properties
-    const name = processor.name || processor.displayName || processor.model || processor.brand
+    const name = proc.name || proc.displayName || proc.model || proc.brand
     if (name) return String(name)
     
     // If no name property, try to construct a meaningful string from available data
-    if (processor.manufacturer && processor.cores) {
-      return `${processor.manufacturer} ${processor.cores}-core processor`
+    if (proc.manufacturer && proc.cores) {
+      return `${proc.manufacturer} ${proc.cores}-core processor`
     }
     
     return 'Unknown Processor'

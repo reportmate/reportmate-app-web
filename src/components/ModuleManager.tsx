@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { moduleLoader, ModuleManifest, ModuleRepository, ModuleRuntime } from '../lib/modules/DynamicModuleLoader'
 
 interface ModuleManagerProps {
@@ -15,12 +15,7 @@ export const ModuleManager: React.FC<ModuleManagerProps> = ({ onClose }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Load data on component mount
-  useEffect(() => {
-    loadData()
-  }, [])
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true)
     setError(null)
     
@@ -46,12 +41,17 @@ export const ModuleManager: React.FC<ModuleManagerProps> = ({ onClose }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [activeTab])
+
+  // Load data on component mount
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   // Refresh data when tab changes
   useEffect(() => {
     loadData()
-  }, [activeTab])
+  }, [loadData])
 
   const handleInstallModule = async (moduleId: string, repositoryUrl?: string) => {
     setLoading(true)
@@ -69,7 +69,7 @@ export const ModuleManager: React.FC<ModuleManagerProps> = ({ onClose }) => {
     }
   }
 
-  const handleInstallFromRepository = async (repoUrl: string) => {
+  const _handleInstallFromRepository = async (repoUrl: string) => {
     setLoading(true)
     try {
       const success = await moduleLoader.installModuleFromRepository(repoUrl)
@@ -375,7 +375,7 @@ const RepositoriesTab: React.FC<{
   repositories: ModuleRepository[]
   onAdd: (repo: Omit<ModuleRepository, 'id'>) => void
   onRefresh: () => void
-}> = ({ repositories, onAdd, onRefresh }) => {
+}> = ({ repositories, onAdd, onRefresh: _onRefresh }) => {
   const [showAddForm, setShowAddForm] = useState(false)
   const [newRepo, setNewRepo] = useState({
     name: '',
@@ -475,7 +475,7 @@ const RepositoriesTab: React.FC<{
                   <input
                     type="checkbox"
                     checked={repo.enabled}
-                    onChange={(e) => {
+                    onChange={(_e) => {
                       // Handle repository toggle
                     }}
                     className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"

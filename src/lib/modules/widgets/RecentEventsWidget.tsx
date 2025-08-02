@@ -5,7 +5,7 @@
 
 import React from 'react'
 import Link from 'next/link'
-import { formatRelativeTime, formatExactTime } from '../../time'
+import { formatRelativeTime } from '../../time'
 
 interface FleetEvent {
   id: string
@@ -187,12 +187,12 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
       }
       
       return String(payload).substring(0, 80)
-    } catch (error) {
+    } catch (_error) {
       return 'Complex payload'
     }
   }
 
-  const getEventIcon = (kind: string) => {
+  const _getEventIcon = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'error':
         return (

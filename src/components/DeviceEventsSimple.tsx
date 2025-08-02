@@ -8,6 +8,18 @@ interface EventDto {
   ts?: string;
 }
 
+// Type for payload objects that might have various properties
+interface PayloadObject extends Record<string, unknown> {
+  summary?: string;
+  message?: string;
+  moduleCount?: number;
+  modules?: string[] | Record<string, unknown>;
+  modules_processed?: number;
+  component?: string;
+  moduleType?: string;
+  clientVersion?: string;
+}
+
 // Helper function to get event type styling
 const getEventTypeConfig = (kind?: string) => {
   switch (kind?.toLowerCase()) {
@@ -50,7 +62,7 @@ const formatTimestamp = (ts?: string): string => {
         minute: '2-digit'
       })
     }
-  } catch (error) {
+  } catch {
     return 'Invalid timestamp'
   }
 }
@@ -83,7 +95,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     
     try {
       return JSON.stringify(raw, null, 2);
-    } catch (error) {
+    } catch {
       return `Error formatting payload: ${String(raw)}`;
     }
   };
@@ -102,33 +114,40 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       
       // Handle object payloads
       if (typeof payload === 'object') {
+        const payloadObj = payload as PayloadObject;
+        
         // Handle summarized payloads
-        if ((payload as any).summary) {
-          return (payload as any).summary
+        if (payloadObj.summary) {
+          return payloadObj.summary
         }
         
         // Handle message-based payloads
-        if ((payload as any).message) {
-          return (payload as any).message
+        if (payloadObj.message) {
+          return payloadObj.message
         }
         
         // Handle module count payloads
-        if ((payload as any).moduleCount && (payload as any).modules) {
-          const moduleCount = (payload as any).moduleCount
-          const modules = (payload as any).modules
-          if (moduleCount === 1) {
-            return `${modules[0]} data reported`
-          } else if (moduleCount <= 3) {
-            return `${modules.join(', ')} data reported`
-          } else {
-            return `All modules reported`
+        if (payloadObj.moduleCount && payloadObj.modules) {
+          const moduleCount = payloadObj.moduleCount
+          const modules = payloadObj.modules
+          
+          // Handle array of module names
+          if (Array.isArray(modules)) {
+            if (moduleCount === 1) {
+              return `${modules[0]} data reported`
+            } else if (moduleCount <= 3) {
+              return `${modules.join(', ')} data reported`
+            } else {
+              return `All modules reported`
+            }
           }
         }
         
         // Handle full device reports (contains multiple modules)
-        if ((payload as any).modules && typeof (payload as any).modules === 'object') {
-          const moduleCount = Object.keys((payload as any).modules).length
-          const moduleNames = Object.keys((payload as any).modules).slice(0, 3)
+        if (payloadObj.modules && typeof payloadObj.modules === 'object' && !Array.isArray(payloadObj.modules)) {
+          const modules = payloadObj.modules as Record<string, unknown>;
+          const moduleCount = Object.keys(modules).length
+          const moduleNames = Object.keys(modules).slice(0, 3)
           
           if (moduleCount > 3) {
             return `All modules reported`
@@ -138,8 +157,8 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         }
         
         // Handle new structure with modules_processed
-        if ((payload as any).modules_processed && typeof (payload as any).modules_processed === 'number') {
-          const modulesProcessed = (payload as any).modules_processed
+        if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
+          const modulesProcessed = payloadObj.modules_processed
           if (modulesProcessed === 1) {
             return `Single module reported`
           } else if (modulesProcessed <= 3) {
@@ -150,9 +169,9 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         }
         
         // Handle common event types
-        if ((payload as any).component || (payload as any).moduleType || (payload as any).clientVersion) {
+        if (payloadObj.component || payloadObj.moduleType || payloadObj.clientVersion) {
           const parts = []
-          if ((payload as any).message) parts.push((payload as any).message)
+          if (payloadObj.message) parts.push(payloadObj.message)
           
           const summary = parts.join(' • ')
           return summary.length > 100 ? summary.substring(0, 100) + '...' : summary || 'System event'
@@ -177,7 +196,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       }
       
       return String(payload).substring(0, 100)
-    } catch (error) {
+    } catch {
       return 'System event'
     }
   }

@@ -67,14 +67,14 @@ export async function initializeCoreModules(): Promise<void> {
     
     const allModules = [...coreModules, ...widgetModules]
     
-    for (const module of allModules) {
+    for (const moduleInstance of allModules) {
       // Handle both class instances and module objects
-      if ('onLoad' in module && typeof module.onLoad === 'function') {
-        await module.onLoad()
+      if ('onLoad' in moduleInstance && typeof moduleInstance.onLoad === 'function') {
+        await moduleInstance.onLoad()
       }
       
       // Register the manifest, casting to handle type compatibility
-      moduleRegistry.register(module.manifest as any)
+      moduleRegistry.register(moduleInstance.manifest as any)
     }
     
     console.log(`Loaded ${allModules.length} modules (${coreModules.length} core, ${widgetModules.length} widgets)`)
@@ -94,8 +94,8 @@ export async function loadCustomModules(sources: string[]): Promise<void> {
   
   for (const source of sources) {
     try {
-      const module = await moduleLoader.loadFromUrl(source)
-      moduleRegistry.register(module.manifest)
+      const moduleInstance = await moduleLoader.loadFromUrl(source)
+      moduleRegistry.register(moduleInstance.manifest)
       loadedCount++
     } catch (error) {
       console.warn(`Failed to load module from ${source}:`, error)
@@ -124,8 +124,8 @@ export async function initializeModules(customModuleSources: string[] = []): Pro
   console.log(`Module system initialized: ${enabled.length}/${total.length} modules enabled`)
   
   // Log enabled modules
-  enabled.forEach(module => {
-    console.log(`  ✓ ${module.name} (${module.id})`)
+  enabled.forEach(moduleManifest => {
+    console.log(`  ✓ ${moduleManifest.name} (${moduleManifest.id})`)
   })
 }
 
@@ -149,21 +149,21 @@ export function getModuleSourcesFromConfig(): string[] {
  */
 export async function installModule(source: string | File): Promise<void> {
   try {
-    let module
+    let moduleInstance
     
     if (typeof source === 'string') {
-      module = await moduleLoader.loadFromUrl(source)
+      moduleInstance = await moduleLoader.loadFromUrl(source)
     } else {
-      module = await moduleLoader.loadFromFile(source)
+      moduleInstance = await moduleLoader.loadFromFile(source)
     }
     
     // Register the module
-    moduleRegistry.register(module.manifest)
+    moduleRegistry.register(moduleInstance.manifest)
     
     // Enable by default
-    moduleRegistry.setEnabled(module.manifest.id, true)
+    moduleRegistry.setEnabled(moduleInstance.manifest.id, true)
     
-    console.log(`Installed module: ${module.manifest.name}`)
+    console.log(`Installed module: ${moduleInstance.manifest.name}`)
   } catch (error) {
     console.error('Failed to install module:', error)
     throw error
