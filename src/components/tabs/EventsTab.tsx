@@ -6,30 +6,41 @@
 import React from 'react'
 import DeviceEventsSimple from '../DeviceEventsSimple'
 
-interface EventsTabProps {
-  device: any
-  events: any[]
-  data?: any
+interface EventData {
+  id?: string;
+  name?: string;
+  kind?: string;
+  ts?: string;
+  raw?: unknown;
+  [key: string]: unknown;
 }
 
-export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) => {
+interface ProcessData {
+  name?: string;
+  status?: string;
+  [key: string]: unknown;
+}
+
+interface ServiceData {
+  status?: string;
+  [key: string]: unknown;
+}
+
+interface DeviceWithProcesses {
+  processes?: ProcessData[];
+  services?: ServiceData[];
+  [key: string]: unknown;
+}
+
+interface EventsTabProps {
+  device: DeviceWithProcesses
+  events: EventData[]
+  data?: Record<string, unknown>
+}
+
+export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
   // Valid event categories - filter out everything else
   const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success']
-  
-  const getEventStatusConfig = (kind: string) => {
-    switch (kind.toLowerCase()) {
-      case 'success':
-        return { bg: 'bg-green-100 dark:bg-green-900', text: 'text-green-800 dark:text-green-200', icon: '✓' }
-      case 'warning':
-        return { bg: 'bg-yellow-100 dark:bg-yellow-900', text: 'text-yellow-800 dark:text-yellow-200', icon: '⚠' }
-      case 'error':
-        return { bg: 'bg-red-100 dark:bg-red-900', text: 'text-red-800 dark:text-red-200', icon: '✗' }
-      case 'info':
-        return { bg: 'bg-blue-100 dark:bg-blue-900', text: 'text-blue-800 dark:text-blue-200', icon: 'ℹ' }
-      default:
-        return { bg: 'bg-gray-100 dark:bg-gray-900', text: 'text-gray-800 dark:text-gray-200', icon: '•' }
-    }
-  }
 
   // Process running on the system that could generate events
   const processes = device?.processes || []
@@ -37,18 +48,17 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
   
   // Filter events to only include valid categories
   const filteredEvents = events?.filter(event => 
-    VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+    event.kind && VALID_EVENT_KINDS.includes(event.kind.toLowerCase())
   ) || []
   
   // Event statistics (only for filtered events)
-  const eventsByKind = filteredEvents.reduce((acc: any, event: any) => {
+  const eventsByKind = filteredEvents.reduce((acc: Record<string, number>, event: EventData) => {
     const kind = event.kind || 'unknown'
     acc[kind] = (acc[kind] || 0) + 1
     return acc
   }, {})
   
-  const recentEvents = filteredEvents.slice(0, 10)
-  const systemProcesses = processes.filter((p: any) => 
+  const systemProcesses = processes.filter((p: ProcessData) => 
     p.name?.toLowerCase().includes('system') ||
     p.name?.toLowerCase().includes('svchost') ||
     p.name?.toLowerCase().includes('winlogon') ||
@@ -89,7 +99,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
             <div className="text-sm text-gray-600 dark:text-gray-400">Running Processes</div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{services.filter((s: any) => s.status === 'RUNNING').length}</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{services.filter((s: ServiceData) => s.status === 'RUNNING').length}</div>
             <div className="text-sm text-gray-600 dark:text-gray-400">Active Services</div>
           </div>
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
@@ -210,9 +220,9 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) =>
         </div>
         <div className="p-6">
           <DeviceEventsSimple events={filteredEvents.map(event => ({
-            id: event.id,
+            id: event.id || `event-${Math.random()}`,
             name: event.kind || 'Event', // Use event kind as fallback name
-            raw: event.payload,
+            raw: (event.payload as Record<string, unknown>) || {},
             kind: event.kind,
             ts: event.ts
           }))} />

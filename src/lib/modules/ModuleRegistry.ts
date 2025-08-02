@@ -203,9 +203,9 @@ class ModuleRegistry {
   getDashboardWidgets(): DashboardWidget[] {
     const widgets: DashboardWidget[] = []
     
-    for (const module of this.getEnabledModules()) {
-      if (module.dashboardWidgets) {
-        widgets.push(...module.dashboardWidgets)
+    for (const moduleInstance of this.getEnabledModules()) {
+      if (moduleInstance.dashboardWidgets) {
+        widgets.push(...moduleInstance.dashboardWidgets)
       }
     }
     
@@ -219,9 +219,9 @@ class ModuleRegistry {
   getDeviceTabs(): DeviceTab[] {
     const tabs: DeviceTab[] = []
     
-    for (const module of this.getEnabledModules()) {
-      if (module.deviceTabs) {
-        tabs.push(...module.deviceTabs)
+    for (const moduleInstance of this.getEnabledModules()) {
+      if (moduleInstance.deviceTabs) {
+        tabs.push(...moduleInstance.deviceTabs)
       }
     }
     
@@ -235,9 +235,9 @@ class ModuleRegistry {
   getDeviceWidgets(): DeviceWidget[] {
     const widgets: DeviceWidget[] = []
     
-    for (const module of this.getEnabledModules()) {
-      if (module.deviceWidgets) {
-        widgets.push(...module.deviceWidgets)
+    for (const moduleInstance of this.getEnabledModules()) {
+      if (moduleInstance.deviceWidgets) {
+        widgets.push(...moduleInstance.deviceWidgets)
       }
     }
     
@@ -251,9 +251,9 @@ class ModuleRegistry {
   getDataProviders(): DataProvider[] {
     const providers: DataProvider[] = []
     
-    for (const module of this.getEnabledModules()) {
-      if (module.dataProviders) {
-        providers.push(...module.dataProviders)
+    for (const moduleInstance of this.getEnabledModules()) {
+      if (moduleInstance.dataProviders) {
+        providers.push(...moduleInstance.dataProviders)
       }
     }
     
@@ -266,9 +266,9 @@ class ModuleRegistry {
   getEventProcessors(): EventProcessor[] {
     const processors: EventProcessor[] = []
     
-    for (const module of this.getEnabledModules()) {
-      if (module.eventProcessors) {
-        processors.push(...module.eventProcessors)
+    for (const moduleInstance of this.getEnabledModules()) {
+      if (moduleInstance.eventProcessors) {
+        processors.push(...moduleInstance.eventProcessors)
       }
     }
     

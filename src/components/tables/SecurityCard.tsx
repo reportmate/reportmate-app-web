@@ -1,5 +1,10 @@
 import React from 'react';
 
+interface SecurityFeature {
+  enabled: boolean;
+  status: string;
+}
+
 interface SecurityData {
   // macOS security features
   gatekeeper?: string;
@@ -20,22 +25,10 @@ interface SecurityData {
   as_security_mode?: string;
   
   // Windows security features
-  antivirus?: {
-    enabled: boolean;
-    status: string;
-  };
-  firewall?: {
-    enabled: boolean;
-    status: string;
-  };
-  bitlocker?: {
-    enabled: boolean;
-    status: string;
-  };
-  tpm?: {
-    enabled: boolean;
-    status: string;
-  };
+  antivirus?: SecurityFeature;
+  firewall?: SecurityFeature;
+  bitlocker?: SecurityFeature;
+  tpm?: SecurityFeature;
 }
 
 interface SecurityCardProps {
@@ -61,7 +54,7 @@ export const SecurityCard: React.FC<SecurityCardProps> = ({ data }) => {
   const isWindows = !!(data.antivirus || data.firewall || data.bitlocker || data.tpm);
   const isMacOS = !!(data.gatekeeper || data.sip || data.filevault_status !== undefined);
 
-  const getSecurityStatus = (feature: any) => {
+  const getSecurityStatus = (feature: SecurityFeature | undefined) => {
     if (!feature) return { color: 'text-gray-600 dark:text-gray-400', status: 'Unknown' };
     if (feature.enabled) return { color: 'text-green-600 dark:text-green-400', status: 'Enabled' };
     return { color: 'text-red-600 dark:text-red-400', status: 'Disabled' };

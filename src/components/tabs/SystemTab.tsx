@@ -7,9 +7,34 @@ import { formatExactTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { processSystemTabData } from '../../lib/data-processing/component-data'
 
+interface DeviceData {
+  id: string;
+  name: string;
+  system?: {
+    operatingSystem?: {
+      name?: string;
+      version?: string;
+      build?: string;
+      architecture?: string;
+      uptime?: string;
+    };
+    services?: Array<{
+      name: string;
+      display_name?: string;
+      status?: string;
+      start_type?: string;
+    }>;
+  };
+  modules?: {
+    system?: Record<string, unknown>;
+    services?: Record<string, unknown>;
+  };
+  [key: string]: unknown;
+}
+
 interface SystemTabProps {
-  device: any
-  data?: any
+  device: DeviceData
+  data?: Record<string, unknown>
 }
 
 export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
@@ -346,7 +371,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
               {filteredServices.length === 0 && servicesSearch && (
                 <div className="px-6 py-8 text-center">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
-                    No services found matching "{servicesSearch}"
+                    No services found matching &quot;{servicesSearch}&quot;
                   </p>
                 </div>
               )}

@@ -4,6 +4,7 @@
 export const dynamic = 'force-dynamic'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
@@ -29,10 +30,12 @@ export default function SettingsPage() {
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                  <img 
+                  <Image 
                     src="/reportmate-logo.png" 
                     alt="ReportMate" 
-                    className="w-8 h-8 object-contain"
+                    width={32}
+                    height={32}
+                    className="object-contain"
                   />
                 </div>
                 <div>

@@ -115,7 +115,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   
   // Get DNS servers - handle both array and string formats
   const dnsServers = (network as any)?.dns?.servers || (network as any)?.dns || []
-  const primaryDns = Array.isArray(dnsServers) ? dnsServers[0] : dnsServers
   
   // Debug logging
   console.log('[NetworkWidget] Device data:', {
@@ -126,28 +125,10 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     networkKeys: network ? Object.keys(network) : [],
     activeConnectionData: activeConnectionData,
     dnsServers: dnsServers,
-    networkSample: JSON.stringify(network).substring(0, 300)
+    networkSample: network ? JSON.stringify(network)?.substring(0, 300) || 'null' : 'null'
   })
   
   const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown' || network
-
-  const formatConnectionStatus = (status?: number) => {
-    switch (status) {
-      case 1: return 'Connected'
-      case 0: return 'Disconnected'
-      case 2: return 'Connecting'
-      default: return 'Unknown'
-    }
-  }
-
-  const getConnectionStatusType = (status?: number): 'success' | 'error' | 'warning' => {
-    switch (status) {
-      case 1: return 'success'
-      case 0: return 'error'
-      case 2: return 'warning'
-      default: return 'warning'
-    }
-  }
 
   if (!hasNetworkInfo) {
     return (

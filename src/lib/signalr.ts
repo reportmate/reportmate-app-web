@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { HubConnectionBuilder, HubConnection, LogLevel } from "@microsoft/signalr"
+import type { HubConnection } from "@microsoft/signalr"
 
 export interface FleetEvent {
   id: string
@@ -17,7 +17,6 @@ export function useLiveEvents() {
   const [lastUpdateTime, setLastUpdateTime] = useState<Date>(new Date())
 
   useEffect(() => {
-    let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     
     // Initialize with empty events array

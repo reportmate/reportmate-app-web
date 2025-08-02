@@ -27,10 +27,10 @@ export class ErrorBoundary extends Component<Props, State> {
     // Log additional context
     console.error('Current URL:', typeof window !== 'undefined' ? window.location.href : 'SSR')
     console.error('User agent:', typeof navigator !== 'undefined' ? navigator.userAgent : 'Unknown')
-    console.error('Memory usage:', typeof performance !== 'undefined' && (performance as any).memory ? {
-      usedJSHeapSize: (performance as any).memory.usedJSHeapSize,
-      totalJSHeapSize: (performance as any).memory.totalJSHeapSize,
-      jsHeapSizeLimit: (performance as any).memory.jsHeapSizeLimit
+    console.error('Memory usage:', typeof performance !== 'undefined' && 'memory' in performance ? {
+      usedJSHeapSize: (performance as typeof performance & { memory: { usedJSHeapSize: number } }).memory.usedJSHeapSize,
+      totalJSHeapSize: (performance as typeof performance & { memory: { totalJSHeapSize: number } }).memory.totalJSHeapSize,
+      jsHeapSizeLimit: (performance as typeof performance & { memory: { jsHeapSizeLimit: number } }).memory.jsHeapSizeLimit
     } : 'Unknown')
     
     return { hasError: true, error }
@@ -77,8 +77,8 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="bg-blue-50 dark:bg-blue-900 p-3 rounded-md mb-4">
                 <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Quick Recovery Steps:</h4>
                 <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Click "Clear Data & Reload" to remove problematic events</li>
-                  <li>• Try the "Reload Dashboard" button for a fresh start</li>
+                  <li>• Click &quot;Clear Data &amp; Reload&quot; to remove problematic events</li>
+                  <li>• Try the &quot;Reload Dashboard&quot; button for a fresh start</li>
                   <li>• Check Windows client configuration to reduce payload sizes</li>
                 </ul>
               </div>
