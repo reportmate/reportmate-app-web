@@ -34,6 +34,7 @@ interface Device {
         architecture: string
         displayVersion?: string
         edition?: string
+        featureUpdate?: string
       }
     }
   }
@@ -60,6 +61,17 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     const osVersion = osInfo?.version || ''
     const _osDisplayVersion = osInfo?.displayVersion || ''
     const _osBuild = osInfo?.build || ''
+    
+    console.log(`[processOSVersions ${osType}] Processing device:`, {
+      deviceName: device.name,
+      osString,
+      osInfo: osInfo ? {
+        name: osInfo.name,
+        version: osInfo.version,
+        build: osInfo.build,
+        featureUpdate: osInfo.featureUpdate
+      } : 'NO_OS_INFO'
+    })
     
     if (osType === 'macOS') {
       // macOS detection and parsing
@@ -93,14 +105,47 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
         let displayVersion = 'Unknown'
         let groupingKey = 'Unknown'
         
-        if (osInfo?.name && osInfo?.build) {
-          // Extract version number from name (e.g., "Windows 11" -> "11")
+        if (osInfo?.name && osInfo?.version) {
+          // Extract Windows version number from name (e.g., "Windows 11" -> "11")
           const nameMatch = osInfo.name.match(/Windows\s+(\d+)/)
-          const versionNumber = nameMatch ? nameMatch[1] : osInfo.name
-          // For display: version number + build (e.g., "11 - 26100")
-          displayVersion = `${versionNumber} - ${osInfo.build}`
-          // For grouping: use the clean version number (e.g., "10.0.26100")
-          groupingKey = osInfo.version || displayVersion
+          const windowsVersion = nameMatch ? nameMatch[1] : '0'
+          
+          // Extract build from version (after last dot in version string)
+          // Version format: "10.0.26100" -> build is "26100"
+          const versionParts = osInfo.version.split('.')
+          const build = versionParts.length > 2 ? versionParts[2] : '0'
+          
+          // Get feature update from the featureUpdate field
+          const featureUpdate = osInfo.featureUpdate || device.modules?.system?.operatingSystem?.featureUpdate || '0'
+          
+          console.log(`[processOSVersions Windows] Version processing:`, {
+            deviceName: device.name,
+            windowsVersion,
+            build,
+            featureUpdate,
+            versionParts,
+            osInfoName: osInfo.name,
+            osInfoVersion: osInfo.version
+          })
+          
+          // Create full version string: "11.0.26100.4652.0"
+          groupingKey = `${windowsVersion}.0.${build}.${featureUpdate}`
+          
+          // Create display version: "11.26100.4652.0" (without the .0 after Windows version)
+          displayVersion = `${windowsVersion}.${build}.${featureUpdate}`
+          
+          console.log(`[processOSVersions Windows] Generated versions:`, {
+            groupingKey,
+            displayVersion
+          })
+          
+        } else if (osInfo?.name && osInfo?.build) {
+          // Fallback: use build directly if version parsing fails
+          const nameMatch = osInfo.name.match(/Windows\s+(\d+)/)
+          const windowsVersion = nameMatch ? nameMatch[1] : osInfo.name
+          const featureUpdate = osInfo.featureUpdate || device.modules?.system?.operatingSystem?.featureUpdate || '0'
+          displayVersion = `${windowsVersion}.${osInfo.build}.${featureUpdate}`
+          groupingKey = displayVersion
         } else if (osInfo?.name) {
           // Just OS name if no build available
           displayVersion = osInfo.name
@@ -132,7 +177,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           versions[groupingKey] = { count: 0, displayName: displayVersion }
         } else {
           // If we already have this version, make sure we use the most detailed display name
-          if (displayVersion.includes(' - ') && !versions[groupingKey].displayName.includes(' - ')) {
+          if (displayVersion.includes('.') && displayVersion.split('.').length > versions[groupingKey].displayName.split('.').length) {
             versions[groupingKey].displayName = displayVersion
           }
         }
@@ -183,6 +228,25 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   const [localDevices, setLocalDevices] = useState<Device[]>([])
   const [localLoading, setLocalLoading] = useState(true)
   
+  // Add debugging for props at component entry
+  console.log(`[OSVersionBarChart ${osType}] === COMPONENT ENTRY DEBUG ===`)
+  console.log(`[OSVersionBarChart ${osType}] Props received:`, {
+    devicesCount: devices.length,
+    loading,
+    osType,
+    firstDeviceDebug: devices[0] ? {
+      name: devices[0].name,
+      os: devices[0].os,
+      serialNumber: devices[0].serialNumber,
+      hasModules: !!devices[0].modules,
+      moduleKeys: devices[0].modules ? Object.keys(devices[0].modules) : [],
+      hasSystemModule: !!devices[0].modules?.system,
+      systemModuleKeys: devices[0].modules?.system ? Object.keys(devices[0].modules.system) : [],
+      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
+      operatingSystemData: devices[0].modules?.system?.operatingSystem
+    } : 'NO_DEVICES'
+  })
+  
   // Fetch devices directly if not provided via props
   useEffect(() => {
     const fetchDevices = async () => {
@@ -231,6 +295,24 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   }
 
   const versionData = processOSVersions(effectiveDevices, osType)
+  
+  // Debug logging
+  console.log(`[OSVersionBarChart ${osType}] Processing ${effectiveDevices.length} devices`)
+  effectiveDevices.forEach((device, index) => {
+    if (index < 3) { // Only log first 3 devices to avoid spam
+      console.log(`[OSVersionBarChart ${osType}] Device ${index}:`, {
+        name: device.name,
+        serialNumber: device.serialNumber,
+        os: device.os,
+        modules: device.modules ? {
+          system: device.modules.system ? {
+            operatingSystem: device.modules.system.operatingSystem
+          } : 'NO_SYSTEM_MODULE'
+        } : 'NO_MODULES'
+      })
+    }
+  })
+  console.log(`[OSVersionBarChart ${osType}] Processed version data:`, versionData)
   
   if (versionData.length === 0) {
     return (

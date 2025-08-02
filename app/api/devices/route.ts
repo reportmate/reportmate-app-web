@@ -70,6 +70,7 @@ export async function GET() {
             d.manufacturer,
             s.data->'operatingSystem'->>'name' as os,
             s.data->'operatingSystem'->>'version' as "osVersion",
+            s.data as system_data,
             i.data as inventory_data
           FROM devices d
           LEFT JOIN system s ON d.id = s.device_id
@@ -81,6 +82,7 @@ export async function GET() {
         const devices = result.rows.map((row: any) => {
           // Extract inventory data for device name
           const inventoryData = row.inventory_data || {}
+          const systemData = row.system_data || {}
           const deviceName = inventoryData.deviceName || inventoryData.device_name || row.name || 'Unknown Device'
           
           // Calculate status based on last_seen (same logic as Azure Functions)
@@ -110,7 +112,8 @@ export async function GET() {
             status: calculateStatus(row.lastSeen), // Calculate status based on last_seen
             // Include modules data for frontend compatibility
             modules: {
-              inventory: inventoryData
+              inventory: inventoryData,
+              system: systemData
             }
           }
         })
