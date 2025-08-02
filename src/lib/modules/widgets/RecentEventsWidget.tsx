@@ -87,8 +87,46 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
   const status = getConnectionStatus(connectionStatus)
 
   const getDeviceName = (deviceId: string) => {
-    // Use device display name from inventory if available, otherwise fall back to serial
-    return deviceNameMap[deviceId] || deviceId
+    // Enhanced device name resolution with multiple fallback strategies
+    
+    // First, try the device name map (preferred)
+    if (deviceNameMap[deviceId]) {
+      return deviceNameMap[deviceId]
+    }
+    
+    // Check if deviceId looks like a serial number pattern and try to find a friendly name
+    // Serial numbers are usually short alphanumeric strings
+    if (deviceId && deviceId.length < 50 && !deviceId.includes('-')) {
+      // Look through the map to see if this serial has a mapped name
+      const mappedName = Object.entries(deviceNameMap).find(([key, value]) => 
+        key === deviceId || key.includes(deviceId)
+      )?.[1]
+      if (mappedName) {
+        return mappedName
+      }
+    }
+    
+    // Check if deviceId is a UUID format and try to find corresponding name
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (uuidPattern.test(deviceId)) {
+      // Look for any mapped name that corresponds to this UUID
+      const correspondingName = Object.values(deviceNameMap).find(name => name && name !== deviceId)
+      if (correspondingName) {
+        return correspondingName
+      }
+    }
+    
+    // If deviceId looks like an asset tag (short, alphanumeric), show it nicely
+    if (deviceId && deviceId.length <= 10 && /^[A-Z0-9]+$/i.test(deviceId)) {
+      return `Asset ${deviceId}` // e.g., "Asset A004733"
+    }
+    
+    // Final fallback - return the deviceId but truncate if it's too long (UUID case)
+    if (deviceId && deviceId.length > 20) {
+      return `Device ${deviceId.substring(0, 8)}...` // e.g., "Device 79349310..."
+    }
+    
+    return deviceId || 'Unknown Device'
   }
 
   // Helper function to safely display payload - enhanced with device name logic
@@ -237,15 +275,6 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-4">
-            {/* Connection status - only show if not polling */}
-            {status.show && (
-              <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-gray-100 dark:bg-gray-700">
-                <div className={`w-2 h-2 rounded-full ${status.dot} animate-pulse`}></div>
-                <span className={`text-sm font-medium ${status.color}`}>
-                  {status.text}
-                </span>
-              </div>
-            )}
             {mounted && lastUpdateTime && (
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Last update: {formatRelativeTime(lastUpdateTime.toISOString())}

@@ -102,7 +102,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Icon - Consistent with other tabs */}
+      {/* Header with Icon */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">

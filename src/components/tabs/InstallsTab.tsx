@@ -73,12 +73,12 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Icon - Consistent with other tabs */}
+      {/* Header with Icon */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
+          <div className="w-12 h-12 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
           </div>
           <div>
@@ -90,7 +90,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
         {installsData?.config?.lastRun && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Run Start</div>
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {formatCompactRelativeTime(installsData.config.lastRun)}
             </div>
           </div>
@@ -99,22 +99,22 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
 
       {/* Configuration Information - 3 Column Layout (50/25/25) */}
       {installsData?.config && (
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
           <div className="grid grid-cols-4 gap-6">
             {/* Column 1 - 50% (2 grid columns) */}
             <div className="col-span-2 space-y-4">
               <div>
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</h3>
-                <div className="bg-gray-900 dark:bg-gray-700 rounded px-3 py-2">
-                  <p className="text-sm font-mono text-gray-100 dark:text-gray-200">
+                <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2">
+                  <p className="text-sm font-mono text-gray-800 dark:text-gray-200">
                     {installsData.config.manifest || 'Not specified'}
                   </p>
                 </div>
               </div>
               <div>
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</h3>
-                <div className="bg-gray-900 dark:bg-gray-700 rounded px-3 py-2">
-                  <p className="text-sm font-mono text-gray-100 dark:text-gray-200">
+                <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2">
+                  <p className="text-sm font-mono text-gray-800 dark:text-gray-200">
                     {installsData.config.softwareRepoURL || 'Not specified'}
                   </p>
                 </div>
@@ -134,7 +134,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
               <div className="text-center">
                 <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</h3>
                 <div className="flex justify-center">
-                  <span className="px-3 py-1 text-sm font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded-full">
+                  <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
                     {installsData.config.runType || 'Unknown'}
                   </span>
                 </div>
