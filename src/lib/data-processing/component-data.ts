@@ -700,6 +700,7 @@ export interface InstallsData {
   failed: number
   lastUpdate: string
   packages: InstallPackage[]
+  systemName?: string // The name of the managed installs system (e.g., "cimian", "munki")
   config?: {
     type: 'cimian' | 'munki'
     version: string
@@ -791,12 +792,18 @@ export function processInstallsData(rawDevice: any): InstallsData {
   // Extract managed installs data from API response - enhanced for Cimian support
   // Check multiple possible locations for installs data
   const installs = rawDevice.installs || rawDevice.managedInstalls || rawDevice.modules?.installs || rawDevice.modules?.managedInstalls || {}
+  
+  // Extract the system name from the top-level key (e.g., "cimian", "munki")
+  const installsKeys = Object.keys(installs)
+  const systemName = installsKeys.find(key => key !== 'recentInstalls' && key !== 'recentEvents' && key !== 'recentSessions') || installsKeys[0]
+  
   console.log('🔍 Found installs data at location:', {
     foundAt: rawDevice.installs ? 'rawDevice.installs' : 
              rawDevice.managedInstalls ? 'rawDevice.managedInstalls' :
              rawDevice.modules?.installs ? 'rawDevice.modules.installs' :
              rawDevice.modules?.managedInstalls ? 'rawDevice.modules.managedInstalls' : 'none',
-    installsDataKeys: installs ? Object.keys(installs) : [],
+    installsDataKeys: installsKeys,
+    extractedSystemName: systemName,
     hasCimian: !!installs.cimian,
     hasRecentInstalls: !!installs.recentInstalls,
     hasRecentEvents: !!installs.recentEvents,
@@ -1056,6 +1063,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
     failed,
     lastUpdate: installs.lastCheckIn || installs.last_check_in || installs.LastCheckIn || installs.lastUpdate || rawDevice.lastSeen || '',
     packages: processedPackages,
+    systemName: systemName, // Add the system name (e.g., "cimian", "munki")
     config: config,
     messages: messages.errors.length > 0 || messages.warnings.length > 0 ? messages : undefined
   }
