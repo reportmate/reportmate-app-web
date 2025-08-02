@@ -212,7 +212,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   if (!hasProfilesData || profiles.length === 0) {
     return (
       <div className="space-y-6">
-        {/* Header with Icon - Consistent with other tabs */}
+        {/* Header with Icon */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
@@ -247,7 +247,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Icon - Consistent with other tabs */}
+      {/* Header with Icon */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">

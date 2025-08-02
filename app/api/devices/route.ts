@@ -69,35 +69,65 @@ export async function GET() {
             d.last_seen as "lastSeen",
             d.manufacturer,
             s.data->'operatingSystem'->>'name' as os,
-            s.data->'operatingSystem'->>'version' as "osVersion"
+            s.data->'operatingSystem'->>'version' as "osVersion",
+            i.data as inventory_data
           FROM devices d
           LEFT JOIN system s ON d.id = s.device_id
+          LEFT JOIN inventory i ON d.serial_number = i.device_id
           ORDER BY d.last_seen DESC
           LIMIT 50
         `)
         
-        const devices = result.rows.map((row: any) => ({
-          id: row.id || row.serialNumber,
-          name: row.name || 'Unknown Device',
-          model: 'Unknown Model',
-          os: row.os || 'Unknown OS',
-          serialNumber: row.serialNumber,
-          assetTag: '',
-          ipAddress: row.ipAddress || 'Unknown',
-          ipAddressV4: row.ipAddress || '',
-          ipAddressV6: '',
-          lastSeen: row.lastSeen
-        }))
+        const devices = result.rows.map((row: any) => {
+          // Extract inventory data for device name
+          const inventoryData = row.inventory_data || {}
+          const deviceName = inventoryData.deviceName || inventoryData.device_name || row.name || 'Unknown Device'
+          
+          // Calculate status based on last_seen (same logic as Azure Functions)
+          const calculateStatus = (lastSeen: any) => {
+            if (!lastSeen) return 'missing'
+            
+            const now = new Date()
+            const lastSeenDate = new Date(lastSeen)
+            const hours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+            
+            if (hours <= 24) return 'active'
+            else if (hours <= 168) return 'stale' // 7 days  
+            else return 'missing'
+          }
+          
+          return {
+            deviceId: row.id || row.serialNumber,  // Use deviceId instead of id
+            name: deviceName,
+            model: 'Unknown Model',
+            os: row.os || 'Unknown OS',
+            serialNumber: row.serialNumber,
+            assetTag: inventoryData.assetTag || '',
+            ipAddress: row.ipAddress || 'Unknown',
+            ipAddressV4: row.ipAddress || '',
+            ipAddressV6: '',
+            lastSeen: row.lastSeen,
+            status: calculateStatus(row.lastSeen), // Calculate status based on last_seen
+            // Include modules data for frontend compatibility
+            modules: {
+              inventory: inventoryData
+            }
+          }
+        })
 
         await pool.end()
 
         console.log(`[DEVICES API] ${timestamp} - Local database fallback successful, found ${devices.length} devices`)
         
-        return NextResponse.json({
-          success: true,
-          devices,
-          source: 'local_database_fallback',
-          timestamp: new Date().toISOString()
+        // Return direct array for frontend compatibility (not wrapped in object)
+        return NextResponse.json(devices, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'local-database-fallback'
+          }
         })
         
       } catch (dbError) {
@@ -190,12 +220,36 @@ export async function GET() {
             // Use full device data if available, otherwise fall back to basic data
             const sourceData = fullDeviceData || device
             
+            // Calculate status based on last_seen timestamp (same logic as Azure Functions API)
+            const calculateDeviceStatus = (lastSeen: string | Date | null) => {
+              if (!lastSeen) return 'missing'
+              
+              const now = new Date()
+              let lastSeenDate: Date
+              
+              if (typeof lastSeen === 'string') {
+                lastSeenDate = new Date(lastSeen)
+              } else {
+                lastSeenDate = lastSeen
+              }
+              
+              const timeDiff = now.getTime() - lastSeenDate.getTime()
+              const hours = timeDiff / (1000 * 60 * 60)
+              
+              if (hours <= 24) return 'active'
+              else if (hours <= 168) return 'stale' // 7 days
+              else return 'missing'
+            }
+
+            const lastSeenValue = sourceData.metadata?.collectedAt || device.last_seen
+            const calculatedStatus = calculateDeviceStatus(lastSeenValue)
+
             const transformed = {
               deviceId: sourceData.metadata?.deviceId || device.id,     // Internal UUID
               serialNumber: sourceData.metadata?.serialNumber || device.serial_number, // Human-readable unique ID
               name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serial_number,
-              lastSeen: sourceData.metadata?.collectedAt || device.last_seen,
-              status: sourceData.status || device.status || 'offline', // Use actual status from Azure Functions API
+              lastSeen: lastSeenValue,
+              status: sourceData.status || device.status || calculatedStatus, // Use calculated status if not provided
               clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
               assetTag: sourceData.inventory?.assetTag, // Asset tag from inventory module
               location: sourceData.inventory?.location, // Location from inventory module
