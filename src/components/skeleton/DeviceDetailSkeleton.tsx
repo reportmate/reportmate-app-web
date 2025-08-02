@@ -27,16 +27,16 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: D
   }, [])
 
       const tabs = useMemo(() => [
-    { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'blue' },
+    { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' },
+    { id: 'installs', label: 'Installs', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4', accentColor: 'emerald' },
+    { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', accentColor: 'violet' },
+    { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', accentColor: 'yellow' },
     { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', accentColor: 'orange' },
     { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', accentColor: 'purple' },
-    { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', accentColor: 'yellow' },
-    { id: 'installs', label: 'Installs', icon: 'M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10', accentColor: 'blue' },
-    { id: 'applications', label: 'Applications', icon: 'M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z', accentColor: 'blue' },
     { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', accentColor: 'red' },
     { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', accentColor: 'teal' },
-    { id: 'profiles', label: 'Profiles', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z', accentColor: 'indigo' },
-    { id: 'events', label: 'Events', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4', accentColor: 'blue' }
+    { id: 'applications', label: 'Applications', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', accentColor: 'blue' },
+    { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' }
   ], [])
 
   // Update loading message based on active tab
@@ -77,6 +77,14 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: D
         active: 'border-purple-500 text-purple-600 dark:text-purple-400',
         inactive: 'border-transparent text-gray-500 dark:text-gray-400'
       },
+      emerald: {
+        active: 'border-emerald-500 text-emerald-600 dark:text-emerald-400',
+        inactive: 'border-transparent text-gray-500 dark:text-gray-400'
+      },
+      violet: {
+        active: 'border-violet-500 text-violet-600 dark:text-violet-400',
+        inactive: 'border-transparent text-gray-500 dark:text-gray-400'
+      },
       yellow: {
         active: 'border-yellow-500 text-yellow-600 dark:text-yellow-400',
         inactive: 'border-transparent text-gray-500 dark:text-gray-400'
@@ -87,6 +95,10 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: D
       },
       teal: {
         active: 'border-teal-500 text-teal-600 dark:text-teal-400',
+        inactive: 'border-transparent text-gray-500 dark:text-gray-400'
+      },
+      monochrome: {
+        active: 'border-gray-500 text-black dark:text-white',
         inactive: 'border-transparent text-gray-500 dark:text-gray-400'
       },
       gray: {
@@ -211,13 +223,14 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: D
         </div>
 
         {activeTab === 'info' && <InfoTabSkeleton />}
-        {activeTab === 'hardware' && <HardwareTabSkeleton />}
-        {activeTab === 'system' && <SystemTabSkeleton />}
-        {activeTab === 'management' && <ManagementTabSkeleton />}
         {activeTab === 'installs' && <InstallsTabSkeleton />}
+        {activeTab === 'profiles' && <ProfilesTabSkeleton />}
         {activeTab === 'applications' && <ApplicationsTabSkeleton />}
-        {activeTab === 'security' && <SecurityTabSkeleton />}
+        {activeTab === 'management' && <ManagementTabSkeleton />}
+        {activeTab === 'system' && <SystemTabSkeleton />}
+        {activeTab === 'hardware' && <HardwareTabSkeleton />}
         {activeTab === 'network' && <NetworkTabSkeleton />}
+        {activeTab === 'security' && <SecurityTabSkeleton />}
         {activeTab === 'events' && <EventsTabSkeleton />}
       </div>
     </div>
@@ -230,48 +243,54 @@ function InfoTabSkeleton() {
   const fieldWidths = ['w-20', 'w-24', 'w-28', 'w-32', 'w-36', 'w-40']
   const valueWidths = ['w-24', 'w-28', 'w-32', 'w-36', 'w-40', 'w-44']
   
-  // Widget data with specific heights to match actual widgets
+  // Widget data matching the exact InfoTab structure
   const widgets = [
     { 
       title: 'Inventory', 
       subtitle: 'Device identity and assignment details',
       icon: 'information',
-      rows: 6, // Device Name, Asset Tag, Serial, Registration, Usage, Location etc.
+      iconColor: 'bg-blue-100 dark:bg-blue-900',
+      rows: 4, // Device Name, Asset Tag, Serial, Registration Date
       twoColumn: true
     },
     { 
       title: 'System', 
       subtitle: 'Operating system information',
       icon: 'desktop',
-      rows: 5, // OS, Version, Build, Architecture, Install Date
+      iconColor: 'bg-purple-100 dark:bg-purple-900',
+      rows: 6, // OS Name, Version, Edition, Build, Architecture, Install Date
       twoColumn: false
     },
     { 
       title: 'Hardware', 
       subtitle: 'Hardware specifications',
       icon: 'chip',
-      rows: 5, // Model, Processor, Memory, Storage, Graphics
+      iconColor: 'bg-orange-100 dark:bg-orange-900',
+      rows: 6, // Model, Processor, Memory, Storage, Graphics, Display
       twoColumn: false
     },
     { 
       title: 'Management', 
       subtitle: 'Device management status',
       icon: 'shield',
-      rows: 4, // MDM Status, Enrollment, Profiles, Compliance
+      iconColor: 'bg-yellow-100 dark:bg-yellow-900',
+      rows: 5, // MDM Status, Enrollment, Server, Profiles, Organization
       twoColumn: false
     },
     { 
       title: 'Security', 
       subtitle: 'Security and compliance status',
       icon: 'lock',
-      rows: 4, // Firewall, Encryption, Updates, Antivirus
+      iconColor: 'bg-red-100 dark:bg-red-900',
+      rows: 6, // Firewall, Encryption, Updates, Antivirus, Gatekeeper, SIP
       twoColumn: false
     },
     { 
       title: 'Network', 
       subtitle: 'Network connectivity information',
       icon: 'wifi',
-      rows: 5, // IP Address, MAC, WiFi, DNS, Gateway
+      iconColor: 'bg-teal-100 dark:bg-teal-900',
+      rows: 6, // IP Address, MAC, WiFi, Connection Type, DNS, Gateway
       twoColumn: false
     }
   ]
@@ -284,9 +303,9 @@ function InfoTabSkeleton() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
               {/* Icon */}
-              <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center animate-pulse" 
+              <div className={`w-10 h-10 ${widget.iconColor} rounded-lg flex items-center justify-center animate-pulse`} 
                    style={{ animationDelay: `${widgetIndex * 0.1}s` }}>
-                <div className="w-5 h-5 bg-blue-200 dark:bg-blue-700 rounded animate-pulse"></div>
+                <div className="w-5 h-5 bg-gray-300 dark:bg-gray-600 rounded animate-pulse"></div>
               </div>
               <div className="flex-1">
                 {/* Title */}
@@ -330,14 +349,16 @@ function InfoTabSkeleton() {
                 </div>
               ) : (
                 // Single column layout for other widgets
-                Array.from({ length: widget.rows }).map((_, i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <div className={`h-4 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
-                         style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05}s` }}></div>
-                    <div className={`h-4 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
-                         style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05 + 0.025}s` }}></div>
-                  </div>
-                ))
+                <div className="space-y-4">
+                  {Array.from({ length: widget.rows }).map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className={`h-3 ${fieldWidths[i % fieldWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                           style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05}s` }}></div>
+                      <div className={`h-4 ${valueWidths[i % valueWidths.length]} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} 
+                           style={{ animationDelay: `${widgetIndex * 0.1 + i * 0.05 + 0.025}s` }}></div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           </div>
@@ -468,6 +489,43 @@ function InstallsTabSkeleton() {
                 <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
               </div>
               <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProfilesTabSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Profile stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {['Total Profiles', 'Configuration', 'Device Restrictions'].map((stat, i) => (
+          <div key={stat} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+            <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" style={{ animationDelay: `${i * 0.1}s` }}></div>
+            <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+            <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Profile list */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="px-6 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.05}s` }}></div>
+                  <div className="h-3 w-60 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.025}s` }}></div>
+                </div>
+                <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.05}s` }}></div>
+              </div>
             </div>
           ))}
         </div>
