@@ -68,7 +68,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
   if (!filteredEvents || filteredEvents.length === 0) {
     return (
       <div className="space-y-6">
-        {/* Header with Icon - Consistent with other tabs */}
+        {/* Header with Icon */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">
@@ -172,7 +172,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header with Icon - Consistent with other tabs */}
+      {/* Header with Icon */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-gray-100 dark:bg-gray-900 rounded-lg flex items-center justify-center">

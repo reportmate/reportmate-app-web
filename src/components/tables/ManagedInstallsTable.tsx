@@ -40,9 +40,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       case 'installed':
         return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200';
       case 'warning':
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       case 'error':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       case 'removed':
@@ -294,7 +294,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     onClick={() => setStatusFilter('all')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                       statusFilter === 'all'
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
+                        ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -314,7 +314,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     onClick={() => setStatusFilter('pending')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                       statusFilter === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >
@@ -324,7 +324,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     onClick={() => setStatusFilter('warning')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
                       statusFilter === 'warning'
-                        ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
                     }`}
                   >

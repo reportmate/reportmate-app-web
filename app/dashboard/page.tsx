@@ -109,7 +109,7 @@ export default function Dashboard() {
                 modules: { ...device.modules },
                 // Extract inventory fields for backwards compatibility
                 assetTag: inventory.assetTag,
-                name: inventory.deviceName || device.name || 'Unknown Device'
+                name: inventory.deviceName || device.name || device.serialNumber || 'Unknown Device'
               }
             })
             
@@ -137,14 +137,39 @@ export default function Dashboard() {
             }
             
             // Build device name mapping (serial -> name)
+            // ENHANCED: Map all possible device identifiers to inventory device names
             const nameMap: Record<string, string> = {}
             processedDevices.forEach((device: Device) => {
-              if (device.serialNumber && device.name) {
-                nameMap[device.serialNumber] = device.name
+              // Get the proper device name from inventory or fallback chain
+              const deviceName = device.name // This already includes inventory.deviceName from processing above
+              
+              if (deviceName) {
+                // Map all possible identifiers that events might use
+                if (device.serialNumber) {
+                  nameMap[device.serialNumber] = deviceName
+                }
+                if (device.deviceId) {
+                  nameMap[device.deviceId] = deviceName
+                }
+                // Also map any asset tag to the device name
+                if (device.assetTag) {
+                  nameMap[device.assetTag] = deviceName
+                }
+                // Map inventory device name to itself (in case events use that)
+                if (device.modules?.inventory?.deviceName) {
+                  nameMap[device.modules.inventory.deviceName] = deviceName
+                }
               }
-              // Also map by deviceId in case that's used
-              nameMap[device.deviceId] = device.name
+              
+              console.log('[DASHBOARD] Device name mapping for:', device.serialNumber, ':', {
+                serialNumber: device.serialNumber,
+                deviceId: device.deviceId,
+                assetTag: device.assetTag,
+                inventoryDeviceName: device.modules?.inventory?.deviceName,
+                mappedName: deviceName
+              })
             })
+            console.log('[DASHBOARD] Final device name map:', nameMap)
             setDeviceNameMap(nameMap)
           } else if (data.success && data.devices) {
             console.log('[DASHBOARD] Processing wrapped format...')
@@ -156,7 +181,7 @@ export default function Dashboard() {
                 // Preserve all modules (including system)
                 modules: { ...device.modules },
                 assetTag: inventory.assetTag,
-                name: inventory.deviceName || device.name || 'Unknown Device'
+                name: inventory.deviceName || device.name || device.serialNumber || 'Unknown Device'
               }
             })
             
@@ -168,14 +193,39 @@ export default function Dashboard() {
             setDevicesLoading(false)
             
             // Build device name mapping (serial -> name)
+            // ENHANCED: Map all possible device identifiers to inventory device names
             const nameMap: Record<string, string> = {}
             processedDevices.forEach((device: Device) => {
-              if (device.serialNumber && device.name) {
-                nameMap[device.serialNumber] = device.name
+              // Get the proper device name from inventory or fallback chain
+              const deviceName = device.name // This already includes inventory.deviceName from processing above
+              
+              if (deviceName) {
+                // Map all possible identifiers that events might use
+                if (device.serialNumber) {
+                  nameMap[device.serialNumber] = deviceName
+                }
+                if (device.deviceId) {
+                  nameMap[device.deviceId] = deviceName
+                }
+                // Also map any asset tag to the device name
+                if (device.assetTag) {
+                  nameMap[device.assetTag] = deviceName
+                }
+                // Map inventory device name to itself (in case events use that)
+                if (device.modules?.inventory?.deviceName) {
+                  nameMap[device.modules.inventory.deviceName] = deviceName
+                }
               }
-              // Also map by deviceId in case that's used
-              nameMap[device.deviceId] = device.name
+              
+              console.log('[DASHBOARD] Device name mapping for:', device.serialNumber, ':', {
+                serialNumber: device.serialNumber,
+                deviceId: device.deviceId,
+                assetTag: device.assetTag,
+                inventoryDeviceName: device.modules?.inventory?.deviceName,
+                mappedName: deviceName
+              })
             })
+            console.log('[DASHBOARD] Final device name map (wrapped format):', nameMap)
             setDeviceNameMap(nameMap)
           } else {
             console.log('[DASHBOARD] Unrecognized data format:', data)
