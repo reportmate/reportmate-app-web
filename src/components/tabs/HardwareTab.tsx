@@ -5,18 +5,57 @@
 
 import React from 'react'
 
+interface HardwareData {
+  model?: unknown;
+  manufacturer?: unknown;
+  memory?: {
+    totalPhysical?: unknown;
+    availablePhysical?: unknown;
+  };
+  processor?: {
+    architecture?: unknown;
+    cores?: unknown;
+    logicalProcessors?: unknown;
+    maxSpeed?: unknown;
+  };
+  battery?: {
+    cycleCount?: unknown;
+  };
+  graphics?: {
+    name?: unknown;
+    manufacturer?: unknown;
+    memorySize?: unknown;
+  };
+  npu?: {
+    name?: unknown;
+    manufacturer?: unknown;
+    computeUnits?: unknown;
+    compute_units?: unknown;
+  };
+  [key: string]: unknown;
+}
+
+interface DeviceWithHardware {
+  modules?: {
+    hardware?: HardwareData;
+  };
+  hardware?: HardwareData;
+  [key: string]: unknown;
+}
+
 interface HardwareTabProps {
-  device: any
-  data?: any
+  device: DeviceWithHardware
+  data?: HardwareData
 }
 
 // Helper function to safely render any value as a string
-const safeString = (value: any): string => {
+const safeString = (value: unknown): string => {
   if (value === null || value === undefined) return 'Unknown'
   if (typeof value === 'object') {
     // If it's an object, try to extract meaningful properties
-    if (value.name) return String(value.name)
-    if (value.value) return String(value.value)
+    const obj = value as Record<string, unknown>
+    if (obj.name) return String(obj.name)
+    if (obj.value) return String(obj.value)
     // Otherwise, just return a placeholder
     return 'Complex Value'
   }
@@ -24,17 +63,18 @@ const safeString = (value: any): string => {
 }
 
 // Helper function to safely extract processor name specifically
-const safeProcessorName = (processor: any): string => {
+const safeProcessorName = (processor: unknown): string => {
   if (!processor) return 'Unknown'
   if (typeof processor === 'string') return processor
   if (typeof processor === 'object') {
-    return String(processor.name || processor.value || 'Unknown Processor')
+    const proc = processor as Record<string, unknown>
+    return String(proc.name || proc.value || 'Unknown Processor')
   }
   return String(processor)
 }
 
 // Helper function to safely get a numeric value
-const safeNumber = (value: any): number => {
+const safeNumber = (value: unknown): number => {
   if (value === null || value === undefined) return 0
   if (typeof value === 'number') return value
   if (typeof value === 'string') {
@@ -128,8 +168,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const usedStorage = totalStorage - freeStorage
   const storageUsagePercent = totalStorage > 0 ? Math.round((usedStorage / totalStorage) * 100) : 0
 
-  const totalMemory = hardwareData.memory?.totalPhysical || 0
-  const availableMemory = hardwareData.memory?.availablePhysical || 0
+  const totalMemory = safeNumber(hardwareData.memory?.totalPhysical) || 0
+  const availableMemory = safeNumber(hardwareData.memory?.availablePhysical) || 0
   const usedMemory = totalMemory - availableMemory
   const memoryUsagePercent = totalMemory > 0 ? Math.round((usedMemory / totalMemory) * 100) : 0
 
@@ -173,11 +213,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 md:col-span-2">
           <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Model</div>
           <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            {hardwareData.model || 'Unknown'}
+            {safeString(hardwareData.model) || 'Unknown'}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Manufacturer</div>
           <div className="text-sm text-gray-900 dark:text-white font-medium">
-            {hardwareData.manufacturer || 'Unknown Manufacturer'}
+            {safeString(hardwareData.manufacturer) || 'Unknown Manufacturer'}
           </div>
         </div>
 

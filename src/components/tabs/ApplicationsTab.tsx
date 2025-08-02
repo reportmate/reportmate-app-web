@@ -7,9 +7,37 @@ import React, { useMemo } from 'react'
 import { ApplicationsTable } from '../tables'
 import { processApplicationsData } from '../../lib/data-processing/component-data'
 
+interface ApplicationInfo {
+  id: string;
+  name: string;
+  displayName?: string;
+  version?: string;
+  publisher?: string;
+  category?: string;
+  installDate?: string;
+  size?: string;
+  path?: string;
+  [key: string]: unknown; // Allow additional properties from API
+}
+
+interface DeviceData {
+  applications?: {
+    installedApps?: ApplicationInfo[]
+  }
+  modules?: {
+    applications?: {
+      installed_applications?: ApplicationInfo[]
+      installedApplications?: ApplicationInfo[]
+      InstalledApplications?: ApplicationInfo[]
+    }
+  }
+}
+
 interface ApplicationsTabProps {
-  device: any
-  data?: any
+  device: DeviceData
+  data?: {
+    installedApps?: ApplicationInfo[]
+  }
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
@@ -17,11 +45,11 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   const applicationsModuleData = processApplicationsData(device)
   
   // Check if we have applications data - prioritize data prop, then processed device data
-  const hasApplicationsData = data?.installedApps?.length > 0 ||
-                              device?.applications?.installedApps?.length > 0 ||
-                              device?.modules?.applications?.installed_applications?.length > 0 || 
-                              device?.modules?.applications?.installedApplications?.length > 0 || 
-                              applicationsModuleData?.installedApps?.length > 0
+  const hasApplicationsData = (data?.installedApps?.length ?? 0) > 0 ||
+                              (device?.applications?.installedApps?.length ?? 0) > 0 ||
+                              (device?.modules?.applications?.installed_applications?.length ?? 0) > 0 || 
+                              (device?.modules?.applications?.installedApplications?.length ?? 0) > 0 || 
+                              (applicationsModuleData?.installedApps?.length ?? 0) > 0
 
   console.log('🔍 ApplicationsTab Debug:', {
     hasDataProp: !!data,
@@ -39,37 +67,8 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     applicationsModuleData: JSON.stringify(applicationsModuleData).substring(0, 500)
   });
 
-  // If no applications data, show empty state with proper message
-  if (!hasApplicationsData) {
-    const applicationsData = {
-      totalApps: 0,
-      installedApps: []
-    }
-    
-    return (
-      <div className="space-y-6">
-        {/* Header with Icon - Consistent with other tabs */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
-              <p className="text-base text-gray-600 dark:text-gray-400">Inventory and details</p>
-            </div>
-          </div>
-        </div>
-
-        <ApplicationsTable data={applicationsData} />
-      </div>
-    )
-  }
-
   // Transform applications data for the table component
-  let installedApps = []
+  let installedApps: ApplicationInfo[] = []
   
   console.log('🔍 ApplicationsTab Data Sources Debug:', {
     hasDataProp: !!data?.installedApps?.length,
@@ -89,7 +88,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   });
   
   // Prioritize data prop, then processed device data, then fallback to raw module data
-  if (data?.installedApps?.length > 0) {
+  if (data?.installedApps?.length) {
     console.log('✅ Using data prop (processedData.applications)');
     installedApps = data.installedApps
   } else if (device?.applications?.installedApps) {
@@ -110,28 +109,28 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   }
 
   // Transform the data to match ApplicationsTable expected format
-  const processedApps = installedApps.map((app: any, index: number) => ({
+  const processedApps = installedApps.map((app: ApplicationInfo, index: number) => ({
     id: app.id || app.name || `app-${index}`,
     name: app.name || app.displayName || 'Unknown Application',
     displayName: app.displayName || app.name,
-    version: app.version || app.bundle_version || 'Unknown',
-    publisher: app.publisher || app.signed_by || 'Unknown Publisher',
+    version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
+    publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
     category: app.category || 'Uncategorized',
-    installDate: app.installDate || app.install_date || app.last_modified,
+    installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
     size: app.size,
-    path: app.path || app.install_location,
-    bundleId: app.bundleId || app.bundle_id,
-    info: app.info,
-    obtained_from: app.obtained_from,
-    runtime_environment: app.runtime_environment,
-    has64bit: app.has64bit,
-    signed_by: app.signed_by
+    path: app.path || (app as unknown as Record<string, unknown>).install_location as string,
+    bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string,
+    info: (app as unknown as Record<string, unknown>).info as string,
+    obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
+    runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
+    has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
+    signed_by: (app as unknown as Record<string, unknown>).signed_by as string
   }))
 
   // Calculate summary statistics
   const totalApps = processedApps.length
-  const signedApps = processedApps.filter((app: any) => app.signed_by || app.publisher !== 'Unknown Publisher').length
-  const recentApps = processedApps.filter((app: any) => {
+  const signedApps = processedApps.filter((app: ApplicationInfo) => (app as unknown as Record<string, unknown>).signed_by || app.publisher !== 'Unknown Publisher').length
+  const recentApps = processedApps.filter((app: ApplicationInfo) => {
     if (!app.installDate) return false
     const installDate = new Date(app.installDate)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
@@ -158,6 +157,30 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
       version: processedApps[0].version
     } : null
   });
+
+  // If no applications data, show empty state with proper message
+  if (!hasApplicationsData) {
+    return (
+      <div className="space-y-6">
+        {/* Header with Icon - Consistent with other tabs */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
+              <p className="text-base text-gray-600 dark:text-gray-400">Inventory and details</p>
+            </div>
+          </div>
+        </div>
+
+        <ApplicationsTable data={applicationsData} />
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">

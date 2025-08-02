@@ -41,7 +41,6 @@ interface ApplicationsTableProps {
 
 export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchUpdateTrigger, setSearchUpdateTrigger] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
   // Component mount tracking
@@ -58,14 +57,13 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
   useEffect(() => {
     console.log('🔍 ApplicationsTable: Search term state changed to:', searchTerm);
     console.log('🔍 ApplicationsTable: Current data.installedApps length:', data?.installedApps?.length || 0);
-    setSearchUpdateTrigger(prev => prev + 1); // Force re-render
-  }, [searchTerm]);
+  }, [searchTerm, data?.installedApps?.length]);
   
   // Debug effect to track data changes
   useEffect(() => {
     console.log('🔍 ApplicationsTable: Data prop changed, apps count:', data?.installedApps?.length || 0);
     console.log('🔍 ApplicationsTable: Sample app:', data?.installedApps?.[0]);
-  }, [data]);
+  }, [data?.installedApps]);
   
   // Filter applications based on search term
   const filteredApps = useMemo(() => {
@@ -104,7 +102,7 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
     
     console.log('🔍 ApplicationsTable: Filtered', filtered.length, 'out of', apps.length, 'apps');
     return filtered;
-  }, [data?.installedApps, searchTerm, searchUpdateTrigger]);
+  }, [data?.installedApps, searchTerm]);
 
   // Handle scrollbar visibility
   useEffect(() => {

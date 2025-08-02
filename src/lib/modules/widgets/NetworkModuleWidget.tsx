@@ -716,8 +716,8 @@ const VpnSecurityWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
   // Analyze security levels
   const securityAnalysis = activeVpns.map(vpn => {
     let securityScore = 0;
-    let issues: string[] = [];
-    let strengths: string[] = [];
+    const issues: string[] = [];
+    const strengths: string[] = [];
 
     // Protocol security scoring
     if (vpn.type) {

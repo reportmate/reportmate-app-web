@@ -51,67 +51,63 @@ export async function GET() {
     
     // Fallback to local database query if Azure Functions API fails
     if (useLocalFallback) {
-      console.log(`[DEVICES API] ${timestamp} - Local database fallback temporarily disabled`)
+      console.log(`[DEVICES API] ${timestamp} - Using local database fallback`)
       
-      // TODO: Restore local database fallback once Prisma is properly configured
-      return NextResponse.json({
-        error: 'Azure Functions API unavailable and local database fallback is disabled',
-        details: 'Please check Azure Functions API connectivity'
-      }, { status: 503 })
-      
-      /*
       try {
-        const devices = await prisma.device.findMany({
-          orderBy: {
-            lastSeen: 'desc'
-          }
+        // Import database connection
+        const { Pool } = require('pg')
+        const pool = new Pool({
+          connectionString: process.env.DATABASE_URL
         })
+
+        const result = await pool.query(`
+          SELECT 
+            d.device_id as id,
+            d.name,
+            d.serial_number as "serialNumber",
+            d.ip_address_v4 as "ipAddress",
+            d.last_seen as "lastSeen",
+            d.manufacturer,
+            s.data->'operatingSystem'->>'name' as os,
+            s.data->'operatingSystem'->>'version' as "osVersion"
+          FROM devices d
+          LEFT JOIN system s ON d.id = s.device_id
+          ORDER BY d.last_seen DESC
+          LIMIT 50
+        `)
         
-        // Transform Prisma result to match expected format
-        const transformedDevices = devices.map(device => ({
-          id: device.id,
-          name: device.name || 'Unknown Device',
-          model: device.model || 'Unknown Model',
-          os: device.os || 'Unknown OS',
-          serialNumber: device.serialNumber || device.id,
-          assetTag: device.assetTag || '',
-          ipAddress: device.ipAddress || 'Unknown',
-          ipAddressV4: device.ipAddress || '',
+        const devices = result.rows.map((row: any) => ({
+          id: row.id || row.serialNumber,
+          name: row.name || 'Unknown Device',
+          model: 'Unknown Model',
+          os: row.os || 'Unknown OS',
+          serialNumber: row.serialNumber,
+          assetTag: '',
+          ipAddress: row.ipAddress || 'Unknown',
+          ipAddressV4: row.ipAddress || '',
           ipAddressV6: '',
-          macAddress: device.macAddress || 'Unknown',
-          location: device.location || 'Unassigned',
-          lastSeen: device.lastSeen?.toISOString() || null,
-          status: device.status === 'Active' ? 'online' : (device.status || 'unknown').toLowerCase(),
-          uptime: 0, // We don't have uptime data in Prisma model yet
-          totalEvents: device.totalEvents || 0,
-          lastEventTime: device.lastEventTime?.toISOString() || null,
-          architecture: device.architecture || 'Unknown',
-          processor: device.processor || 'Unknown',
-          memory: device.memory || 'Unknown',
-          osName: '',  // Will be populated once Prisma client is updated
-          osVersion: '',
-          osBuild: '',
-          osArchitecture: ''
+          lastSeen: row.lastSeen
         }))
+
+        await pool.end()
+
+        console.log(`[DEVICES API] ${timestamp} - Local database fallback successful, found ${devices.length} devices`)
         
-        console.log(`[DEVICES API] ${timestamp} - 🚀 Returning ${transformedDevices.length} devices from local database`)
-        return NextResponse.json(transformedDevices, {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Fetched-At': timestamp,
-            'X-Data-Source': 'local-database'
-          }
+        return NextResponse.json({
+          success: true,
+          devices,
+          source: 'local_database_fallback',
+          timestamp: new Date().toISOString()
         })
         
       } catch (dbError) {
-        console.error(`[DEVICES API] ${timestamp} - Local database query failed:`, dbError)
+        console.error(`[DEVICES API] ${timestamp} - Local database fallback failed:`, dbError)
+        
         return NextResponse.json({
-          error: 'Failed to fetch devices from both Azure Functions API and local database',
-          details: 'Local database fallback is temporarily disabled'
+          error: 'Both Azure Functions API and local database unavailable',
+          details: `Azure API: ${response?.status || 'unreachable'}, Database: ${dbError}`
         }, { status: 503 })
-      */
+      }
     }
     
     // Continue with Azure Functions API response processing if we have a valid response

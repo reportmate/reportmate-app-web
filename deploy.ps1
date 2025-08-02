@@ -23,7 +23,7 @@ param(
     [switch]$DryRun,
     
     [Parameter(Mandatory = $false)]
-    [switch]$VerboseLogging,
+    [switch]$NoCache,
     
     [Parameter(Mandatory = $false)]
     [switch]$Help
@@ -86,6 +86,7 @@ OPTIONS:
     -SkipBuild             Skip Docker build (use existing image)
     -SkipDeploy            Skip Azure deployment (build only)
     -DryRun                Show what would be done without executing
+    -NoCache               Disable Docker layer caching
     -VerboseLogging        Enable verbose logging
     -Help                  Show this help message
 
@@ -107,6 +108,9 @@ EXAMPLES:
 
     # Deploy with custom tag
     .\deploy.ps1 -Tag "v1.2.3"
+
+    # Deploy without using Docker cache
+    .\deploy.ps1 -NoCache
 
 ENVIRONMENT VARIABLES:
     AZURE_SUBSCRIPTION_ID   Azure subscription ID
@@ -252,13 +256,34 @@ function Invoke-BuildImage {
     $FullImageName = "$RegistryName.azurecr.io/$ImageName`:$Tag"
     $LatestImageName = "$RegistryName.azurecr.io/$ImageName`:latest"
     
+    # Try to pull latest image for cache (ignore if fails)
+    if (-not $NoCache) {
+        try {
+            Write-LogVerbose "Attempting to pull latest image for cache..."
+            docker pull $LatestImageName 2>$null | Out-Null
+            $CacheArgs = @("--cache-from", $LatestImageName)
+            Write-LogVerbose "Using cache from: $LatestImageName"
+        } catch {
+            Write-LogVerbose "Could not pull latest image for cache, building without cache"
+            $CacheArgs = @()
+        }
+    } else {
+        Write-LogVerbose "Cache disabled via --NoCache flag"
+        $CacheArgs = @()
+    }
+
     $BuildArgs = @(
         "build"
         "--platform", "linux/amd64"
         "--build-arg", "DOCKER_BUILD=true"
         "--build-arg", "NODE_ENV=production"
-        "--build-arg", "BUILDKIT_INLINE_CACHE=1"
-        "--cache-from", $LatestImageName
+    )
+    
+    # Add cache args if available
+    $BuildArgs += $CacheArgs
+    
+    # Add remaining args
+    $BuildArgs += @(
         "-t", $FullImageName
         "-t", $LatestImageName
         $ScriptDir
@@ -345,8 +370,12 @@ function Invoke-DeployToAzure {
     }
 
     # Check if container app exists
-    $AppExists = az containerapp show --name $ContainerAppName --resource-group $ResourceGroup --output none 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    try {
+        az containerapp show --name $ContainerAppName --resource-group $ResourceGroup --output none 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "Container app not found"
+        }
+    } catch {
         Write-LogError "Container app '$ContainerAppName' not found in resource group '$ResourceGroup'"
         Write-LogError "Please ensure the infrastructure is deployed via Terraform first"
         exit 1

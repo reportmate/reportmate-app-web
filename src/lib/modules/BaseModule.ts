@@ -130,9 +130,9 @@ export class ModuleLoader {
    * Unload module
    */
   async unload(moduleId: string): Promise<void> {
-    const module = this.loadedModules.get(moduleId)
-    if (module) {
-      await module.onUnload()
+    const moduleInstance = this.loadedModules.get(moduleId)
+    if (moduleInstance) {
+      await moduleInstance.onUnload()
       this.loadedModules.delete(moduleId)
     }
   }

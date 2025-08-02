@@ -4,7 +4,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { SuccessStatsWidget, WarningStatsWidget, ErrorStatsWidget, DevicesStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
+import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
@@ -46,12 +46,17 @@ interface Device {
       collectedAt?: string
       serialNumber?: string
     }
+    system?: {
+      operatingSystem?: Record<string, unknown>;
+      [key: string]: unknown;
+    };
+    [key: string]: unknown;
   }
 }
 
 // Reuse the live events hook from the original dashboard
 
-export default function DashboardPage() {
+export default function Dashboard() {
   const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
@@ -90,7 +95,7 @@ export default function DashboardPage() {
             // Process devices to extract inventory data while preserving ALL modules
             const processedDevices = data.map((device: Device) => {
               const inventory = device.modules?.inventory || {}
-              const modules = device.modules as any
+              const modules = device.modules
               
               console.log('[DASHBOARD] Device modules available:', Object.keys(device.modules || {}))
               console.log('[DASHBOARD] System module present:', !!modules?.system)
@@ -211,6 +216,7 @@ export default function DashboardPage() {
     
     // Call direct API after a short delay
     setTimeout(loadDevicesDirectly, 1000)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally running once on mount
   }, [])
 
   // Update relative times every 30 seconds
