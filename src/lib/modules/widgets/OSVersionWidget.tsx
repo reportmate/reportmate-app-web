@@ -25,6 +25,21 @@ interface Device {
   architecture?: string
   processor?: string
   memory?: string
+  // Modular data structure
+  modules?: {
+    inventory?: any
+    system?: {
+      operatingSystem?: {
+        name: string
+        version: string
+        build: string
+        architecture: string
+        displayVersion?: string
+        edition?: string
+        featureUpdate?: string
+      }
+    }
+  }
 }
 
 interface OSVersionWidgetProps {
