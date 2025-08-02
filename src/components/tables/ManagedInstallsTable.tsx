@@ -86,96 +86,11 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   return (
     <div className="space-y-6">
-      {/* Main Layout: 30% left sidebar for config + 70% right area for packages */}
-      <div className="grid grid-cols-1 lg:grid-cols-10 gap-6">
-        {/* Left Sidebar - Configuration and Status (30% width) */}
-        <div className="lg:col-span-3 space-y-6">
-          {/* Configuration Section */}
-          {data.config && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="px-4 py-3.5 border-b border-gray-200 dark:border-gray-700">
-                <div className="flex items-center justify-between min-h-[2rem]">
-                  <div>
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      {data.config.type === 'cimian' ? 'Cimian' : 'Munki'} Config
-                    </h3>
-                  </div>
-                  <div></div>
-                </div>
-              </div>
-              <div className="p-4">
-                <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Manifest</label>
-                    <p className="text-xs font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-2 rounded break-all">
-                      {data.config.manifest}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Repository URL</label>
-                    <p className="text-xs font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 p-2 rounded break-all">
-                      {data.config.softwareRepoURL}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Version</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{data.config.version}</p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Last Run</label>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      {(() => {
-                        try {
-                          const date = new Date(data.config.lastRun);
-                          if (isNaN(date.getTime())) return 'Invalid date';
-                          
-                          const year = date.getFullYear();
-                          const month = String(date.getMonth() + 1).padStart(2, '0');
-                          const day = String(date.getDate()).padStart(2, '0');
-                          const hours = String(date.getHours()).padStart(2, '0');
-                          const minutes = String(date.getMinutes()).padStart(2, '0');
-                          const seconds = String(date.getSeconds()).padStart(2, '0');
-                          
-                          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-                        } catch {
-                          return 'Invalid date';
-                        }
-                      })()}
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Run Type</label>
-                    <p className="text-sm text-gray-900 dark:text-white">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        data.config.runType === 'auto' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                        data.config.runType === 'manual' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                        'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      }`}>
-                        {data.config.runType}
-                      </span>
-                    </p>
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Duration</label>
-                    <p className="text-sm text-gray-900 dark:text-white">{data.config.duration}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-        </div>
-
-        {/* Right Area - Packages Table (70% width) */}
-        <div className="lg:col-span-7 space-y-4">
-          {/* Error and Warning Messages - Above Packages Table Only */}
-          {data.messages && (data.messages.errors.length > 0 || data.messages.warnings.length > 0) && (
-            <div className="space-y-4">
+      {/* Full Width Packages Table */}
+      <div className="space-y-4">
+        {/* Error and Warning Messages - Above Packages Table Only */}
+        {data.messages && (data.messages.errors.length > 0 || data.messages.warnings.length > 0) && (
+          <div className="space-y-4">
               {/* Errors Section */}
               {data.messages.errors.length > 0 && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -491,7 +406,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
             </div>
           </div>
         </div>
-      </div>
     </div>
   );
 };
