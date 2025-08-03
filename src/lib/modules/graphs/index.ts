@@ -5,3 +5,5 @@
 
 export { OSVersionBarChart } from './OSVersionBarChart'
 export { StatusDonutChart } from './StatusDonutChart'
+export { PlatformDistributionChart } from './PlatformDistributionChart'
+export { HardwareArchDistributionChart } from './HardwareArchDistributionChart'

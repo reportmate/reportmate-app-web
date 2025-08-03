@@ -10,6 +10,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { ConnectionStatusWidget } from "../../src/lib/modules/widgets/ConnectionStatusWidget"
+import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { useLiveEvents } from "./hooks"
 
@@ -390,6 +391,11 @@ export default function Dashboard() {
                 {/* Windows Versions */}
                 <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
               </div>
+            </ErrorBoundary>
+
+            {/* Platform Distribution - Full Width */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
+              <PlatformDistributionWidget devices={devices as any} loading={devicesLoading} />
             </ErrorBoundary>
           </div>
         </div>
