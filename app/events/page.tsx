@@ -42,14 +42,15 @@ const safeDisplayPayload = (payload: EventPayload | string | null | undefined): 
     
     // Now handle object payloads
     if (typeof payload === 'object') {
+      // **PRIORITY 1: Look for direct message field (ReportMate events)**
+      if (payload.message && typeof payload.message === 'string') {
+        const message = payload.message
+        return message.length > 150 ? message.substring(0, 150) + '...' : message
+      }
+      
       // Handle summarized payloads (from our new API structure)
       if (payload.summary) {
         return payload.summary
-      }
-      
-      // Handle message-based payloads
-      if (payload.message) {
-        return payload.message
       }
       
       // Handle module count payloads
@@ -104,7 +105,7 @@ const safeDisplayPayload = (payload: EventPayload | string | null | undefined): 
       const keys = Object.keys(payload)
       if (keys.length === 0) return 'Empty payload'
       if (keys.length > 5) {
-        return `Large data object (${keys.length} properties): ${keys.slice(0, 3).join(', ')}...`
+        return `System event (${keys.length} properties): ${keys.slice(0, 3).join(', ')}...`
       }
       
       // Try to stringify, but with strict size limit
