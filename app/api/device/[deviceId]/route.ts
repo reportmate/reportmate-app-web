@@ -65,7 +65,107 @@ export async function GET(
     if (!response.ok) {
       console.error('[DEVICE API] Azure Functions API error:', response.status, response.statusText)
       
-      // If Azure Functions API is not available, fall back to sample data
+      // Try direct database fallback first (for development/troubleshooting)
+      console.log('[DEVICE API] Trying direct database fallback...')
+      
+      try {
+        const { pool } = await import('../../../../src/lib/db')
+        
+        // Query device basic info
+        const deviceQuery = `
+          SELECT 
+            id, device_id, name, serial_number, os, status, last_seen, 
+            model, manufacturer, created_at, updated_at
+          FROM devices 
+          WHERE id = $1 OR serial_number = $1
+          LIMIT 1`
+        
+        const deviceResult = await pool.query(deviceQuery, [deviceId])
+        
+        if (deviceResult.rows.length > 0) {
+          const deviceRow = deviceResult.rows[0]
+          
+          // Get module data for this device
+          const validModules = [
+            'applications', 'displays', 'hardware', 'installs', 'inventory',
+            'management', 'network', 'printers', 'profiles', 'security', 'system'
+          ]
+          
+          const modules: Record<string, unknown> = {}
+          let latestCollectionTime = null
+          
+          // Query each module table for this device's data
+          for (const moduleName of validModules) {
+            try {
+              const moduleQuery = `
+                SELECT data, collected_at, created_at
+                FROM ${moduleName} 
+                WHERE device_id = $1
+                ORDER BY created_at DESC
+                LIMIT 1`
+              
+              const moduleResult = await pool.query(moduleQuery, [deviceRow.id])
+              
+              if (moduleResult.rows.length > 0 && moduleResult.rows[0].data) {
+                const moduleData = moduleResult.rows[0].data
+                
+                if (moduleResult.rows[0].collected_at) {
+                  moduleData.collectedAt = moduleResult.rows[0].collected_at.toISOString()
+                  
+                  if (!latestCollectionTime || moduleResult.rows[0].collected_at > latestCollectionTime) {
+                    latestCollectionTime = moduleResult.rows[0].collected_at
+                  }
+                }
+                
+                modules[moduleName] = moduleData
+                console.log(`[DEVICE API] ✅ Retrieved ${moduleName} data from database`)
+              }
+            } catch (moduleError) {
+              console.warn(`[DEVICE API] ❌ Failed to query ${moduleName} table:`, moduleError)
+              continue
+            }
+          }
+          
+          // Build metadata
+          const metadata = {
+            deviceId: deviceRow.device_id,
+            serialNumber: deviceRow.serial_number,
+            collectedAt: latestCollectionTime ? latestCollectionTime.toISOString() : deviceRow.last_seen?.toISOString(),
+            clientVersion: '1.0.0'
+          }
+          
+          // Return device data in expected format
+          const responseData = {
+            success: true,
+            device: {
+              deviceId: metadata.deviceId,
+              serialNumber: metadata.serialNumber,
+              status: 'active',
+              lastSeen: metadata.collectedAt,
+              clientVersion: metadata.clientVersion,
+              modules: modules
+            },
+            source: 'direct-database'
+          }
+          
+          console.log(`[DEVICE API] ✅ Successfully retrieved device data from database with ${Object.keys(modules).length} modules`)
+          
+          return NextResponse.json(responseData, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+        } else {
+          console.log('[DEVICE API] Device not found in direct database query')
+        }
+        
+      } catch (dbError) {
+        console.error('[DEVICE API] Direct database fallback failed:', dbError)
+      }
+      
+      // If database fallback failed, try sample data
       console.log('[DEVICE API] Falling back to sample data')
       
       try {
