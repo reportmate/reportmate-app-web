@@ -6,6 +6,60 @@ import fs from 'fs'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+// Helper function to convert PowerShell object strings to JSON objects
+function parsePowerShellObject(str: string): unknown {
+  if (typeof str !== 'string' || !str.startsWith('@{') || !str.endsWith('}')) {
+    return str
+  }
+  
+  try {
+    // Remove @{ and } wrapper
+    const content = str.slice(2, -1)
+    
+    // Split by semicolons and parse key-value pairs
+    const pairs = content.split(';')
+    const result: Record<string, unknown> = {}
+    
+    for (const pair of pairs) {
+      const [key, ...valueParts] = pair.split('=')
+      if (key && valueParts.length > 0) {
+        const cleanKey = key.trim()
+        const valueStr = valueParts.join('=').trim()
+        
+        // Try to parse as number if it looks like one
+        if (/^\d+$/.test(valueStr)) {
+          result[cleanKey] = parseInt(valueStr, 10)
+        } else if (/^\d+\.\d+$/.test(valueStr)) {
+          result[cleanKey] = parseFloat(valueStr)
+        } else {
+          result[cleanKey] = valueStr
+        }
+      }
+    }
+    
+    return result
+  } catch (error) {
+    console.warn('Failed to parse PowerShell object:', str, error)
+    return str
+  }
+}
+
+// Recursively process object to convert PowerShell object strings
+function convertPowerShellObjects(obj: unknown): unknown {
+  if (typeof obj === 'string') {
+    return parsePowerShellObject(obj)
+  } else if (Array.isArray(obj)) {
+    return obj.map(convertPowerShellObjects)
+  } else if (obj && typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertPowerShellObjects(value)
+    }
+    return result
+  }
+  return obj
+}
+
 // Type definitions
 interface RecentAttempt {
   version?: string;
@@ -107,7 +161,10 @@ export async function GET(
               const moduleResult = await pool.query(moduleQuery, [deviceRow.id])
               
               if (moduleResult.rows.length > 0 && moduleResult.rows[0].data) {
-                const moduleData = moduleResult.rows[0].data
+                let moduleData = moduleResult.rows[0].data
+                
+                // Convert PowerShell object strings to proper JSON objects
+                moduleData = convertPowerShellObjects(moduleData)
                 
                 if (moduleResult.rows[0].collected_at) {
                   moduleData.collectedAt = moduleResult.rows[0].collected_at.toISOString()
@@ -118,7 +175,7 @@ export async function GET(
                 }
                 
                 modules[moduleName] = moduleData
-                console.log(`[DEVICE API] ✅ Retrieved ${moduleName} data from database`)
+                console.log(`[DEVICE API] ✅ Retrieved and processed ${moduleName} data from database`)
               }
             } catch (moduleError) {
               console.warn(`[DEVICE API] ❌ Failed to query ${moduleName} table:`, moduleError)
