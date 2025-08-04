@@ -129,104 +129,129 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
     return deviceId || 'Unknown Device'
   }
 
-  // Helper function to safely display payload - enhanced with device name logic
+  // Helper function to safely display payload - enhanced for ReportMate events
   const formatPayloadPreview = (payload: Record<string, unknown> | string) => {
     try {
       if (!payload) return 'No payload'
       
-      // Handle summarized payloads (from our new API structure)
-      if (typeof payload === 'object' && payload.summary) {
-        return payload.summary
+      // Handle string payloads directly
+      if (typeof payload === 'string') {
+        return payload.length > 120 ? payload.substring(0, 120) + '...' : payload
       }
       
-      // Handle message-based payloads
-      if (typeof payload === 'object' && (payload as any).message) {
-        return (payload as any).message
+      if (typeof payload !== 'object') {
+        return String(payload).substring(0, 80)
       }
-      
-      // Handle module count payloads
-      if (typeof payload === 'object' && (payload as any).moduleCount && (payload as any).modules) {
-        const moduleCount = (payload as any).moduleCount
-        const modules = (payload as any).modules
+
+      const payloadObj = payload as any
+
+      // **PRIORITY 1: Look for direct message field (ReportMate events)**
+      if (payloadObj.message && typeof payloadObj.message === 'string') {
+        const message = payloadObj.message
+        return message.length > 120 ? message.substring(0, 120) + '...' : message
+      }
+
+      // **PRIORITY 2: Look for summary field (API summaries)**
+      if (payloadObj.summary && typeof payloadObj.summary === 'string') {
+        return payloadObj.summary
+      }
+
+      // **PRIORITY 3: Handle modules_processed structure (data collection events)**
+      if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
+        const moduleCount = payloadObj.modules_processed
+        const enabledModules = payloadObj.enabled_modules
+        
+        if (Array.isArray(enabledModules) && enabledModules.length > 0) {
+          if (moduleCount === 1) {
+            return `${enabledModules[0]} module data collected`
+          } else if (moduleCount <= 3) {
+            return `${enabledModules.slice(0, moduleCount).join(', ')} modules data collected`
+          } else {
+            return `All ${moduleCount} modules data collected`
+          }
+        }
+        
+        return `${moduleCount} modules data collected`
+      }
+
+      // **PRIORITY 4: Handle moduleCount structure (older format)**
+      if (payloadObj.moduleCount && payloadObj.modules && Array.isArray(payloadObj.modules)) {
+        const moduleCount = payloadObj.moduleCount
+        const modules = payloadObj.modules
         if (moduleCount === 1) {
           return `${modules[0]} data reported`
         } else if (moduleCount <= 3) {
           return `${modules.join(', ')} data reported`
         } else {
-          return `All modules reported`
+          return `All modules data reported`
+        }
+      }
+
+      // **PRIORITY 5: Handle full device report structure**
+      if (payloadObj.modules && typeof payloadObj.modules === 'object') {
+        const moduleNames = Object.keys(payloadObj.modules)
+        const moduleCount = moduleNames.length
+        
+        if (moduleCount === 1) {
+          return `${moduleNames[0]} data reported`
+        } else if (moduleCount <= 3) {
+          return `${moduleNames.join(', ')} data reported`
+        } else {
+          return `All modules data reported`
+        }
+      }
+
+      // **PRIORITY 6: Handle sanitized payload summaries**
+      if (payloadObj.message && payloadObj.dataSize && payloadObj.truncated) {
+        // This is a sanitized large payload
+        if (payloadObj.keys && Array.isArray(payloadObj.keys)) {
+          const keys = payloadObj.keys
+          if (keys.includes('modules') || keys.includes('device_name') || keys.includes('client_version')) {
+            return 'System data collection completed'
+          }
+        }
+        return 'Data collection completed'
+      }
+
+      // **PRIORITY 7: Look for other common message fields**
+      if (payloadObj.description) {
+        return String(payloadObj.description).substring(0, 120)
+      }
+      if (payloadObj.title) {
+        return String(payloadObj.title).substring(0, 120)
+      }
+      if (payloadObj.event_message) {
+        return String(payloadObj.event_message).substring(0, 120)
+      }
+
+      // **FALLBACK: Create a descriptive summary**
+      const keys = Object.keys(payloadObj)
+      if (keys.length === 0) return 'Empty event data'
+      
+      // Check for known patterns in key names
+      if (keys.some(k => k.includes('module') || k.includes('install') || k.includes('system'))) {
+        return 'System event occurred'
+      }
+      
+      if (keys.length === 1) {
+        const key = keys[0]
+        const value = payloadObj[key]
+        if (typeof value === 'string' && value.length < 50) {
+          return `${key}: ${value}`
+        } else if (typeof value === 'number') {
+          return `${key}: ${value}`
         }
       }
       
-      // Handle string payloads
-      if (typeof payload === 'string') {
-        return payload.length > 80 ? payload.substring(0, 80) + '...' : payload
+      // Last resort - show key count but make it more user-friendly
+      if (keys.length <= 3) {
+        return `Event with ${keys.join(', ')} data`
+      } else {
+        return `Complex event (${keys.length} data fields)`
       }
       
-      // For other objects, try to find a meaningful representation
-      if (typeof payload === 'object') {
-        // Check if this is a full device report (contains multiple modules)
-        if ((payload as any).modules && typeof (payload as any).modules === 'object') {
-          const moduleCount = Object.keys((payload as any).modules).length
-          const moduleNames = Object.keys((payload as any).modules).slice(0, 3)
-          
-          if (moduleCount > 3) {
-            return `All modules reported`
-          } else {
-            return `${moduleNames.join(', ')} data reported`
-          }
-        }
-        
-        // Check for new structure with modules_processed
-        if ((payload as any).modules_processed && typeof (payload as any).modules_processed === 'number') {
-          const modulesProcessed = (payload as any).modules_processed
-          if (modulesProcessed === 1) {
-            return `Single module reported`
-          } else if (modulesProcessed <= 3) {
-            return `${modulesProcessed} modules reported`
-          } else {
-            return `All modules reported`
-          }
-        }
-        
-        // Check for common event types
-        if ((payload as any).component || (payload as any).moduleType || (payload as any).clientVersion) {
-          const parts = []
-          if ((payload as any).message) parts.push((payload as any).message)
-          
-          const summary = parts.join(' • ')
-          return summary.length > 80 ? summary.substring(0, 80) + '...' : summary || 'Info event'
-        }
-        
-        // Check if it's a large data payload summary (from sanitization)
-        if ((payload as any).message && (payload as any).dataSize && (payload as any).truncated) {
-          // This is a sanitized large payload, try to create a better summary
-          if ((payload as any).keys && Array.isArray((payload as any).keys)) {
-            const keys = (payload as any).keys
-            if (keys.includes('modules') || keys.includes('device_name') || keys.includes('client_version')) {
-              return 'All modules reported'
-            }
-          }
-          return 'Data collection completed'
-        }
-        
-        // Fallback for complex objects
-        const keys = Object.keys(payload)
-        if (keys.length === 0) return 'Empty payload'
-        if (keys.length > 3) {
-          return `Data collection completed`
-        }
-        
-        // Try to stringify, but with strict size limit
-        const stringified = JSON.stringify(payload)
-        if (stringified.length > 80) {
-          return `Data collection completed`
-        }
-        return stringified.substring(0, 80)
-      }
-      
-      return String(payload).substring(0, 80)
     } catch (_error) {
-      return 'Complex payload'
+      return 'Event data (parsing error)'
     }
   }
 
