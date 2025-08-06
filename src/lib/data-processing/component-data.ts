@@ -791,7 +791,8 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   // Extract managed installs data from API response - enhanced for Cimian support
   // Check multiple possible locations for installs data
-  const installs = rawDevice.installs || rawDevice.managedInstalls || rawDevice.modules?.installs || rawDevice.modules?.managedInstalls || {}
+  // PRIORITY: Check modules.installs FIRST since that's where API puts data
+  const installs = rawDevice.modules?.installs || rawDevice.installs || rawDevice.managedInstalls || rawDevice.modules?.managedInstalls || {}
   
   // Extract the system name from the top-level key (e.g., "cimian", "munki")
   const installsKeys = Object.keys(installs)

@@ -29,6 +29,7 @@ function mapExtendedCategory(category?: string): 'core' | 'widget' | 'integratio
 // Import core modules
 import DeviceInfoModule from './core/DeviceInfoModule'
 import EventsModule from './core/EventsModule'
+import PeripheralsModule from './core/PeripheralsModule'
 
 // Import widget modules
 import ManagedInstallsModule from './widgets/ManagedInstallsModule'
@@ -51,6 +52,7 @@ export async function initializeCoreModules(): Promise<void> {
     const coreModules = [
       new DeviceInfoModule(),
       new EventsModule(),
+      new PeripheralsModule(),
     ]
     
     // Register widget modules

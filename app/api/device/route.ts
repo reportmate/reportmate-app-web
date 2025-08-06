@@ -26,19 +26,66 @@ export async function POST(request: Request) {
     
     console.log(`[DEVICE API] ${timestamp} - Forwarding to Azure Functions API:`, apiBaseUrl)
     
-    // Forward the request to Azure Functions /api/device endpoint
-    const response = await fetch(`${apiBaseUrl}/api/device`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
-      },
-      body: JSON.stringify(requestData)
-    })
+    // Try Azure Functions first, fall back to local processing if it fails
+    let response: Response | null = null
+    let useLocalFallback = false
     
-    if (!response.ok) {
+    try {
+      // Forward the request to Azure Functions /api/device endpoint
+      response = await fetch(`${apiBaseUrl}/api/device`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+        },
+        body: JSON.stringify(requestData)
+      })
+      
+      if (!response.ok) {
+        console.error(`[DEVICE API] ${timestamp} - Azure Functions API error:`, response.status, response.statusText)
+        useLocalFallback = true
+      }
+    } catch (fetchError) {
+      console.error(`[DEVICE API] ${timestamp} - Failed to reach Azure Functions API:`, fetchError)
+      useLocalFallback = true
+    }
+    
+    // Fallback to local database processing if Azure Functions failed
+    if (useLocalFallback) {
+      console.log(`[DEVICE API] ${timestamp} - Using local database fallback`)
+      
+      try {
+        const localResult = await processDeviceDataLocally(requestData, timestamp)
+        console.log(`[DEVICE API] ${timestamp} - Local processing successful`)
+        return NextResponse.json(localResult, {
+          status: 200,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+      } catch (localError) {
+        console.error(`[DEVICE API] ${timestamp} - Local processing also failed:`, localError)
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to process device data',
+          details: `Azure Functions failed and local fallback also failed: ${localError instanceof Error ? localError.message : 'Unknown error'}`
+        }, { 
+          status: 500,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+      }
+    }
+    
+    // If Azure Functions succeeded, process the response
+    if (response && response.ok) {
       console.error(`[DEVICE API] ${timestamp} - Azure Functions API error:`, response.status, response.statusText)
       
       // Get error details from the response
@@ -82,17 +129,27 @@ export async function POST(request: Request) {
       }
     }
 
-    const data = await response.json()
-    console.log(`[DEVICE API] ${timestamp} - Successfully processed device data`)
-    
-    return NextResponse.json(data, {
-      status: 200,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    })
+    // If we reach here, Azure Functions succeeded
+    if (response) {
+      const data = await response.json()
+      console.log(`[DEVICE API] ${timestamp} - Successfully processed device data`)
+      
+      return NextResponse.json(data, {
+        status: 200,
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+    } else {
+      // This should not happen, but handle it gracefully
+      console.error(`[DEVICE API] ${timestamp} - No response from Azure Functions and no fallback triggered`)
+      return NextResponse.json({
+        success: false,
+        error: 'No response from Azure Functions'
+      }, { status: 500 })
+    }
     
   } catch (error) {
     const timestamp = new Date().toISOString()
@@ -163,43 +220,81 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
       }
     }
     
-    // Insert event into events table
-    const eventQuery = `
-      INSERT INTO events (device_id, event_type, message, timestamp, details) 
-      VALUES ($1, $2, $3, NOW(), $4) 
-      RETURNING id
-    `
-    const eventResult = await pool.query(eventQuery, [
-      deviceId,
-      'info',
-      `Device data processed locally for modules: ${enabledModules.join(', ')}`,
-      JSON.stringify(eventData.payload)
-    ])
+    // Process each module and create module-specific events
+    const processedModules = []
+    const eventIds = []
     
-    console.log(`[LOCAL PROCESSING] ${timestamp} - Created event with ID: ${eventResult.rows[0].id}`)
+    for (const module of enabledModules) {
+      if (deviceData[module]) {
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Processing ${module} module`)
+        
+        // Store module data in module-specific table
+        const moduleQuery = `
+          INSERT INTO ${module} (device_id, data, collected_at, created_at, updated_at)
+          VALUES ($1, $2, NOW(), NOW(), NOW())
+          ON CONFLICT (device_id) 
+          DO UPDATE SET 
+            data = EXCLUDED.data,
+            collected_at = EXCLUDED.collected_at,
+            updated_at = NOW()
+          RETURNING id
+        `
+        
+        const moduleResult = await pool.query(moduleQuery, [
+          deviceId,
+          JSON.stringify(deviceData[module])
+        ])
+        
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Updated ${module} table with ID: ${moduleResult.rows[0].id}`)
+        
+        // Create module-specific event
+        const moduleEventQuery = `
+          INSERT INTO events (device_id, event_type, message, timestamp, details) 
+          VALUES ($1, $2, $3, NOW(), $4) 
+          RETURNING id
+        `
+        const moduleEventResult = await pool.query(moduleEventQuery, [
+          deviceId,
+          'info',
+          `Module '${module}' data collected and stored`,
+          JSON.stringify({
+            module_id: module,
+            collection_type: 'modular',
+            data_size_kb: Math.round(JSON.stringify(deviceData[module]).length / 1024),
+            processing_method: 'local_fallback',
+            timestamp: timestamp
+          })
+        ])
+        
+        processedModules.push(module)
+        eventIds.push(moduleEventResult.rows[0].id)
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Created event for ${module} module with ID: ${moduleEventResult.rows[0].id}`)
+      }
+    }
     
-    // Process installs data if present
-    if (deviceData.installs && enabledModules.includes('installs')) {
-      console.log(`[LOCAL PROCESSING] ${timestamp} - Processing installs data`)
-      
-      // Update or insert into installs table
-      const installsQuery = `
-        INSERT INTO installs (device_id, data, collected_at, created_at, updated_at)
-        VALUES ($1, $2, NOW(), NOW(), NOW())
-        ON CONFLICT (device_id) 
-        DO UPDATE SET 
-          data = EXCLUDED.data,
-          collected_at = EXCLUDED.collected_at,
-          updated_at = NOW()
+    // Create summary event only if multiple modules processed
+    let summaryEventId = null
+    if (processedModules.length > 1) {
+      const summaryEventQuery = `
+        INSERT INTO events (device_id, event_type, message, timestamp, details) 
+        VALUES ($1, $2, $3, NOW(), $4) 
         RETURNING id
       `
-      
-      const installsResult = await pool.query(installsQuery, [
+      const summaryEventResult = await pool.query(summaryEventQuery, [
         deviceId,
-        JSON.stringify(deviceData.installs)
+        'info',
+        `Data collection completed for ${processedModules.length} modules`,
+        JSON.stringify({
+          modules: processedModules,
+          collection_type: 'routine',
+          module_id: 'system',
+          processing_method: 'local_fallback',
+          processed_locally: true,
+          processing_timestamp: timestamp
+        })
       ])
-      
-      console.log(`[LOCAL PROCESSING] ${timestamp} - Updated installs table with ID: ${installsResult.rows[0].id}`)
+      summaryEventId = summaryEventResult.rows[0].id
+      console.log(`[LOCAL PROCESSING] ${timestamp} - Created summary event with ID: ${summaryEventId}`)
     }
     
     console.log(`[LOCAL PROCESSING] ${timestamp} - Local processing completed successfully`)
@@ -207,8 +302,9 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
     return {
       success: true,
       message: 'Device data processed locally',
-      processed_modules: enabledModules,
-      event_id: eventResult.rows[0].id,
+      processed_modules: processedModules,
+      event_ids: eventIds,
+      summary_event_id: summaryEventId,
       processing_method: 'local_fallback'
     }
     

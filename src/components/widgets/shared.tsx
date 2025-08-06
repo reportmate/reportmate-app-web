@@ -244,6 +244,36 @@ export const Icons = {
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
     </svg>
+  ),
+  usb: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h4a1 1 0 011 1v2M7 4a1 1 0 00-1 1v4a1 1 0 001 1h6a1 1 0 001-1V5a1 1 0 00-1-1M7 4h6M5 21h10a2 2 0 002-2v-2a2 2 0 00-2-2H5a2 2 0 00-2 2v2a2 2 0 002 2z" />
+    </svg>
+  ),
+  input: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9-7-9-7-9 7 9 7z" />
+    </svg>
+  ),
+  audio: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5 7v8a1 1 0 001 1h3l4 4V2L9 6H6a1 1 0 00-1 1z" />
+    </svg>
+  ),
+  bluetooth: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10v1.414L9.414 10 8 8.586 8 10zm0 4V12.586L6.586 14 8 14zm8-4V8.586L14.586 10 16 11.414 16 10zm0 4v1.414L14.586 14 16 12.586 16 14z" />
+    </svg>
+  ),
+  camera: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9zM15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+    </svg>
+  ),
+  storage: (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" />
+    </svg>
   )
 }
 
@@ -256,5 +286,7 @@ export const WidgetColors = {
   purple: "bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-400",
   indigo: "bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400",
   yellow: "bg-yellow-200 dark:bg-yellow-800 text-yellow-700 dark:text-yellow-300",
-  teal: "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400"
+  teal: "bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400",
+  pink: "bg-pink-100 dark:bg-pink-900 text-pink-600 dark:text-pink-400",
+  gray: "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-400"
 }

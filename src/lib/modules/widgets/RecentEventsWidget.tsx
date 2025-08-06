@@ -21,6 +21,7 @@ interface RecentEventsWidgetProps {
   lastUpdateTime: Date | null
   mounted: boolean
   deviceNameMap: Record<string, string>
+  isLoading?: boolean
 }
 
 // Helper function to get event status configuration
@@ -82,7 +83,8 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
   connectionStatus, 
   lastUpdateTime, 
   mounted, 
-  deviceNameMap 
+  deviceNameMap,
+  isLoading = false
 }) => {
   const status = getConnectionStatus(connectionStatus)
 
@@ -163,9 +165,13 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         
         if (Array.isArray(enabledModules) && enabledModules.length > 0) {
           if (moduleCount === 1) {
-            return `${enabledModules[0]} module data collected`
+            const capitalizedModule = enabledModules[0].charAt(0).toUpperCase() + enabledModules[0].slice(1)
+            return `${capitalizedModule} module data collected`
           } else if (moduleCount <= 3) {
-            return `${enabledModules.slice(0, moduleCount).join(', ')} modules data collected`
+            const capitalizedModules = enabledModules.slice(0, moduleCount).map(module => 
+              module.charAt(0).toUpperCase() + module.slice(1)
+            )
+            return `${capitalizedModules.join(', ')} modules data collected`
           } else {
             return `All ${moduleCount} modules data collected`
           }
@@ -179,9 +185,12 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         const moduleCount = payloadObj.moduleCount
         const modules = payloadObj.modules
         if (moduleCount === 1) {
-          return `${modules[0]} data reported`
+          return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} data reported`
         } else if (moduleCount <= 3) {
-          return `${modules.join(', ')} data reported`
+          const capitalizedModules = modules.map((module: string) => 
+            module.charAt(0).toUpperCase() + module.slice(1)
+          )
+          return `${capitalizedModules.join(', ')} data reported`
         } else {
           return `All modules data reported`
         }
@@ -193,9 +202,12 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         const moduleCount = moduleNames.length
         
         if (moduleCount === 1) {
-          return `${moduleNames[0]} data reported`
+          return `${moduleNames[0].charAt(0).toUpperCase() + moduleNames[0].slice(1)} data reported`
         } else if (moduleCount <= 3) {
-          return `${moduleNames.join(', ')} data reported`
+          const capitalizedModules = moduleNames.map(module => 
+            module.charAt(0).toUpperCase() + module.slice(1)
+          )
+          return `${capitalizedModules.join(', ')} data reported`
         } else {
           return `All modules data reported`
         }
@@ -312,82 +324,147 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
       {events.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-2 2m0 0l-2-2m2 2v6" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              No events yet
-            </h3>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              Waiting for fleet events to arrive. Send a test event to get started.
-            </p>
+            {isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? (
+              // Loading state
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  Loading events...
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Connecting to the event stream to retrieve latest activity.
+                </p>
+              </>
+            ) : (
+              // No events state
+              <>
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-2 2m0 0l-2-2m2 2v6" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                  No events yet
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  Waiting for fleet events to arrive. Send a test event to get started.
+                </p>
+              </>
+            )}
           </div>
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          <div className="overflow-x-auto overlay-scrollbar h-full">
-            <table className="w-full table-fixed min-w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                <tr>
-                  <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Type
-                  </th>
-                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Device
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
-                    Message
-                  </th>
-                  <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Time
-                  </th>
-                </tr>
-              </thead>
-            </table>
-            <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
+          {isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? (
+            // Loading skeleton
+            <div className="overflow-x-auto overlay-scrollbar h-full">
               <table className="w-full table-fixed min-w-full">
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {events.slice(0, 50).map((event) => {
-                    const statusConfig = getStatusConfig(event.kind)
-                    return (
-                      <tr 
-                        key={event.id} 
-                        className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                  <tr>
+                    <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Device
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                      Message
+                    </th>
+                    <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Time
+                    </th>
+                  </tr>
+                </thead>
+              </table>
+              <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
+                <table className="w-full table-fixed min-w-full">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[...Array(8)].map((_, index) => (
+                      <tr key={index} className="animate-pulse">
                         <td className="w-20 px-3 py-2.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                            {event.kind === 'system' ? 'info' : event.kind}
-                          </span>
+                          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-12"></div>
                         </td>
                         <td className="w-56 px-3 py-2.5">
-                          <Link
-                            href={`/device/${encodeURIComponent(event.device)}`}
-                            className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                          >
-                            {getDeviceName(event.device)}
-                          </Link>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
                         </td>
                         <td className="px-3 py-2.5 hidden md:table-cell">
-                          <div className="text-sm text-gray-900 dark:text-white truncate">
-                            {formatPayloadPreview(event.payload)}
-                          </div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
                         </td>
                         <td className="w-44 px-3 py-2.5">
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            <div className="font-medium truncate">
-                              {formatRelativeTime(event.ts)}
-                            </div>
-                          </div>
+                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
                         </td>
                       </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Normal events table
+            <div className="overflow-x-auto overlay-scrollbar h-full">
+              <table className="w-full table-fixed min-w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                  <tr>
+                    <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Device
+                    </th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                      Message
+                    </th>
+                    <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Time
+                    </th>
+                  </tr>
+                </thead>
+              </table>
+              <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
+                <table className="w-full table-fixed min-w-full">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {events.slice(0, 50).map((event) => {
+                      const statusConfig = getStatusConfig(event.kind)
+                      return (
+                        <tr 
+                          key={event.id} 
+                          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <td className="w-20 px-3 py-2.5">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                              {event.kind === 'system' ? 'info' : event.kind}
+                            </span>
+                          </td>
+                          <td className="w-56 px-3 py-2.5">
+                            <Link
+                              href={`/device/${encodeURIComponent(event.device)}`}
+                              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                            >
+                              {getDeviceName(event.device)}
+                            </Link>
+                          </td>
+                          <td className="px-3 py-2.5 hidden md:table-cell">
+                            <div className="text-sm text-gray-900 dark:text-white truncate">
+                              {formatPayloadPreview(event.payload)}
+                            </div>
+                          </td>
+                          <td className="w-44 px-3 py-2.5">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                              <div className="font-medium truncate">
+                                {formatRelativeTime(event.ts)}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

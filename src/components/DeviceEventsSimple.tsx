@@ -134,9 +134,12 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           // Handle array of module names
           if (Array.isArray(modules)) {
             if (moduleCount === 1) {
-              return `${modules[0]} data reported`
+              return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} data reported`
             } else if (moduleCount <= 3) {
-              return `${modules.join(', ')} data reported`
+              const capitalizedModules = modules.map((module: string) => 
+                module.charAt(0).toUpperCase() + module.slice(1)
+              )
+              return `${capitalizedModules.join(', ')} data reported`
             } else {
               return `All modules reported`
             }
@@ -152,7 +155,10 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           if (moduleCount > 3) {
             return `All modules reported`
           } else {
-            return `${moduleNames.join(', ')} data reported`
+            const capitalizedModules = moduleNames.map(module => 
+              module.charAt(0).toUpperCase() + module.slice(1)
+            )
+            return `${capitalizedModules.join(', ')} data reported`
           }
         }
         
