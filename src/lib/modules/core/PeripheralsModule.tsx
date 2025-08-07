@@ -69,7 +69,7 @@ export class PeripheralsModule extends BaseModule {
       {
         id: 'peripherals',
         name: 'Peripherals',
-        icon: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z',
+        icon: 'M8 4a4 4 0 100 8h8a4 4 0 100-8H8zm0 2h8a2 2 0 110 4H8a2 2 0 110-4zm2 1a1 1 0 100 2 1 1 0 000-2zm4 0a1 1 0 100 2 1 1 0 000-2z',
         component: PeripheralsTabWrapper,
         order: 6, // Place after Hardware (5) but before Network (7)
       },
