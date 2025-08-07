@@ -37,7 +37,8 @@ import {
   HardwareTab,
   NetworkTab,
   SecurityTab,
-  EventsTab
+  EventsTab,
+  PeripheralsTab
 } from "../../../src/components/tabs"
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 
@@ -470,7 +471,7 @@ interface ManagedPackage {
   category?: string
 }
 
-type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'events'
+type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'peripherals' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string; accentColor: string }[] = [
   // New priority order as requested
@@ -479,10 +480,11 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
   { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', description: 'MDM configuration profiles and settings', accentColor: 'violet' },
   { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', description: 'Device management and enrollment status', accentColor: 'yellow' },
   { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance', accentColor: 'orange' },
+  { id: 'peripherals', label: 'Peripherals', icon: 'M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', description: 'Displays, printers, and connected peripherals', accentColor: 'cyan' },
   { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', description: 'Operating system and system information', accentColor: 'purple' },
   { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', description: 'Security status and compliance', accentColor: 'red' },
   { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', description: 'Network connectivity and settings', accentColor: 'teal' },
-  { id: 'applications', label: 'Applications', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', description: 'Installed applications and packages', accentColor: 'blue' },
+  { id: 'applications', label: 'Applications', icon: 'M19 12.2H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V10.2a2 2 0 00-2-2M5 12.2V10.2a2 2 0 012-2m0 0V6.2a2 2 0 012-2h6a2 2 0 012 2v2M7 8.2h10', description: 'Installed applications and packages', accentColor: 'blue' },
   { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Event history and activity log', accentColor: 'monochrome' }
 ]
 
@@ -1250,6 +1252,9 @@ export default function DeviceDetailPage() {
         </div>
         <div className={activeTab === 'security' ? 'block' : 'hidden'}>
           <SecurityTab device={deviceInfo} data={processedData.security} />
+        </div>
+        <div className={activeTab === 'peripherals' ? 'block' : 'hidden'}>
+          <PeripheralsTab device={deviceInfo} />
         </div>
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
           <EventsTab device={deviceInfo} events={events} data={processedData.events} />

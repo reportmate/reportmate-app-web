@@ -142,7 +142,7 @@ export async function GET(
           // Get module data for this device
           const validModules = [
             'applications', 'displays', 'hardware', 'installs', 'inventory',
-            'management', 'network', 'printers', 'profiles', 'security', 'system'
+            'management', 'network', 'peripherals', 'printers', 'profiles', 'security', 'system'
           ]
           
           const modules: Record<string, unknown> = {}

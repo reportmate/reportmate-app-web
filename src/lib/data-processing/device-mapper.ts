@@ -3,7 +3,7 @@
  * NEW CLEAN VERSION - modules are the source of truth, no duplicate data
  */
 
-import { processApplicationsData } from './component-data'
+import { processApplicationsData, processPeripheralsData } from './component-data'
 
 export interface ProcessedDeviceInfo {
   deviceId: string     // Internal UUID (unique)
@@ -174,6 +174,12 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   if (rawDevice.modules?.applications?.installed_applications) {
     const applicationsData = processApplicationsData(rawDevice);
     ;(mappedDevice as any).applications = applicationsData
+  }
+
+  // Peripherals data processing
+  if (rawDevice.modules?.peripherals || rawDevice.modules?.displays || rawDevice.modules?.printers) {
+    const peripheralsData = processPeripheralsData(rawDevice);
+    ;(mappedDevice as any).peripherals = peripheralsData
   }
 
   console.log('DeviceMapper DEBUG - Clean mapped device:', {

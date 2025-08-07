@@ -1254,6 +1254,316 @@ function groupRegistryPoliciesBySource(registryPolicies: any[]): Record<string, 
   return grouped
 }
 
+// Peripherals Data Processing
+export interface PeripheralsData {
+  displays: DisplayDevice[]
+  printers: PrinterDevice[]
+  usbDevices: UsbDevice[]
+  inputDevices: InputDevice[]
+  totalDisplays: number
+  totalPrinters: number
+  totalUsbDevices: number
+  totalInputDevices: number
+  hasPeripheralData: boolean
+}
+
+export interface DisplayDevice {
+  name?: string
+  model?: string
+  manufacturer?: string
+  resolution?: string
+  refreshRate?: string
+  connectionType?: string
+  isPrimary?: boolean
+  isBuiltIn?: boolean
+  driverVersion?: string
+  driverDate?: string
+}
+
+export interface PrinterDevice {
+  name: string
+  driverName?: string
+  portName?: string
+  shareName?: string
+  location?: string
+  comment?: string
+  status?: string
+  isDefault?: boolean
+  isLocal?: boolean
+  isShared?: boolean
+  isOnline?: boolean
+  connectionType?: string
+  ipAddress?: string
+  serverName?: string
+  manufacturer?: string
+  model?: string
+}
+
+export interface UsbDevice {
+  vendorId?: string
+  productId?: string
+  vendor?: string
+  model?: string
+  version?: string
+  serial?: string
+  class?: string
+  subclass?: string
+  protocol?: string
+  removable?: boolean
+}
+
+export interface InputDevice {
+  name?: string
+  type?: string
+  manufacturer?: string
+  interface?: string
+}
+
+export function processPeripheralsData(rawDevice: any): PeripheralsData {
+  console.log('🖨️ Processing peripherals data for device:', rawDevice.serialNumber || rawDevice.deviceId)
+  
+  // Extract peripherals data from modular API structure
+  const peripheralsModule = rawDevice.modules?.peripherals || rawDevice.peripherals || {}
+  const displaysModule = rawDevice.modules?.displays || rawDevice.displays || {}
+  const printersModule = rawDevice.modules?.printers || rawDevice.printers || {}
+  
+  // DEBUG: Log the actual structure of these modules
+  console.log('🔍 DEBUG displaysModule structure:', {
+    hasDisplays: !!displaysModule.displays,
+    displaysType: typeof displaysModule.displays,
+    displaysValue: displaysModule.displays,
+    displaysKeys: Object.keys(displaysModule),
+    fullModule: displaysModule
+  })
+  
+  console.log('🔍 DEBUG peripheralsModule structure:', {
+    hasPeripherals: !!peripheralsModule,
+    peripheralsKeys: Object.keys(peripheralsModule),
+    fullModule: peripheralsModule
+  })
+  
+  // Process displays from peripherals module (actual monitors/displays ONLY - NO graphics cards)
+  const displays: DisplayDevice[] = []
+  
+  // NEW API structure: peripherals.displays.monitors (ACTUAL display devices)
+  if (peripheralsModule.displays?.monitors && Array.isArray(peripheralsModule.displays.monitors)) {
+    displays.push(...peripheralsModule.displays.monitors.map((display: any) => ({
+      name: display.model || display.name || display.deviceName,
+      model: display.model,
+      manufacturer: display.manufacturer,
+      resolution: display.resolution,
+      refreshRate: display.refreshRate?.toString(),
+      connectionType: display.connectionType || display.interface,
+      isPrimary: display.isPrimary || display.primary,
+      isBuiltIn: display.isBuiltIn || display.builtin,
+      driverVersion: display.driver_version || display.driverVersion,
+      driverDate: display.driver_date || display.driverDate
+    })))
+  }
+  // Legacy structure: peripherals.displays (array)
+  else if (peripheralsModule.displays && Array.isArray(peripheralsModule.displays)) {
+    displays.push(...peripheralsModule.displays.map((display: any) => ({
+      name: display.name || display.deviceName,
+      model: display.model,
+      manufacturer: display.manufacturer,
+      resolution: display.resolution,
+      refreshRate: display.refreshRate?.toString(),
+      connectionType: display.connectionType || display.interface,
+      isPrimary: display.isPrimary || display.primary,
+      isBuiltIn: display.isBuiltIn || display.builtin,
+      driverVersion: display.driverVersion,
+      driverDate: display.driverDate
+    })))
+  } 
+  // Legacy displays module
+  else if (displaysModule.displays && Array.isArray(displaysModule.displays)) {
+    displays.push(...displaysModule.displays.map((display: any) => ({
+      name: display.name || display.deviceName,
+      model: display.model,
+      manufacturer: display.manufacturer,
+      resolution: display.resolution,
+      refreshRate: display.refreshRate?.toString(),
+      connectionType: display.connectionType || display.interface,
+      isPrimary: display.isPrimary || display.primary,
+      isBuiltIn: display.isBuiltIn || display.builtin,
+      driverVersion: display.driverVersion,
+      driverDate: display.driverDate
+    })))
+  }
+
+  // Process printers from peripherals module (new structure: printers.installed_printers) or legacy printers module
+  const printers: PrinterDevice[] = []
+  
+  // NEW API structure: peripherals.printers.installed_printers
+  if (peripheralsModule.printers?.installed_printers && Array.isArray(peripheralsModule.printers.installed_printers)) {
+    printers.push(...peripheralsModule.printers.installed_printers.map((printer: any) => ({
+      name: printer.name || printer.deviceName,
+      driverName: printer.driver || printer.driverName,
+      portName: printer.port || printer.portName,
+      shareName: printer.share_name || printer.shareName || printer.share,
+      location: printer.location,
+      comment: printer.comment,
+      status: printer.status,
+      isDefault: printer.is_default || printer.isDefault || printer.default,
+      isLocal: printer.is_local || printer.isLocal || printer.local,
+      isShared: printer.is_shared || printer.isShared || printer.shared,
+      isOnline: printer.is_online || printer.isOnline || printer.online,
+      connectionType: printer.connection_type || printer.connectionType || printer.type,
+      ipAddress: printer.ip_address || printer.ipAddress || printer.ip,
+      serverName: printer.server_name || printer.serverName || printer.server,
+      manufacturer: printer.manufacturer,
+      model: printer.model
+    })))
+  }
+  // Legacy structure: peripherals.printers (array)
+  else if (peripheralsModule.printers && Array.isArray(peripheralsModule.printers)) {
+    printers.push(...peripheralsModule.printers.map((printer: any) => ({
+      name: printer.name || printer.deviceName,
+      driverName: printer.driverName || printer.driver,
+      portName: printer.portName || printer.port,
+      shareName: printer.shareName || printer.share,
+      location: printer.location,
+      comment: printer.comment,
+      status: printer.status,
+      isDefault: printer.isDefault || printer.default,
+      isLocal: printer.isLocal || printer.local,
+      isShared: printer.isShared || printer.shared,
+      isOnline: printer.isOnline || printer.online,
+      connectionType: printer.connectionType || printer.type,
+      ipAddress: printer.ipAddress || printer.ip,
+      serverName: printer.serverName || printer.server,
+      manufacturer: printer.manufacturer,
+      model: printer.model
+    })))
+  } 
+  // Legacy printers module
+  else if (printersModule.printers && Array.isArray(printersModule.printers)) {
+    printers.push(...printersModule.printers.map((printer: any) => ({
+      name: printer.name || printer.deviceName,
+      driverName: printer.driverName || printer.driver,
+      portName: printer.portName || printer.port,
+      shareName: printer.shareName || printer.share,
+      location: printer.location,
+      comment: printer.comment,
+      status: printer.status,
+      isDefault: printer.isDefault || printer.default,
+      isLocal: printer.isLocal || printer.local,
+      isShared: printer.isShared || printer.shared,
+      isOnline: printer.isOnline || printer.online,
+      connectionType: printer.connectionType || printer.type,
+      ipAddress: printer.ipAddress || printer.ip,
+      serverName: printer.serverName || printer.server,
+      manufacturer: printer.manufacturer,
+      model: printer.model
+    })))
+  }
+
+  // Process USB devices from peripherals module (new structure: usb_devices.connected_devices)
+  const usbDevices: UsbDevice[] = []
+  
+  // NEW API structure: peripherals.usb_devices.connected_devices
+  if (peripheralsModule.usb_devices?.connected_devices && Array.isArray(peripheralsModule.usb_devices.connected_devices)) {
+    usbDevices.push(...peripheralsModule.usb_devices.connected_devices.map((usb: any) => ({
+      vendorId: usb.vendor_id || usb.vendorId,
+      productId: usb.product_id || usb.productId,
+      vendor: usb.vendor || usb.manufacturer,
+      model: usb.product || usb.model,
+      version: usb.version,
+      serial: usb.serial_number || usb.serial || usb.serialNumber,
+      class: usb.device_class || usb.class || usb.deviceClass,
+      subclass: usb.device_subclass || usb.subclass || usb.deviceSubclass,
+      protocol: usb.device_protocol || usb.protocol || usb.deviceProtocol,
+      removable: usb.removable
+    })))
+  }
+  // Legacy structure: peripherals.usbDevices (array)
+  else if (peripheralsModule.usbDevices && Array.isArray(peripheralsModule.usbDevices)) {
+    usbDevices.push(...peripheralsModule.usbDevices.map((usb: any) => ({
+      vendorId: usb.vendorId || usb.vendor_id,
+      productId: usb.productId || usb.product_id,
+      vendor: usb.vendor || usb.manufacturer,
+      model: usb.model || usb.product,
+      version: usb.version,
+      serial: usb.serial || usb.serialNumber,
+      class: usb.class || usb.deviceClass,
+      subclass: usb.subclass || usb.deviceSubclass,
+      protocol: usb.protocol || usb.deviceProtocol,
+      removable: usb.removable
+    })))
+  }
+
+  // Process input devices from peripherals module (new structure: input_devices.mice, input_devices.keyboards)
+  const inputDevices: InputDevice[] = []
+  
+  // NEW API structure: peripherals.input_devices.mice and peripherals.input_devices.keyboards
+  if (peripheralsModule.input_devices) {
+    if (peripheralsModule.input_devices.mice && Array.isArray(peripheralsModule.input_devices.mice)) {
+      inputDevices.push(...peripheralsModule.input_devices.mice.map((device: any) => ({
+        name: device.description || device.name || device.deviceName,
+        type: 'mouse',
+        manufacturer: device.manufacturer,
+        interface: device.interface || device.connectionType || 'HID'
+      })))
+    }
+    if (peripheralsModule.input_devices.keyboards && Array.isArray(peripheralsModule.input_devices.keyboards)) {
+      inputDevices.push(...peripheralsModule.input_devices.keyboards.map((device: any) => ({
+        name: device.description || device.name || device.deviceName,
+        type: 'keyboard',
+        manufacturer: device.manufacturer,
+        interface: device.interface || device.connectionType || 'HID'
+      })))
+    }
+    if (peripheralsModule.input_devices.other_input && Array.isArray(peripheralsModule.input_devices.other_input)) {
+      inputDevices.push(...peripheralsModule.input_devices.other_input.map((device: any) => ({
+        name: device.description || device.name || device.deviceName,
+        type: device.type || 'input',
+        manufacturer: device.manufacturer,
+        interface: device.interface || device.connectionType
+      })))
+    }
+  }
+  // Legacy structure: peripherals.inputDevices (array)
+  else if (peripheralsModule.inputDevices && Array.isArray(peripheralsModule.inputDevices)) {
+    inputDevices.push(...peripheralsModule.inputDevices.map((input: any) => ({
+      name: input.name || input.deviceName,
+      type: input.type || input.deviceType,
+      manufacturer: input.manufacturer,
+      interface: input.interface || input.connectionType
+    })))
+  }
+
+  // DEBUG: Log what we found
+  console.log('�️ Peripherals processing complete:', {
+    displaysFound: displays.length,
+    printersFound: printers.length,
+    usbDevicesFound: usbDevices.length,
+    inputDevicesFound: inputDevices.length,
+    hasAnyData: displays.length > 0 || printers.length > 0 || usbDevices.length > 0 || inputDevices.length > 0
+  })
+
+  const result: PeripheralsData = {
+    displays,
+    printers,
+    usbDevices,
+    inputDevices,
+    totalDisplays: displays.length,
+    totalPrinters: printers.length,
+    totalUsbDevices: usbDevices.length,
+    totalInputDevices: inputDevices.length,
+    hasPeripheralData: displays.length > 0 || printers.length > 0 || usbDevices.length > 0 || inputDevices.length > 0
+  }
+
+  console.log('🖨️ Processed peripherals data:', {
+    totalDisplays: result.totalDisplays,
+    totalPrinters: result.totalPrinters,
+    totalUsbDevices: result.totalUsbDevices,
+    totalInputDevices: result.totalInputDevices,
+    hasPeripheralData: result.hasPeripheralData
+  })
+
+  return result
+}
+
 // Export all processors
 export const dataProcessors = {
   applications: processApplicationsData,
@@ -1263,5 +1573,6 @@ export const dataProcessors = {
   system: processSystemData,
   events: processEventsData,
   installs: processInstallsData,
-  profiles: processProfilesData
+  profiles: processProfilesData,
+  peripherals: processPeripheralsData
 }
