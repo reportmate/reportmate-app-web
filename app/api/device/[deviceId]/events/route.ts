@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 
 interface DeviceEvent {
   kind?: string
+  message?: string  // User-friendly message from the database
   [key: string]: unknown
 }
 
@@ -94,6 +95,7 @@ export async function GET(
         device: deviceId,
         kind: 'system',
         ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
+        message: 'System module data reported', // User-friendly message from database
         payload: {
           message: 'System information collected',
           component: 'reportmate-client',
@@ -105,6 +107,7 @@ export async function GET(
         device: deviceId,
         kind: 'info',
         ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
+        message: 'Device check-in completed', // User-friendly message from database
         payload: {
           message: 'Device check-in completed',
           clientVersion: '2025.7.22.0'
@@ -115,6 +118,7 @@ export async function GET(
         device: deviceId, 
         kind: 'success',
         ts: new Date(Date.now() - 300000).toISOString(), // 5 minutes ago
+        message: 'Data transmission successful', // User-friendly message from database
         payload: {
           message: 'Data transmission successful',
           transmissionSize: '2.3KB'

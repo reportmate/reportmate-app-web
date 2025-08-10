@@ -253,9 +253,11 @@ export async function GET(
           console.log('[DEVICE API] Using sample data fallback')
           
           // Return sample data in the expected format
+          // If sample data has nested device structure, flatten it
+          const deviceData = sampleData.device || sampleData
           return NextResponse.json({
             success: true,
-            device: sampleData,
+            device: deviceData,
             source: 'sample-data'
           }, {
             headers: {
