@@ -253,14 +253,43 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
           VALUES ($1, $2, $3, NOW(), $4) 
           RETURNING id
         `
+        
+        // Create user-friendly messages for single and multiple modules
+        let friendlyMessage;
+        if (module === 'installs') {
+          friendlyMessage = "Installs module data reported"
+        } else if (module === 'network') {
+          friendlyMessage = "Network module data reported"
+        } else if (module === 'management') {
+          friendlyMessage = "Management module data reported"
+        } else if (module === 'system') {
+          friendlyMessage = "System module data reported"
+        } else if (module === 'hardware') {
+          friendlyMessage = "Hardware module data reported"
+        } else if (module === 'security') {
+          friendlyMessage = "Security module data reported"
+        } else if (module === 'applications') {
+          friendlyMessage = "Applications module data reported"
+        } else if (module === 'inventory') {
+          friendlyMessage = "Inventory module data reported"
+        } else if (module === 'profiles') {
+          friendlyMessage = "Profiles module data reported"
+        } else if (module === 'displays') {
+          friendlyMessage = "Displays module data reported"
+        } else if (module === 'printers') {
+          friendlyMessage = "Printers module data reported"
+        } else {
+          friendlyMessage = `${module.charAt(0).toUpperCase() + module.slice(1)} module data reported`
+        }
+        
         const moduleEventResult = await pool.query(moduleEventQuery, [
           deviceId,
           'info',
-          `Module '${module}' data collected and stored`,
+          friendlyMessage,
           JSON.stringify({
             module_id: module,
             collection_type: 'modular',
-            data_size_kb: Math.round(JSON.stringify(deviceData[module]).length / 1024),
+            data_size_kb: Math.round(JSON.stringify(deviceData[module]).length / 1024 * 10) / 10,
             processing_method: 'local_fallback',
             timestamp: timestamp
           })
@@ -280,10 +309,23 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
         VALUES ($1, $2, $3, NOW(), $4) 
         RETURNING id
       `
+      
+      // Create friendly message for multiple modules
+      let summaryMessage;
+      if (processedModules.length === 2) {
+        const modules = processedModules.map(m => m.charAt(0).toUpperCase() + m.slice(1));
+        summaryMessage = `${modules.join(', ')} modules reported data`
+      } else if (processedModules.length === 3) {
+        const modules = processedModules.map(m => m.charAt(0).toUpperCase() + m.slice(1));
+        summaryMessage = `${modules.join(', ')} modules reported data`
+      } else {
+        summaryMessage = `${processedModules.length} modules reported data`
+      }
+      
       const summaryEventResult = await pool.query(summaryEventQuery, [
         deviceId,
         'info',
-        `Data collection completed for ${processedModules.length} modules`,
+        summaryMessage,
         JSON.stringify({
           modules: processedModules,
           collection_type: 'routine',

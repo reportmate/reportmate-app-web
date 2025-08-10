@@ -8,6 +8,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
+import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
@@ -28,6 +29,17 @@ interface EventPayload {
   modules_processed?: number;
   collection_type?: string;
   [key: string]: unknown;
+}
+
+// Helper function to get event message - prioritizes event-level message over payload message
+const getEventMessage = (event: any): string => {
+  // **PRIORITY 1: Use event-level message field if available (from database)**
+  if (event.message && typeof event.message === 'string') {
+    return event.message.length > 150 ? event.message.substring(0, 150) + '...' : event.message;
+  }
+  
+  // **PRIORITY 2: Fallback to payload message extraction**
+  return safeDisplayPayload(event.payload);
 }
 
 // Helper function to safely display payload
@@ -127,6 +139,7 @@ function EventsPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
@@ -166,11 +179,11 @@ function EventsPageContent() {
           
           // Build device name mapping (serial -> name)
           const nameMap: Record<string, string> = {}
-          devices.forEach((device: Record<string, unknown>) => {
+          devices.forEach((device: any) => {
             if (device.serialNumber) {
               // Use inventory deviceName if available, otherwise fall back to name or serialNumber
               const deviceName = device.modules?.inventory?.deviceName || device.name || device.serialNumber
-              nameMap[device.serialNumber] = deviceName
+              nameMap[device.serialNumber as string] = deviceName as string
             }
           })
           setDeviceNameMap(nameMap)
@@ -223,16 +236,32 @@ function EventsPageContent() {
     fetchEvents()
   }, [])
 
-  // Filter events based on selected type
+  // Filter events based on selected type and search query
   const filteredEvents = events.filter(event => {
-    if (filterType === 'all') return true
-    return event.kind.toLowerCase() === filterType.toLowerCase()
+    // Filter by type first
+    const typeMatch = filterType === 'all' || event.kind.toLowerCase() === filterType.toLowerCase()
+    
+    // Then filter by search query if provided
+    if (!searchQuery.trim()) {
+      return typeMatch
+    }
+    
+    const query = searchQuery.toLowerCase()
+    const searchMatch = (
+      event.id.toLowerCase().includes(query) ||
+      event.device.toLowerCase().includes(query) ||
+      event.kind.toLowerCase().includes(query) ||
+      getEventMessage(event).toLowerCase().includes(query) ||
+      (deviceNameMap[event.device] && deviceNameMap[event.device].toLowerCase().includes(query))
+    )
+    
+    return typeMatch && searchMatch
   })
 
-  // Reset to page 1 when filter changes
+  // Reset to page 1 when filter or search changes
   useEffect(() => {
     setCurrentPage(1)
-  }, [filterType])
+  }, [filterType, searchQuery])
 
   // Calculate pagination
   const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
@@ -427,7 +456,7 @@ function EventsPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-                All Events
+                All
               </h1>
             </div>
           </div>
@@ -477,13 +506,6 @@ function EventsPageContent() {
               </Link>
               <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center overflow-hidden flex-shrink-0">
-                  <img 
-                    src="/reportmate-logo.png" 
-                    alt="ReportMate Logo" 
-                    className="w-full h-full object-contain"
-                  />
-                </div>
                 <div className="min-w-0">
                   <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                     All Events
@@ -492,58 +514,17 @@ function EventsPageContent() {
               </div>
             </div>
 
-            {/* Right side - Navigation, Search, Settings */}
+            {/* Right side - Navigation */}
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation - Hidden on small screens */}
-              <nav className="hidden lg:flex items-center gap-4">
-                <Link
-                  href="/devices"
-                  className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                  title="Devices"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                  </svg>
-                  <span className="text-sm font-medium">Devices</span>
-                </Link>
-              </nav>
-
-              {/* Search - Priority item, scales down but stays visible */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-2 sm:pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search"
-                  className="block w-32 sm:w-48 md:w-64 lg:w-80 pl-8 sm:pl-10 pr-3 py-1.5 sm:py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
+              {/* Navigation */}
+              <div className="hidden lg:flex">
+                <DevicePageNavigation className="flex items-center gap-2" currentPage="events" />
               </div>
 
-              {/* Navigation link for small screens */}
-              <Link
-                href="/devices"
-                className="lg:hidden p-1.5 sm:p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                title="Devices"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </Link>
-
-              {/* Settings */}
-              <Link
-                href="/settings"
-                className="p-1.5 sm:p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                title="Settings"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </Link>
+              {/* Mobile Navigation */}
+              <div className="lg:hidden">
+                <DevicePageNavigation className="flex items-center gap-2" currentPage="events" />
+              </div>
             </div>
           </div>
         </div>
@@ -551,116 +532,128 @@ function EventsPageContent() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        {/* Filter Tabs */}
-        <div className="mb-6 sm:mb-8">
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            {/* Desktop filter tabs */}
-            <nav className="hidden sm:flex -mb-px space-x-4 lg:space-x-8 overflow-x-auto overlay-scrollbar">
-              {[
-                { key: 'all', label: 'All Events', count: filterCounts.all },
-                { key: 'success', label: 'Success', count: filterCounts.success },
-                { key: 'warning', label: 'Warnings', count: filterCounts.warning },
-                { key: 'error', label: 'Errors', count: filterCounts.error },
-                { key: 'info', label: 'Info', count: filterCounts.info },
-                { key: 'system', label: 'System', count: filterCounts.system },
-              ].map((filter) => {
-                const isActive = filterType === filter.key
-                const statusConfig = filter.key !== 'all' ? getStatusConfig(filter.key) : null
-                
-                return (
-                  <button
-                    key={filter.key}
-                    onClick={() => setFilterType(filter.key)}
-                    className={`${
-                      isActive
-                        ? 'border-blue-500 text-blue-600 dark:text-blue-400'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
-                    } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors flex-shrink-0`}
-                  >
-                    {statusConfig && (
-                      <div className={`w-4 h-4 ${statusConfig.text}`}>
-                        {statusConfig.icon}
-                      </div>
-                    )}
-                    <span className="hidden md:inline">{filter.label}</span>
-                    <span className="md:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
-                    <span className={`${
-                      isActive 
-                        ? 'bg-blue-100 text-blue-600 dark:bg-blue-900 dark:text-blue-400'
-                        : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                    } inline-flex items-center px-2 sm:px-2.5 py-0.5 rounded-full text-xs font-medium`}>
-                      {filter.count}
-                    </span>
-                  </button>
-                )
-              })}
-            </nav>
 
-            {/* Mobile filter dropdown */}
-            <div className="sm:hidden pb-4">
-              <div className="relative">
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
-                  className="appearance-none block w-full pl-3 pr-10 py-2.5 text-base border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                >
-                  {[
-                    { key: 'all', label: 'All Events', count: filterCounts.all },
-                    { key: 'success', label: 'Success Events', count: filterCounts.success },
-                    { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
-                    { key: 'error', label: 'Error Events', count: filterCounts.error },
-                    { key: 'info', label: 'Info Events', count: filterCounts.info },
-                    { key: 'system', label: 'System Events', count: filterCounts.system },
-                  ].map((filter) => (
-                    <option key={filter.key} value={filter.key}>
-                      {filter.label} ({filter.count})
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Events Table */}
-        {filteredEvents.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 py-16">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-2 2m0 0l-2-2m2 2v6" />
-                </svg>
+        <>
+          {/* Desktop Table View (lg and up) */}
+          <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {/* Table Header with Search */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Events Feed
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Real-time activity from fleet
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search events..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-full sm:w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      >
+                        <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                No {filterType === 'all' ? '' : filterType} events found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-6">
-                {filterType === 'all' 
-                  ? 'No events have been received yet from fleet.'
-                  : `No ${filterType} events match your current filter.`}
-              </p>
-              {filterType !== 'all' && (
-                <button
-                  onClick={() => setFilterType('all')}
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                >
-                  Show All Events
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table View (lg and up) */}
-            <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
                   <thead className="bg-gray-50 dark:bg-gray-700">
+                    {/* Filter Row */}
+                    <tr className="border-b border-gray-200 dark:border-gray-600">
+                      <td colSpan={6} className="px-6 py-3">
+                        {/* Desktop filter tabs */}
+                        <nav className="hidden sm:flex flex-wrap gap-2">
+                          {[
+                            { key: 'all', label: 'All', count: filterCounts.all },
+                            { key: 'success', label: 'Success', count: filterCounts.success },
+                            { key: 'warning', label: 'Warnings', count: filterCounts.warning },
+                            { key: 'error', label: 'Errors', count: filterCounts.error },
+                            { key: 'info', label: 'Info', count: filterCounts.info },
+                            { key: 'system', label: 'System', count: filterCounts.system },
+                          ].map((filter) => {
+                            const isActive = filterType === filter.key
+                            const statusConfig = filter.key !== 'all' ? getStatusConfig(filter.key) : null
+                            
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setFilterType(filter.key)}
+                                className={`${
+                                  isActive
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                                } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                              >
+                                {statusConfig && (
+                                  <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
+                                    {statusConfig.icon}
+                                  </div>
+                                )}
+                                <span className="hidden md:inline">{filter.label}</span>
+                                <span className="md:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
+                                <span className={`${
+                                  isActive 
+                                    ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                                } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                                  {filter.count}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </nav>
+                        {/* Mobile filter dropdown */}
+                        <div className="sm:hidden">
+                          <div className="relative">
+                            <select
+                              value={filterType}
+                              onChange={(e) => setFilterType(e.target.value)}
+                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
+                            >
+                              {[
+                                { key: 'all', label: 'All', count: filterCounts.all },
+                                { key: 'success', label: 'Success Events', count: filterCounts.success },
+                                { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
+                                { key: 'error', label: 'Error Events', count: filterCounts.error },
+                                { key: 'info', label: 'Info Events', count: filterCounts.info },
+                                { key: 'system', label: 'System Events', count: filterCounts.system },
+                              ].map((filter) => (
+                                <option key={filter.key} value={filter.key}>
+                                  {filter.label} ({filter.count})
+                                </option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Header Row */}
                     <tr>
                       <th className="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         ID
@@ -683,7 +676,20 @@ function EventsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {currentEvents.map((event) => {
+                    {currentEvents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center justify-center">
+                            <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-lg font-medium mb-1">No events found</p>
+                            <p className="text-sm">Try adjusting your filter settings</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      currentEvents.map((event) => {
                       const statusConfig = getStatusConfig(event.kind)
                       const isExpanded = expandedEvent === event.id
                       
@@ -716,7 +722,7 @@ function EventsPageContent() {
                             </td>
                             <td className="px-6 py-4 overflow-hidden">
                               <div className="text-sm text-gray-900 dark:text-white truncate">
-                                {safeDisplayPayload(event.payload)}
+                                {getEventMessage(event)}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
@@ -821,7 +827,7 @@ function EventsPageContent() {
                           )}
                         </React.Fragment>
                       )
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -829,9 +835,122 @@ function EventsPageContent() {
 
             {/* Tablet Table View (md to lg) - Horizontally scrollable */}
             <div className="hidden md:block lg:hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              {/* Table Header with Search */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Events Feed
+                  </h2>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Real-time activity from all fleet devices
+                  </p>
+                </div>
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  {/* Search Input */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search events..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-full sm:w-48 pl-9 pr-7 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center"
+                      >
+                        <svg className="h-3 w-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-700">
+                    {/* Filter Row */}
+                    <tr className="border-b border-gray-200 dark:border-gray-600">
+                      <td colSpan={6} className="px-4 py-3">
+                        {/* Desktop filter tabs */}
+                        <nav className="hidden sm:flex flex-wrap gap-2">
+                          {[
+                            { key: 'all', label: 'All', count: filterCounts.all },
+                            { key: 'success', label: 'Success', count: filterCounts.success },
+                            { key: 'warning', label: 'Warnings', count: filterCounts.warning },
+                            { key: 'error', label: 'Errors', count: filterCounts.error },
+                            { key: 'info', label: 'Info', count: filterCounts.info },
+                            { key: 'system', label: 'System', count: filterCounts.system },
+                          ].map((filter) => {
+                            const isActive = filterType === filter.key
+                            const statusConfig = filter.key !== 'all' ? getStatusConfig(filter.key) : null
+                            
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setFilterType(filter.key)}
+                                className={`${
+                                  isActive
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                                } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                              >
+                                {statusConfig && (
+                                  <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
+                                    {statusConfig.icon}
+                                  </div>
+                                )}
+                                <span className="hidden lg:inline">{filter.label}</span>
+                                <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
+                                <span className={`${
+                                  isActive 
+                                    ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                                } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                                  {filter.count}
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </nav>
+                        {/* Mobile filter dropdown */}
+                        <div className="sm:hidden">
+                          <div className="relative">
+                            <select
+                              value={filterType}
+                              onChange={(e) => setFilterType(e.target.value)}
+                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
+                            >
+                              {[
+                                { key: 'all', label: 'All', count: filterCounts.all },
+                                { key: 'success', label: 'Success Events', count: filterCounts.success },
+                                { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
+                                { key: 'error', label: 'Error Events', count: filterCounts.error },
+                                { key: 'info', label: 'Info Events', count: filterCounts.info },
+                                { key: 'system', label: 'System Events', count: filterCounts.system },
+                              ].map((filter) => (
+                                <option key={filter.key} value={filter.key}>
+                                  {filter.label} ({filter.count})
+                                </option>
+                              ))}
+                            </select>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    {/* Header Row */}
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         ID
@@ -854,7 +973,20 @@ function EventsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {currentEvents.map((event) => {
+                    {currentEvents.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center justify-center">
+                            <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <p className="text-lg font-medium mb-1">No events found</p>
+                            <p className="text-sm">Try adjusting your filter settings</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      currentEvents.map((event) => {
                       const statusConfig = getStatusConfig(event.kind)
                       const isExpanded = expandedEvent === event.id
                       
@@ -887,7 +1019,7 @@ function EventsPageContent() {
                             </td>
                             <td className="px-4 py-3 max-w-xs">
                               <div className="text-sm text-gray-900 dark:text-white truncate">
-                                {safeDisplayPayload(event.payload)}
+                                {getEventMessage(event)}
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
@@ -953,7 +1085,7 @@ function EventsPageContent() {
                           )}
                         </React.Fragment>
                       )
-                    })}
+                    }))}
                   </tbody>
                 </table>
               </div>
@@ -961,7 +1093,57 @@ function EventsPageContent() {
 
             {/* Mobile Card View (sm and below) */}
             <div className="block md:hidden space-y-4">
-              {currentEvents.map((event) => {
+              {/* Search Header for Mobile */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                      Events Feed
+                    </h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                      Real-time activity from all fleet devices
+                    </p>
+                  </div>
+                  {/* Search Input */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search events..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-full pl-9 pr-7 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute inset-y-0 right-0 pr-2 flex items-center"
+                      >
+                        <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {currentEvents.length === 0 ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p className="text-lg font-medium mb-1 text-gray-900 dark:text-white">No events found</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">Try adjusting your filter settings</p>
+                  </div>
+                </div>
+              ) : (
+                currentEvents.map((event) => {
                 const statusConfig = getStatusConfig(event.kind)
                 const isExpanded = expandedEvent === event.id
                 
@@ -997,7 +1179,7 @@ function EventsPageContent() {
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
                       <div className="text-sm text-gray-900 dark:text-white break-words">
-                        {safeDisplayPayload(event.payload)}
+                        {getEventMessage(event)}
                       </div>
                     </div>
 
@@ -1054,7 +1236,7 @@ function EventsPageContent() {
                     )}
                   </div>
                 )
-              })}
+              }))}
             </div>
 
             {/* Pagination */}
@@ -1140,7 +1322,6 @@ function EventsPageContent() {
               </div>
             )}
           </>
-        )}
       </div>
     </div>
   )

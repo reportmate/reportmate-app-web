@@ -8,6 +8,7 @@ export interface FleetEvent {
   device: string
   kind: string
   ts: string
+  message?: string // User-friendly message from database
   payload: Record<string, unknown>
 }
 
@@ -65,6 +66,7 @@ export function useLiveEvents() {
         device: String(eventObj.device || 'unknown'),
         kind: String(eventObj.kind || 'info'),
         ts: String(eventObj.ts || new Date().toISOString()),
+        message: eventObj.message ? String(eventObj.message) : undefined, // PRESERVE message field from database
         payload: sanitizePayloadForDisplay(eventObj.payload)
       }
     } catch (error) {

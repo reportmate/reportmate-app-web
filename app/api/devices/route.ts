@@ -239,18 +239,18 @@ export async function GET() {
               const timeDiff = now.getTime() - lastSeenDate.getTime()
               const hours = timeDiff / (1000 * 60 * 60)
               
-              if (hours <= 24) return 'active'
-              else if (hours <= 168) return 'stale' // 7 days
-              else return 'missing'
+              if (hours <= 72) return 'active'      // < 3 days
+              else if (hours <= 240) return 'stale' // 3-10 days
+              else return 'missing'                 // 10+ days
             }
 
             const lastSeenValue = sourceData.metadata?.collectedAt || device.last_seen
             const calculatedStatus = calculateDeviceStatus(lastSeenValue)
 
             const transformed = {
-              deviceId: sourceData.metadata?.deviceId || device.id,     // Internal UUID
-              serialNumber: sourceData.metadata?.serialNumber || device.serial_number, // Human-readable unique ID
-              name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serial_number,
+              deviceId: sourceData.metadata?.deviceId || device.id || device.deviceId,     // Internal UUID - handle both id and deviceId
+              serialNumber: sourceData.metadata?.serialNumber || device.serial_number || device.serialNumber, // Human-readable unique ID - handle both snake_case and camelCase
+              name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serialNumber || device.serial_number,
               lastSeen: lastSeenValue,
               status: sourceData.status || device.status || calculatedStatus, // Use calculated status if not provided
               clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
