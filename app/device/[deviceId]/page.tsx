@@ -19,6 +19,7 @@ import {
   processInstallsData,
   processProfilesData,
   ApplicationsData,
+  ApplicationInfo,
   HardwareData,
   NetworkData,
   SecurityData,
@@ -234,26 +235,7 @@ interface FleetEvent {
   kind: string
   ts: string
   payload: Record<string, unknown>
-}
-
-interface ApplicationInfo {
-  id: string
-  name: string
-  displayName?: string
-  path?: string
-  version: string
-  bundle_version?: string
-  last_modified?: number
-  obtained_from?: string
-  runtime_environment?: string
-  info?: string
-  has64bit?: boolean
-  signed_by?: string
-  publisher?: string
-  category?: string
-  installDate?: string  // Windows install date format (YYYYMMDD)
-  size?: string
-  bundleId?: string
+  [key: string]: unknown
 }
 
 interface _DeviceInfo {
@@ -688,7 +670,7 @@ export default function DeviceDetailPage() {
       {
         key: 'lastRun',
         label: 'Last Run',
-        value: formatRelativeTime(config.lastRun || config.LastCheckDate),
+        value: formatRelativeTime(String(config.lastRun || config.LastCheckDate || '')),
         subValue: `Duration: ${config.duration}`,
         fullWidth: false
       },
@@ -717,7 +699,7 @@ export default function DeviceDetailPage() {
               <div key={field.key} className="px-4 py-2">
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">{field.label}</div>
                 <div className="text-sm text-gray-900 dark:text-white break-all">
-                  {field.value}
+                  {String(field.value || 'N/A')}
                 </div>
               </div>
             )
@@ -727,7 +709,7 @@ export default function DeviceDetailPage() {
                 <span className="text-sm font-medium text-gray-600 dark:text-gray-400">{field.label}</span>
                 <div className="text-right">
                   <div className={`text-sm text-gray-900 dark:text-white font-semibold ${field.capitalize ? 'capitalize' : ''}`}>
-                    {field.value}
+                    {String(field.value || 'N/A')}
                   </div>
                   {field.subValue && (
                     <div className="text-xs text-gray-600 dark:text-gray-400">{field.subValue}</div>
@@ -940,10 +922,10 @@ export default function DeviceDetailPage() {
             // Set empty defaults if processing fails
             setProcessedData({
               applications: { totalApps: 0, installedApps: [], recentlyUpdated: 0, categoryBreakdown: {} },
-              hardware: { processor: 'Unknown', memory: 'Unknown', storage: 'Unknown' },
-              network: { interfaces: [] },
-              security: { status: 'unknown', issues: [] },
-              system: { osVersion: 'Unknown', uptime: 'Unknown' },
+              hardware: { cpu: 'Unknown', memory: 'Unknown', storage: 'Unknown', graphics: 'Unknown', architecture: 'Unknown' },
+              network: { connectionType: 'Unknown', ipAddress: 'Unknown', macAddress: 'Unknown', hostname: 'Unknown', gateway: 'Unknown', dns: 'Unknown', primaryInterface: 'Unknown', vpnActive: false, interfaces: [], wifiNetworks: [], vpnConnections: [], routes: [] },
+              security: { overallScore: 0, issues: 0, compliant: 0, warnings: 0, lastScan: 'Unknown', features: [] },
+              system: { osVersion: 'Unknown', uptime: 'Unknown', bootTime: 'Unknown', kernelVersion: 'Unknown', processes: 0, services: 0, patches: 0 },
               installs: { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] },
               profiles: { totalProfiles: 0, systemProfiles: 0, userProfiles: 0, profiles: [] }
             })
@@ -1242,10 +1224,10 @@ export default function DeviceDetailPage() {
           <ManagementTab device={deviceInfo} />
         </div>
         <div className={activeTab === 'system' ? 'block' : 'hidden'}>
-          <SystemTab device={deviceInfo} data={processedData.system as unknown as Record<string, unknown>} />
+          <SystemTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} data={processedData.system as unknown as Record<string, unknown>} />
         </div>
         <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
-          <HardwareTab device={deviceInfo} data={processedData.hardware} />
+          <HardwareTab device={deviceInfo} />
         </div>
         <div className={activeTab === 'network' ? 'block' : 'hidden'}>
           <NetworkTab device={deviceInfo} data={processedData.network} />
@@ -1254,7 +1236,7 @@ export default function DeviceDetailPage() {
           <SecurityTab device={deviceInfo} data={processedData.security} />
         </div>
         <div className={activeTab === 'peripherals' ? 'block' : 'hidden'}>
-          <PeripheralsTab device={deviceInfo} />
+          <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
         </div>
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
           <EventsTab device={deviceInfo} events={events} data={processedData.events} />

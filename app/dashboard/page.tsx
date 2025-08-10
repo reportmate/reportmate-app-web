@@ -5,14 +5,14 @@ import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
 import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
-import { RecentEventsWidget } from "../../src/lib/modules/widgets/RecentEventsWidget"
+import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
-import { ConnectionStatusWidget } from "../../src/lib/modules/widgets/ConnectionStatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { useLiveEvents } from "./hooks"
+import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 
 // Import the same hooks and types from the original dashboard
 
@@ -48,9 +48,16 @@ interface Device {
       serialNumber?: string
     }
     system?: {
-      operatingSystem?: Record<string, unknown>;
-      [key: string]: unknown;
-    };
+      operatingSystem?: {
+        name: string
+        version: string
+        build: string
+        architecture: string
+        displayVersion?: string
+        edition?: string
+        featureUpdate?: string
+      }
+    }
     [key: string]: unknown;
   }
 }
@@ -316,18 +323,15 @@ export default function Dashboard() {
                     ReportMate
                   </h1>
                   <p className="text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
-                    Endpoint Monitoring Dashboard
+                    Endpoint Monitoring
                   </p>
                 </div>
               </div>
             </div>
             
             {/* Actions */}
-            <div className="flex items-center gap-3">
-              {/* Connection Status */}
-              <ConnectionStatusWidget 
-                connectionStatus={connectionStatus}
-              />
+            <div className="flex items-center gap-2">
+              <DevicePageNavigation className="flex items-center gap-2" currentPage="dashboard" />
               
               {/* Settings Gear Icon */}
               <Link
@@ -358,8 +362,8 @@ export default function Dashboard() {
             {/* Error and Warning Stats Cards */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
               <div className="grid grid-cols-1 gap-4">
-                <ErrorStatsWidget events={events} />
-                <WarningStatsWidget events={events} />
+                <ErrorStatsWidget events={events} devices={devices} />
+                <WarningStatsWidget events={events} devices={devices} />
               </div>
             </ErrorBoundary>
 
@@ -373,7 +377,7 @@ export default function Dashboard() {
           <div className="lg:col-span-7 space-y-8">
             {/* Recent Events Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
-              <RecentEventsWidget
+              <RecentEventsTable
                 events={events}
                 connectionStatus={connectionStatus}
                 lastUpdateTime={lastUpdateTime}
