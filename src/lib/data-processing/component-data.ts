@@ -23,6 +23,7 @@ export interface ApplicationInfo {
   installDate?: string
   size?: string
   path?: string
+  [key: string]: unknown
 }
 
 export function processApplicationsData(rawDevice: any): ApplicationsData {
@@ -602,6 +603,7 @@ export interface EventsData {
   warnings: number
   lastEvent: string
   eventsByType: Record<string, number>
+  [key: string]: unknown
 }
 
 export function processEventsData(rawDevice: any, events: any[]): EventsData {

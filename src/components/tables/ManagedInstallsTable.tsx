@@ -16,16 +16,31 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     hasData: !!data,
     totalPackages: data?.totalPackages,
     packagesLength: data?.packages?.length,
+    hasConfig: !!data?.config,
+    configType: data?.config?.type,
+    systemName: data?.systemName,
     firstPackage: data?.packages?.[0],
     samplePackageFields: data?.packages?.[0] ? Object.keys(data.packages[0]) : []
   });
 
-  if (!data || !data.packages || data.packages.length === 0) {
+  // Check if this is truly no managed installs system vs. no packages
+  const hasManagementSystem = data?.config || data?.systemName;
+  const hasPackages = data?.packages && data.packages.length > 0;
+
+  console.log('🔍 [MANAGED INSTALLS TABLE] System status:', {
+    hasManagementSystem,
+    hasPackages,
+    configExists: !!data?.config,
+    systemName: data?.systemName
+  });
+
+  // Only show "No Managed Installs" if there's no management system configured at all
+  if (!data || (!hasManagementSystem && !hasPackages)) {
     return (
       <div className="text-center py-16">
         <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
           </svg>
         </div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Managed Installs</h3>
@@ -52,8 +67,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     }
   };
 
-  // Filter packages based on status
   const getFilteredPackages = () => {
+    if (!data.packages || data.packages.length === 0) return [];
     if (statusFilter === 'all') return data.packages;
     
     return data.packages.filter(pkg => {
@@ -77,12 +92,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   const filteredPackages = getFilteredPackages();
 
-  // Calculate counts for each status
-  const installedCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'installed').length;
-  const pendingCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'pending').length;
-  const warningCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'warning').length;
-  const errorCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'error').length;
-  const removedCount = data.packages.filter(pkg => pkg.status?.toLowerCase() === 'removed').length;
+  // Calculate counts for each status (handle empty packages array)
+  const installedCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'installed').length : 0;
+  const pendingCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'pending').length : 0;
+  const warningCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'warning').length : 0;
+  const errorCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'error').length : 0;
+  const removedCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'removed').length : 0;
 
   return (
     <div className="space-y-6">
@@ -283,7 +298,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       Managed Packages:
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white"> {data.totalPackages}</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white"> {data.totalPackages || 0}</span>
                     </h3>
                   </div>
                 </div>
@@ -374,33 +389,60 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {[...filteredPackages].sort((a, b) => 
-                    (a.displayName || a.name).localeCompare(b.displayName || b.name)
-                  ).map((pkg) => (
-                    <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName || pkg.name || 'Unknown Package'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {pkg.version || 'Unknown'}
-                          {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {pkg.installedVersion} installed
-                            </div>
+                  {!hasPackages ? (
+                    // Empty state when managed system is configured but no packages
+                    <tr>
+                      <td colSpan={4} className="px-6 py-16">
+                        <div className="text-center">
+                          <div className="w-12 h-12 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                            {data.systemName ? `${data.systemName.charAt(0).toUpperCase() + data.systemName.slice(1)} System Active` : 'Management System Active'}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            The managed installs system is configured and running, but no packages are currently assigned to this device.
+                          </p>
+                          {data.config?.lastRun && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                              Last check: {formatRelativeTime(data.config.lastRun)}
+                            </p>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
-                          {(pkg.status || 'Unknown').replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {formatRelativeTime(pkg.lastUpdate)}
-                      </td>
                     </tr>
-                  ))}
+                  ) : (
+                    // Show packages when available
+                    [...filteredPackages].sort((a, b) => 
+                      (a.displayName || a.name).localeCompare(b.displayName || b.name)
+                    ).map((pkg) => (
+                      <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName || pkg.name || 'Unknown Package'}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {pkg.version || 'Unknown'}
+                            {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                {pkg.installedVersion} installed
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
+                            {(pkg.status || 'Unknown').replace(/_/g, ' ')}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {formatRelativeTime(pkg.lastUpdate)}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
