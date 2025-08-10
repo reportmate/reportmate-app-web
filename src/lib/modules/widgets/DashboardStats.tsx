@@ -95,14 +95,29 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
   )
 }
 
-// Warning Events Widget
-export const WarningStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
-  const warningCount = events.filter(e => e.kind.toLowerCase() === 'warning').length
+// Warning Events Widget - counts devices with warnings (but no errors)
+export const WarningStatsWidget: React.FC<{ events: any[], devices: any[] }> = ({ events, devices }) => {
+  // Count devices that have warnings but no errors
+  const devicesWithWarnings = devices.filter(device => {
+    // Check device events using all possible device identifiers
+    const deviceEvents = events.filter(e => 
+      e.deviceId === device.deviceId || 
+      e.deviceId === device.serialNumber ||
+      e.device === device.serialNumber ||
+      e.device === device.name ||
+      e.device === device.deviceId
+    )
+    const hasErrors = deviceEvents.some(e => e.kind.toLowerCase() === 'error')
+    const hasWarnings = deviceEvents.some(e => e.kind.toLowerCase() === 'warning')
+    
+    // Only count if device has warnings but no errors (error takes priority)
+    return hasWarnings && !hasErrors
+  }).length
   
   return (
     <StatsWidget
-      value={warningCount}
-      label="Warnings"
+      value={devicesWithWarnings}
+      label={devicesWithWarnings === 1 ? "Warning" : "Warnings"}
       color="yellow"
       href="/events?filter=warning"
       icon={
@@ -114,14 +129,25 @@ export const WarningStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
   )
 }
 
-// Error Events Widget
-export const ErrorStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
-  const errorCount = events.filter(e => e.kind.toLowerCase() === 'error').length
+// Error Events Widget - counts devices with errors (error takes priority)
+export const ErrorStatsWidget: React.FC<{ events: any[], devices: any[] }> = ({ events, devices }) => {
+  // Count devices that have errors
+  const devicesWithErrors = devices.filter(device => {
+    // Check device events using all possible device identifiers
+    const deviceEvents = events.filter(e => 
+      e.deviceId === device.deviceId || 
+      e.deviceId === device.serialNumber ||
+      e.device === device.serialNumber ||
+      e.device === device.name ||
+      e.device === device.deviceId
+    )
+    return deviceEvents.some(e => e.kind.toLowerCase() === 'error')
+  }).length
   
   return (
     <StatsWidget
-      value={errorCount}
-      label="Errors"
+      value={devicesWithErrors}
+      label={devicesWithErrors === 1 ? "Error" : "Errors"}
       color="red"
       href="/events?filter=error"
       icon={

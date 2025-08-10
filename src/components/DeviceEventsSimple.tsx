@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 interface EventDto {
   id: string;
   name: string;
+  message?: string; // User-friendly message from the database
   raw: Record<string, unknown> | string;
   kind?: string;
   ts?: string;
@@ -71,6 +72,8 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
+  const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
+  const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
   const eventsPerPage = 10;
 
   // Valid event categories - filter out everything else
@@ -100,9 +103,64 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     }
   };
 
+  // Function to fetch full payload lazily from dedicated endpoint
+  const fetchFullPayload = async (eventId: string) => {
+    if (fullPayloads[eventId] || loadingPayloads.has(eventId)) {
+      return // Already loaded or loading
+    }
+
+    setLoadingPayloads(prev => new Set(prev).add(eventId))
+    
+    try {
+      console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventId}`)
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`[DEVICE EVENTS SIMPLE] Successfully fetched full payload for ${eventId}`)
+        
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: data.payload
+        }))
+      } else {
+        console.error(`[DEVICE EVENTS SIMPLE] Failed to fetch payload for ${eventId}:`, response.status)
+        // Fallback to the existing payload from events list
+        const event = events.find(e => e.id === eventId)
+        if (event) {
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventId]: event.raw
+          }))
+        }
+      }
+    } catch (error) {
+      console.error(`[DEVICE EVENTS SIMPLE] Error fetching payload for ${eventId}:`, error)
+      // Fallback to the existing payload from events list
+      const event = events.find(e => e.id === eventId)
+      if (event) {
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: event.raw
+        }))
+      }
+    } finally {
+      setLoadingPayloads(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(eventId)
+        return newSet
+      })
+    }
+  }
+
   // Helper function to extract message from event data - using simplified logic
   const getEventMessage = (ev: EventDto): string => {
     try {
+      // **PRIORITY 1: Use the message field from EventDto if available**
+      if (ev.message && typeof ev.message === 'string') {
+        return ev.message.length > 100 ? ev.message.substring(0, 100) + '...' : ev.message;
+      }
+
       const payload = ev.raw
       
       if (!payload) return 'No payload'
@@ -112,7 +170,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
       }
       
-      // Handle object payloads
+      // Handle object payloads - only as fallback when message field is not available
       if (typeof payload === 'object') {
         const payloadObj = payload as PayloadObject;
         
@@ -134,14 +192,14 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           // Handle array of module names
           if (Array.isArray(modules)) {
             if (moduleCount === 1) {
-              return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} data reported`
+              return `Module ${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} data reported`
             } else if (moduleCount <= 3) {
               const capitalizedModules = modules.map((module: string) => 
                 module.charAt(0).toUpperCase() + module.slice(1)
               )
-              return `${capitalizedModules.join(', ')} data reported`
+              return `Modules ${capitalizedModules.join(', ')} data reported`
             } else {
-              return `All modules reported`
+              return `All modules data reported`
             }
           }
         }
@@ -153,12 +211,12 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           const moduleNames = Object.keys(modules).slice(0, 3)
           
           if (moduleCount > 3) {
-            return `All modules reported`
+            return `All modules data reported`
           } else {
             const capitalizedModules = moduleNames.map(module => 
               module.charAt(0).toUpperCase() + module.slice(1)
             )
-            return `${capitalizedModules.join(', ')} data reported`
+            return `Modules ${capitalizedModules.join(', ')} data reported`
           }
         }
         
@@ -166,11 +224,11 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
           const modulesProcessed = payloadObj.modules_processed
           if (modulesProcessed === 1) {
-            return `Single module reported`
+            return `Single module data reported`
           } else if (modulesProcessed <= 3) {
-            return `${modulesProcessed} modules reported`
+            return `${modulesProcessed} modules data reported`
           } else {
-            return `All modules reported`
+            return `All modules data reported`
           }
         }
         
@@ -291,7 +349,15 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                 </div>
                 
                 <button 
-                  onClick={() => setExpanded(e => (e === ev.id ? null : ev.id))}
+                  onClick={() => {
+                    const isOpening = expanded !== ev.id;
+                    setExpanded(e => (e === ev.id ? null : ev.id));
+                    
+                    // Auto-fetch full payload when opening, just like the main events page
+                    if (isOpening) {
+                      fetchFullPayload(ev.id);
+                    }
+                  }}
                   className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
                   aria-expanded={expanded === ev.id}
                   aria-controls={`payload-${ev.id}`}
@@ -310,36 +376,37 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                      Raw Payload
+                      {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
                     </h4>
-                    <button
-                      onClick={() => copyToClipboard(formatPayload(ev.raw), ev.id)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                      title="Copy payload to clipboard"
-                    >
-                      {copiedEventId === ev.id ? (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                          Copied!
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                          Copy
-                        </>
-                      )}
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const payloadToShow = fullPayloads[ev.id] || ev.raw
+                          copyToClipboard(formatPayload(payloadToShow as Record<string, unknown> | string), ev.id)
+                        }}
+                        className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                      >
+                        {copiedEventId === ev.id ? '✓ Copied' : 'Copy'}
+                      </button>
+                    </div>
                   </div>
                   <div className="relative bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 overflow-hidden">
-                    <pre className="overflow-x-auto overflow-y-auto max-h-96 overlay-scrollbar p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                      <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                        {formatPayload(ev.raw)}
-                      </code>
-                    </pre>
+                    {loadingPayloads.has(ev.id) ? (
+                      <div className="flex items-center justify-center py-8 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                          Loading full payload...
+                        </div>
+                      </div>
+                    ) : (
+                      <pre className="overflow-x-auto overflow-y-auto max-h-96 overlay-scrollbar p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                        <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
+                          {formatPayload((fullPayloads[ev.id] || ev.raw) as Record<string, unknown> | string)}
+                        </code>
+                      </pre>
+                    )}
                   </div>
                 </div>
               )}

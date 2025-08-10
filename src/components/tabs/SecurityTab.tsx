@@ -96,12 +96,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
 
       {/* Protection Category - Big Card with 3 Columns */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-            <Shield className="w-5 h-5 text-red-600 dark:text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Protection</h2>
-        </div>
+
         
         <div className="grid grid-cols-3 gap-8 divide-x divide-gray-200 dark:divide-gray-700">
           {/* Antivirus */}

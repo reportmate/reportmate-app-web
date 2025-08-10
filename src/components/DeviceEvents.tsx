@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 interface EventDto {
   id: string;
   name: string;
+  message?: string; // User-friendly message from the database
   raw: Record<string, unknown> | string;
   kind?: string;
   ts?: string;
@@ -15,10 +16,101 @@ interface DeviceEventsProps {
 
 export default function DeviceEvents({ events }: DeviceEventsProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
+  const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   const toggleExpanded = (eventId: string) => {
+    const isOpening = expanded !== eventId;
     setExpanded(current => current === eventId ? null : eventId);
+    
+    // Auto-fetch full payload when opening, just like the main events page
+    if (isOpening) {
+      fetchFullPayload(eventId);
+    }
   };
+
+  // Function to fetch full payload lazily from dedicated endpoint
+  const fetchFullPayload = async (eventId: string) => {
+    if (fullPayloads[eventId] || loadingPayloads.has(eventId)) {
+      return // Already loaded or loading
+    }
+
+    setLoadingPayloads(prev => new Set(prev).add(eventId))
+    
+    try {
+      console.log(`[DEVICE EVENTS] Fetching full payload for event: ${eventId}`)
+      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
+      
+      if (response.ok) {
+        const data = await response.json()
+        console.log(`[DEVICE EVENTS] Successfully fetched full payload for ${eventId}`)
+        
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: data.payload
+        }))
+      } else {
+        console.error(`[DEVICE EVENTS] Failed to fetch payload for ${eventId}:`, response.status)
+        // Fallback to the existing payload from events list
+        const event = events.find(e => e.id === eventId)
+        if (event) {
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventId]: event.raw
+          }))
+        }
+      }
+    } catch (error) {
+      console.error(`[DEVICE EVENTS] Error fetching payload for ${eventId}:`, error)
+      // Fallback to the existing payload from events list
+      const event = events.find(e => e.id === eventId)
+      if (event) {
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventId]: event.raw
+        }))
+      }
+    } finally {
+      setLoadingPayloads(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(eventId)
+        return newSet
+      })
+    }
+  }
+
+  // Helper function to copy payload to clipboard
+  const copyToClipboard = async (text: string, eventId: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedEventId(eventId);
+      // Reset the copied state after 2 seconds
+      setTimeout(() => setCopiedEventId(null), 2000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+      setCopiedEventId(eventId);
+      setTimeout(() => setCopiedEventId(null), 2000);
+    }
+  };
+
+  // Helper function to format full payload for display
+  const formatFullPayload = (payload: any): string => {
+    try {
+      if (!payload) return 'No payload'
+      if (typeof payload === 'string') return payload
+      return JSON.stringify(payload, null, 2)
+    } catch (error) {
+      return 'Error formatting payload: ' + String(payload)
+    }
+  }
 
   const getEventKindBadge = (kind?: string) => {
     if (!kind) return null;
@@ -96,7 +188,7 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
                 aria-expanded={expanded === ev.id}
                 aria-controls={`payload-${ev.id}`}
               >
-                Payload
+                {expanded === ev.id ? 'Hide Payload' : 'Show Payload'}
                 {expanded === ev.id ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -115,18 +207,39 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
                 id={`payload-${ev.id}`}
                 className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
               >
-                <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                  Raw Payload
-                </h4>
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                    {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        const payloadToShow = fullPayloads[ev.id] || ev.raw
+                        copyToClipboard(formatFullPayload(payloadToShow), ev.id)
+                      }}
+                      className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
+                    >
+                      {copiedEventId === ev.id ? '✓ Copied' : 'Copy'}
+                    </button>
+                  </div>
+                </div>
                 <div className="relative">
-                  <pre className="max-w-full overflow-x-auto rounded-lg bg-gray-900 dark:bg-gray-950 p-4 text-sm text-gray-100 border border-gray-700">
-                    <code className="whitespace-pre-wrap break-all">
-                      {typeof ev.raw === 'string' 
-                        ? ev.raw 
-                        : JSON.stringify(ev.raw, null, 2)
-                      }
-                    </code>
-                  </pre>
+                  {loadingPayloads.has(ev.id) ? (
+                    <div className="flex items-center justify-center py-8 bg-gray-50 dark:bg-gray-900 rounded-lg">
+                      <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                        <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Loading full payload...
+                      </div>
+                    </div>
+                  ) : (
+                    <pre className="max-w-full overflow-x-auto rounded-lg bg-gray-900 dark:bg-gray-950 p-4 text-sm text-gray-100 border border-gray-700">
+                      <code className="whitespace-pre-wrap break-all">
+                        {formatFullPayload(fullPayloads[ev.id] || ev.raw)}
+                      </code>
+                    </pre>
+                  )}
                 </div>
               </div>
             )}
