@@ -3,7 +3,7 @@
  * NEW CLEAN VERSION - modules are the source of truth, no duplicate data
  */
 
-import { processApplicationsData, processPeripheralsData } from './component-data'
+import { processApplicationsData, processPeripheralsData, processInstallsData } from './component-data'
 
 export interface ProcessedDeviceInfo {
   deviceId: string     // Internal UUID (unique)
@@ -180,6 +180,19 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   if (rawDevice.modules?.peripherals || rawDevice.modules?.displays || rawDevice.modules?.printers) {
     const peripheralsData = processPeripheralsData(rawDevice);
     ;(mappedDevice as any).peripherals = peripheralsData
+  }
+
+  // Installs data processing - CRITICAL for managed installs display
+  if (rawDevice.modules?.installs) {
+    const installsData = processInstallsData(rawDevice);
+    ;(mappedDevice as any).installs = installsData
+    console.log('🔧 DeviceMapper: Processed installs data:', {
+      totalPackages: installsData.totalPackages,
+      hasConfig: !!installsData.config,
+      systemName: installsData.systemName
+    })
+  } else {
+    console.log('🔧 DeviceMapper: No installs module found in rawDevice.modules')
   }
 
   console.log('DeviceMapper DEBUG - Clean mapped device:', {

@@ -1,9 +1,9 @@
 /**
- * Recent Events Widget
+ * Recent Events Table
  * Displays live event feed with real-time updates
  */
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 
@@ -12,10 +12,11 @@ interface FleetEvent {
   device: string
   kind: string
   ts: string
+  message?: string // User-friendly message from database
   payload: Record<string, unknown> | string
 }
 
-interface RecentEventsWidgetProps {
+interface RecentEventsTableProps {
   events: FleetEvent[]
   connectionStatus: string
   lastUpdateTime: Date | null
@@ -40,45 +41,7 @@ const getStatusConfig = (kind: string) => {
   }
 }
 
-// Helper function to get connection status configuration
-const getConnectionStatus = (connectionStatus: string) => {
-  switch (connectionStatus) {
-    case 'connected':
-      return { 
-        text: 'Live', 
-        color: 'text-green-600 dark:text-green-400', 
-        dot: 'bg-green-500',
-        show: true
-      }
-    case 'polling':
-      return { 
-        text: 'Polling', 
-        color: 'text-blue-600 dark:text-blue-400', 
-        dot: 'bg-blue-500',
-        show: true
-      }
-    case 'connecting':
-    case 'reconnecting':
-      // Don't show "Connecting" pill since top of page already has one
-      return { 
-        text: 'Connecting', 
-        color: 'text-yellow-600 dark:text-yellow-400', 
-        dot: 'bg-yellow-500',
-        show: false  // Hide this status as requested by user
-      }
-    case 'error':
-    case 'disconnected':
-    default:
-      return { 
-        text: 'Offline', 
-        color: 'text-red-600 dark:text-red-400', 
-        dot: 'bg-red-500',
-        show: true
-      }
-  }
-}
-
-export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({ 
+export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({ 
   events, 
   connectionStatus, 
   lastUpdateTime, 
@@ -86,7 +49,83 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
   deviceNameMap,
   isLoading = false
 }) => {
-  const status = getConnectionStatus(connectionStatus)
+  const [isHovered, setIsHovered] = useState(false)
+  const [showTooltip, setShowTooltip] = useState(false)
+  const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  const handleMouseEnter = () => {
+    setIsHovered(true)
+    // Clear any existing timeout
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+    // Set 1-second delay for tooltip
+    timeoutRef.current = setTimeout(() => {
+      setShowTooltip(true)
+    }, 1000)
+  }
+
+  const handleMouseLeave = () => {
+    setIsHovered(false)
+    setShowTooltip(false)
+    // Clear timeout if user leaves before tooltip shows
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+    }
+  }
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Enhanced connection status with tooltips
+  const getConnectionStatusWithTooltip = (connectionStatus: string) => {
+    switch (connectionStatus) {
+      case 'connected':
+        return { 
+          text: 'Live', 
+          color: 'text-green-600 dark:text-green-400', 
+          dot: 'bg-green-500',
+          show: true,
+          tooltip: 'Real-time connection is active and working'
+        }
+      case 'polling':
+        return { 
+          text: 'Polling', 
+          color: 'text-green-600 dark:text-green-400', 
+          dot: 'bg-green-500',
+          show: true,
+          tooltip: 'HTTP polling /api/events every 5 seconds'
+        }
+      case 'connecting':
+      case 'reconnecting':
+        // Don't show "Connecting" pill since top of page already has one
+        return { 
+          text: 'Connecting', 
+          color: 'text-yellow-600 dark:text-yellow-400', 
+          dot: 'bg-yellow-500',
+          show: false,  // Hide this status as requested by user
+          tooltip: 'Real-time connection handshake in progress'
+        }
+      case 'error':
+      case 'disconnected':
+      default:
+        return { 
+          text: 'Offline', 
+          color: 'text-red-600 dark:text-red-400', 
+          dot: 'bg-red-500',
+          show: true,
+          tooltip: 'Connection failed, events may be delayed'
+        }
+    }
+  }
+
+  const status = getConnectionStatusWithTooltip(connectionStatus)
 
   const getDeviceName = (deviceId: string) => {
     // Enhanced device name resolution with multiple fallback strategies
@@ -166,18 +205,18 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         if (Array.isArray(enabledModules) && enabledModules.length > 0) {
           if (moduleCount === 1) {
             const capitalizedModule = enabledModules[0].charAt(0).toUpperCase() + enabledModules[0].slice(1)
-            return `${capitalizedModule} module data collected`
+            return `${capitalizedModule} module reported data`
           } else if (moduleCount <= 3) {
             const capitalizedModules = enabledModules.slice(0, moduleCount).map(module => 
               module.charAt(0).toUpperCase() + module.slice(1)
             )
-            return `${capitalizedModules.join(', ')} modules data collected`
+            return `${capitalizedModules.join(', ')} modules reported data`
           } else {
-            return `All ${moduleCount} modules data collected`
+            return `All ${moduleCount} modules reported data`
           }
         }
         
-        return `${moduleCount} modules data collected`
+        return `${moduleCount} modules reported data`
       }
 
       // **PRIORITY 4: Handle moduleCount structure (older format)**
@@ -185,14 +224,14 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         const moduleCount = payloadObj.moduleCount
         const modules = payloadObj.modules
         if (moduleCount === 1) {
-          return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} data reported`
+          return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} module reported data`
         } else if (moduleCount <= 3) {
           const capitalizedModules = modules.map((module: string) => 
             module.charAt(0).toUpperCase() + module.slice(1)
           )
-          return `${capitalizedModules.join(', ')} data reported`
+          return `${capitalizedModules.join(', ')} modules reported data`
         } else {
-          return `All modules data reported`
+          return `All modules reported data`
         }
       }
 
@@ -202,14 +241,14 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
         const moduleCount = moduleNames.length
         
         if (moduleCount === 1) {
-          return `${moduleNames[0].charAt(0).toUpperCase() + moduleNames[0].slice(1)} data reported`
+          return `${moduleNames[0].charAt(0).toUpperCase() + moduleNames[0].slice(1)} module reported data`
         } else if (moduleCount <= 3) {
           const capitalizedModules = moduleNames.map(module => 
             module.charAt(0).toUpperCase() + module.slice(1)
           )
-          return `${capitalizedModules.join(', ')} data reported`
+          return `${capitalizedModules.join(', ')} modules reported data`
         } else {
-          return `All modules data reported`
+          return `All modules reported data`
         }
       }
 
@@ -312,6 +351,35 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
             </p>
           </div>
           <div className="flex items-center gap-4">
+            {/* Connection Status with expansion and tooltip */}
+            {status.show && (
+              <div className="relative">
+                <div 
+                  className={`flex items-center h-6 rounded-full bg-gray-100 dark:bg-gray-700 transition-all duration-300 ease-in-out ${
+                    isHovered ? 'px-3 justify-start' : 'w-6 justify-center'
+                  }`}
+                  onMouseEnter={handleMouseEnter}
+                  onMouseLeave={handleMouseLeave}
+                >
+                  <div className={`w-2 h-2 rounded-full ${status.dot} flex-shrink-0`}></div>
+                  <div className={`transition-all duration-300 ease-in-out ${
+                    isHovered ? 'opacity-100 w-auto ml-2' : 'opacity-0 w-0 ml-0'
+                  }`}>
+                    <span className={`text-sm font-medium ${status.color} whitespace-nowrap`}>
+                      {status.text}
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Custom Tooltip */}
+                {showTooltip && (
+                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-2 bg-gray-900 dark:bg-gray-700 text-white dark:text-gray-100 text-sm font-medium rounded-lg shadow-lg whitespace-nowrap z-50 border border-gray-700 dark:border-gray-600">
+                    {status.tooltip}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-b-4 border-transparent border-b-gray-900 dark:border-b-gray-700"></div>
+                  </div>
+                )}
+              </div>
+            )}
             {mounted && lastUpdateTime && (
               <div className="text-sm text-gray-500 dark:text-gray-400">
                 Last update: {formatRelativeTime(lastUpdateTime.toISOString())}
@@ -425,7 +493,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
               <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {events.slice(0, 50).map((event) => {
+                    {events.slice(0, 50).map((event: FleetEvent) => {
                       const statusConfig = getStatusConfig(event.kind)
                       return (
                         <tr 
@@ -447,7 +515,7 @@ export const RecentEventsWidget: React.FC<RecentEventsWidgetProps> = ({
                           </td>
                           <td className="px-3 py-2.5 hidden md:table-cell">
                             <div className="text-sm text-gray-900 dark:text-white truncate">
-                              {formatPayloadPreview(event.payload)}
+                              {event.message || formatPayloadPreview(event.payload)}
                             </div>
                           </td>
                           <td className="w-44 px-3 py-2.5">

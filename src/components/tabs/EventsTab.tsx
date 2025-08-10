@@ -219,13 +219,24 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
           <p className="text-sm text-gray-600 dark:text-gray-400">Latest device activity and events</p>
         </div>
         <div className="p-6">
-          <DeviceEventsSimple events={filteredEvents.map(event => ({
-            id: event.id || `event-${Math.random()}`,
-            name: event.kind || 'Event', // Use event kind as fallback name
-            raw: (event.payload as Record<string, unknown>) || {},
-            kind: event.kind,
-            ts: event.ts
-          }))} />
+          <DeviceEventsSimple events={filteredEvents.map(event => {
+            // Extract message from event (priority: event.message, then payload.message, then fallback)
+            let message: string | undefined;
+            if ((event as any).message) {
+              message = (event as any).message;
+            } else if (event.payload && typeof event.payload === 'object' && (event.payload as any).message) {
+              message = (event.payload as any).message;
+            }
+
+            return {
+              id: event.id || `event-${Math.random()}`,
+              name: message || event.kind || 'Event', // Use actual message first, then event kind as fallback
+              message: message, // Include the message field in EventDto
+              raw: (event.payload as Record<string, unknown>) || {},
+              kind: event.kind,
+              ts: event.ts
+            };
+          })} />
         </div>
       </div>
     </div>
