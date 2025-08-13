@@ -3,21 +3,18 @@
 // Force dynamic rendering and disable caching for events page
 export const dynamic = 'force-dynamic'
 
-import React, { useEffect, useState, Suspense } from "react"
+import React, { useEffect, useState, Suspense, useMemo } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
+import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
-interface Event {
-  id: string
-  device: string
-  kind: string
-  ts: string
-  payload: Record<string, unknown> | string
+interface Event extends FleetEvent {
+  // Event structure is now consistent with FleetEvent
 }
 
 // Interface for payload data
@@ -31,15 +28,20 @@ interface EventPayload {
   [key: string]: unknown;
 }
 
-// Helper function to get event message - prioritizes event-level message over payload message
-const getEventMessage = (event: any): string => {
+// Helper function to get event message - uses shared bundling utilities
+const getEventMessage = (event: BundledEvent): string => {
+  if (event.isBundle) {
+    return event.message // Already processed by bundling logic
+  }
+  
   // **PRIORITY 1: Use event-level message field if available (from database)**
   if (event.message && typeof event.message === 'string') {
     return event.message.length > 150 ? event.message.substring(0, 150) + '...' : event.message;
   }
   
   // **PRIORITY 2: Fallback to payload message extraction**
-  return safeDisplayPayload(event.payload);
+  const originalEvent = event as unknown as Event
+  return formatPayloadPreview(originalEvent.payload);
 }
 
 // Helper function to safely display payload
@@ -153,6 +155,23 @@ function EventsPageContent() {
   // Valid event categories - filter out everything else
   const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
+  // Bundle events using the shared bundling logic
+  const bundledEvents: BundledEvent[] = useMemo(() => {
+    if (!events.length) return []
+    
+    // Convert events to FleetEvent format and bundle them
+    const fleetEvents: FleetEvent[] = events.map(event => ({
+      id: event.id,
+      device: event.device,
+      kind: event.kind,
+      ts: event.ts,
+      message: (event as any).message,
+      payload: event.payload
+    }))
+    
+    return bundleEvents(fleetEvents)
+  }, [events])
+
   // Initialize filter from URL parameters
   useEffect(() => {
     const urlFilter = searchParams.get('filter')
@@ -237,9 +256,9 @@ function EventsPageContent() {
   }, [])
 
   // Filter events based on selected type and search query
-  const filteredEvents = events.filter(event => {
+  const filteredEvents = bundledEvents.filter(event => {
     // Filter by type first
-    const typeMatch = filterType === 'all' || event.kind.toLowerCase() === filterType.toLowerCase()
+    const typeMatch = filterType === 'all' || event.bundledKinds.some(kind => kind.toLowerCase() === filterType.toLowerCase())
     
     // Then filter by search query if provided
     if (!searchQuery.trim()) {
@@ -250,7 +269,7 @@ function EventsPageContent() {
     const searchMatch = (
       event.id.toLowerCase().includes(query) ||
       event.device.toLowerCase().includes(query) ||
-      event.kind.toLowerCase().includes(query) ||
+      event.bundledKinds.some(kind => kind.toLowerCase().includes(query)) ||
       getEventMessage(event).toLowerCase().includes(query) ||
       (deviceNameMap[event.device] && deviceNameMap[event.device].toLowerCase().includes(query))
     )
@@ -274,6 +293,32 @@ function EventsPageContent() {
     try {
       if (!payload) return 'No payload'
       if (typeof payload === 'string') return payload
+      
+      // Handle bundled events with multiple payloads
+      if (payload.isBundle && payload.payloads) {
+        let result = `Bundle Summary:\n`
+        result += `- Event Count: ${payload.count}\n`
+        result += `- Event Types: ${(payload.bundledKinds || []).join(', ')}\n`
+        result += `- Message: ${payload.message}\n\n`
+        result += `Individual Event Payloads:\n`
+        result += `${'='.repeat(50)}\n\n`
+        
+        payload.payloads.forEach((item: any, index: number) => {
+          result += `Event ${index + 1} (ID: ${item.eventId}):\n`
+          result += `${'-'.repeat(30)}\n`
+          if (item.error) {
+            result += `Error: ${item.error}\n`
+          } else {
+            result += typeof item.payload === 'string' 
+              ? item.payload 
+              : JSON.stringify(item.payload, null, 2)
+          }
+          result += `\n\n`
+        })
+        
+        return result
+      }
+      
       return JSON.stringify(payload, null, 2)
     } catch (error) {
       return 'Error formatting payload: ' + String(payload)
@@ -290,6 +335,48 @@ function EventsPageContent() {
     
     try {
       console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventId}`)
+      
+      // For bundled events, we need to handle them differently
+      if (eventId.startsWith('bundle-')) {
+        // For bundled events, fetch payloads from all constituent events
+        const bundledEvent = filteredEvents.find(e => e.id === eventId)
+        if (bundledEvent && bundledEvent.isBundle && bundledEvent.eventIds) {
+          console.log(`[EVENTS PAGE] Fetching payloads for ${bundledEvent.eventIds.length} bundled events`)
+          
+          // Fetch payloads for all bundled events in parallel
+          const payloadPromises = bundledEvent.eventIds.map(async (realEventId: string) => {
+            try {
+              const response = await fetch(`/api/events/${realEventId}/payload`)
+              if (!response.ok) {
+                console.error(`[EVENTS PAGE] Failed to fetch payload for event ${realEventId}: ${response.status}`)
+                return { eventId: realEventId, error: `Failed to fetch (${response.status})` }
+              }
+              const data = await response.json()
+              return { eventId: realEventId, payload: data.payload || 'No payload data' }
+            } catch (error) {
+              console.error(`[EVENTS PAGE] Error fetching payload for event ${realEventId}:`, error)
+              return { eventId: realEventId, error: error instanceof Error ? error.message : 'Unknown error' }
+            }
+          })
+          
+          const payloadResults = await Promise.all(payloadPromises)
+          const bundleInfo = {
+            eventIds: bundledEvent.eventIds,
+            count: bundledEvent.count,
+            bundledKinds: bundledEvent.bundledKinds,
+            message: bundledEvent.message,
+            payloads: payloadResults,
+            isBundle: true
+          }
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventId]: bundleInfo
+          }))
+          return
+        }
+      }
+      
+      // For regular events, fetch from API
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
       
       if (response.ok) {
@@ -302,23 +389,30 @@ function EventsPageContent() {
         }))
       } else {
         console.error(`[EVENTS PAGE] Failed to fetch payload for ${eventId}:`, response.status)
-        // Fallback to the existing payload from events list
-        const event = events.find(e => e.id === eventId)
-        if (event) {
+        // Fallback to showing bundle info for bundled events
+        const bundledEvent = filteredEvents.find(e => e.id === eventId)
+        if (bundledEvent) {
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: event.payload
+            [eventId]: bundledEvent.isBundle ? { 
+              message: bundledEvent.message,
+              eventIds: bundledEvent.eventIds,
+              isBundle: true 
+            } : 'Unable to load payload'
           }))
         }
       }
     } catch (error) {
       console.error(`[EVENTS PAGE] Error fetching payload for ${eventId}:`, error)
-      // Fallback to the existing payload from events list
-      const event = events.find(e => e.id === eventId)
-      if (event) {
+      const bundledEvent = filteredEvents.find(e => e.id === eventId)
+      if (bundledEvent) {
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: event.payload
+          [eventId]: bundledEvent.isBundle ? { 
+            message: bundledEvent.message,
+            eventIds: bundledEvent.eventIds,
+            isBundle: true 
+          } : 'Error loading payload'
         }))
       }
     } finally {
@@ -401,7 +495,7 @@ function EventsPageContent() {
         return { 
           bg: 'bg-purple-500', 
           text: 'text-purple-700 dark:text-purple-300', 
-          badge: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+          badge: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
           icon: (
             <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
@@ -424,12 +518,12 @@ function EventsPageContent() {
 
   const getFilterCounts = () => {
     return {
-      all: events.length,
-      success: events.filter(e => e.kind.toLowerCase() === 'success').length,
-      warning: events.filter(e => e.kind.toLowerCase() === 'warning').length,
-      error: events.filter(e => e.kind.toLowerCase() === 'error').length,
-      info: events.filter(e => e.kind.toLowerCase() === 'info').length,
-      system: events.filter(e => e.kind.toLowerCase() === 'system').length,
+      all: bundledEvents.length,
+      success: bundledEvents.filter(e => e.bundledKinds.includes('success')).length,
+      warning: bundledEvents.filter(e => e.bundledKinds.includes('warning')).length,
+      error: bundledEvents.filter(e => e.bundledKinds.includes('error')).length,
+      info: bundledEvents.filter(e => e.bundledKinds.includes('info')).length,
+      system: bundledEvents.filter(e => e.bundledKinds.includes('system')).length,
     }
   }
 
@@ -581,7 +675,7 @@ function EventsPageContent() {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-6 py-3">
+                      <td colSpan={5} className="px-6 py-3">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -616,7 +710,7 @@ function EventsPageContent() {
                                   isActive 
                                     ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
                                     : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                                } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                                } inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ml-1`}>
                                   {filter.count}
                                 </span>
                               </button>
@@ -655,9 +749,6 @@ function EventsPageContent() {
                     </tr>
                     {/* Header Row */}
                     <tr>
-                      <th className="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        ID
-                      </th>
                       <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
@@ -696,11 +787,6 @@ function EventsPageContent() {
                       return (
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
-                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400 truncate">
-                                {event.id}
-                              </div>
-                            </td>
                             <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
                               <div className="flex items-center gap-2">
                                 <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
@@ -770,7 +856,7 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-6 py-4">
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
@@ -779,7 +865,9 @@ function EventsPageContent() {
                                       </h4>
                                       <button
                                         onClick={() => {
-                                          const payloadToShow = fullPayloads[event.id] || event.payload
+                                          const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
+                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                            'No payload available')
                                           copyToClipboard(formatFullPayload(payloadToShow), event.id)
                                         }}
                                         className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
@@ -815,7 +903,9 @@ function EventsPageContent() {
                                       <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
                                         <div className="overflow-auto max-h-96">
                                           <pre className="p-4 text-sm text-gray-100 whitespace-pre-wrap break-all min-w-0">
-                                            <code className="block break-all min-w-0">{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                                            <code className="block break-all min-w-0">{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                              { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                              'No payload available'))}</code>
                                           </pre>
                                         </div>
                                       </div>
@@ -878,7 +968,7 @@ function EventsPageContent() {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-4 py-3">
+                      <td colSpan={5} className="px-4 py-3">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -913,7 +1003,7 @@ function EventsPageContent() {
                                   isActive 
                                     ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
                                     : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                                } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                                } inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ml-1`}>
                                   {filter.count}
                                 </span>
                               </button>
@@ -953,9 +1043,6 @@ function EventsPageContent() {
                     {/* Header Row */}
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                        ID
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         Type
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
@@ -993,11 +1080,6 @@ function EventsPageContent() {
                       return (
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <div className="text-xs font-mono text-gray-600 dark:text-gray-400">
-                                {event.id}
-                              </div>
-                            </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <div className="flex items-center gap-2">
                                 <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
@@ -1056,7 +1138,7 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-4 py-3">
                                   <div className="space-y-2">
                                     <div className="flex items-center justify-between">
@@ -1065,7 +1147,9 @@ function EventsPageContent() {
                                       </h4>
                                       <button
                                         onClick={() => {
-                                          const payloadToShow = fullPayloads[event.id] || event.payload
+                                          const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
+                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                            'No payload available')
                                           copyToClipboard(formatFullPayload(payloadToShow), event.id)
                                         }}
                                         className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
@@ -1075,7 +1159,9 @@ function EventsPageContent() {
                                     </div>
                                     <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 overflow-auto">
                                       <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
-                                        <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                                        <code>{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                          { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                          'No payload available'))}</code>
                                       </pre>
                                     </div>
                                   </div>
@@ -1159,9 +1245,6 @@ function EventsPageContent() {
                           {event.kind}
                         </span>
                       </div>
-                      <div className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                        #{event.id}
-                      </div>
                     </div>
 
                     {/* Device */}
@@ -1219,7 +1302,9 @@ function EventsPageContent() {
                           </h4>
                           <button
                             onClick={() => {
-                              const payloadToShow = fullPayloads[event.id] || event.payload
+                              const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
+                                { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                'No payload available')
                               copyToClipboard(formatFullPayload(payloadToShow), event.id)
                             }}
                             className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
@@ -1229,7 +1314,9 @@ function EventsPageContent() {
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto max-h-64">
                           <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
-                            <code>{formatFullPayload(fullPayloads[event.id] || event.payload)}</code>
+                            <code>{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                              { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                              'No payload available'))}</code>
                           </pre>
                         </div>
                       </div>
