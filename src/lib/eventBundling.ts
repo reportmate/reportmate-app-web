@@ -18,6 +18,8 @@ export interface BundledEvent extends FleetEvent {
   firstEventTime?: string
   lastEventTime?: string
   bundledEvents?: FleetEvent[]
+  bundledKinds?: string[]
+  eventIds?: string[]
 }
 
 /**
@@ -43,6 +45,15 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       existing.bundledEvents.push(event)
       existing.isBundle = existing.count > 1
       
+      // Update bundledKinds to include all unique kinds
+      if (existing.bundledKinds && !existing.bundledKinds.includes(event.kind)) {
+        existing.bundledKinds.push(event.kind)
+      }
+      
+      // Update eventIds to include all event IDs
+      existing.eventIds = existing.eventIds || []
+      existing.eventIds.push(event.id)
+      
       // Update message for bundle
       if (existing.count > 1) {
         existing.message = `${getBundleCategory(event)} (${existing.count} events)`
@@ -55,6 +66,8 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
         firstEventTime: event.ts,
         lastEventTime: event.ts,
         bundledEvents: [event],
+        bundledKinds: [event.kind],
+        eventIds: [event.id],
         isBundle: false
       }
       eventMap.set(bundleKey, bundledEvent)
