@@ -113,6 +113,48 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     
     try {
       console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventId}`)
+      
+      // For bundled events, we need to handle them differently
+      if (eventId.startsWith('bundle-')) {
+        // For bundled events, fetch payloads from all constituent events
+        const bundledEvent = events.find(e => e.id === eventId)
+        if (bundledEvent && (bundledEvent as any).raw?.bundledEvents) {
+          const bundledEventIds = (bundledEvent as any).raw.bundledEvents
+          console.log(`[DEVICE EVENTS SIMPLE] Fetching payloads for ${bundledEventIds.length} bundled events`)
+          
+          // Fetch payloads for all bundled events in parallel
+          const payloadPromises = bundledEventIds.map(async (realEventId: string) => {
+            try {
+              const response = await fetch(`/api/events/${realEventId}/payload`)
+              if (!response.ok) {
+                console.error(`[DEVICE EVENTS SIMPLE] Failed to fetch payload for event ${realEventId}: ${response.status}`)
+                return { eventId: realEventId, error: `Failed to fetch (${response.status})` }
+              }
+              const data = await response.json()
+              return { eventId: realEventId, payload: data.payload || 'No payload data' }
+            } catch (error) {
+              console.error(`[DEVICE EVENTS SIMPLE] Error fetching payload for event ${realEventId}:`, error)
+              return { eventId: realEventId, error: error instanceof Error ? error.message : 'Unknown error' }
+            }
+          })
+          
+          const payloadResults = await Promise.all(payloadPromises)
+          const bundleInfo = {
+            eventIds: bundledEventIds,
+            count: (bundledEvent as any).raw?.count || bundledEventIds.length,
+            message: bundledEvent.message || (bundledEvent as any).raw?.message,
+            payloads: payloadResults,
+            isBundle: true
+          }
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventId]: bundleInfo
+          }))
+          return
+        }
+      }
+      
+      // For regular events, fetch from API
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
       
       if (response.ok) {
@@ -130,7 +172,11 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         if (event) {
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: event.raw
+            [eventId]: (event as any).isBundle ? { 
+              message: event.message,
+              eventIds: (event as any).raw?.bundledEvents,
+              isBundle: true 
+            } : event.raw
           }))
         }
       }
@@ -141,7 +187,11 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       if (event) {
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: event.raw
+          [eventId]: (event as any).isBundle ? { 
+            message: event.message,
+            eventIds: (event as any).raw?.bundledEvents,
+            isBundle: true 
+          } : event.raw
         }))
       }
     } finally {
@@ -150,6 +200,41 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         newSet.delete(eventId)
         return newSet
       })
+    }
+  }
+
+  const formatFullPayload = (payload: any): string => {
+    try {
+      if (!payload) return 'No payload'
+      if (typeof payload === 'string') return payload
+      
+      // Handle bundled events with multiple payloads
+      if (payload.isBundle && payload.payloads) {
+        let result = `Bundle Summary:\n`
+        result += `- Event Count: ${payload.count}\n`
+        result += `- Message: ${payload.message}\n\n`
+        result += `Individual Event Payloads:\n`
+        result += `${'='.repeat(50)}\n\n`
+        
+        payload.payloads.forEach((item: any, index: number) => {
+          result += `Event ${index + 1} (ID: ${item.eventId}):\n`
+          result += `${'-'.repeat(30)}\n`
+          if (item.error) {
+            result += `Error: ${item.error}\n`
+          } else {
+            result += typeof item.payload === 'string' 
+              ? item.payload 
+              : JSON.stringify(item.payload, null, 2)
+          }
+          result += `\n\n`
+        })
+        
+        return result
+      }
+      
+      return JSON.stringify(payload, null, 2)
+    } catch (error) {
+      return 'Error formatting payload: ' + String(payload)
     }
   }
 
@@ -382,7 +467,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                       <button
                         onClick={() => {
                           const payloadToShow = fullPayloads[ev.id] || ev.raw
-                          copyToClipboard(formatPayload(payloadToShow as Record<string, unknown> | string), ev.id)
+                          copyToClipboard(formatFullPayload(payloadToShow), ev.id)
                         }}
                         className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
                       >
@@ -403,7 +488,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     ) : (
                       <pre className="overflow-x-auto overflow-y-auto max-h-96 overlay-scrollbar p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                         <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                          {formatPayload((fullPayloads[ev.id] || ev.raw) as Record<string, unknown> | string)}
+                          {formatFullPayload(fullPayloads[ev.id] || ev.raw)}
                         </code>
                       </pre>
                     )}
