@@ -264,7 +264,7 @@ export async function GET() {
               serialNumber: sourceData.metadata?.serialNumber || device.serialNumber || device.serial_number,
               name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serialNumber || device.serial_number,
               lastSeen: lastSeenValue,
-              status: sourceData.status || device.status || calculatedStatus,
+              status: calculatedStatus, // Use calculated status based on actual recent timestamps
               clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
               assetTag: sourceData.inventory?.assetTag,
               location: sourceData.inventory?.location,
