@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 
 interface RawDevice {
-  serial_number?: string
+  serialNumber?: string  // Azure Functions uses camelCase
+  serial_number?: string  // Fallback for snake_case
   [key: string]: unknown
 }
 
@@ -205,8 +206,8 @@ export async function GET() {
       const transformedDevices = await Promise.all(
         devicesArray
           .filter((device: RawDevice) => {
-            // Filter out test devices
-            const serialNumber = device.serial_number
+            // Filter out test devices - handle both camelCase and snake_case
+            const serialNumber = device.serialNumber || device.serial_number
             return serialNumber && 
                    !serialNumber.startsWith('TEST-') && 
                    !serialNumber.includes('test-device') &&
@@ -214,12 +215,13 @@ export async function GET() {
                    !serialNumber.includes('{"serial_number"')
           })
           .map(async (device: RawDevice) => {
-            console.log('[DEVICES API] 🔍 Processing device:', device.serial_number)
+            const serialNumber = device.serialNumber || device.serial_number
+            console.log('[DEVICES API] 🔍 Processing device:', serialNumber)
             
             // Fetch full device details with modules
             let fullDeviceData = null
             try {
-              const deviceDetailResponse = await fetch(`${apiBaseUrl}/api/device/${device.serial_number}`, {
+              const deviceDetailResponse = await fetch(`${apiBaseUrl}/api/device/${serialNumber}`, {
                 cache: 'no-store',
                 headers: {
                   'Cache-Control': 'no-cache',
@@ -232,11 +234,11 @@ export async function GET() {
                 const deviceDetailData = await deviceDetailResponse.json()
                 if (deviceDetailData && (deviceDetailData.metadata || deviceDetailData.inventory || deviceDetailData.applications)) {
                   fullDeviceData = deviceDetailData
-                  console.log('[DEVICES API] ✅ Got full device data with modules for:', device.serial_number)
+                  console.log('[DEVICES API] ✅ Got full device data with modules for:', serialNumber)
                 }
               }
             } catch (error) {
-              console.warn('[DEVICES API] ⚠️ Failed to fetch full device data for:', device.serial_number, error)
+              console.warn('[DEVICES API] ⚠️ Failed to fetch full device data for:', serialNumber, error)
             }
             
             const sourceData = fullDeviceData || device
@@ -259,7 +261,7 @@ export async function GET() {
 
             return {
               deviceId: sourceData.metadata?.deviceId || device.id || device.deviceId,
-              serialNumber: sourceData.metadata?.serialNumber || device.serial_number || device.serialNumber,
+              serialNumber: sourceData.metadata?.serialNumber || device.serialNumber || device.serial_number,
               name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serialNumber || device.serial_number,
               lastSeen: lastSeenValue,
               status: sourceData.status || device.status || calculatedStatus,
