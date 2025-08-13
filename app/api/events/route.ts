@@ -1,63 +1,9 @@
 import { NextResponse } from 'next/server';
 
-// Import database fallback
+// DISABLED - Always use cloud infrastructure only
 async function getEventsFromDatabase(limit = 100) {
-  const { Pool } = require('pg');
-  const DATABASE_CONNECTION_STRING = process.env.DATABASE_CONNECTION_STRING || 
-    'postgresql://reportmate:2sSWbVxyqjXp9WUpeMmzRaC@reportmate-database.postgres.database.azure.com:5432/reportmate?sslmode=require';
-  
-  const pool = new Pool({ connectionString: DATABASE_CONNECTION_STRING });
-  
-  try {
-    console.log('[DATABASE FALLBACK] Querying events directly from database');
-    
-    const query = `
-      SELECT id, device_id, event_type, message, details, timestamp
-      FROM events 
-      ORDER BY timestamp DESC 
-      LIMIT $1
-    `;
-    
-    const result = await pool.query(query, [limit]);
-    
-    // Format events to match frontend expectations
-    const formattedEvents = result.rows.map((row: any) => {
-      // Parse details if it's JSON
-      let details = row.details;
-      if (details && typeof details === 'string') {
-        try {
-          details = JSON.parse(details);
-        } catch (e) {
-          details = { raw: details };
-        }
-      }
-
-      return {
-        id: row.id.toString(),
-        device: row.device_id,          // Map device_id to device
-        kind: row.event_type,           // Map event_type to kind
-        message: row.message || '',
-        payload: details || {},         // Map details to payload
-        ts: row.timestamp ? new Date(row.timestamp).toISOString() : new Date().toISOString()
-      };
-    });
-    
-    console.log(`[DATABASE FALLBACK] Successfully fetched ${formattedEvents.length} events from database`);
-    
-    return {
-      success: true,
-      events: formattedEvents,
-      count: formattedEvents.length,
-      source: 'database-direct',
-      timestamp: new Date().toISOString()
-    };
-    
-  } catch (error: any) {
-    console.error('[DATABASE FALLBACK] Error querying database:', error.message);
-    throw error;
-  } finally {
-    await pool.end();
-  }
+  console.error('[EVENTS API] DATABASE FALLBACK DISABLED - Use cloud infrastructure only')
+  throw new Error('Database fallback is disabled - use cloud infrastructure only')
 }
 
 interface RawEvent {
@@ -171,26 +117,18 @@ export async function GET() {
 
     // Try direct database query as backup
     try {
-      console.log('[EVENTS API] Trying direct database fallback');
-      const databaseResult = await getEventsFromDatabase(100);
+      console.log('[EVENTS API] Database fallback disabled - returning error instead');
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable - cloud infrastructure error' },
+        { status: 503 }
+      );
       
-      // Filter events to only include valid categories
-      if (databaseResult.success && Array.isArray(databaseResult.events)) {
-        const filteredEvents = databaseResult.events.filter((event: any) => 
-          VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
-        );
-        
-        const filteredData = {
-          ...databaseResult,
-          events: filteredEvents,
-          count: filteredEvents.length
-        };
-        console.log('[EVENTS API] Direct database query successful, returning', filteredEvents.length, 'filtered events');
-        return NextResponse.json(filteredData);
-      }
-    } catch (dbError) {
-      console.log('[EVENTS API] Direct database fallback failed:', dbError instanceof Error ? dbError.message : String(dbError));
-      // Fall through to hardcoded fallback
+    } catch (error) {
+      console.error('[EVENTS API] Error in events processing:', error);
+      return NextResponse.json(
+        { error: 'Internal server error' },
+        { status: 500 }
+      );
     }
 
     // Return events based on actual device IDs in the database as fallback
