@@ -42,71 +42,69 @@ export async function GET() {
     }
     
     if (useLocalFallback) {
-      console.log(`[HARDWARE API] ${timestamp} - Using local database fallback`)
+      console.log(`[HARDWARE API] ${timestamp} - Azure Functions /api/hardware not found - extracting from events`)
       
       try {
-        const { Pool } = require('pg')
-        const pool = new Pool({
-          connectionString: process.env.DATABASE_URL
-        })
-
-        const result = await pool.query(`
-          SELECT 
-            h.device_id,
-            d.name as device_name,
-            d.serial_number,
-            d.last_seen,
-            h.data,
-            h.collected_at
-          FROM hardware h
-          JOIN devices d ON h.device_id = d.id
-          ORDER BY h.updated_at DESC
-          LIMIT 1000
-        `)
-        
-        const hardwareData = result.rows.map((row: any) => {
-          const data = row.data || {}
-          
-          return {
-            id: row.device_id,
-            deviceId: row.device_id,
-            deviceName: row.device_name || 'Unknown Device',
-            serialNumber: row.serial_number,
-            lastSeen: row.last_seen,
-            collectedAt: row.collected_at,
-            // Hardware-specific fields
-            processor: data.processor?.name || data.cpu?.name || 'Unknown Processor',
-            processorSpeed: data.processor?.speed || data.cpu?.speed || null,
-            processorCores: data.processor?.cores || data.cpu?.cores || null,
-            memory: data.memory?.total || data.ram?.total || 'Unknown',
-            memoryModules: data.memory?.modules || data.ram?.modules || [],
-            storage: data.storage?.drives || data.disks || [],
-            graphics: data.graphics?.cards || data.gpu || [],
-            motherboard: data.motherboard || data.mainboard || null,
-            // Raw data
-            raw: data
-          }
-        })
-        
-        console.log(`[HARDWARE API] ${timestamp} - Successfully fetched ${hardwareData.length} hardware records`)
-        
-        return NextResponse.json(hardwareData, {
+        // Try to get hardware data from events
+        const eventsResponse = await fetch(`${apiBaseUrl}/api/events`, {
+          cache: 'no-store',
           headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Fetched-At': timestamp,
-            'X-Data-Source': 'local-database'
+            'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
           }
         })
         
-      } catch (dbError) {
-        console.error(`[HARDWARE API] ${timestamp} - Local database error:`, dbError)
-        return NextResponse.json({
-          error: 'Database error',
-          details: 'Failed to fetch hardware data'
-        }, { status: 500 })
+        if (eventsResponse.ok) {
+          const eventsData = await eventsResponse.json()
+          
+          if (eventsData.success && Array.isArray(eventsData.events)) {
+            console.log(`[HARDWARE API] ${timestamp} - Extracting hardware data from ${eventsData.events.length} events`)
+            
+            // Find hardware module events
+            const hardwareEvents = eventsData.events.filter((event: any) => 
+              event.payload && 
+              typeof event.payload === 'object' && 
+              event.payload.module_id === 'hardware'
+            )
+            
+            const hardwareData = hardwareEvents.map((event: any) => ({
+              id: event.device,
+              deviceId: event.device,
+              deviceName: event.device,
+              serialNumber: event.device,
+              lastSeen: event.ts,
+              collectedAt: event.payload.timestamp,
+              dataSize: event.payload.data_size_kb,
+              collectionType: event.payload.collection_type,
+              eventId: event.id,
+              message: event.message
+            }))
+            
+            console.log(`[HARDWARE API] ${timestamp} - Found ${hardwareData.length} hardware events`)
+            
+            return NextResponse.json(hardwareData, {
+              headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache', 
+                'Expires': '0',
+                'X-Fetched-At': timestamp,
+                'X-Data-Source': 'azure-functions-events'
+              }
+            })
+          }
+        }
+        
+        console.error(`[HARDWARE API] ${timestamp} - Events fallback also failed`)
+      } catch (eventsError) {
+        console.error(`[HARDWARE API] ${timestamp} - Events fallback error:`, eventsError)
       }
+      
+      // If events fallback also fails, return 503
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable - cloud infrastructure error' },
+        { status: 503 }
+      )
     }
     
     if (!response) {
