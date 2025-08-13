@@ -71,12 +71,13 @@ export async function POST(request: Request) {
             'Expires': '0'
           }
         })
-      } catch (localError) {
-        console.error(`[DEVICE API] ${timestamp} - Local processing also failed:`, localError)
+      } catch (localError: unknown) {
+        const errorMessage = (localError as Error)?.message || String(localError)
+        console.error(`[DEVICE API] ${timestamp} - Local processing also failed:`, errorMessage)
         return NextResponse.json({
           success: false,
           error: 'Failed to process device data',
-          details: `Azure Functions failed and local fallback also failed: ${localError instanceof Error ? localError.message : String(localError)}`
+          details: `Azure Functions failed and local fallback also failed: ${errorMessage}`
         }, { 
           status: 500,
           headers: {
