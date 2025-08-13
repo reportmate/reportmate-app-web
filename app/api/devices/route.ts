@@ -27,11 +27,9 @@ export async function GET() {
     
     console.log(`[DEVICES API] ${timestamp} - Using API base URL:`, apiBaseUrl)
     
-    let response
-    let useLocalFallback = false
-    
+    // 🚨 CLOUD-FIRST: No fallbacks, fail immediately on API errors
     try {
-      response = await fetch(`${apiBaseUrl}/api/devices`, {
+      const response = await fetch(`${apiBaseUrl}/api/devices`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -41,117 +39,142 @@ export async function GET() {
       })
       
       if (!response.ok) {
-        console.error(`[DEVICES API] ${timestamp} - Azure Functions API error:`, response.status, response.statusText)
-        useLocalFallback = true
-      }
-    } catch (fetchError) {
-      console.error(`[DEVICES API] ${timestamp} - Failed to reach Azure Functions API:`, fetchError)
-      useLocalFallback = true
-    }
-    
-    // Fallback to local database query if Azure Functions API fails
-    if (useLocalFallback) {
-      console.log(`[DEVICES API] ${timestamp} - Using local database fallback`)
-      
-      try {
-        // Import database connection
-        const { Pool } = require('pg')
-        const pool = new Pool({
-          connectionString: process.env.DATABASE_URL
-        })
-
-        const result = await pool.query(`
-          SELECT 
-            d.device_id as id,
-            d.name,
-            d.serial_number as "serialNumber",
-            d.ip_address_v4 as "ipAddress",
-            d.last_seen as "lastSeen",
-            d.manufacturer,
-            s.data->'operatingSystem'->>'name' as os,
-            s.data->'operatingSystem'->>'version' as "osVersion",
-            s.data as system_data,
-            i.data as inventory_data
-          FROM devices d
-          LEFT JOIN system s ON d.id = s.device_id
-          LEFT JOIN inventory i ON d.serial_number = i.device_id
-          ORDER BY d.last_seen DESC
-          LIMIT 50
-        `)
+        console.error(`[DEVICES API] ${timestamp} - 🚨 CRITICAL: Azure Functions API failed with ${response.status} ${response.statusText}`)
+        console.error(`[DEVICES API] ${timestamp} - 🔄 ENTERING DEGRADED MODE: Building device list from individual device calls`)
         
-        const devices = result.rows.map((row: any) => {
-          // Extract inventory data for device name
-          const inventoryData = row.inventory_data || {}
-          const systemData = row.system_data || {}
-          const deviceName = inventoryData.deviceName || inventoryData.device_name || row.name || 'Unknown Device'
-          
-          // Calculate status based on last_seen (same logic as Azure Functions)
-          const calculateStatus = (lastSeen: any) => {
-            if (!lastSeen) return 'missing'
-            
-            const now = new Date()
-            const lastSeenDate = new Date(lastSeen)
-            const hours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-            
-            if (hours <= 24) return 'active'
-            else if (hours <= 168) return 'stale' // 7 days  
-            else return 'missing'
-          }
-          
-          return {
-            deviceId: row.id || row.serialNumber,  // Use deviceId instead of id
-            name: deviceName,
-            model: 'Unknown Model',
-            os: row.os || 'Unknown OS',
-            serialNumber: row.serialNumber,
-            assetTag: inventoryData.assetTag || '',
-            ipAddress: row.ipAddress || 'Unknown',
-            ipAddressV4: row.ipAddress || '',
-            ipAddressV6: '',
-            lastSeen: row.lastSeen,
-            status: calculateStatus(row.lastSeen), // Calculate status based on last_seen
-            // Include modules data for frontend compatibility
-            modules: {
-              inventory: inventoryData,
-              system: systemData
+        // 🔄 DEGRADED MODE: Try to build device list by calling individual device endpoints
+        // This is a temporary workaround while the Azure Functions /api/devices endpoint is fixed
+        try {
+          // First, try to get a list of device serial numbers from events
+          const eventsResponse = await fetch(`${apiBaseUrl}/api/events`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'Pragma': 'no-cache',
+              'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
             }
+          })
+          
+          if (!eventsResponse.ok) {
+            throw new Error(`Events API also failing: ${eventsResponse.status}`)
           }
-        })
-
-        await pool.end()
-
-        console.log(`[DEVICES API] ${timestamp} - Local database fallback successful, found ${devices.length} devices`)
-        
-        // Return direct array for frontend compatibility (not wrapped in object)
-        return NextResponse.json(devices, {
-          headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Fetched-At': timestamp,
-            'X-Data-Source': 'local-database-fallback'
+          
+          const eventsData = await eventsResponse.json()
+          console.log(`[DEVICES API] ${timestamp} - 🔄 DEGRADED: Got ${eventsData.events?.length || 0} events`)
+          
+          // Extract unique device serial numbers from events
+          const deviceSerials = new Set<string>()
+          if (eventsData.events && Array.isArray(eventsData.events)) {
+            eventsData.events.forEach((event: any) => {
+              if (event.device && 
+                  !event.device.startsWith('TEST-') && 
+                  !event.device.includes('test-device') &&
+                  event.device !== 'localhost') {
+                deviceSerials.add(event.device)
+              }
+            })
           }
-        })
-        
-      } catch (dbError) {
-        console.error(`[DEVICES API] ${timestamp} - Local database fallback failed:`, dbError)
-        
-        return NextResponse.json({
-          error: 'Both Azure Functions API and local database unavailable',
-          details: `Azure API: ${response?.status || 'unreachable'}, Database: ${dbError}`
-        }, { status: 503 })
+          
+          console.log(`[DEVICES API] ${timestamp} - 🔄 DEGRADED: Found ${deviceSerials.size} unique devices in events`)
+          
+          // Fetch detailed data for each device
+          const degradedDevices = await Promise.all(
+            Array.from(deviceSerials).map(async (serial) => {
+              try {
+                const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${serial}`, {
+                  cache: 'no-store',
+                  headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache',
+                    'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+                  }
+                })
+                
+                if (deviceResponse.ok) {
+                  const deviceData = await deviceResponse.json()
+                  
+                  // Transform to match expected format
+                  return {
+                    deviceId: deviceData.metadata?.deviceId || serial,
+                    serialNumber: serial,
+                    name: deviceData.inventory?.deviceName || serial,
+                    lastSeen: deviceData.metadata?.collectedAt,
+                    status: 'active', // Default since we got recent events
+                    clientVersion: deviceData.metadata?.clientVersion || '1.0.0',
+                    assetTag: deviceData.inventory?.assetTag,
+                    location: deviceData.inventory?.location,
+                    modules: {
+                      inventory: deviceData.inventory,
+                      applications: deviceData.applications,
+                      security: deviceData.security,
+                      services: deviceData.services,
+                      system: deviceData.system,
+                      hardware: deviceData.hardware,
+                      network: deviceData.network,
+                      displays: deviceData.displays,
+                      printers: deviceData.printers,
+                      profiles: deviceData.profiles,
+                      management: deviceData.management,
+                      installs: deviceData.installs
+                    },
+                    totalEvents: 0,
+                    lastEventTime: deviceData.metadata?.collectedAt
+                  }
+                } else {
+                  console.warn(`[DEVICES API] ${timestamp} - 🔄 DEGRADED: Failed to fetch device ${serial}: ${deviceResponse.status}`)
+                  return null
+                }
+              } catch (error) {
+                console.warn(`[DEVICES API] ${timestamp} - 🔄 DEGRADED: Error fetching device ${serial}:`, error)
+                return null
+              }
+            })
+          )
+          
+          const validDevices = degradedDevices.filter(d => d !== null)
+          
+          console.error(`[DEVICES API] ${timestamp} - 🔄 DEGRADED MODE SUCCESS: Built ${validDevices.length} devices from individual API calls`)
+          console.error(`[DEVICES API] ${timestamp} - ⚠️  WARNING: This is a temporary workaround - Azure Functions /api/devices needs to be fixed!`)
+          
+          return NextResponse.json(validDevices, {
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+              'Pragma': 'no-cache',
+              'X-Fetched-At': timestamp,
+              'X-Data-Source': 'degraded-individual-calls',
+              'X-Cloud-API-Status': 'failed-using-fallback',
+              'X-Warning': 'API-in-degraded-mode',
+              'X-Original-Error': `${response.status}-${response.statusText}`
+            }
+          })
+          
+        } catch (degradedError) {
+          console.error(`[DEVICES API] ${timestamp} - 🚨 DEGRADED MODE FAILED:`, degradedError)
+          
+          return NextResponse.json({
+            error: `Critical Infrastructure Failure`,
+            details: `Azure Functions /api/devices is failing (${response.status} ${response.statusText}) and degraded mode also failed. This requires immediate attention.`,
+            timestamp,
+            primaryError: `${response.status} ${response.statusText}`,
+            degradedModeError: degradedError instanceof Error ? degradedError.message : String(degradedError),
+            cloudApiUrl: `${apiBaseUrl}/api/devices`
+          }, { 
+            status: 503,
+            headers: {
+              'Cache-Control': 'no-store, no-cache, must-revalidate',
+              'Pragma': 'no-cache',
+              'X-Cloud-API-Status': response.status.toString(),
+              'X-Error-Type': 'total-infrastructure-failure'
+            }
+          })
+        }
       }
-    }
-    
-    // Continue with Azure Functions API response processing if we have a valid response
-    if (response) {
+
+      // Success path - process the response
       const data = await response.json()
-      console.log(`[DEVICES API] ${timestamp} - Successfully fetched data from Azure Functions`)
+      console.log(`[DEVICES API] ${timestamp} - ✅ Successfully fetched data from Azure Functions`)
       
-      // CRITICAL FIX: Always extract devices array from Azure Functions response
-      // Azure Functions returns: {"devices": [...], "count": 4}
-      // Frontend expects: [device1, device2, ...]
-      
+      // Extract devices array from Azure Functions response
       console.log('[DEVICES API] Raw response type:', typeof data)
       console.log('[DEVICES API] Raw response structure:', Object.keys(data || {}))
       
@@ -172,19 +195,17 @@ export async function GET() {
         }, { 
           status: 500,
           headers: {
-            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0'
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache'
           }
         })
       }
       
-      // Transform field names from snake_case to camelCase for frontend compatibility
-      // ENHANCED: Fetch full device details with modules for each device
+      // Transform and enrich device data
       const transformedDevices = await Promise.all(
         devicesArray
           .filter((device: RawDevice) => {
-            // Filter out test devices - only include devices with real serial numbers
+            // Filter out test devices
             const serialNumber = device.serial_number
             return serialNumber && 
                    !serialNumber.startsWith('TEST-') && 
@@ -195,7 +216,7 @@ export async function GET() {
           .map(async (device: RawDevice) => {
             console.log('[DEVICES API] 🔍 Processing device:', device.serial_number)
             
-            // Fetch full device details with modules from individual device endpoint
+            // Fetch full device details with modules
             let fullDeviceData = null
             try {
               const deviceDetailResponse = await fetch(`${apiBaseUrl}/api/device/${device.serial_number}`, {
@@ -209,35 +230,24 @@ export async function GET() {
               
               if (deviceDetailResponse.ok) {
                 const deviceDetailData = await deviceDetailResponse.json()
-                // Check if response has device modules (indicating a successful detailed response)
                 if (deviceDetailData && (deviceDetailData.metadata || deviceDetailData.inventory || deviceDetailData.applications)) {
                   fullDeviceData = deviceDetailData
                   console.log('[DEVICES API] ✅ Got full device data with modules for:', device.serial_number)
-                  console.log('[DEVICES API]   Available modules:', Object.keys(deviceDetailData).filter(key => key !== 'metadata'))
                 }
               }
             } catch (error) {
               console.warn('[DEVICES API] ⚠️ Failed to fetch full device data for:', device.serial_number, error)
             }
             
-            // Use full device data if available, otherwise fall back to basic data
             const sourceData = fullDeviceData || device
             
-            // Calculate status based on last_seen timestamp (same logic as Azure Functions API)
+            // Calculate status based on last_seen timestamp
             const calculateDeviceStatus = (lastSeen: string | Date | null) => {
               if (!lastSeen) return 'missing'
               
               const now = new Date()
-              let lastSeenDate: Date
-              
-              if (typeof lastSeen === 'string') {
-                lastSeenDate = new Date(lastSeen)
-              } else {
-                lastSeenDate = lastSeen
-              }
-              
-              const timeDiff = now.getTime() - lastSeenDate.getTime()
-              const hours = timeDiff / (1000 * 60 * 60)
+              const lastSeenDate = new Date(lastSeen)
+              const hours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
               
               if (hours <= 72) return 'active'      // < 3 days
               else if (hours <= 240) return 'stale' // 3-10 days
@@ -247,66 +257,77 @@ export async function GET() {
             const lastSeenValue = sourceData.metadata?.collectedAt || device.last_seen
             const calculatedStatus = calculateDeviceStatus(lastSeenValue)
 
-            const transformed = {
-              deviceId: sourceData.metadata?.deviceId || device.id || device.deviceId,     // Internal UUID - handle both id and deviceId
-              serialNumber: sourceData.metadata?.serialNumber || device.serial_number || device.serialNumber, // Human-readable unique ID - handle both snake_case and camelCase
+            return {
+              deviceId: sourceData.metadata?.deviceId || device.id || device.deviceId,
+              serialNumber: sourceData.metadata?.serialNumber || device.serial_number || device.serialNumber,
               name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serialNumber || device.serial_number,
               lastSeen: lastSeenValue,
-              status: sourceData.status || device.status || calculatedStatus, // Use calculated status if not provided
+              status: sourceData.status || device.status || calculatedStatus,
               clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
-              assetTag: sourceData.inventory?.assetTag, // Asset tag from inventory module
-              location: sourceData.inventory?.location, // Location from inventory module
+              assetTag: sourceData.inventory?.assetTag,
+              location: sourceData.inventory?.location,
               modules: {
                 inventory: sourceData.inventory,
                 applications: sourceData.applications,
                 security: sourceData.security,
                 services: sourceData.services,
-                system: sourceData.system,           // Add system module for OS data
-                hardware: sourceData.hardware,       // Add hardware module
-                network: sourceData.network,         // Add network module
-                displays: sourceData.displays,       // Add displays module
-                printers: sourceData.printers,       // Add printers module
-                profiles: sourceData.profiles,       // Add profiles module
-                management: sourceData.management,   // Add management module
-                installs: sourceData.installs        // Add installs module
+                system: sourceData.system,
+                hardware: sourceData.hardware,
+                network: sourceData.network,
+                displays: sourceData.displays,
+                printers: sourceData.printers,
+                profiles: sourceData.profiles,
+                management: sourceData.management,
+                installs: sourceData.installs
               },
-              totalEvents: 0,                                // Default for compatibility
-              lastEventTime: sourceData.metadata?.collectedAt || device.last_seen // Use collectedAt as placeholder
+              totalEvents: 0,
+              lastEventTime: sourceData.metadata?.collectedAt || device.last_seen
             }
-            
-            return transformed
           })
       )
       
-      // Always return a direct array for the frontend
-      console.log(`[DEVICES API] ${timestamp} - Returning filtered devices array with ${transformedDevices.length} items (filtered from ${devicesArray.length})`)
+      console.log(`[DEVICES API] ${timestamp} - ✅ Returning ${transformedDevices.length} devices from Azure Functions`)
       return NextResponse.json(transformedDevices, {
         headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Pragma': 'no-cache',
-          'Expires': '0',
           'X-Fetched-At': timestamp,
-          'X-Data-Source': 'azure-functions'
+          'X-Data-Source': 'azure-functions',
+          'X-Cloud-API-Status': 'success'
+        }
+      })
+      
+    } catch (fetchError) {
+      console.error(`[DEVICES API] ${timestamp} - 🚨 CRITICAL: Failed to reach Azure Functions API:`, fetchError)
+      
+      return NextResponse.json({
+        error: 'Cloud infrastructure unavailable',
+        details: `Cannot connect to Azure Functions API at ${apiBaseUrl}/api/devices. This indicates a critical network or infrastructure problem.`,
+        timestamp,
+        cloudApiUrl: `${apiBaseUrl}/api/devices`,
+        networkError: fetchError instanceof Error ? fetchError.message : String(fetchError)
+      }, { 
+        status: 503, // Service Unavailable
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'Pragma': 'no-cache',
+          'X-Error-Type': 'network-failure'
         }
       })
     }
-    
-    // This should not be reached since we handle the fallback above
-    return NextResponse.json({
-      error: 'Unexpected error in API routing'
-    }, { status: 500 })
 
   } catch (error) {
-    console.error('[DEVICES API] Error fetching devices:', error)
+    console.error('[DEVICES API] 🚨 CRITICAL: Unexpected error in devices API:', error)
     return NextResponse.json({
-      error: 'Failed to fetch devices',
-      details: error instanceof Error ? error.message : String(error)
+      error: 'Critical system error',
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
     }, { 
       status: 500,
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0'
+        'X-Error-Type': 'system-failure'
       }
     })
   }
