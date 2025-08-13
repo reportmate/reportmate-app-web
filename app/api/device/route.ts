@@ -76,7 +76,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: false,
           error: 'Failed to process device data',
-          details: `Azure Functions failed and local fallback also failed: ${localError instanceof Error ? localError.message : 'Unknown error'}`
+          details: `Azure Functions failed and local fallback also failed: ${localError instanceof Error ? localError.message : String(localError)}`
         }, { 
           status: 500,
           headers: {
