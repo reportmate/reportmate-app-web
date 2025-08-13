@@ -4,7 +4,9 @@
  */
 
 import React from 'react'
-import { Shield, Lock, Fingerprint, Cpu } from 'lucide-react'
+import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from '../widgets/shared'
+import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
+import { Lock, Fingerprint, Cpu } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
@@ -39,7 +41,52 @@ const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, lab
 
 export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
   // Get security data from the new modular structure
-  const security = device?.modules?.security || device?.security
+  const rawSecurity = device?.modules?.security || device?.security
+
+  // Parse PowerShell objects to proper JavaScript objects
+  const security = convertPowerShellObjects(rawSecurity)
+
+  // Debug logging to see exactly what data we're getting
+  console.log('🔐 SecurityTab DEBUG:', {
+    deviceName: device?.name,
+    hasModules: !!device?.modules,
+    hasModulesSecurity: !!device?.modules?.security,
+    hasDirectSecurity: !!device?.security,
+    rawSecurityData: rawSecurity,
+    parsedSecurityData: security,
+    windowsHelloData: security?.windowsHello,
+    windowsHelloStatusDisplay: security?.windowsHello?.statusDisplay,
+    credentialProviders: security?.windowsHello?.credentialProviders,
+    pinEnabled: security?.windowsHello?.credentialProviders?.pinEnabled,
+    faceRecognition: security?.windowsHello?.credentialProviders?.faceRecognitionEnabled,
+    fingerprint: security?.windowsHello?.credentialProviders?.fingerprintEnabled
+  })
+  
+  // DETAILED PowerShell parsing debug
+  console.log('🔍 DETAILED PARSING DEBUG:')
+  console.log('  📥 Raw security type:', typeof rawSecurity)
+  console.log('  📥 Raw security string preview:', typeof rawSecurity === 'string' ? rawSecurity.substring(0, 200) + '...' : 'NOT A STRING')
+  console.log('  📥 Raw security full data:', JSON.stringify(rawSecurity, null, 2))
+  console.log('  🔧 Parsed security:', JSON.stringify(security, null, 2))
+  
+  if (security?.windowsHello) {
+    console.log('  ✅ windowsHello found:')
+    console.log('    - statusDisplay:', security.windowsHello.statusDisplay)
+    console.log('    - credentialProviders:', JSON.stringify(security.windowsHello.credentialProviders, null, 2))
+    
+    if (security.windowsHello.credentialProviders) {
+      console.log('    - pinEnabled value:', security.windowsHello.credentialProviders.pinEnabled)
+      console.log('    - pinEnabled type:', typeof security.windowsHello.credentialProviders.pinEnabled)
+      console.log('    - faceRecognitionEnabled value:', security.windowsHello.credentialProviders.faceRecognitionEnabled)
+      console.log('    - faceRecognitionEnabled type:', typeof security.windowsHello.credentialProviders.faceRecognitionEnabled)
+      console.log('    - fingerprintEnabled value:', security.windowsHello.credentialProviders.fingerprintEnabled)
+      console.log('    - fingerprintEnabled type:', typeof security.windowsHello.credentialProviders.fingerprintEnabled)
+    } else {
+      console.log('    ❌ NO credentialProviders found')
+    }
+  } else {
+    console.log('  ❌ NO windowsHello found in security data')
+  }
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'
@@ -208,9 +255,17 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
               <div className="text-left">
                 <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Hello</div>
                 <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  security.windowsHello ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                  security.windowsHello.statusDisplay !== 'Disabled' && (
+                    security.windowsHello.credentialProviders?.pinEnabled || 
+                    security.windowsHello.credentialProviders?.faceRecognitionEnabled ||
+                    security.windowsHello.credentialProviders?.fingerprintEnabled
+                  ) ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
                 }`}>
-                  {security.windowsHello ? 'Enabled' : 'Disabled'}
+                  {security.windowsHello.statusDisplay !== 'Disabled' && (
+                    security.windowsHello.credentialProviders?.pinEnabled || 
+                    security.windowsHello.credentialProviders?.faceRecognitionEnabled ||
+                    security.windowsHello.credentialProviders?.fingerprintEnabled
+                  ) ? 'Enabled' : 'Disabled'}
                 </div>
               </div>
               

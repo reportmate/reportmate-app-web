@@ -1,10 +1,11 @@
 /**
  * Events Tab Component
- * Device activity and event history
+ * Device activity and event history with intelligent event bundling
  */
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import DeviceEventsSimple from '../DeviceEventsSimple'
+import { bundleEvents, type FleetEvent } from '../../lib/eventBundling'
 
 interface EventData {
   id?: string;
@@ -51,10 +52,28 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
     event.kind && VALID_EVENT_KINDS.includes(event.kind.toLowerCase())
   ) || []
   
-  // Event statistics (only for filtered events)
-  const eventsByKind = filteredEvents.reduce((acc: Record<string, number>, event: EventData) => {
-    const kind = event.kind || 'unknown'
-    acc[kind] = (acc[kind] || 0) + 1
+  // Apply intelligent event bundling
+  const bundledEvents = useMemo(() => {
+    if (!filteredEvents.length) return []
+    
+    // Convert to FleetEvent format
+    const fleetEvents: FleetEvent[] = filteredEvents.map(event => ({
+      id: event.id || `event-${Math.random()}`,
+      device: 'current-device', // Device context for this tab
+      kind: event.kind || 'info',
+      ts: event.ts || new Date().toISOString(),
+      message: (event as any).message,
+      payload: (event.raw as Record<string, unknown>) || {}
+    }))
+    
+    return bundleEvents(fleetEvents)
+  }, [filteredEvents])
+  
+  // Event statistics based on bundled events
+  const eventsByKind = bundledEvents.reduce((acc: Record<string, number>, event) => {
+    event.bundledKinds.forEach(kind => {
+      acc[kind] = (acc[kind] || 0) + 1
+    })
     return acc
   }, {})
   
@@ -65,7 +84,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
     p.name?.toLowerCase().includes('csrss')
   ).length
 
-  if (!filteredEvents || filteredEvents.length === 0) {
+  if (!bundledEvents || bundledEvents.length === 0) {
     return (
       <div className="space-y-6">
         {/* Header with Icon */}
@@ -186,11 +205,11 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
           </div>
         </div>
         {/* Total Events - Top Right */}
-        {filteredEvents.length > 0 && (
+        {bundledEvents.length > 0 && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Total Events</div>
             <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">
-              {filteredEvents.length.toLocaleString()}
+              {bundledEvents.length.toLocaleString()}
             </div>
           </div>
         )}
@@ -219,22 +238,23 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
           <p className="text-sm text-gray-600 dark:text-gray-400">Latest device activity and events</p>
         </div>
         <div className="p-6">
-          <DeviceEventsSimple events={filteredEvents.map(event => {
-            // Extract message from event (priority: event.message, then payload.message, then fallback)
-            let message: string | undefined;
-            if ((event as any).message) {
-              message = (event as any).message;
-            } else if (event.payload && typeof event.payload === 'object' && (event.payload as any).message) {
-              message = (event.payload as any).message;
-            }
-
+          <DeviceEventsSimple events={bundledEvents.map(event => {
             return {
-              id: event.id || `event-${Math.random()}`,
-              name: message || event.kind || 'Event', // Use actual message first, then event kind as fallback
-              message: message, // Include the message field in EventDto
-              raw: (event.payload as Record<string, unknown>) || {},
+              id: event.id,
+              name: event.message, // Use the bundled/smart message
+              message: event.message,
+              raw: event.isBundle ? 
+                { 
+                  bundledEvents: event.eventIds,
+                  count: event.count,
+                  message: event.message,
+                  isBundle: true 
+                } : 
+                {},
               kind: event.kind,
-              ts: event.ts
+              ts: event.ts,
+              count: event.count,
+              isBundle: event.isBundle
             };
           })} />
         </div>

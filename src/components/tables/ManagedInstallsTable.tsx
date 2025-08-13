@@ -121,7 +121,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           </svg>
                         </div>
                         <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
-                          {data.messages.errors.length} Critical Error{data.messages.errors.length !== 1 ? 's' : ''} Found
+                          {data.messages.errors.length} Error{data.messages.errors.length !== 1 ? 's' : ''} Detected
                         </h3>
                       </div>
                       <div className="flex items-center text-red-600 dark:text-red-400">

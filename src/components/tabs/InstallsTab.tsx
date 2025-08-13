@@ -8,7 +8,7 @@ import { ManagedInstallsTable } from '../tables'
 import { processInstallsData, InstallsData } from '../../lib/data-processing/component-data'
 
 interface InstallsTabProps {
-  device: Record<string, unknown>
+  device: any
   data?: InstallsData
 }
 
@@ -52,16 +52,68 @@ const formatCompactRelativeTime = (timestamp: string): string => {
 }
 
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
-  console.log('[INSTALLS TAB] Received props:', {
+  // DISABLED: Hard-code test data to verify component rendering works
+  // Now using real processInstallsData function to get actual package data
+  const testData = null
+  
+  console.log('🚨🚨🚨 INSTALLS TAB RENDERED! 🚨🚨🚨 - UPDATED VERSION')
+  console.log('💡 testData is now null, should call processInstallsData')
+  console.log('[INSTALLS TAB] === DEBUGGING START ===')
+  console.log('[INSTALLS TAB] Raw props:', {
     hasDevice: !!device,
     hasData: !!data,
     deviceKeys: device ? Object.keys(device) : [],
-    deviceId: device?.metadata?.deviceId || device?.deviceId,
-    serialNumber: device?.metadata?.serialNumber || device?.serialNumber
+    dataKeys: data ? Object.keys(data) : [],
+  })
+  console.log('[INSTALLS TAB] Using test data:', testData)
+  
+  // Debug the exact data paths we're looking for
+  console.log('[INSTALLS TAB] Device installs structure:', {
+    hasDeviceInstalls: !!device?.installs,
+    deviceInstallsKeys: device?.installs ? Object.keys(device.installs) : [],
+    hasCimian: !!device?.installs?.cimian,
+    cimianKeys: device?.installs?.cimian ? Object.keys(device.installs.cimian) : [],
+    hasConfig: !!device?.installs?.cimian?.config,
+    hasSessions: !!device?.installs?.cimian?.sessions,
+    sessionsLength: device?.installs?.cimian?.sessions?.length || 0,
+    firstSessionKeys: device?.installs?.cimian?.sessions?.[0] ? Object.keys(device.installs.cimian.sessions[0]) : []
   })
   
-  // Use the processed installs data which includes configuration
-  const installsData = data || processInstallsData(device)
+  // Debug the processed data structure
+  console.log('[INSTALLS TAB] Processed data structure:', {
+    hasConfig: !!data?.config,
+    configKeys: data?.config ? Object.keys(data.config) : [],
+    totalPackages: data?.totalPackages,
+    systemName: data?.systemName,
+    fullData: data
+  })
+  
+  // Debug the specific values we're trying to display
+  console.log('[INSTALLS TAB] Specific field values:', {
+    manifest: {
+      fromData: data?.config?.manifest,
+      fromDeviceConfig: device?.installs?.cimian?.config?.ClientIdentifier,
+      fromDeviceSession: device?.installs?.cimian?.sessions?.[0]?.config?.client_identifier
+    },
+    repo: {
+      fromData: data?.config?.softwareRepoURL,
+      fromDeviceConfig: device?.installs?.cimian?.config?.SoftwareRepoURL,
+      fromDeviceSession: device?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url
+    },
+    version: {
+      fromData: data?.config?.version,
+      fromDevice: device?.installs?.cimian?.version
+    },
+    runType: {
+      fromData: data?.config?.runType,
+      fromDevice: device?.installs?.cimian?.sessions?.[0]?.runType
+    }
+  })
+  
+  console.log('[INSTALLS TAB] === DEBUGGING END ===')
+  
+  // Use the test data instead of processed data for debugging
+  const installsData = testData || data || processInstallsData(device)
   
   console.log('[INSTALLS TAB] Processed data:', {
     totalPackages: installsData?.totalPackages,
@@ -86,74 +138,85 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
             <p className="text-base text-gray-600 dark:text-gray-400">Software deployment report</p>
           </div>
         </div>
-        {/* Run Start - Top Right */}
-        {installsData?.config?.lastRun && (
+        {/* Last Run - Top Right */}
+        {(data?.config?.lastRun || device?.installs?.cimian?.sessions?.[0]?.endTime) && (
           <div className="text-right mr-8">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Run Start</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">Last Run</div>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCompactRelativeTime(installsData.config.lastRun)}
+              {formatCompactRelativeTime(data?.config?.lastRun || device?.installs?.cimian?.sessions?.[0]?.endTime || '')}
             </div>
           </div>
         )}
       </div>
 
-      {/* Configuration Information - 3 Column Layout (50/25/25) */}
-      {installsData?.config && (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
-          <div className="grid grid-cols-4 gap-6">
-            {/* Column 1 - 50% (2 grid columns) */}
-            <div className="col-span-2 space-y-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</h3>
-                <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2">
-                  <p className="text-sm font-mono text-gray-800 dark:text-gray-200">
-                    {installsData.config.manifest || 'Not specified'}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</h3>
-                <div className="bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded px-3 py-2">
-                  <p className="text-sm font-mono text-gray-800 dark:text-gray-200">
-                    {installsData.config.softwareRepoURL || 'Not specified'}
-                  </p>
-                </div>
+      {/* Managed Installs Configuration Card */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex gap-8 items-end">
+          {/* Column 1 - 45% - Manifest & Repo */}
+          <div className="flex-[0_0_45%] space-y-4">
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
+                {data?.config?.manifest || 
+                 device?.installs?.cimian?.config?.ClientIdentifier || 
+                 device?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
+                 'Not specified'}
               </div>
             </div>
-            
-            {/* Column 2 - 25% (1 grid column) */}
-            <div className="space-y-5">
-              <div className="text-center pt-3">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                  {installsData.systemName ? `${installsData.systemName.charAt(0).toUpperCase()}${installsData.systemName.slice(1)} Version` : 'Version'}
-                </h3>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {installsData.config.version || 'Unknown'}
-                </p>
-              </div>
-              <div className="text-center">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</h3>
-                <div className="flex justify-center">
-                  <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
-                    {installsData.config.runType || 'Unknown'}
-                  </span>
-                </div>
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
+                {data?.config?.softwareRepoURL || 
+                 device?.installs?.cimian?.config?.SoftwareRepoURL || 
+                 device?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
+                 'Not specified'}
               </div>
             </div>
-            
-            {/* Column 3 - 25% (1 grid column) */}
-            <div className="space-y-5">
-              <div className="text-center pt-3">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Duration</h3>
-                <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {installsData.config.duration || 'Unknown'}
-                </p>
+          </div>
+
+          {/* Column 2 - 25% - Run Type & Version - Center Aligned */}
+          <div className="flex-[0_0_25%] space-y-4 text-center">
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</div>
+              <div className="flex justify-center">
+                <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
+                  {data?.config?.runType || 
+                   device?.installs?.cimian?.sessions?.[0]?.runType || 
+                   'Unknown'}
+                </span>
               </div>
-              <div className="text-center">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Timestamp</h3>
-                <div className="flex justify-center">
-                  <span className="px-3 py-1 text-sm font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-full">
-                    {installsData.config.lastRun ? new Date(installsData.config.lastRun).toLocaleString('en-CA', {
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+                {installsData?.systemName ? `${installsData.systemName.charAt(0).toUpperCase()}${installsData.systemName.slice(1)} Version` : 'Cimian Version'}
+              </div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border mx-auto inline-block">
+                {data?.config?.version || 
+                 device?.installs?.cimian?.version || 
+                 'Unknown'}
+              </div>
+            </div>
+          </div>
+
+          {/* Column 3 - 25% - Duration & Last Seen - Right Aligned with 2% padding */}
+          <div className="flex-[0_0_25%] space-y-4 text-right pr-[2%]">
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Duration</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {data?.config?.duration || 
+                 device?.installs?.cimian?.sessions?.[0]?.duration || 
+                 'Unknown'}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Seen Timestamp</div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
+                {(() => {
+                  const timestamp = data?.config?.lastRun || device?.installs?.cimian?.sessions?.[0]?.endTime
+                  if (!timestamp) return 'Never'
+                  
+                  try {
+                    return new Date(timestamp).toLocaleString('en-CA', {
                       year: 'numeric',
                       month: '2-digit',
                       day: '2-digit',
@@ -161,12 +224,88 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
                       minute: '2-digit',
                       second: '2-digit',
                       hour12: false
-                    }).replace(', ', ' ') : 'Never'}
-                  </span>
-                </div>
+                    }).replace(', ', ' ')
+                  } catch (error) {
+                    console.error('Error formatting timestamp:', timestamp, error)
+                    return String(timestamp)
+                  }
+                })()}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Error and Warning Cards Section */}
+      {((installsData?.messages?.errors?.length ?? 0) > 0 || (installsData?.messages?.warnings?.length ?? 0) > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Error Messages Card */}
+          {(installsData?.messages?.errors?.length ?? 0) > 0 && (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-red-200 dark:border-red-700">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                <h3 className="text-lg font-semibold text-red-600 dark:text-red-400">
+                  Errors Detected ({installsData?.messages?.errors?.length ?? 0})
+                </h3>
+              </div>
+              <div className="space-y-3 max-h-48 overflow-y-auto">
+                {installsData?.messages?.errors?.slice(0, 10).map((error, index) => (
+                  <div key={index} className="text-sm">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {error.package || 'System'}
+                    </div>
+                    <div className="text-red-600 dark:text-red-400 mt-1">
+                      {error.message}
+                    </div>
+                    {error.timestamp && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {formatCompactRelativeTime(error.timestamp)}
+                      </div>
+                    )}
+                  </div>
+                )) ?? []}
+                {(installsData?.messages?.errors?.length ?? 0) > 10 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-red-200 dark:border-red-700">
+                    ... and {(installsData?.messages?.errors?.length ?? 0) - 10} more errors
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Warning Messages Card */}
+          {(installsData?.messages?.warnings?.length ?? 0) > 0 && (
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-yellow-200 dark:border-yellow-700">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                <h3 className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                  Warnings ({installsData?.messages?.warnings?.length ?? 0})
+                </h3>
+              </div>
+              <div className="space-y-3 max-h-48 overflow-y-auto">
+                {installsData?.messages?.warnings?.slice(0, 10).map((warning, index) => (
+                  <div key={index} className="text-sm">
+                    <div className="font-medium text-gray-900 dark:text-white">
+                      {warning.package || 'System'}
+                    </div>
+                    <div className="text-yellow-600 dark:text-yellow-400 mt-1">
+                      {warning.message}
+                    </div>
+                    {warning.timestamp && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        {formatCompactRelativeTime(warning.timestamp)}
+                      </div>
+                    )}
+                  </div>
+                )) ?? []}
+                {(installsData?.messages?.warnings?.length ?? 0) > 10 && (
+                  <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-yellow-200 dark:border-yellow-700">
+                    ... and {(installsData?.messages?.warnings?.length ?? 0) - 10} more warnings
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

@@ -6,6 +6,7 @@
 
 import React, { useState } from 'react'
 import { Icons } from '../widgets/shared'
+import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 
 interface ManagementTabProps {
   device: Record<string, unknown>
@@ -13,18 +14,25 @@ interface ManagementTabProps {
 
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
-  const management = device.modules?.management || device.management
+  const rawManagement = (device as any).modules?.management || (device as any).management
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
-  // Debug logging to see what data we're getting
-  console.log('ManagementTab DEBUG:', {
+  // Parse PowerShell objects to proper JavaScript objects
+  const management = convertPowerShellObjects(rawManagement)
+
+  // Debug logging to see what data we're getting for the tab
+  console.log('🔧 ManagementTab DEBUG:', {
+    deviceName: device?.name,
     hasModules: !!device.modules,
     hasManagement: !!management,
     managementKeys: management ? Object.keys(management) : [],
-    hasDeviceDetails: !!management?.deviceDetails,
-    deviceDetailsKeys: management?.deviceDetails ? Object.keys(management.deviceDetails) : [],
-    intuneDeviceId: management?.deviceDetails?.intuneDeviceId,
-    entraObjectId: management?.deviceDetails?.entraObjectId
+    deviceState: management?.deviceState,
+    entraJoined: management?.deviceState?.entraJoined,
+    ssoState: management?.ssoState,
+    entraPrt: management?.ssoState?.entraPrt,
+    userState: management?.userState,
+    ngcSet: management?.userState?.ngcSet,
+    mdmEnrollment: management?.mdmEnrollment?.isEnrolled
   })
 
   // Copy to clipboard function
@@ -140,7 +148,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
         )}
       </div>
 
-      {/* Top Row - Split 60/40 between Enrollment Status and Identity & Authentication */}
+      {/* Top Row - Split 60/40 between Enrollment Status and Management Resources */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Left Card - Enrollment Status (60% - 3 columns) */}
         <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -269,142 +277,61 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           )}
         </div>
 
-        {/* Right Card - Identity & Authentication Details (40% - 2 columns) */}
-        {isEnrolled && (management.userState || management.ssoState || management.deviceState) && (
+        {/* Right Card - Management Resources (40% - 2 columns) */}
+        {isEnrolled && (
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Identity & Authentication</h3>
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Management Resources</h3>
             
-            <div className="space-y-4">
-              {/* Domain Status with pill on right */}
-              {management.deviceState?.entraJoined && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Entra Joined</span>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    Joined
-                  </span>
+            <div className="grid grid-cols-1 gap-6">
+              <div className="text-left">
+                <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                  {profileCount}
                 </div>
-              )}
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Profiles
+                </div>
+              </div>
               
-              {management.deviceState?.domainJoined && (
+              <div className="text-left">
+                <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                  {management.compliancePolicies?.length || 0}
+                </div>
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Compliance Policies
+                </div>
+              </div>
+              
+              <div className="text-left">
+                <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                  {management.metadata?.Applications?.length || 0}
+                </div>
+                <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                  Managed Apps
+                </div>
+              </div>
+            </div>
+
+            {/* Compliance Status with pill on right */}
+            <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+              {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Domain Joined</span>
+                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies Applied</span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    Joined
+                    {management.compliancePolicies.length} policies
                   </span>
                 </div>
-              )}
-
-              {/* SSO Authentication State with pills on right */}
-              {management.ssoState?.entraPrt !== undefined && (
+              ) : (
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Entra PRT</span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    management.ssoState.entraPrt 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {management.ssoState.entraPrt ? 'Active' : 'Inactive'}
+                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance</span>
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
+                    No policies applied
                   </span>
-                </div>
-              )}
-
-              {management.ssoState?.cloudTgt !== undefined && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Cloud TGT</span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    management.ssoState.cloudTgt 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {management.ssoState.cloudTgt ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-              )}
-
-              {/* Windows Hello Status with pill on right */}
-              {management.userState?.ngcSet !== undefined && (
-                <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Windows Hello</span>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    management.userState.ngcSet 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {management.userState.ngcSet ? 'Configured' : 'Not Set'}
-                  </span>
-                </div>
-              )}
-
-              {/* PRT Expiry */}
-              {management.ssoState?.entraPrtExpiryTime && (
-                <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                  <div className="flex justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">PRT Expires:</span>
-                    <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                      {formatExpiryDate(management.ssoState.entraPrtExpiryTime)}
-                    </span>
-                  </div>
                 </div>
               )}
             </div>
           </div>
         )}
       </div>
-
-      {/* Management Resources Card */}
-      {isEnrolled && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Management Resources</h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {profileCount}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Profiles
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {management.compliancePolicies?.length || 0}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Compliance Policies
-              </div>
-            </div>
-            
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                {management.metadata?.Applications?.length || 0}
-              </div>
-              <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Managed Apps
-              </div>
-            </div>
-          </div>
-
-          {/* Compliance Status with pill on right */}
-          <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-            {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
-              <div className="flex items-center justify-between">
-                <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies Applied</span>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                  {management.compliancePolicies.length} policies
-                </span>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <span className="text-base font-medium text-gray-900 dark:text-white">Compliance</span>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
-                  No policies applied
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Configuration Profiles */}
       {isEnrolled && management.profiles && management.profiles.length > 0 && (

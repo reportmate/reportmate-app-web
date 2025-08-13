@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
+import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 
 interface Management {
   deviceState?: {
@@ -117,17 +118,24 @@ interface ManagementWidgetProps {
 
 export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
-  const management = device.modules?.management || device.management
+  const rawManagement = device.modules?.management || device.management
+
+  // Parse PowerShell objects to proper JavaScript objects
+  const management = convertPowerShellObjects(rawManagement)
 
   // Debug logging to see what data we're getting
-  console.log('ManagementWidget DEBUG:', {
+  console.log('🔧 ManagementWidget DEBUG:', {
+    deviceName: device?.name,
     hasModules: !!device.modules,
     hasManagement: !!management,
     managementKeys: management ? Object.keys(management) : [],
-    hasDeviceDetails: !!management?.deviceDetails,
-    deviceDetailsKeys: management?.deviceDetails ? Object.keys(management.deviceDetails) : [],
-    intuneDeviceId: management?.deviceDetails?.intuneDeviceId,
-    entraObjectId: management?.deviceDetails?.entraObjectId
+    hasDeviceState: !!management?.deviceState,
+    deviceState: management?.deviceState,
+    entraJoined: management?.deviceState?.entraJoined,
+    ssoState: management?.ssoState,
+    entraPrt: management?.ssoState?.entraPrt,
+    userState: management?.userState,
+    ngcSet: management?.userState?.ngcSet
   })
 
   if (!management) {

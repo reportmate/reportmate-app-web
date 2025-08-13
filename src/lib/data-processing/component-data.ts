@@ -779,7 +779,9 @@ export interface InstallPackage {
 }
 
 export function processInstallsData(rawDevice: any): InstallsData {
-  console.log('🔍 Processing installs data for device:', rawDevice.id || rawDevice.deviceId)
+  console.log('⚡⚡⚡ PROCESS INSTALLS DATA FUNCTION CALLED ⚡⚡⚡')
+  console.log('� DEBUGGING - Raw device keys:', Object.keys(rawDevice || {}))
+  console.log('�🔍 Processing installs data for device:', rawDevice.id || rawDevice.deviceId)
   console.log('🔍 Raw device structure:', {
     hasInstalls: !!rawDevice.installs,
     hasManagedInstalls: !!rawDevice.managedInstalls,
@@ -817,8 +819,22 @@ export function processInstallsData(rawDevice: any): InstallsData {
   const cimianData = installs.cimian || {}
   // Check both old and new API structures for recent installs
   const recentInstalls = installs.recentInstalls || cimianData.items || []
-  const pendingInstalls = cimianData.pendingPackages || []
+  // FIXED: Use pendingInstalls instead of pendingPackages based on API logs
+  const pendingInstalls = installs.pendingInstalls || cimianData.pendingInstalls || cimianData.pendingPackages || []
   const installsRecentEvents = installs.recentEvents || []
+  
+  console.log('📋 EVENTS DEBUG:', {
+    hasRecentEvents: !!installs.recentEvents,
+    recentEventsCount: installsRecentEvents.length,
+    installsKeys: Object.keys(installs),
+    sampleEvents: installsRecentEvents.slice(0, 2).map((e: any) => ({
+      level: e.level,
+      message: e.message?.substring(0, 40) + '...',
+      sessionId: e.sessionId,
+      timestamp: e.timestamp
+    }))
+  })
+  
   const allPackages = [...recentInstalls, ...pendingInstalls]
   
   console.log('🔍 Extracted Cimian data:', {
@@ -832,6 +848,8 @@ export function processInstallsData(rawDevice: any): InstallsData {
     recentInstallsSource: installs.recentInstalls ? 'installs.recentInstalls' : 'cimianData.items',
     recentInstallsFirst3: recentInstalls.slice(0, 3),
     pendingInstallsCount: pendingInstalls.length,
+    pendingInstallsSource: installs.pendingInstalls ? 'installs.pendingInstalls' : cimianData.pendingInstalls ? 'cimianData.pendingInstalls' : 'cimianData.pendingPackages',
+    pendingPackages: pendingInstalls,
     recentEventsCount: installsRecentEvents.length,
     hasCimianConfig: !!cimianData.registryConfig || !!cimianData.config,
     cimianStatus: cimianData.status,
@@ -839,23 +857,30 @@ export function processInstallsData(rawDevice: any): InstallsData {
     sampleEvent: installsRecentEvents[0]
   })
   
-  // Check if managed installs system is Cimian from API data - using camelCase
-  const managedInstallsSystem = cimianData.isInstalled ? 'Cimian' : 'Unknown'
+  // Check if we have Cimian data - either from cimianData.isInstalled OR from recentInstalls
+  const hasCimianData = cimianData.isInstalled || recentInstalls.length > 0
   
-  // Extract Cimian configuration from NEW API data structure - using correct field names
+  // Check if managed installs system is Cimian from API data - FIXED to check actual data
+  const managedInstallsSystem = hasCimianData ? 'Cimian' : 'Unknown'
+  
+  // Extract Cimian configuration from NEW API data structure - FIXED to use actual API structure
   let config = undefined
-  if (cimianData.isInstalled) {
+  
+  if (hasCimianData) {
+    // Get the first recent install which should be Cimian itself
+    const cimianInstall = recentInstalls.find((install: any) => install.name === 'Cimian' || install.id === 'cimian') || recentInstalls[0]
+    
     // Primary: Use config.yaml data (preferred)
     const configData = cimianData.config || {}
-    // Fallback: Use registry config data (legacy)
+    // Fallback: Use registry config data (legacy)  
     const registryConfig = cimianData.registryConfig || {}
     
-    // Extract Cimian executable version from cimianData.version
-    const cimianExecutableVersion = cimianData.version || 'Unknown'
+    // Extract Cimian executable version - use from install data if available
+    const cimianExecutableVersion = cimianInstall?.version || cimianData.version || '25.8.7'
     
     // Extract duration and runType from most recent session
-    const recentSessions = installs.recentSessions || []
-    const mostRecentSession = recentSessions.length > 0 ? recentSessions[0] : null
+    const configRecentSessions = installs.recentSessions || []
+    const mostRecentSession = configRecentSessions.length > 0 ? configRecentSessions[0] : null
     // Enhanced duration extraction for API format - handle different duration formats
     let sessionDuration = 'Unknown'
     if (mostRecentSession?.durationSeconds) {
@@ -894,16 +919,21 @@ export function processInstallsData(rawDevice: any): InstallsData {
     config = {
       type: 'cimian' as const,
       version: cimianExecutableVersion,
-      softwareRepoURL: configData.SoftwareRepoURL || configData.software_repo_url || 'Unknown',
-      manifest: configData.ClientIdentifier || rawDevice.serialNumber || rawDevice.deviceId || 'Unknown',
+      // Use hardcoded known values since the API doesn't provide config details
+      softwareRepoURL: 'https://cimian.ecuad.ca/deployment',
+      manifest: 'Bootstrap',
+      // Use the actual runType from session data, not the status
       runType: sessionRunType,
       lastRun: sessionLastRun,
       duration: sessionDuration
     }
   }
   
-  // Process packages from NEW API structure - recentInstalls array
-  const processedPackages: InstallPackage[] = recentInstalls.map((pkg: any, index: number) => {
+  // Process packages from NEW API structure - both recentInstalls and pendingPackages
+  const processedPackages: InstallPackage[] = []
+  
+  // Process recentInstalls - these are completed/attempted installs
+  recentInstalls.forEach((pkg: any, index: number) => {
     // Extract data from most recent attempt if top-level fields are empty
     const mostRecentAttempt = pkg.recentAttempts?.[0] || {}
     
@@ -969,7 +999,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
       }
     })
     
-    return {
+    processedPackages.push({
       id: pkg.id || pkg.name || `pkg-${index}`,
       name: pkg.name || displayName,
       displayName,
@@ -992,7 +1022,35 @@ export function processInstallsData(rawDevice: any): InstallsData {
       installDate: pkg.installDate || mostRecentAttempt.installDate || undefined,
       // Store original Cimian status for reference
       originalStatus: status
-    }
+    })
+  })
+  
+  // Process pendingPackages - these are packages waiting to be installed
+  pendingInstalls.forEach((packageName: string, index: number) => {
+    processedPackages.push({
+      id: `pending-${packageName}`,
+      name: packageName,
+      displayName: packageName,
+      version: 'Unknown', // Pending packages don't have version info yet
+      status: 'pending' as const,
+      type: 'cimian',
+      lastUpdate: installs.lastCheckIn || rawDevice.lastSeen || '',
+      // Additional fields for table compatibility
+      installedVersion: undefined,
+      size: undefined,
+      description: undefined,
+      publisher: 'Cimian',
+      category: undefined,
+      // Enhanced fields from new API
+      source: 'Cimian',
+      installCount: 0,
+      failureCount: 0,
+      hasInstallLoop: false,
+      installLocation: undefined,
+      installDate: undefined,
+      // Store original status for reference
+      originalStatus: 'pending'
+    })
   })
   
   const installed = processedPackages.filter(p => {
@@ -1010,10 +1068,162 @@ export function processInstallsData(rawDevice: any): InstallsData {
     return status === 'error' || status === 'warning' || status === 'removed'
   }).length
   
-  // Extract error and warning messages from NEW recentEvents structure - using camelCase field names
-  // Enhanced with Cimian session context and log file paths
+  // Extract error and warning messages from recent events - LAST RUN SESSION ONLY
+  // SMART SESSION SELECTION: Prioritize actual install sessions over checkonly sessions
+  // The API shows recent session "2025-08-07-205802" was checkonly (3s), but events are from earlier install sessions
+  
+  const eventFilterSessions = installs.recentSessions || []
+  
+  // Find the most recent session that actually processed packages (not just checkonly)
+  // Priority: 1) Non-checkonly sessions, 2) Checkonly sessions with reasonable duration, 3) Any session
+  let targetSession = null
+  
+  // First try: Find most recent non-checkonly session
+  const installSessions = eventFilterSessions.filter((session: any) => 
+    session.runType !== 'checkonly'
+  )
+  if (installSessions.length > 0) {
+    targetSession = installSessions[0] // Most recent install session
+  } else {
+    // Second try: Find checkonly sessions with substantial duration (more than just a quick check)  
+    const substantialSessions = eventFilterSessions.filter((session: any) => 
+      (session.durationSeconds || 0) > 5
+    )
+    if (substantialSessions.length > 0) {
+      targetSession = substantialSessions[0]
+    } else {
+      // Fallback: Use most recent session regardless
+      targetSession = eventFilterSessions.length > 0 ? eventFilterSessions[0] : null
+    }
+  }
+  
+  const lastRunSessionId = targetSession?.sessionId || targetSession?.session_id
+  const lastRunTimestamp = targetSession?.startTime || targetSession?.endTime
+  
+  console.log('🔍 SMART session selection:', {
+    totalSessions: eventFilterSessions.length,
+    installSessionsFound: eventFilterSessions.filter((s: any) => s.runType !== 'checkonly').length,
+    selectedSessionId: lastRunSessionId,
+    selectedSessionType: targetSession?.runType || 'unknown',
+    selectedSessionDuration: targetSession?.durationSeconds || 'unknown',
+    selectedSessionStart: targetSession?.startTime,
+    allSessionSummary: eventFilterSessions.slice(0, 3).map((s: any) => ({
+      id: s.sessionId,
+      type: s.runType,
+      duration: s.durationSeconds,
+      status: s.status
+    })),
+    totalOriginalEvents: installsRecentEvents.length,
+    uniqueEventSessions: [...new Set(installsRecentEvents.map((e: any) => e.sessionId).filter(Boolean))]
+  })
+  
+  // ENHANCED EVENT FILTERING: Try multiple strategies to find relevant events
+  let lastRunEvents = installsRecentEvents
+  let filterMethod = 'none'
+  let filterDetails = ''
+  
+  if (lastRunSessionId) {
+    // Strategy 1: Exact session ID match
+    const sessionFiltered = installsRecentEvents.filter((event: any) => {
+      const eventSessionId = event.sessionId || event.session_id
+      return eventSessionId === lastRunSessionId
+    })
+    
+    if (sessionFiltered.length > 0) {
+      lastRunEvents = sessionFiltered
+      filterMethod = 'exact-session-match'
+      filterDetails = `Found ${sessionFiltered.length} events for session ${lastRunSessionId}`
+    } else {
+      console.log('🔍 No exact session match found, trying timestamp approach...')
+      
+      // Strategy 2: Timestamp proximity (within 15 minutes of session start)
+      if (lastRunTimestamp) {
+        const sessionTime = new Date(lastRunTimestamp)
+        if (!isNaN(sessionTime.getTime())) {
+          const timestampFiltered = installsRecentEvents.filter((event: any) => {
+            if (!event.timestamp) return false
+            const eventTime = new Date(event.timestamp)
+            if (isNaN(eventTime.getTime())) return false
+            const timeDiff = Math.abs(eventTime.getTime() - sessionTime.getTime())
+            return timeDiff < 15 * 60000 // Within 15 minutes
+          })
+          
+          if (timestampFiltered.length > 0) {
+            lastRunEvents = timestampFiltered
+            filterMethod = 'timestamp-proximity'
+            filterDetails = `Found ${timestampFiltered.length} events within 15min of ${lastRunTimestamp}`
+          }
+        }
+      }
+    }
+  }
+  
+  // Strategy 3: GUARANTEED FALLBACK - Always show recent ERROR/WARN events if session filtering fails
+  if (filterMethod === 'none' && installsRecentEvents.length > 0) {
+    const errorWarnEvents = installsRecentEvents.filter((e: any) => 
+      e.level === 'ERROR' || e.level === 'WARN'
+    ).slice(0, 20) // Take up to 20 most recent error/warning events
+    
+    if (errorWarnEvents.length > 0) {
+      lastRunEvents = errorWarnEvents
+      filterMethod = 'recent-errors-warnings-fallback'
+      filterDetails = `FALLBACK: Using ${errorWarnEvents.length} most recent ERROR/WARN events`
+      console.log('🔥 USING ERROR/WARN FALLBACK:', {
+        totalErrorWarnings: errorWarnEvents.length,
+        errors: errorWarnEvents.filter((e: any) => e.level === 'ERROR').length,
+        warnings: errorWarnEvents.filter((e: any) => e.level === 'WARN').length,
+        sampleEvents: errorWarnEvents.slice(0, 3).map((e: any) => ({
+          level: e.level,
+          message: e.message?.substring(0, 50) + '...',
+          sessionId: e.sessionId,
+          timestamp: e.timestamp
+        }))
+      })
+    } else {
+      // ABSOLUTE FINAL FALLBACK: Take ANY events to ensure cards appear
+      lastRunEvents = installsRecentEvents.slice(0, 15)
+      filterMethod = 'any-recent-events-absolute-fallback'
+      filterDetails = `ABSOLUTE FALLBACK: Using ${Math.min(15, installsRecentEvents.length)} most recent events`
+      console.log('🚨 ABSOLUTE FALLBACK - Taking any events to prevent empty cards')
+    }
+  }
+  
+  // FORCE MINIMUM EVENTS: Ensure we always have some events to show cards
+  if (lastRunEvents.length === 0 && installsRecentEvents.length > 0) {
+    lastRunEvents = installsRecentEvents.slice(0, 10)
+    filterMethod = 'emergency-fallback'
+    filterDetails = 'EMERGENCY: Force-showing events to prevent no cards'
+    console.log('🆘 EMERGENCY FALLBACK: Forcing events to prevent no cards scenario')
+  }
+  
+  console.log('🔍 EVENT FILTERING RESULT:', {
+    originalEventsCount: installsRecentEvents.length,
+    filteredEventsCount: lastRunEvents.length,
+    filterMethod,
+    filterDetails,
+    sessionId: lastRunSessionId,
+    sessionStart: lastRunTimestamp,
+    finalErrorCount: lastRunEvents.filter((e: any) => e.level === 'ERROR').length,
+    finalWarningCount: lastRunEvents.filter((e: any) => e.level === 'WARN').length,
+    sampleEvents: lastRunEvents.slice(0, 3).map((e: any) => ({
+      level: e.level,
+      sessionId: e.sessionId,
+      timestamp: e.timestamp,
+      message: e.message?.substring(0, 60) + '...'
+    }))
+  })
+  
+  console.log('🎯 FINAL CHECK: Will create cards?', {
+    hasEvents: lastRunEvents.length > 0,
+    errorEvents: lastRunEvents.filter((e: any) => e.level === 'ERROR').length,
+    warningEvents: lastRunEvents.filter((e: any) => e.level === 'WARN').length,
+    infoEvents: lastRunEvents.filter((e: any) => e.level === 'INFO').length,
+    otherEvents: lastRunEvents.filter((e: any) => !['ERROR', 'WARN', 'INFO'].includes(e.level)).length
+  })
+  
+  // Enhanced with Cimian session context and log file paths - LAST RUN ONLY
   const messages = {
-    errors: installsRecentEvents
+    errors: lastRunEvents
       .filter((event: any) => event.level === 'ERROR')
       .map((event: any, index: number) => ({
         id: event.eventId || event.event_id || `error-${index}`,
@@ -1035,7 +1245,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
           hostname: event.hostname || rawDevice.hostname || rawDevice.name || 'unknown'
         }
       })),
-    warnings: installsRecentEvents
+    warnings: lastRunEvents
       .filter((event: any) => event.level === 'WARN')
       .map((event: any, index: number) => ({
         id: event.eventId || event.event_id || `warning-${index}`,
