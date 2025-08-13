@@ -7,8 +7,9 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[INVENTORY API] ${timestamp} - Fetching inventory data`)
+    console.log(`[INVENTORY API] ${timestamp} - Fetching inventory data from Azure Functions API`)
 
+    // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
@@ -18,6 +19,8 @@ export async function GET() {
         details: 'API_BASE_URL environment variable not configured'
       }, { status: 500 })
     }
+    
+    console.log(`[INVENTORY API] ${timestamp} - Using API base URL:`, apiBaseUrl)
     
     let response
     let useLocalFallback = false
@@ -41,6 +44,7 @@ export async function GET() {
       useLocalFallback = true
     }
     
+    // Fallback to local database query if Azure Functions API fails
     if (useLocalFallback) {
       console.log(`[INVENTORY API] ${timestamp} - Azure Functions /api/inventory not found - extracting from events`)
       
@@ -106,40 +110,101 @@ export async function GET() {
         { status: 503 }
       )
     }
-    
-    // Continue with Azure Functions API response processing if we have a valid response
-    if (response) {
-      const data = await response.json()
-      console.log(`[INVENTORY API] ${timestamp} - Successfully received data from Azure Functions API`)
       
-      return NextResponse.json(data, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Fetched-At': timestamp,
-          'X-Data-Source': 'azure-functions'
-        }
-      })
+      try {
+        // Import database connection
+        const { Pool } = require('pg')
+        const pool = new Pool({
+          connectionString: process.env.DATABASE_URL
+        })
+
+        const result = await pool.query(`
+          SELECT 
+            i.device_id,
+            d.name as device_name,
+            d.serial_number,
+            d.last_seen,
+            i.data,
+            i.collected_at,
+            i.created_at
+          FROM inventory i
+          JOIN devices d ON i.device_id = d.id
+          ORDER BY i.updated_at DESC
+          LIMIT 1000
+        `)
+        
+        const inventoryData = result.rows.map((row: any) => {
+          const data = row.data || {}
+          
+          return {
+            id: row.device_id,
+            deviceId: row.device_id,
+            deviceName: data.deviceName || row.device_name || data.computerName || 'Unknown Device',
+            serialNumber: row.serial_number,
+            lastSeen: row.last_seen,
+            collectedAt: row.collected_at,
+            // Inventory-specific fields
+            assetTag: data.assetTag || data.asset_tag || null,
+            location: data.location || null,
+            usage: data.usage || null,
+            catalog: data.catalog || null,
+            computerName: data.computerName || data.computer_name || null,
+            domain: data.domain || null,
+            organizationalUnit: data.organizationalUnit || data.organizational_unit || null,
+            manufacturer: data.manufacturer || data.system?.manufacturer || null,
+            model: data.model || data.system?.model || null,
+            uuid: data.uuid || data.system?.uuid || null,
+            // Raw data for debugging
+            raw: data
+          }
+        })
+        
+        console.log(`[INVENTORY API] ${timestamp} - Successfully fetched ${inventoryData.length} inventory records from local database`)
+        
+        return NextResponse.json(inventoryData, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'local-database'
+          }
+        })
+        
+      } catch (dbError) {
+        console.error(`[INVENTORY API] ${timestamp} - Local database error:`, dbError)
+        return NextResponse.json({
+          error: 'Database error',
+          details: 'Failed to fetch inventory data from both API and database'
+        }, { status: 500 })
+      }
     }
     
-    // This should not be reached since we handle the fallback above
-    return NextResponse.json({
-      error: 'Unexpected error in API routing'
-    }, { status: 500 })
-
-  } catch (error) {
-    console.error('[INVENTORY API] Error fetching inventory:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch inventory data',
-      details: error instanceof Error ? error.message : String(error)
-    }, { 
-      status: 500,
+    // If we get here, Azure Functions API worked
+    if (!response) {
+      throw new Error('Response is undefined')
+    }
+    
+    const data = await response.json()
+    console.log(`[INVENTORY API] ${timestamp} - Successfully received data from Azure Functions API`)
+    
+    return NextResponse.json(data, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
-        'Expires': '0'
+        'Expires': '0',
+        'X-Fetched-At': timestamp,
+        'X-Data-Source': 'azure-functions'
       }
     })
+    
+  } catch (error) {
+    console.error('[INVENTORY API] Failed to fetch inventory data:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+    
+    return NextResponse.json({
+      error: 'API request failed',
+      details: errorMessage
+    }, { status: 500 })
   }
 }

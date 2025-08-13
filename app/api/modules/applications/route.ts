@@ -44,7 +44,11 @@ export async function GET() {
     
     // Fallback to local database query if Azure Functions API fails
     if (useLocalFallback) {
-      console.log(`[APPLICATIONS API] ${timestamp} - Using local database fallback`)
+      console.log(`[APPLICATIONS API] ${timestamp} - Azure Functions API failed - NO FALLBACK ALLOWED`)
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable - cloud infrastructure error' },
+        { status: 503 }
+      )
       
       try {
         const { Pool } = require('pg')
