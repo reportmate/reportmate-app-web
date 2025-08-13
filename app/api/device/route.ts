@@ -54,7 +54,11 @@ export async function POST(request: Request) {
     
     // Fallback to local database processing if Azure Functions failed
     if (useLocalFallback) {
-      console.log(`[DEVICE API] ${timestamp} - Using local database fallback`)
+      console.log(`[DEVICE API] ${timestamp} - Azure Functions API failed - NO FALLBACK ALLOWED`)
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable - cloud infrastructure error' },
+        { status: 503 }
+      )
       
       try {
         const localResult = await processDeviceDataLocally(requestData, timestamp)
