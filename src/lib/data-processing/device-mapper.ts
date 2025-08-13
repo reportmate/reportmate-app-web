@@ -131,7 +131,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     os: rawDevice.modules?.system?.operatingSystem?.name,
     platform: rawDevice.modules?.system?.operatingSystem?.platform,
     lastSeen: validLastSeen,
-    status: getDeviceStatus(validLastSeen),
+    status: getDeviceStatus(rawDevice),
     uptime: rawDevice.modules?.system?.uptimeString,
     location: rawDevice.modules?.inventory?.location,
     assetTag: rawDevice.modules?.inventory?.assetTag,
@@ -183,16 +183,18 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   }
 
   // Installs data processing - CRITICAL for managed installs display
-  if (rawDevice.modules?.installs) {
+  // Check both old and new API structures
+  if (rawDevice.modules?.installs || rawDevice.installs) {
     const installsData = processInstallsData(rawDevice);
     ;(mappedDevice as any).installs = installsData
     console.log('🔧 DeviceMapper: Processed installs data:', {
       totalPackages: installsData.totalPackages,
       hasConfig: !!installsData.config,
-      systemName: installsData.systemName
+      systemName: installsData.systemName,
+      foundAt: rawDevice.modules?.installs ? 'modules.installs' : 'installs'
     })
   } else {
-    console.log('🔧 DeviceMapper: No installs module found in rawDevice.modules')
+    console.log('🔧 DeviceMapper: No installs data found in rawDevice.modules.installs or rawDevice.installs')
   }
 
   console.log('DeviceMapper DEBUG - Clean mapped device:', {

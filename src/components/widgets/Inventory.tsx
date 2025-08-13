@@ -47,6 +47,18 @@ interface InventoryWidgetProps {
 }
 
 export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
+  // Debug logging to see exactly what data we're getting
+  console.log('📋 InventoryWidget DEBUG:', {
+    deviceName: device?.name,
+    deviceId: device?.id,
+    serialNumber: device?.serialNumber,
+    hasModules: !!device?.modules,
+    hasModulesInventory: !!device?.modules?.inventory,
+    hasDirectInventory: !!device?.inventory,
+    inventoryData: device?.modules?.inventory || device?.inventory,
+    deviceNameFromInventory: (device?.modules?.inventory || device?.inventory)?.deviceName
+  })
+
   // Use inventory module data if available, fallback to device properties
   const inventory = device.modules?.inventory || device.inventory || {}
   
