@@ -14,32 +14,48 @@ function parsePowerShellObject(str: string): unknown {
   
   try {
     // Remove @{ and } wrapper
-    const content = str.slice(2, -1)
+    const content = str.slice(2, -1).trim()
+    
+    if (!content) return {}
     
     // Split by semicolons and parse key-value pairs
     const pairs = content.split(';')
     const result: Record<string, unknown> = {}
     
     for (const pair of pairs) {
-      const [key, ...valueParts] = pair.split('=')
-      if (key && valueParts.length > 0) {
-        const cleanKey = key.trim()
-        const valueStr = valueParts.join('=').trim()
-        
-        // Try to parse as number if it looks like one
-        if (/^\d+$/.test(valueStr)) {
-          result[cleanKey] = parseInt(valueStr, 10)
-        } else if (/^\d+\.\d+$/.test(valueStr)) {
-          result[cleanKey] = parseFloat(valueStr)
-        } else {
-          result[cleanKey] = valueStr
-        }
+      const equalIndex = pair.indexOf('=')
+      if (equalIndex === -1) continue
+      
+      const key = pair.slice(0, equalIndex).trim()
+      const valueStr = pair.slice(equalIndex + 1).trim()
+      
+      if (!key) continue
+      
+      // Handle different value types
+      if (valueStr === '') {
+        result[key] = ''
+      } else if (valueStr === 'True') {
+        result[key] = true
+      } else if (valueStr === 'False') {
+        result[key] = false
+      } else if (/^\d+$/.test(valueStr)) {
+        result[key] = parseInt(valueStr, 10)
+      } else if (/^\d+\.\d+$/.test(valueStr)) {
+        result[key] = parseFloat(valueStr)
+      } else if (valueStr.startsWith('@{') && valueStr.endsWith('}')) {
+        // Nested PowerShell object
+        result[key] = parsePowerShellObject(valueStr)
+      } else if (valueStr.startsWith('System.Object[]')) {
+        // PowerShell array - simplified to empty array for now
+        result[key] = []
+      } else {
+        result[key] = valueStr
       }
     }
     
     return result
   } catch (error) {
-    console.warn('Failed to parse PowerShell object:', str, error)
+    console.warn('Failed to parse PowerShell object:', str.substring(0, 100), error)
     return str
   }
 }
@@ -307,6 +323,9 @@ export async function GET(
       responseSize: JSON.stringify(data).length
     })
     
+    // DEBUG: Log the raw response to understand the structure
+    console.log('[DEVICE API] RAW RESPONSE SAMPLE:', JSON.stringify(data, null, 2).substring(0, 1000))
+    
     console.log('[DEVICE API] Unified data structure sample:', JSON.stringify({
       metadata: data.metadata,
       moduleKeys: Object.keys(data).filter(k => k !== 'metadata')
@@ -354,62 +373,6 @@ export async function GET(
         }
       }
       
-      // Debug installs module specifically
-      console.log('[DEVICE API] 🔍 Installs module debug:', {
-        hasInstallsModule: !!modules.installs,
-        installsKeys: modules.installs ? Object.keys(modules.installs) : [],
-        hasCimian: !!(modules.installs as InstallsModule)?.cimian,
-        hasRecentInstalls: !!(modules.installs as InstallsModule)?.recentInstalls,
-        recentInstallsCount: (modules.installs as InstallsModule)?.recentInstalls?.length || 0,
-        sampleRecentInstall: (modules.installs as InstallsModule)?.recentInstalls?.[0],
-        first3Installs: (modules.installs as InstallsModule)?.recentInstalls?.slice(0, 3).map((pkg: InstallPackage) => ({
-          name: pkg.name,
-          displayName: pkg.displayName,
-          version: pkg.version,
-          status: pkg.status,
-          lastAttemptStatus: pkg.lastAttemptStatus,
-          installedVersion: pkg.installedVersion,
-          allKeys: Object.keys(pkg),
-          recentAttemptsLength: pkg.recentAttempts?.length || 0,
-          firstAttempt: pkg.recentAttempts?.[0],
-          firstAttemptKeys: pkg.recentAttempts?.[0] ? Object.keys(pkg.recentAttempts[0]) : [],
-          firstAttemptDetails: pkg.recentAttempts?.[0] ? {
-            version: pkg.recentAttempts[0].version,
-            status: pkg.recentAttempts[0].status,
-            result: pkg.recentAttempts[0].result,
-            installedVersion: pkg.recentAttempts[0].installedVersion,
-            timestamp: pkg.recentAttempts[0].timestamp,
-            // DEEP DIVE - Look for ANY field that might contain version info
-            allVersionFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
-              key.toLowerCase().includes('version')).reduce((acc: Record<string, unknown>, key: string) => {
-              const firstAttempt = pkg.recentAttempts?.[0];
-              if (firstAttempt) {
-                acc[key] = firstAttempt[key];
-              }
-              return acc;
-            }, {}),
-            // Also check for fields that might contain status/state info
-            allStatusFields: Object.keys(pkg.recentAttempts[0]).filter(key => 
-              key.toLowerCase().includes('status') || key.toLowerCase().includes('state') || 
-              key.toLowerCase().includes('result')).reduce((acc: Record<string, unknown>, key: string) => {
-              const firstAttempt = pkg.recentAttempts?.[0];
-              if (firstAttempt) {
-                acc[key] = firstAttempt[key];
-              }
-              return acc;
-            }, {}),
-            // Show first few fields of the attempt to see structure
-            sampleFields: Object.keys(pkg.recentAttempts[0]).slice(0, 10).reduce((acc: Record<string, unknown>, key: string) => {
-              const firstAttempt = pkg.recentAttempts?.[0];
-              if (firstAttempt) {
-                acc[key] = firstAttempt[key];
-              }
-              return acc;
-            }, {})
-          } : null
-        }))
-      })
-      
       console.log('[DEVICE API] Returning CLEAN modular structure with', Object.keys(modules).length, 'modules')
       return NextResponse.json(responseData, {
         headers: {
@@ -418,6 +381,61 @@ export async function GET(
           'Expires': '0'
         }
       })
+    } else {
+      // Handle direct Azure Functions response format (without metadata wrapper)
+      console.log('[DEVICE API] Handling direct Azure Functions response format')
+      
+      // Check if this is the raw Azure Functions format with direct module properties
+      if (data.success && (data.security || data.management || data.inventory)) {
+        console.log('[DEVICE API] Found direct Azure Functions format')
+        
+        // Extract device metadata from the response
+        const deviceMetadata = {
+          deviceId: data.metadata?.deviceId || data.deviceId,
+          serialNumber: data.metadata?.serialNumber || data.serialNumber,
+          collectedAt: data.metadata?.collectedAt || data.collectedAt,
+          clientVersion: data.metadata?.clientVersion || data.clientVersion || '1.0.0'
+        }
+        
+        // Build modules from the response
+        const modules: Record<string, unknown> = {}
+        const moduleNames = [
+          'applications', 'displays', 'hardware', 'installs', 'inventory',
+          'management', 'network', 'peripherals', 'printers', 'profiles', 'security', 'system'
+        ]
+        
+        moduleNames.forEach(moduleName => {
+          if (data[moduleName]) {
+            modules[moduleName] = data[moduleName]
+          }
+        })
+        
+        // Build device name from inventory module
+        const deviceName = data.inventory?.deviceName || 'Unknown Device'
+        
+        // Return properly structured response
+        const responseData = {
+          success: true,
+          name: deviceName,
+          deviceId: deviceMetadata.deviceId,
+          serialNumber: deviceMetadata.serialNumber,
+          status: 'active',
+          lastSeen: deviceMetadata.collectedAt,
+          clientVersion: deviceMetadata.clientVersion,
+          modules: modules
+        }
+        
+        console.log('[DEVICE API] Returning Azure Functions format with', Object.keys(modules).length, 'modules')
+        console.log('[DEVICE API] Device name from inventory:', deviceName)
+        
+        return NextResponse.json(responseData, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+      }
     }
     
     // If no metadata found, return error
