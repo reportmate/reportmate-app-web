@@ -1,9 +1,9 @@
 /**
  * Recent Events Table
- * Displays live event feed with real-time updates
+ * Displays live event feed with real-time updates and intelligent event bundling
  */
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 
@@ -16,6 +16,18 @@ interface FleetEvent {
   payload: Record<string, unknown> | string
 }
 
+interface BundledEvent {
+  id: string
+  device: string
+  kind: string
+  ts: string
+  message: string
+  count: number
+  eventIds: string[]
+  isBundle: boolean
+  bundledKinds: string[]
+}
+
 interface RecentEventsTableProps {
   events: FleetEvent[]
   connectionStatus: string
@@ -23,6 +35,156 @@ interface RecentEventsTableProps {
   mounted: boolean
   deviceNameMap: Record<string, string>
   isLoading?: boolean
+}
+
+// Helper function to bundle related events intelligently
+const bundleEvents = (events: FleetEvent[]): BundledEvent[] => {
+  if (!events.length) return []
+
+  // Sort events by timestamp (newest first)
+  const sortedEvents = [...events].sort((a, b) => 
+    new Date(b.ts).getTime() - new Date(a.ts).getTime()
+  )
+
+  const bundled: BundledEvent[] = []
+  const processed = new Set<string>()
+
+  for (const event of sortedEvents) {
+    if (processed.has(event.id)) continue
+
+    // Find other events from the same device within 2 minutes that should be bundled
+    const bundleTimeWindow = 2 * 60 * 1000 // 2 minutes in ms
+    const eventTime = new Date(event.ts).getTime()
+    
+    const relatedEvents = sortedEvents.filter(other => 
+      !processed.has(other.id) &&
+      other.device === event.device &&
+      Math.abs(new Date(other.ts).getTime() - eventTime) <= bundleTimeWindow &&
+      shouldBundleTogether(event, other)
+    )
+
+    // If we found related events, create a bundle
+    if (relatedEvents.length > 1) {
+      const bundleKinds = [...new Set(relatedEvents.map(e => e.kind))]
+      const primaryKind = getBundlePrimaryKind(bundleKinds)
+      
+      // Mark all related events as processed
+      relatedEvents.forEach(e => processed.add(e.id))
+
+      bundled.push({
+        id: `bundle-${event.device}-${eventTime}`,
+        device: event.device,
+        kind: primaryKind,
+        ts: event.ts, // Use the primary event's timestamp
+        message: createBundleMessage(relatedEvents, bundleKinds),
+        count: relatedEvents.length,
+        eventIds: relatedEvents.map(e => e.id),
+        isBundle: true,
+        bundledKinds: bundleKinds
+      })
+    } else {
+      // Single event, add as-is
+      processed.add(event.id)
+      bundled.push({
+        id: event.id,
+        device: event.device,
+        kind: event.kind,
+        ts: event.ts,
+        message: event.message || formatPayloadPreview(event.payload),
+        count: 1,
+        eventIds: [event.id],
+        isBundle: false,
+        bundledKinds: [event.kind]
+      })
+    }
+  }
+
+  return bundled.slice(0, 50) // Limit to 50 items
+}
+
+// Determine if two events should be bundled together
+const shouldBundleTogether = (event1: FleetEvent, event2: FleetEvent): boolean => {
+  // Same device is required (already checked in caller)
+  
+  // Bundle events of the same type (info + info, error + error, etc.)
+  if (event1.kind === event2.kind) return true
+  
+  // Bundle success/info events together (data collection events)
+  const dataCollectionTypes = new Set(['success', 'info', 'system'])
+  if (dataCollectionTypes.has(event1.kind) && dataCollectionTypes.has(event2.kind)) {
+    return true
+  }
+  
+  // Don't bundle errors or warnings with other types
+  if (['error', 'warning'].includes(event1.kind) || ['error', 'warning'].includes(event2.kind)) {
+    return event1.kind === event2.kind
+  }
+  
+  return false
+}
+
+// Get the primary kind for a bundle (errors and warnings take precedence)
+const getBundlePrimaryKind = (kinds: string[]): string => {
+  if (kinds.includes('error')) return 'error'
+  if (kinds.includes('warning')) return 'warning'
+  if (kinds.includes('success')) return 'success'
+  return kinds[0] || 'info'
+}
+
+// Create a smart message for bundled events
+const createBundleMessage = (events: FleetEvent[], kinds: string[]): string => {
+  const kindCounts = kinds.reduce((acc, kind) => {
+    acc[kind] = (acc[kind] || 0) + events.filter(e => e.kind === kind).length
+    return acc
+  }, {} as Record<string, number>)
+
+  // Check if these are module data collection events
+  const moduleEvents = events.filter(event => {
+    const message = event.message || formatPayloadPreview(event.payload)
+    return message.includes('module reported data') || message.includes('modules reported data')
+  })
+
+  if (moduleEvents.length === events.length) {
+    // All events are module data collection - create a smart summary
+    const moduleNames = new Set<string>()
+    
+    events.forEach(event => {
+      const message = event.message || formatPayloadPreview(event.payload)
+      // Extract module names from messages like "Hardware module reported data"
+      const matches = message.match(/^(\w+) module reported data$/i)
+      if (matches) {
+        moduleNames.add(matches[1])
+      }
+    })
+    
+    const moduleArray = Array.from(moduleNames)
+    if (moduleArray.length === 1) {
+      return `${moduleArray[0]} module data collection`
+    } else if (moduleArray.length <= 3) {
+      return `${moduleArray.join(', ')} modules data collection`
+    } else {
+      return `${moduleArray.length} modules data collection completed`
+    }
+  }
+
+  // For mixed event types, create a summary
+  const parts: string[] = []
+  
+  if (kindCounts.error) {
+    parts.push(`${kindCounts.error} error${kindCounts.error > 1 ? 's' : ''}`)
+  }
+  if (kindCounts.warning) {
+    parts.push(`${kindCounts.warning} warning${kindCounts.warning > 1 ? 's' : ''}`)
+  }
+  if (kindCounts.success) {
+    parts.push(`${kindCounts.success} success event${kindCounts.success > 1 ? 's' : ''}`)
+  }
+  if (kindCounts.info || kindCounts.system) {
+    const infoCount = (kindCounts.info || 0) + (kindCounts.system || 0)
+    parts.push(`${infoCount} info event${infoCount > 1 ? 's' : ''}`)
+  }
+
+  return parts.length > 0 ? parts.join(', ') : `${events.length} events occurred`
 }
 
 // Helper function to get event status configuration
@@ -41,6 +203,186 @@ const getStatusConfig = (kind: string) => {
   }
 }
 
+// Helper function to safely display payload - enhanced for ReportMate events
+const formatPayloadPreview = (payload: Record<string, unknown> | string) => {
+  try {
+    if (!payload) return 'No payload'
+    
+    // Handle string payloads directly
+    if (typeof payload === 'string') {
+      return payload.length > 120 ? payload.substring(0, 120) + '...' : payload
+    }
+    
+    if (typeof payload !== 'object') {
+      return String(payload).substring(0, 80)
+    }
+
+    const payloadObj = payload as any
+
+    // **PRIORITY 1: Look for direct message field (ReportMate events)**
+    if (payloadObj.message && typeof payloadObj.message === 'string') {
+      const message = payloadObj.message
+      return message.length > 120 ? message.substring(0, 120) + '...' : message
+    }
+
+    // **PRIORITY 2: Look for summary field (API summaries)**
+    if (payloadObj.summary && typeof payloadObj.summary === 'string') {
+      return payloadObj.summary
+    }
+
+    // **PRIORITY 3: Handle modules_processed structure (data collection events)**
+    if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
+      const moduleCount = payloadObj.modules_processed
+      const enabledModules = payloadObj.enabled_modules
+      
+      if (Array.isArray(enabledModules) && enabledModules.length > 0) {
+        if (moduleCount === 1) {
+          const capitalizedModule = enabledModules[0].charAt(0).toUpperCase() + enabledModules[0].slice(1)
+          return `${capitalizedModule} module reported data`
+        } else if (moduleCount <= 3) {
+          const capitalizedModules = enabledModules.slice(0, moduleCount).map(module => 
+            module.charAt(0).toUpperCase() + module.slice(1)
+          )
+          return `${capitalizedModules.join(', ')} modules reported data`
+        } else {
+          return `All ${moduleCount} modules reported data`
+        }
+      }
+      
+      return `${moduleCount} modules reported data`
+    }
+
+    // **PRIORITY 4: Handle moduleCount structure (older format)**
+    if (payloadObj.moduleCount && payloadObj.modules && Array.isArray(payloadObj.modules)) {
+      const moduleCount = payloadObj.moduleCount
+      const modules = payloadObj.modules
+      if (moduleCount === 1) {
+        return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} module reported data`
+      } else if (moduleCount <= 3) {
+        const capitalizedModules = modules.map((module: string) => 
+          module.charAt(0).toUpperCase() + module.slice(1)
+        )
+        return `${capitalizedModules.join(', ')} modules reported data`
+      } else {
+        return `All modules reported data`
+      }
+    }
+
+    // **PRIORITY 5: Handle full device report structure**
+    if (payloadObj.modules && typeof payloadObj.modules === 'object') {
+      const moduleNames = Object.keys(payloadObj.modules)
+      const moduleCount = moduleNames.length
+      
+      if (moduleCount === 1) {
+        return `${moduleNames[0].charAt(0).toUpperCase() + moduleNames[0].slice(1)} module reported data`
+      } else if (moduleCount <= 3) {
+        const capitalizedModules = moduleNames.map(module => 
+          module.charAt(0).toUpperCase() + module.slice(1)
+        )
+        return `${capitalizedModules.join(', ')} modules reported data`
+      } else {
+        return `All modules reported data`
+      }
+    }
+
+    // **PRIORITY 6: Handle sanitized payload summaries**
+    if (payloadObj.message && payloadObj.dataSize && payloadObj.truncated) {
+      // This is a sanitized large payload
+      if (payloadObj.keys && Array.isArray(payloadObj.keys)) {
+        const keys = payloadObj.keys
+        if (keys.includes('modules') || keys.includes('device_name') || keys.includes('client_version')) {
+          return 'System data collection completed'
+        }
+      }
+      return 'Data collection completed'
+    }
+
+    // **PRIORITY 7: Look for other common message fields**
+    if (payloadObj.description) {
+      return String(payloadObj.description).substring(0, 120)
+    }
+    if (payloadObj.title) {
+      return String(payloadObj.title).substring(0, 120)
+    }
+    if (payloadObj.event_message) {
+      return String(payloadObj.event_message).substring(0, 120)
+    }
+
+    // **FALLBACK: Create a descriptive summary**
+    const keys = Object.keys(payloadObj)
+    if (keys.length === 0) return 'Empty event data'
+    
+    // Check for known patterns in key names
+    if (keys.some(k => k.includes('module') || k.includes('install') || k.includes('system'))) {
+      return 'System event occurred'
+    }
+    
+    if (keys.length === 1) {
+      const key = keys[0]
+      const value = payloadObj[key]
+      if (typeof value === 'string' && value.length < 50) {
+        return `${key}: ${value}`
+      } else if (typeof value === 'number') {
+        return `${key}: ${value}`
+      }
+    }
+    
+    // Last resort - show key count but make it more user-friendly
+    if (keys.length <= 3) {
+      return `Event with ${keys.join(', ')} data`
+    } else {
+      return `Complex event (${keys.length} data fields)`
+    }
+    
+  } catch (_error) {
+    return 'Event data (parsing error)'
+  }
+}
+
+// Helper function to get device display name
+const getDeviceName = (deviceId: string, deviceNameMap: Record<string, string>) => {
+  // Enhanced device name resolution with multiple fallback strategies
+  
+  // First, try the device name map (preferred)
+  if (deviceNameMap[deviceId]) {
+    return deviceNameMap[deviceId]
+  }
+  
+  // Check if deviceId looks like a serial number pattern and try to find a friendly name
+  // Serial numbers are usually short alphanumeric strings
+  if (deviceId && deviceId.length < 50 && !deviceId.includes('-')) {
+    // Look through the map to see if this serial has a mapped name
+    const mappedName = Object.entries(deviceNameMap).find(([key, value]) => 
+      key === deviceId || key.includes(deviceId)
+    )?.[1]
+    if (mappedName) {
+      return mappedName
+    }
+  }
+  
+  // Check if deviceId is a UUID format and try to find corresponding name
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+  if (uuidPattern.test(deviceId)) {
+    // Look for any mapped name that corresponds to this UUID
+    const correspondingName = Object.values(deviceNameMap).find(name => name && name !== deviceId)
+    if (correspondingName) {
+      return correspondingName
+    }
+  }
+  
+  // If deviceId looks like an asset tag (short, alphanumeric), show it nicely
+  if (deviceId && deviceId.length <= 10 && /^[A-Z0-9]+$/i.test(deviceId)) {
+    return `Asset ${deviceId}` // e.g., "Asset A004733"
+  }
+  
+  // Final fallback - return the deviceId but truncate if it's too long (UUID case)
+  if (deviceId && deviceId.length > 20) {
+    return `Device ${deviceId.substring(0, 8)}...` // e.g., "Device 79349310..."
+  }
+  
+  return deviceId || 'Unknown Device'
+}
+
 export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({ 
   events, 
   connectionStatus, 
@@ -52,6 +394,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Bundle related events intelligently
+  const bundledEvents = useMemo(() => bundleEvents(events), [events])
 
   const handleMouseEnter = () => {
     setIsHovered(true)
@@ -126,185 +471,6 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   }
 
   const status = getConnectionStatusWithTooltip(connectionStatus)
-
-  const getDeviceName = (deviceId: string) => {
-    // Enhanced device name resolution with multiple fallback strategies
-    
-    // First, try the device name map (preferred)
-    if (deviceNameMap[deviceId]) {
-      return deviceNameMap[deviceId]
-    }
-    
-    // Check if deviceId looks like a serial number pattern and try to find a friendly name
-    // Serial numbers are usually short alphanumeric strings
-    if (deviceId && deviceId.length < 50 && !deviceId.includes('-')) {
-      // Look through the map to see if this serial has a mapped name
-      const mappedName = Object.entries(deviceNameMap).find(([key, value]) => 
-        key === deviceId || key.includes(deviceId)
-      )?.[1]
-      if (mappedName) {
-        return mappedName
-      }
-    }
-    
-    // Check if deviceId is a UUID format and try to find corresponding name
-    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (uuidPattern.test(deviceId)) {
-      // Look for any mapped name that corresponds to this UUID
-      const correspondingName = Object.values(deviceNameMap).find(name => name && name !== deviceId)
-      if (correspondingName) {
-        return correspondingName
-      }
-    }
-    
-    // If deviceId looks like an asset tag (short, alphanumeric), show it nicely
-    if (deviceId && deviceId.length <= 10 && /^[A-Z0-9]+$/i.test(deviceId)) {
-      return `Asset ${deviceId}` // e.g., "Asset A004733"
-    }
-    
-    // Final fallback - return the deviceId but truncate if it's too long (UUID case)
-    if (deviceId && deviceId.length > 20) {
-      return `Device ${deviceId.substring(0, 8)}...` // e.g., "Device 79349310..."
-    }
-    
-    return deviceId || 'Unknown Device'
-  }
-
-  // Helper function to safely display payload - enhanced for ReportMate events
-  const formatPayloadPreview = (payload: Record<string, unknown> | string) => {
-    try {
-      if (!payload) return 'No payload'
-      
-      // Handle string payloads directly
-      if (typeof payload === 'string') {
-        return payload.length > 120 ? payload.substring(0, 120) + '...' : payload
-      }
-      
-      if (typeof payload !== 'object') {
-        return String(payload).substring(0, 80)
-      }
-
-      const payloadObj = payload as any
-
-      // **PRIORITY 1: Look for direct message field (ReportMate events)**
-      if (payloadObj.message && typeof payloadObj.message === 'string') {
-        const message = payloadObj.message
-        return message.length > 120 ? message.substring(0, 120) + '...' : message
-      }
-
-      // **PRIORITY 2: Look for summary field (API summaries)**
-      if (payloadObj.summary && typeof payloadObj.summary === 'string') {
-        return payloadObj.summary
-      }
-
-      // **PRIORITY 3: Handle modules_processed structure (data collection events)**
-      if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
-        const moduleCount = payloadObj.modules_processed
-        const enabledModules = payloadObj.enabled_modules
-        
-        if (Array.isArray(enabledModules) && enabledModules.length > 0) {
-          if (moduleCount === 1) {
-            const capitalizedModule = enabledModules[0].charAt(0).toUpperCase() + enabledModules[0].slice(1)
-            return `${capitalizedModule} module reported data`
-          } else if (moduleCount <= 3) {
-            const capitalizedModules = enabledModules.slice(0, moduleCount).map(module => 
-              module.charAt(0).toUpperCase() + module.slice(1)
-            )
-            return `${capitalizedModules.join(', ')} modules reported data`
-          } else {
-            return `All ${moduleCount} modules reported data`
-          }
-        }
-        
-        return `${moduleCount} modules reported data`
-      }
-
-      // **PRIORITY 4: Handle moduleCount structure (older format)**
-      if (payloadObj.moduleCount && payloadObj.modules && Array.isArray(payloadObj.modules)) {
-        const moduleCount = payloadObj.moduleCount
-        const modules = payloadObj.modules
-        if (moduleCount === 1) {
-          return `${modules[0].charAt(0).toUpperCase() + modules[0].slice(1)} module reported data`
-        } else if (moduleCount <= 3) {
-          const capitalizedModules = modules.map((module: string) => 
-            module.charAt(0).toUpperCase() + module.slice(1)
-          )
-          return `${capitalizedModules.join(', ')} modules reported data`
-        } else {
-          return `All modules reported data`
-        }
-      }
-
-      // **PRIORITY 5: Handle full device report structure**
-      if (payloadObj.modules && typeof payloadObj.modules === 'object') {
-        const moduleNames = Object.keys(payloadObj.modules)
-        const moduleCount = moduleNames.length
-        
-        if (moduleCount === 1) {
-          return `${moduleNames[0].charAt(0).toUpperCase() + moduleNames[0].slice(1)} module reported data`
-        } else if (moduleCount <= 3) {
-          const capitalizedModules = moduleNames.map(module => 
-            module.charAt(0).toUpperCase() + module.slice(1)
-          )
-          return `${capitalizedModules.join(', ')} modules reported data`
-        } else {
-          return `All modules reported data`
-        }
-      }
-
-      // **PRIORITY 6: Handle sanitized payload summaries**
-      if (payloadObj.message && payloadObj.dataSize && payloadObj.truncated) {
-        // This is a sanitized large payload
-        if (payloadObj.keys && Array.isArray(payloadObj.keys)) {
-          const keys = payloadObj.keys
-          if (keys.includes('modules') || keys.includes('device_name') || keys.includes('client_version')) {
-            return 'System data collection completed'
-          }
-        }
-        return 'Data collection completed'
-      }
-
-      // **PRIORITY 7: Look for other common message fields**
-      if (payloadObj.description) {
-        return String(payloadObj.description).substring(0, 120)
-      }
-      if (payloadObj.title) {
-        return String(payloadObj.title).substring(0, 120)
-      }
-      if (payloadObj.event_message) {
-        return String(payloadObj.event_message).substring(0, 120)
-      }
-
-      // **FALLBACK: Create a descriptive summary**
-      const keys = Object.keys(payloadObj)
-      if (keys.length === 0) return 'Empty event data'
-      
-      // Check for known patterns in key names
-      if (keys.some(k => k.includes('module') || k.includes('install') || k.includes('system'))) {
-        return 'System event occurred'
-      }
-      
-      if (keys.length === 1) {
-        const key = keys[0]
-        const value = payloadObj[key]
-        if (typeof value === 'string' && value.length < 50) {
-          return `${key}: ${value}`
-        } else if (typeof value === 'number') {
-          return `${key}: ${value}`
-        }
-      }
-      
-      // Last resort - show key count but make it more user-friendly
-      if (keys.length <= 3) {
-        return `Event with ${keys.join(', ')} data`
-      } else {
-        return `Complex event (${keys.length} data fields)`
-      }
-      
-    } catch (_error) {
-      return 'Event data (parsing error)'
-    }
-  }
 
   const _getEventIcon = (kind: string) => {
     switch (kind.toLowerCase()) {
@@ -470,7 +636,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               </div>
             </div>
           ) : (
-            // Normal events table
+            // Bundled events table
             <div className="overflow-x-auto overlay-scrollbar h-full">
               <table className="w-full table-fixed min-w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
@@ -493,35 +659,42 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {events.slice(0, 50).map((event: FleetEvent) => {
-                      const statusConfig = getStatusConfig(event.kind)
+                    {bundledEvents.map((bundledEvent: BundledEvent) => {
+                      const statusConfig = getStatusConfig(bundledEvent.kind)
                       return (
                         <tr 
-                          key={event.id} 
+                          key={bundledEvent.id} 
                           className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                           <td className="w-20 px-3 py-2.5">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                              {event.kind === 'system' ? 'info' : event.kind}
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
+                                {bundledEvent.kind === 'system' ? 'info' : bundledEvent.kind}
+                              </span>
+                            </div>
                           </td>
                           <td className="w-56 px-3 py-2.5">
                             <Link
-                              href={`/device/${encodeURIComponent(event.device)}`}
+                              href={`/device/${encodeURIComponent(bundledEvent.device)}`}
                               className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                             >
-                              {getDeviceName(event.device)}
+                              {getDeviceName(bundledEvent.device, deviceNameMap)}
                             </Link>
                           </td>
                           <td className="px-3 py-2.5 hidden md:table-cell">
                             <div className="text-sm text-gray-900 dark:text-white truncate">
-                              {event.message || formatPayloadPreview(event.payload)}
+                              {bundledEvent.message}
+                              {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                  ({bundledEvent.bundledKinds.join(', ')})
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td className="w-44 px-3 py-2.5">
                             <div className="text-sm text-gray-600 dark:text-gray-400">
                               <div className="font-medium truncate">
-                                {formatRelativeTime(event.ts)}
+                                {formatRelativeTime(bundledEvent.ts)}
                               </div>
                             </div>
                           </td>
