@@ -31,7 +31,7 @@ interface EventPayload {
 // Helper function to get event message - uses shared bundling utilities
 const getEventMessage = (event: BundledEvent): string => {
   if (event.isBundle) {
-    return event.message // Already processed by bundling logic
+    return event.message || 'Bundle of events' // Already processed by bundling logic
   }
   
   // **PRIORITY 1: Use event-level message field if available (from database)**
@@ -258,7 +258,7 @@ function EventsPageContent() {
   // Filter events based on selected type and search query
   const filteredEvents = bundledEvents.filter(event => {
     // Filter by type first
-    const typeMatch = filterType === 'all' || event.bundledKinds.some(kind => kind.toLowerCase() === filterType.toLowerCase())
+    const typeMatch = filterType === 'all' || (event.bundledKinds || []).some(kind => kind.toLowerCase() === filterType.toLowerCase())
     
     // Then filter by search query if provided
     if (!searchQuery.trim()) {
@@ -269,7 +269,7 @@ function EventsPageContent() {
     const searchMatch = (
       event.id.toLowerCase().includes(query) ||
       event.device.toLowerCase().includes(query) ||
-      event.bundledKinds.some(kind => kind.toLowerCase().includes(query)) ||
+      (event.bundledKinds || []).some(kind => kind.toLowerCase().includes(query)) ||
       getEventMessage(event).toLowerCase().includes(query) ||
       (deviceNameMap[event.device] && deviceNameMap[event.device].toLowerCase().includes(query))
     )
@@ -519,11 +519,11 @@ function EventsPageContent() {
   const getFilterCounts = () => {
     return {
       all: bundledEvents.length,
-      success: bundledEvents.filter(e => e.bundledKinds.includes('success')).length,
-      warning: bundledEvents.filter(e => e.bundledKinds.includes('warning')).length,
-      error: bundledEvents.filter(e => e.bundledKinds.includes('error')).length,
-      info: bundledEvents.filter(e => e.bundledKinds.includes('info')).length,
-      system: bundledEvents.filter(e => e.bundledKinds.includes('system')).length,
+      success: bundledEvents.filter(e => (e.bundledKinds || []).includes('success')).length,
+      warning: bundledEvents.filter(e => (e.bundledKinds || []).includes('warning')).length,
+      error: bundledEvents.filter(e => (e.bundledKinds || []).includes('error')).length,
+      info: bundledEvents.filter(e => (e.bundledKinds || []).includes('info')).length,
+      system: bundledEvents.filter(e => (e.bundledKinds || []).includes('system')).length,
     }
   }
 
