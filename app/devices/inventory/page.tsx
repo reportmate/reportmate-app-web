@@ -86,7 +86,8 @@ function InventoryPageContent() {
         console.log(`${timestamp} - API response received:`, { 
           type: typeof data, 
           isArray: Array.isArray(data), 
-          length: Array.isArray(data) ? data.length : 'N/A'
+          length: Array.isArray(data) ? data.length : 'N/A',
+          fullResponse: data
         })
         
         // The API returns a direct array of inventory items
@@ -95,6 +96,7 @@ function InventoryPageContent() {
         if (Array.isArray(data)) {
           inventoryArray = data
           console.log('✅ Successfully received inventory array:', inventoryArray.length, 'items')
+          console.log('📋 First inventory item sample:', inventoryArray[0])
         } else {
           console.error('❌ Invalid API response format:', data)
           throw new Error('API returned invalid data format')
@@ -106,6 +108,7 @@ function InventoryPageContent() {
           setError(null)
         } else {
           console.log('✅ Successfully loaded', inventoryArray.length, 'inventory items from API')
+          console.log('📋 Setting inventory state with:', inventoryArray)
           setInventory(inventoryArray)
           setError(null)
         }
@@ -127,6 +130,13 @@ function InventoryPageContent() {
   // Filter inventory based on search query and filters
   const filteredInventory = (() => {
     try {
+      console.log('🔍 Filter function called with inventory:', {
+        isArray: Array.isArray(inventory),
+        length: inventory?.length,
+        firstItem: inventory?.[0],
+        inventoryState: inventory
+      })
+      
       if (!Array.isArray(inventory)) {
         console.warn('Inventory is not an array:', inventory)
         return []
@@ -184,38 +194,57 @@ function InventoryPageContent() {
         })
       }
       
-      return filtered
+      // Remove duplicates based on serialNumber
+      const uniqueFiltered = filtered.reduce((unique: InventoryItem[], item: InventoryItem) => {
+        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      
+      console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items`)
+      console.log('🔍 Sample filtered item:', uniqueFiltered[0])
+      
+      return uniqueFiltered
     } catch (e) {
       console.error('Error in filteredInventory:', e)
       return []
     }
   })()
 
-  // Get filter counts
+  // Get filter counts from unique inventory (remove duplicates first)
   const getFilterCounts = () => {
     try {
       if (!Array.isArray(inventory)) return { 
         all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 
       }
       
+      // Remove duplicates first based on serialNumber
+      const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
+        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      
       return {
-        all: inventory.length,
-        assigned: inventory.filter(item => 
+        all: uniqueInventory.length,
+        assigned: uniqueInventory.filter(item => 
           item.usage?.toLowerCase() === 'assigned'
         ).length,
-        shared: inventory.filter(item => 
+        shared: uniqueInventory.filter(item => 
           item.usage?.toLowerCase() === 'shared'
         ).length,
-        curriculum: inventory.filter(item => 
+        curriculum: uniqueInventory.filter(item => 
           item.catalog?.toLowerCase() === 'curriculum'
         ).length,
-        staff: inventory.filter(item => 
+        staff: uniqueInventory.filter(item => 
           item.catalog?.toLowerCase() === 'staff'
         ).length,
-        faculty: inventory.filter(item => 
+        faculty: uniqueInventory.filter(item => 
           item.catalog?.toLowerCase() === 'faculty'
         ).length,
-        kiosk: inventory.filter(item => 
+        kiosk: uniqueInventory.filter(item => 
           item.catalog?.toLowerCase() === 'kiosk'
         ).length,
       }
@@ -520,7 +549,7 @@ function InventoryPageContent() {
                     </tr>
                   ) : (
                     filteredInventory.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    <tr key={`${item.serialNumber}-${item.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <td className="px-4 lg:px-6 py-4">
                         <Link
                           href={`/device/${encodeURIComponent(item.serialNumber)}`}
@@ -528,7 +557,7 @@ function InventoryPageContent() {
                         >
                           <div className="min-w-0">
                             <div className="font-medium text-gray-900 dark:text-white truncate">
-                              {item.deviceName || item.computerName || 'Unknown Device'}
+                              {item.deviceName || item.computerName || item.serialNumber || 'Unknown Device'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
                               {item.manufacturer && item.model ? `${item.manufacturer} ${item.model}` : (item.manufacturer || item.model || '')}
@@ -570,6 +599,9 @@ function InventoryPageContent() {
                               {item.catalog}
                             </span>
                           )}
+                          {!item.usage && !item.catalog && (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
@@ -579,7 +611,9 @@ function InventoryPageContent() {
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {item.collectedAt ? formatRelativeTime(item.collectedAt) : '-'}
+                          {item.collectedAt ? formatRelativeTime(item.collectedAt) : (
+                            item.lastSeen ? formatRelativeTime(item.lastSeen) : '-'
+                          )}
                         </div>
                       </td>
                     </tr>
