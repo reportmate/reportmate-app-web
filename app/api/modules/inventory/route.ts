@@ -1,8 +1,18 @@
 import { NextResponse } from 'next/server'
+import { Pool } from 'pg'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+// Create database connection directly in this file to avoid import issues
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : { rejectUnauthorized: false },
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 2000
+})
 
 export async function GET() {
   try {
@@ -42,69 +52,86 @@ export async function GET() {
     }
     
     if (useLocalFallback) {
-      console.log(`[INVENTORY API] ${timestamp} - Azure Functions /api/inventory not found - extracting from events`)
+      console.log(`[INVENTORY API] ${timestamp} - Azure Functions API unavailable - querying database directly`)
       
       try {
-        // Try to get inventory data from events
-        const eventsResponse = await fetch(`${apiBaseUrl}/api/events`, {
-          cache: 'no-store',
+        // Query the database directly for inventory data        
+        const inventoryQuery = `
+          SELECT 
+            d.id as deviceId,
+            d.serial_number as serialNumber,
+            d.name as deviceName,
+            d.last_seen as lastSeen,
+            i.data,
+            i.collected_at as collectedAt,
+            d.manufacturer,
+            d.model
+          FROM devices d
+          LEFT JOIN inventory i ON d.id = i.device_id
+          WHERE d.serial_number IS NOT NULL 
+            AND d.serial_number != ''
+            AND d.serial_number NOT LIKE 'TEST-%'
+            AND d.serial_number != 'localhost'
+          ORDER BY d.last_seen DESC
+        `
+        
+        const result = await pool.query(inventoryQuery)
+        console.log(`[INVENTORY API] ${timestamp} - Found ${result.rows.length} devices in database`)
+        
+        const inventoryData = result.rows.map((row: any) => {
+          const inventoryJsonData = row.data || {}
+          
+          const processedItem = {
+            id: row.deviceid,
+            deviceId: row.deviceid,
+            deviceName: inventoryJsonData.deviceName || row.devicename || row.serialnumber || row.deviceid,
+            serialNumber: row.serialnumber,
+            lastSeen: row.lastseen,
+            collectedAt: row.collectedat,
+            // Extract inventory fields from the JSON data
+            assetTag: inventoryJsonData.assetTag || inventoryJsonData.asset_tag || null,
+            location: inventoryJsonData.location || null,
+            usage: inventoryJsonData.usage || null,
+            catalog: inventoryJsonData.catalog || null,
+            computerName: inventoryJsonData.computerName || inventoryJsonData.computer_name || row.devicename,
+            domain: inventoryJsonData.domain || null,
+            organizationalUnit: inventoryJsonData.organizationalUnit || inventoryJsonData.organizational_unit || null,
+            manufacturer: row.manufacturer || inventoryJsonData.manufacturer || null,
+            model: row.model || inventoryJsonData.model || null,
+            uuid: inventoryJsonData.uuid || inventoryJsonData.device_id || null,
+            raw: inventoryJsonData
+          }
+          
+          return processedItem
+        })
+        
+        console.log(`[INVENTORY API] ${timestamp} - Processed ${inventoryData.length} inventory items from database`)
+        
+        return NextResponse.json(inventoryData, {
           headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache', 
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'direct-database'
           }
         })
         
-        if (eventsResponse.ok) {
-          const eventsData = await eventsResponse.json()
-          
-          if (eventsData.success && Array.isArray(eventsData.events)) {
-            console.log(`[INVENTORY API] ${timestamp} - Extracting inventory data from ${eventsData.events.length} events`)
-            
-            // Find inventory module events
-            const inventoryEvents = eventsData.events.filter((event: any) => 
-              event.payload && 
-              typeof event.payload === 'object' && 
-              event.payload.module_id === 'inventory'
-            )
-            
-            const inventoryData = inventoryEvents.map((event: any) => ({
-              id: event.device,
-              deviceId: event.device,
-              deviceName: event.device,
-              serialNumber: event.device,
-              lastSeen: event.ts,
-              collectedAt: event.payload.timestamp,
-              dataSize: event.payload.data_size_kb,
-              collectionType: event.payload.collection_type,
-              eventId: event.id,
-              message: event.message
-            }))
-            
-            console.log(`[INVENTORY API] ${timestamp} - Found ${inventoryData.length} inventory events`)
-            
-            return NextResponse.json(inventoryData, {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache', 
-                'Expires': '0',
-                'X-Fetched-At': timestamp,
-                'X-Data-Source': 'azure-functions-events'
-              }
-            })
-          }
-        }
+      } catch (dbError) {
+        console.error(`[INVENTORY API] ${timestamp} - Database fallback error:`, dbError)
         
-        console.error(`[INVENTORY API] ${timestamp} - Events fallback also failed`)
-      } catch (eventsError) {
-        console.error(`[INVENTORY API] ${timestamp} - Events fallback error:`, eventsError)
+        // Return empty array instead of error to prevent UI issues
+        return NextResponse.json([], {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache', 
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'empty-fallback',
+            'X-Error': 'Database query failed'
+          }
+        })
       }
-      
-      // If events fallback also fails, return 503
-      return NextResponse.json(
-        { error: 'Service temporarily unavailable - cloud infrastructure error' },
-        { status: 503 }
-      )
     }
     
     // Continue with Azure Functions API response processing if we have a valid response
