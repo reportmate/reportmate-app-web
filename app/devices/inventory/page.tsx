@@ -519,7 +519,10 @@ function InventoryPageContent() {
                       Serial Number
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Usage / Catalog
+                      Usage
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Catalog
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Location
@@ -532,7 +535,7 @@ function InventoryPageContent() {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                         <div className="flex flex-col items-center justify-center">
                           <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -576,33 +579,34 @@ function InventoryPageContent() {
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {item.usage && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              item.usage.toLowerCase() === 'assigned' 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            }`}>
-                              {item.usage}
-                            </span>
-                          )}
-                          {item.catalog && (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              item.catalog.toLowerCase() === 'curriculum' 
-                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                                : item.catalog.toLowerCase() === 'staff'
-                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                                : item.catalog.toLowerCase() === 'faculty'
-                                ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                            }`}>
-                              {item.catalog}
-                            </span>
-                          )}
-                          {!item.usage && !item.catalog && (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
-                          )}
-                        </div>
+                        {item.usage ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.usage.toLowerCase() === 'assigned' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          }`}>
+                            {item.usage}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        {item.catalog ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.catalog.toLowerCase() === 'curriculum' 
+                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                              : item.catalog.toLowerCase() === 'staff'
+                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                              : item.catalog.toLowerCase() === 'faculty'
+                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                          }`}>
+                            {item.catalog}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                        )}
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         <div className="text-sm text-gray-900 dark:text-white">
