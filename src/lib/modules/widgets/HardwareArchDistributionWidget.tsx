@@ -1,5 +1,5 @@
 
-ls/**
+/**
  * Hardware Architecture Distribution Widget
  * Dashboard widget for displaying hardware architecture distribution charts
  */
