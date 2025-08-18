@@ -52,12 +52,8 @@ const formatCompactRelativeTime = (timestamp: string): string => {
 }
 
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
-  // DISABLED: Hard-code test data to verify component rendering works
-  // Now using real processInstallsData function to get actual package data
-  const testData = null
-  
+  // Process real installs data - no more test data
   console.log('🚨🚨🚨 INSTALLS TAB RENDERED! 🚨🚨🚨 - UPDATED VERSION')
-  console.log('💡 testData is now null, should call processInstallsData')
   console.log('[INSTALLS TAB] === DEBUGGING START ===')
   console.log('[INSTALLS TAB] Raw props:', {
     hasDevice: !!device,
@@ -65,7 +61,6 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
     deviceKeys: device ? Object.keys(device) : [],
     dataKeys: data ? Object.keys(data) : [],
   })
-  console.log('[INSTALLS TAB] Using test data:', testData)
   
   // Debug the exact data paths we're looking for
   console.log('[INSTALLS TAB] Device installs structure:', {
@@ -112,15 +107,17 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   
   console.log('[INSTALLS TAB] === DEBUGGING END ===')
   
-  // Use the test data instead of processed data for debugging
-  const installsData = testData || data || processInstallsData(device)
+  // Process real data using the updated processInstallsData function
+  const installsData = data || processInstallsData(device)
   
   console.log('[INSTALLS TAB] Processed data:', {
     totalPackages: installsData?.totalPackages,
     hasConfig: !!installsData?.config,
     hasMessages: !!installsData?.messages,
     errorCount: installsData?.messages?.errors?.length || 0,
-    warningCount: installsData?.messages?.warnings?.length || 0
+    warningCount: installsData?.messages?.warnings?.length || 0,
+    packagesLength: installsData?.packages?.length || 0,
+    samplePackage: installsData?.packages?.[0]
   })
 
   return (

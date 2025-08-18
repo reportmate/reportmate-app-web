@@ -903,10 +903,10 @@ export default function DeviceDetailPage() {
               installsData: deviceData.device?.installs
             })
             
-            console.log('🚨🚨🚨 CALLING PROCESS INSTALLS DATA 🚨🚨🚨')
+            console.log('🚨🚨🚨 CALLING PROCESS INSTALLS DATA v2 🚨🚨🚨')
             console.log('[COMPONENT DATA] Processing installs data...')
             const installsData = processInstallsData(deviceData.device)
-            console.log('🚨🚨🚨 PROCESS INSTALLS DATA RESULT 🚨🚨🚨')
+            console.log('🚨🚨🚨 PROCESS INSTALLS DATA RESULT v2 🚨🚨🚨')
             console.log('[COMPONENT DATA] Processed installs result:', installsData)
             
             const componentData = {

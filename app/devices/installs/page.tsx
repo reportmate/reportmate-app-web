@@ -8,6 +8,82 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 
+function LoadingSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Dashboard Style Widgets Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Errors/Warnings Stack */}
+        <div className="space-y-4">
+          {[...Array(2)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                <div className="space-y-2">
+                  <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-8"></div>
+                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Version Distribution Skeletons */}
+        {[...Array(2)].map((_, i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+            </div>
+            <div className="space-y-3">
+              {[...Array(3)].map((_, j) => (
+                <div key={j} className="space-y-2">
+                  <div className="flex justify-between">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-12"></div>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Table Skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex justify-between items-center">
+            <div className="space-y-2">
+              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+            </div>
+            <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
+          </div>
+        </div>
+        <div className="border-b border-gray-200 dark:border-gray-600 px-6 py-3 bg-gray-50 dark:bg-gray-700">
+          <div className="flex gap-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-8 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+            ))}
+          </div>
+        </div>
+        <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="px-6 py-4 flex space-x-6">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-40"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 interface InstallRecord {
   id: string
   deviceId: string
@@ -85,9 +161,13 @@ function InstallsPageContent() {
             const { processInstallsData } = await import('../../../src/lib/data-processing/component-data')
             const installsData = processInstallsData(deviceData.device)
             
-            // Only include devices that actually have packages
-            if (!installsData.packages || installsData.packages.length === 0) {
-              return null
+            // Include devices that have a managed installs system (config) OR packages
+            // This shows devices with Cimian/Munki configured even if no packages currently assigned
+            const hasManagementSystem = installsData.config || installsData.systemName
+            const hasPackages = installsData.packages && installsData.packages.length > 0
+            
+            if (!hasManagementSystem && !hasPackages) {
+              return null // Only exclude if neither management system nor packages exist
             }
             
             // Get device name from inventory module (prioritized) or fallback
@@ -192,6 +272,50 @@ function InstallsPageContent() {
     return true
   })
 
+  // Create a function to filter packages within each device based on search and status
+  const getFilteredPackagesForDevice = (install: InstallRecord) => {
+    if (!install.packages || install.packages.length === 0) {
+      return []
+    }
+
+    return install.packages.filter((pkg: any) => {
+      // Apply search filter to individual packages
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        const deviceMatches = install.deviceName?.toLowerCase().includes(query) ||
+                             install.serialNumber?.toLowerCase().includes(query)
+        const packageMatches = pkg.name?.toLowerCase().includes(query) ||
+                              pkg.displayName?.toLowerCase().includes(query)
+        
+        // If device matches, show all packages; if only package matches, show only matching packages
+        if (!deviceMatches && !packageMatches) {
+          return false
+        }
+      }
+
+      // Apply status filter to individual packages
+      if (statusFilter !== 'all') {
+        const status = pkg.status?.toLowerCase() || '';
+        switch (statusFilter) {
+          case 'installed':
+            return status === 'installed';
+          case 'pending':
+            return status === 'pending';
+          case 'warning':
+            return status === 'warning';
+          case 'error':
+            return status === 'error';
+          case 'removed':
+            return status === 'removed';
+          default:
+            return false;
+        }
+      }
+
+      return true
+    })
+  }
+
   // Calculate totals
   const totals = {
     devices: installs.length,
@@ -204,20 +328,38 @@ function InstallsPageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <div className="animate-pulse">
-          <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-          <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
-              <div className="space-y-4">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="flex space-x-4">
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/3"></div>
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-                  </div>
-                ))}
+        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <div className="flex items-center gap-4 min-w-0 flex-1">
+                <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span className="text-sm font-medium hidden sm:inline">Dashboard</span>
+                </Link>
+                <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                <div className="flex items-center gap-3 min-w-0">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Installs</h1>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="hidden lg:flex">
+                  <DevicePageNavigation className="flex items-center gap-2" />
+                </div>
+                <div className="lg:hidden">
+                  <DevicePageNavigation className="flex items-center gap-2" />
+                </div>
               </div>
             </div>
           </div>
+        </header>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-8">
+          <LoadingSkeleton />
         </div>
       </div>
     )
@@ -381,11 +523,6 @@ function InstallsPageContent() {
               if (sortedCimianVersions.length === 0) {
                 return (
                   <div className="text-center py-8">
-                    <div className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600">
-                      <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" clipRule="evenodd" />
-                      </svg>
-                    </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">No Windows devices</p>
                   </div>
                 );
@@ -461,11 +598,6 @@ function InstallsPageContent() {
               if (sortedMunkiVersions.length === 0) {
                 return (
                   <div className="text-center py-8">
-                    <div className="w-10 h-10 mx-auto mb-3 text-gray-300 dark:text-gray-600">
-                      <svg fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" clipRule="evenodd" />
-                      </svg>
-                    </div>
                     <p className="text-sm text-gray-500 dark:text-gray-400">No macOS devices</p>
                   </div>
                 );
@@ -550,38 +682,50 @@ function InstallsPageContent() {
           {/* Filter Row */}
           <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
             <nav className="flex flex-wrap gap-2">
-              {[
-                { key: 'all', label: 'All', count: installs.reduce((sum, install) => sum + (install.packages?.length || 0), 0) },
-                { key: 'installed', label: 'Installed', count: installs.reduce((sum, install) => sum + (install.packages?.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length || 0), 0) },
-                { key: 'pending', label: 'Pending', count: installs.reduce((sum, install) => sum + (install.packages?.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length || 0), 0) },
-                { key: 'warning', label: 'Warning', count: installs.reduce((sum, install) => sum + (install.packages?.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length || 0), 0) },
-                { key: 'error', label: 'Error', count: installs.reduce((sum, install) => sum + (install.packages?.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length || 0), 0) },
-                { key: 'removed', label: 'Removed', count: installs.reduce((sum, install) => sum + (install.packages?.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length || 0), 0) },
-              ].map((filter) => {
-                const isActive = statusFilter === filter.key
+              {(() => {
+                // Calculate counts based on currently visible/filtered data
+                const allPackages = filteredInstalls.flatMap(install => getFilteredPackagesForDevice(install))
+                const installedCount = allPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length
+                const pendingCount = allPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length
+                const warningCount = allPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length
+                const errorCount = allPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length
+                const removedCount = allPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length
                 
-                return (
-                  <button
-                    key={filter.key}
-                    onClick={() => setStatusFilter(filter.key)}
-                    className={`${
-                      isActive
-                        ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                    } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                  >
-                    <span className="hidden lg:inline">{filter.label}</span>
-                    <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label}</span>
-                    <span className={`${
-                      isActive 
-                        ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                        : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                    } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                      {filter.count}
-                    </span>
-                  </button>
-                )
-              })}
+                const filters = [
+                  { key: 'all', label: 'All', count: allPackages.length },
+                  { key: 'installed', label: 'Installed', count: installedCount },
+                  { key: 'pending', label: 'Pending', count: pendingCount },
+                  { key: 'warning', label: 'Warning', count: warningCount },
+                  { key: 'error', label: 'Error', count: errorCount },
+                  { key: 'removed', label: 'Removed', count: removedCount },
+                ]
+
+                return filters.map((filter) => {
+                  const isActive = statusFilter === filter.key
+                  
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => setStatusFilter(filter.key)}
+                      className={`${
+                        isActive
+                          ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                    >
+                      <span className="hidden lg:inline">{filter.label}</span>
+                      <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label}</span>
+                      <span className={`${
+                        isActive 
+                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                        {filter.count}
+                      </span>
+                    </button>
+                  )
+                })
+              })()}
             </nav>
           </div>
 
@@ -625,9 +769,11 @@ function InstallsPageContent() {
                     </td>
                   </tr>
                 ) : (
-                  filteredInstalls.flatMap((install) => 
-                    install.packages && install.packages.length > 0 ? 
-                      install.packages.map((pkg: any, index: number) => (
+                  filteredInstalls.flatMap((install) => {
+                    const filteredPackages = getFilteredPackagesForDevice(install)
+                    
+                    if (filteredPackages.length > 0) {
+                      return filteredPackages.map((pkg: any, index: number) => (
                         <tr key={`${install.id}-pkg-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                           <td className="px-4 lg:px-6 py-4">
                             <div className="min-w-0">
@@ -676,9 +822,13 @@ function InstallsPageContent() {
                             </div>
                           </td>
                         </tr>
-                      )) :
-                      // Show a row for devices with no packages
-                      [(
+                      ))
+                    } else if ((!searchQuery.trim() || 
+                               install.deviceName?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                               install.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase())) && 
+                               statusFilter === 'all') {
+                      // Show devices with no packages only if no search query or device matches search
+                      return [(
                         <tr key={install.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                           <td className="px-4 lg:px-6 py-4">
                             <div className="min-w-0">
@@ -717,7 +867,10 @@ function InstallsPageContent() {
                           </td>
                         </tr>
                       )]
-                  )
+                    } else {
+                      return []
+                    }
+                  })
                 )}
               </tbody>
             </table>
