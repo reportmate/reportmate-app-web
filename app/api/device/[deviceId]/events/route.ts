@@ -41,7 +41,7 @@ export async function GET(
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
+          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
         },
         signal: AbortSignal.timeout(10000)
       })
