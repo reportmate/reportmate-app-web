@@ -20,7 +20,7 @@ export async function GET(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
         },
         cache: 'no-store',
         signal: AbortSignal.timeout(10000)
