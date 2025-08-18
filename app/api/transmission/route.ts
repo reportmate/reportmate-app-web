@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE,
+                'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!,
                 'User-Agent': 'ReportMate-Frontend-Dev/1.0'
             },
             body: JSON.stringify(body)
