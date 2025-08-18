@@ -780,8 +780,8 @@ export interface InstallPackage {
 
 export function processInstallsData(rawDevice: any): InstallsData {
   console.log('⚡⚡⚡ PROCESS INSTALLS DATA FUNCTION CALLED ⚡⚡⚡')
-  console.log('� DEBUGGING - Raw device keys:', Object.keys(rawDevice || {}))
-  console.log('�🔍 Processing installs data for device:', rawDevice.id || rawDevice.deviceId)
+  console.log('📱 DEBUGGING - Raw device keys:', Object.keys(rawDevice || {}))
+  console.log('🔍 Processing installs data for device:', rawDevice.id || rawDevice.deviceId)
   console.log('🔍 Raw device structure:', {
     hasInstalls: !!rawDevice.installs,
     hasManagedInstalls: !!rawDevice.managedInstalls,
@@ -795,8 +795,17 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   // Extract managed installs data from API response - enhanced for Cimian support
   // Check multiple possible locations for installs data
-  // PRIORITY: Check modules.installs FIRST since that's where API puts data
-  const installs = rawDevice.modules?.installs || rawDevice.installs || rawDevice.managedInstalls || rawDevice.modules?.managedInstalls || {}
+  // PRIORITY: Check installs FIRST since API structure changed from modules.installs to device.installs
+  const installs = rawDevice.installs || rawDevice.modules?.installs || rawDevice.managedInstalls || rawDevice.modules?.managedInstalls || {}
+  
+  console.log('🔧 FOUND INSTALLS DATA:', {
+    sourceLocation: rawDevice.installs ? 'rawDevice.installs' : 
+                   rawDevice.modules?.installs ? 'rawDevice.modules.installs' : 
+                   rawDevice.managedInstalls ? 'rawDevice.managedInstalls' : 
+                   rawDevice.modules?.managedInstalls ? 'rawDevice.modules.managedInstalls' : 'none',
+    installsData: installs,
+    installsKeys: Object.keys(installs)
+  })
   
   // Extract the system name from the top-level key (e.g., "cimian", "munki")
   const installsKeys = Object.keys(installs)
@@ -804,8 +813,8 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   console.log('🔍 Found installs data at location:', {
     foundAt: rawDevice.installs ? 'rawDevice.installs' : 
-             rawDevice.managedInstalls ? 'rawDevice.managedInstalls' :
              rawDevice.modules?.installs ? 'rawDevice.modules.installs' :
+             rawDevice.managedInstalls ? 'rawDevice.managedInstalls' :
              rawDevice.modules?.managedInstalls ? 'rawDevice.modules.managedInstalls' : 'none',
     installsDataKeys: installsKeys,
     extractedSystemName: systemName,
@@ -817,11 +826,42 @@ export function processInstallsData(rawDevice: any): InstallsData {
   
   // Handle NEW Cimian API structure (current) - using correct field names from API
   const cimianData = installs.cimian || {}
+  
+  // CRITICAL FIX: The real data is in different locations! 
+  // Recent installs should come from sessions that show packagesInstalled > 0
+  // Pending packages should be inferred from sessions, events, or config
+  
   // Check both old and new API structures for recent installs
-  const recentInstalls = installs.recentInstalls || cimianData.items || []
-  // FIXED: Use pendingInstalls instead of pendingPackages based on API logs
-  const pendingInstalls = installs.pendingInstalls || cimianData.pendingInstalls || cimianData.pendingPackages || []
-  const installsRecentEvents = installs.recentEvents || []
+  let recentInstalls = installs.recentInstalls || cimianData.items || []
+  
+  // Use ONLY real data - NO mock/fake data generation
+  
+  // FIXED: Use the correct API structure - pendingPackages is in cimian!
+  // Convert string array to proper package objects
+  let pendingInstalls = (cimianData.pendingPackages || []).map((packageName: string) => ({
+    id: `pending-${packageName}`,
+    name: packageName,
+    displayName: packageName,
+    status: 'pending',
+    version: 'Unknown',
+    timestamp: new Date().toISOString(),
+    lastUpdate: new Date().toISOString(),
+    type: 'cimian',
+    publisher: 'Unknown'
+  }))
+  
+  console.log('🔧 PENDING PACKAGES CHECK:', {
+    pendingInstallsLength: pendingInstalls.length,
+    pendingInstallsSource: installs.pendingInstalls ? 'installs.pendingInstalls' : 
+                           cimianData.pendingInstalls ? 'cimianData.pendingInstalls' : 
+                           cimianData.pendingPackages ? 'cimianData.pendingPackages' : 'none',
+    actualPendingPackages: cimianData.pendingPackages,
+    pendingPackagesLength: cimianData.pendingPackages?.length || 0
+  })
+  
+  // Use ONLY real pending packages data - NO mock data generation
+  
+  const installsRecentEvents = installs.recentEvents || cimianData.events || []
   
   console.log('📋 EVENTS DEBUG:', {
     hasRecentEvents: !!installs.recentEvents,
@@ -929,128 +969,59 @@ export function processInstallsData(rawDevice: any): InstallsData {
     }
   }
   
-  // Process packages from NEW API structure - both recentInstalls and pendingPackages
+  // Process packages from REAL API data ONLY - NO fake data
   const processedPackages: InstallPackage[] = []
   
-  // Process recentInstalls - these are completed/attempted installs
-  recentInstalls.forEach((pkg: any, index: number) => {
-    // Extract data from most recent attempt if top-level fields are empty
-    const mostRecentAttempt = pkg.recentAttempts?.[0] || {}
-    
-    console.log('🔍 Processing package:', { 
-      name: pkg.name, 
-      displayName: pkg.displayName, 
-      version: pkg.version, 
-      latestVersion: pkg.latestVersion,
-      installedVersion: pkg.installedVersion,
-      status: pkg.status,
-      lastAttemptStatus: pkg.lastAttemptStatus,
-      recentAttemptsLength: pkg.recentAttempts?.length || 0,
-      firstAttempt: pkg.recentAttempts?.[0],
-      allKeys: Object.keys(pkg),
-      versionDebug: {
-        pkgVersion: JSON.stringify(pkg.version),
-        pkgLatestVersion: JSON.stringify(pkg.latestVersion),
-        pkgInstalledVersion: JSON.stringify(pkg.installedVersion),
-        attemptVersion: JSON.stringify(mostRecentAttempt.version),
-        attemptInstalledVersion: JSON.stringify(mostRecentAttempt.installedVersion)
-      }
-    })
-    
-    // Since most fields are empty, use available data with reasonable fallbacks
-    const displayName = pkg.displayName || pkg.name || mostRecentAttempt.displayName || mostRecentAttempt.name || 'Unknown Package'
-    
-    // Enhanced version extraction with proper empty string handling
-    let version = 'Unknown'
-    
-    // Check all possible version sources, treating empty strings as falsy
-    if (pkg.version && pkg.version.trim() !== '') {
-      version = pkg.version.trim()
-    } else if (pkg.latestVersion && pkg.latestVersion.trim() !== '') {
-      version = pkg.latestVersion.trim()
-    } else if (pkg.installedVersion && pkg.installedVersion.trim() !== '') {
-      version = pkg.installedVersion.trim()
-    } else if (mostRecentAttempt.version && mostRecentAttempt.version.trim() !== '') {
-      version = mostRecentAttempt.version.trim()
-    } else if (mostRecentAttempt.installedVersion && mostRecentAttempt.installedVersion.trim() !== '') {
-      version = mostRecentAttempt.installedVersion.trim()
-    }
-    
-    // For status, check multiple sources and provide reasonable defaults based on package presence
-    let status = pkg.status || pkg.lastAttemptStatus || mostRecentAttempt.status || mostRecentAttempt.result
-    if (!status || status === '') {
-      // If no status available, assume installed since it's in recentInstalls
-      status = pkg.installCount > 0 ? 'Installed' : 'Unknown'
-    }
-    
-    // Map Cimian status to ReportMate status with Unknown version override for consistent dashboard display
-    const mappedStatus = mapCimianStatusToReportMate(status, version);
-    
-    console.log('🔍 Final package data:', {
-      name: pkg.name,
-      displayName,
-      version,
-      originalStatus: status,
-      mappedStatus,
-      fallbackUsed: {
-        displayName: !pkg.displayName,
-        version: !pkg.version,
-        status: !pkg.status && !pkg.lastAttemptStatus
-      }
-    })
-    
+  // ONLY process real pending packages from Cimian API
+  pendingInstalls.forEach((pkg: any) => {
     processedPackages.push({
-      id: pkg.id || pkg.name || `pkg-${index}`,
-      name: pkg.name || displayName,
-      displayName,
-      version,
-      status: mappedStatus, // Use mapped ReportMate status instead of raw Cimian status
+      id: pkg.id || `pending-${pkg.name}`,
+      name: pkg.name,
+      displayName: pkg.displayName || pkg.name,
+      version: pkg.version || 'Unknown',
+      status: pkg.status || 'pending',
       type: 'cimian',
-      lastUpdate: pkg.lastUpdate || pkg.lastAttemptTime || mostRecentAttempt.timestamp || pkg.installDate || installs.lastCheckIn || '',
-      // Additional fields for table compatibility
-      installedVersion: pkg.installedVersion || mostRecentAttempt.installedVersion || version,
-      size: undefined,
-      description: undefined,
-      publisher: pkg.publisher || pkg.source || mostRecentAttempt.publisher || 'Cimian',
-      category: undefined,
-      // Enhanced fields from new API
+      lastUpdate: pkg.lastUpdate || installs.lastCheckIn || rawDevice.lastSeen || '',
+      installedVersion: pkg.installedVersion,
+      size: pkg.size,
+      description: pkg.description,
+      publisher: pkg.publisher || 'Cimian',
+      category: pkg.category,
       source: pkg.source || 'Cimian',
       installCount: pkg.installCount || 0,
       failureCount: pkg.failureCount || 0,
       hasInstallLoop: pkg.hasInstallLoop || false,
-      installLocation: pkg.installLocation || mostRecentAttempt.installLocation || undefined,
-      installDate: pkg.installDate || mostRecentAttempt.installDate || undefined,
-      // Store original Cimian status for reference
-      originalStatus: status
+      installLocation: pkg.installLocation,
+      installDate: pkg.installDate,
+      originalStatus: pkg.status || 'pending'
     })
   })
   
-  // Process pendingPackages - these are packages waiting to be installed
-  pendingInstalls.forEach((packageName: string, index: number) => {
-    processedPackages.push({
-      id: `pending-${packageName}`,
-      name: packageName,
-      displayName: packageName,
-      version: 'Unknown', // Pending packages don't have version info yet
-      status: 'pending' as const,
-      type: 'cimian',
-      lastUpdate: installs.lastCheckIn || rawDevice.lastSeen || '',
-      // Additional fields for table compatibility
-      installedVersion: undefined,
-      size: undefined,
-      description: undefined,
-      publisher: 'Cimian',
-      category: undefined,
-      // Enhanced fields from new API
-      source: 'Cimian',
-      installCount: 0,
-      failureCount: 0,
-      hasInstallLoop: false,
-      installLocation: undefined,
-      installDate: undefined,
-      // Store original status for reference
-      originalStatus: 'pending'
-    })
+  // ONLY process real installed packages if they exist
+  recentInstalls.forEach((pkg: any) => {
+    if (pkg && pkg.name) { // Only process packages with actual names
+      processedPackages.push({
+        id: pkg.id || `installed-${pkg.name}`,
+        name: pkg.name,
+        displayName: pkg.displayName || pkg.name,
+        version: pkg.version || pkg.installedVersion || 'Unknown',
+        status: pkg.status || 'Installed',
+        type: 'cimian',
+        lastUpdate: pkg.lastUpdate || pkg.installDate || installs.lastCheckIn || rawDevice.lastSeen || '',
+        installedVersion: pkg.installedVersion,
+        size: pkg.size,
+        description: pkg.description,
+        publisher: pkg.publisher || 'Cimian',
+        category: pkg.category,
+        source: pkg.source || 'Cimian',
+        installCount: pkg.installCount || 1,
+        failureCount: pkg.failureCount || 0,
+        hasInstallLoop: pkg.hasInstallLoop || false,
+        installLocation: pkg.installLocation,
+        installDate: pkg.installDate,
+        originalStatus: pkg.status || 'Installed'
+      })
+    }
   })
   
   const installed = processedPackages.filter(p => {
@@ -1788,3 +1759,5 @@ export const dataProcessors = {
   profiles: processProfilesData,
   peripherals: processPeripheralsData
 }
+
+
