@@ -26,20 +26,31 @@ export async function GET() {
       }, { status: 500 })
     }
     
-    console.log(`[DEVICES API] ${timestamp} - Using API base URL:`, apiBaseUrl)
+  console.log(`[DEVICES API] ${timestamp} - Using API base URL:`, apiBaseUrl)
+  
+  // Check if REPORTMATE_PASSPHRASE is configured
+  if (!process.env.REPORTMATE_PASSPHRASE) {
+    console.error(`[DEVICES API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
+    return NextResponse.json({
+      success: false,
+      error: 'Configuration error',
+      details: 'REPORTMATE_PASSPHRASE environment variable not configured',
+      timestamp
+    }, { status: 500 })
+  }
+  
+  // 🚨 CLOUD-FIRST: No fallbacks, fail immediately on API errors
+  try {
+    const response = await fetch(`${apiBaseUrl}/api/devices`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
+      }
+    })
     
-    // 🚨 CLOUD-FIRST: No fallbacks, fail immediately on API errors
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/devices`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
-        }
-      })
-      
-      if (!response.ok) {
+    if (!response.ok) {
         console.error(`[DEVICES API] ${timestamp} - 🚨 CRITICAL: Azure Functions API failed with ${response.status} ${response.statusText}`)
         console.error(`[DEVICES API] ${timestamp} - 🔄 ENTERING DEGRADED MODE: Building device list from individual device calls`)
         
@@ -52,7 +63,7 @@ export async function GET() {
             headers: {
               'Cache-Control': 'no-cache',
               'Pragma': 'no-cache',
-              'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+              'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
             }
           })
           
@@ -87,7 +98,7 @@ export async function GET() {
                   headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache',
-                    'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+                    'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
                   }
                 })
                 
@@ -226,7 +237,7 @@ export async function GET() {
                 headers: {
                   'Cache-Control': 'no-cache',
                   'Pragma': 'no-cache',
-                  'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+                  'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
                 }
               })
               
