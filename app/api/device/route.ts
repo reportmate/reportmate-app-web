@@ -49,7 +49,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
+          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
         },
         body: JSON.stringify(requestData)
       })
