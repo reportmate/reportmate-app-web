@@ -30,6 +30,17 @@ export async function POST(request: NextRequest) {
             }
         }
         
+        // Check if REPORTMATE_PASSPHRASE is configured
+        if (!process.env.REPORTMATE_PASSPHRASE) {
+            console.error(`[TRANSMISSION] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`);
+            return NextResponse.json({
+                success: false,
+                error: 'Configuration error',
+                details: 'REPORTMATE_PASSPHRASE environment variable not configured',
+                timestamp
+            }, { status: 500 });
+        }
+        
         // Forward the request to production Azure Functions API
         const productionUrl = `${PRODUCTION_API_BASE}/api/transmission`;
         console.log(`[TRANSMISSION] ${timestamp} - Forwarding to production API: ${productionUrl}`);
@@ -38,7 +49,7 @@ export async function POST(request: NextRequest) {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE || 's3cur3-p@ssphras3!',
+                'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE,
                 'User-Agent': 'ReportMate-Frontend-Dev/1.0'
             },
             body: JSON.stringify(body)

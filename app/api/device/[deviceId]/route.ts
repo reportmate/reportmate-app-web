@@ -128,7 +128,7 @@ export async function GET(
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
-        'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+        'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
       }
     })
     

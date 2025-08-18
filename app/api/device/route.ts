@@ -28,6 +28,17 @@ export async function POST(request: Request) {
     
     // Try Azure Functions first, fall back to local processing if it fails
     let response: Response | null = null
+    // Check if REPORTMATE_PASSPHRASE is configured
+    if (!process.env.REPORTMATE_PASSPHRASE) {
+      console.error(`[DEVICE API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
+      return NextResponse.json({
+        success: false,
+        error: 'Configuration error',
+        details: 'REPORTMATE_PASSPHRASE environment variable not configured',
+        timestamp
+      }, { status: 500 })
+    }
+
     let useLocalFallback = false
     
     try {
@@ -38,7 +49,7 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
         },
         body: JSON.stringify(requestData)
       })

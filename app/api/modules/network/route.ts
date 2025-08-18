@@ -22,13 +22,22 @@ export async function GET() {
     let response
     let useLocalFallback = false
     
+    // Check if REPORTMATE_PASSPHRASE is configured
+    if (!process.env.REPORTMATE_PASSPHRASE) {
+      console.error(`[NETWORK API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
+      return NextResponse.json({
+        error: 'Configuration error',
+        details: 'REPORTMATE_PASSPHRASE environment variable not configured'
+      }, { status: 500 })
+    }
+
     try {
       response = await fetch(`${apiBaseUrl}/api/network`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
         }
       })
       
@@ -51,7 +60,7 @@ export async function GET() {
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
-            'X-API-PASSPHRASE': 's3cur3-p@ssphras3!'
+            'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE
           }
         })
         
