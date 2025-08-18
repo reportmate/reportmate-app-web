@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
 import { ThemeProvider } from "../src/components/theme-provider";
+import AuthProvider from "../components/auth/AuthProvider";
+import AutoAuth from "../components/auth/AutoAuth";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,11 +21,15 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
-        <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
-          <ErrorBoundary>
-            {children}
-          </ErrorBoundary>
-        </ThemeProvider>
+        <AuthProvider>
+          <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+            <ErrorBoundary>
+              <AutoAuth>
+                {children}
+              </AutoAuth>
+            </ErrorBoundary>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
