@@ -15,19 +15,13 @@ interface Management {
   serialNumber: string
   lastSeen: string
   collectedAt: string
-  managementType: string
+  provider: string
   enrollmentStatus: string
-  enrollmentDate: string
-  lastContact: string
-  serverUrl: string
-  deviceIdentity: string
-  pushMagic: string
-  unlockToken: string
-  mdmOptions: any
-  bootstrapToken: string
-  supervised: boolean
-  userApproved: boolean
-  depEnrolled: boolean
+  enrollmentType: string
+  intuneId: string
+  tenantName: string
+  isEnrolled: boolean
+  raw: any
 }
 
 function LoadingSkeleton() {
@@ -51,7 +45,7 @@ function ManagementPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [management, setManagement] = useState<Management[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [enrollmentFilter, setEnrollmentFilter] = useState('all')
+  const [providerFilter, setProviderFilter] = useState('all')
 
   useEffect(() => {
     const fetchManagement = async () => {
@@ -81,24 +75,25 @@ function ManagementPageContent() {
     fetchManagement()
   }, [])
 
-  // Get unique enrollment statuses
-  const enrollmentStatuses = Array.from(new Set(
-    management.map(m => m.enrollmentStatus).filter(Boolean)
+  // Get unique providers
+  const providers = Array.from(new Set(
+    management.map(m => m.provider).filter(Boolean)
   )).sort()
 
   // Filter management
   const filteredManagement = management.filter(m => {
-    if (enrollmentFilter !== 'all') {
-      if (m.enrollmentStatus !== enrollmentFilter) return false
+    if (providerFilter !== 'all') {
+      if (m.provider !== providerFilter) return false
     }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
         m.deviceName?.toLowerCase().includes(query) ||
-        m.managementType?.toLowerCase().includes(query) ||
         m.enrollmentStatus?.toLowerCase().includes(query) ||
-        m.serverUrl?.toLowerCase().includes(query) ||
+        m.provider?.toLowerCase().includes(query) ||
+        m.enrollmentType?.toLowerCase().includes(query) ||
+        m.intuneId?.toLowerCase().includes(query) ||
         m.serialNumber?.toLowerCase().includes(query)
       )
     }
@@ -157,29 +152,45 @@ function ManagementPageContent() {
       <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Left side - Logo and Title */}
+            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+              <Link
+                href="/dashboard"
+                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+              >
+                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                 </svg>
-                <span className="text-sm font-medium hidden sm:inline">Dashboard</span>
+                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
               </Link>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Management</h1>
+                <div className="min-w-0">
+                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
+                    Management
+                  </h1>
+                </div>
               </div>
             </div>
-            
+
+            {/* Right side - Navigation */}
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Navigation */}
+              <div className="hidden lg:flex">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
+
+              {/* Mobile Navigation */}
+              <div className="lg:hidden">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Navigation */}
-      <DevicePageNavigation />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -193,15 +204,15 @@ function ManagementPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Enrollment Filter */}
+                {/* Provider Filter */}
                 <select
-                  value={enrollmentFilter}
-                  onChange={(e) => setEnrollmentFilter(e.target.value)}
+                  value={providerFilter}
+                  onChange={(e) => setProviderFilter(e.target.value)}
                   className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
                 >
-                  <option value="all">All Enrollment</option>
-                  {enrollmentStatuses.map(status => (
-                    <option key={status} value={status}>{status}</option>
+                  <option value="all">All Providers</option>
+                  {providers.map(provider => (
+                    <option key={provider} value={provider}>{provider}</option>
                   ))}
                 </select>
                 
@@ -228,17 +239,16 @@ function ManagementPageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Management Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Enrollment</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Server</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Provider</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Enrollment Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Enrollment Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Intune ID</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredManagement.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={5} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -263,52 +273,34 @@ function ManagementPageContent() {
                         </Link>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {mgmt.managementType || 'Unknown'}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          mgmt.provider === 'Microsoft Intune'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : mgmt.provider === 'Apple'
+                            ? 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                            : 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                        }`}>
+                          {mgmt.provider}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div>
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            mgmt.enrollmentStatus === 'Enrolled' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : mgmt.enrollmentStatus === 'Pending'
-                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                          }`}>
-                            {mgmt.enrollmentStatus || 'Unknown'}
-                          </span>
-                          {mgmt.enrollmentDate && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                              {formatRelativeTime(mgmt.enrollmentDate)}
-                            </div>
-                          )}
-                        </div>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          mgmt.enrollmentStatus === 'Enrolled'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : mgmt.enrollmentStatus === 'Pending'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {mgmt.enrollmentStatus}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        <div className="max-w-48 truncate" title={mgmt.serverUrl}>
-                          {mgmt.serverUrl || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {mgmt.supervised && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              Supervised
-                            </span>
-                          )}
-                          {mgmt.userApproved && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              User Approved
-                            </span>
-                          )}
-                          {mgmt.depEnrolled && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                              DEP
-                            </span>
-                          )}
-                        </div>
+                        {mgmt.enrollmentType}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {mgmt.lastSeen ? formatRelativeTime(mgmt.lastSeen) : '-'}
+                        <div className="max-w-48 truncate font-mono text-xs" title={mgmt.intuneId}>
+                          {mgmt.intuneId}
+                        </div>
                       </td>
                     </tr>
                   ))

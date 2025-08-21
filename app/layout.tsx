@@ -18,18 +18,31 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // For development, completely bypass all authentication
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
-        <AuthProvider>
+        {isDevelopment ? (
+          // Development: No authentication at all
           <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
             <ErrorBoundary>
-              <AutoAuth>
-                {children}
-              </AutoAuth>
+              {children}
             </ErrorBoundary>
           </ThemeProvider>
-        </AuthProvider>
+        ) : (
+          // Production: Full authentication
+          <AuthProvider>
+            <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+              <ErrorBoundary>
+                <AutoAuth>
+                  {children}
+                </AutoAuth>
+              </ErrorBoundary>
+            </ThemeProvider>
+          </AuthProvider>
+        )}
       </body>
     </html>
   );

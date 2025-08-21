@@ -86,8 +86,62 @@ export async function GET(
       // Fall through to local fallback
     }
 
-    // Return sample events as fallback for the specific device
-    console.log('[DEVICE EVENTS API] Using local fallback for device:', deviceId)
+    // Try direct database fallback for real events data
+    console.log('[DEVICE EVENTS API] Trying direct database fallback for device:', deviceId)
+    
+    try {
+      const { pool } = await import('../../../../../src/lib/db')
+      
+      // Query events for this device from the database
+      const eventsQuery = `
+        SELECT 
+          id, device_id, event_type as kind, message, timestamp as ts, details, created_at
+        FROM events 
+        WHERE device_id = $1
+        ORDER BY timestamp DESC
+        LIMIT 50`
+      
+      const eventsResult = await pool.query(eventsQuery, [deviceId])
+      
+      if (eventsResult.rows.length > 0) {
+        console.log(`[DEVICE EVENTS API] ✅ Retrieved ${eventsResult.rows.length} real events from database`)
+        
+        // Transform database events to expected API format
+        const realEvents = eventsResult.rows
+          .filter(row => VALID_EVENT_KINDS.includes(row.kind?.toLowerCase() ?? ''))
+          .map(row => ({
+            id: row.id.toString(),
+            device: deviceId,
+            kind: row.kind,
+            ts: row.ts?.toISOString() || row.created_at?.toISOString() || new Date().toISOString(),
+            message: row.message || `${row.kind} event`,
+            payload: row.details ? (typeof row.details === 'object' ? row.details : { details: row.details }) : {}
+          }))
+        
+        return NextResponse.json({
+          success: true,
+          events: realEvents,
+          count: realEvents.length,
+          deviceId: deviceId,
+          source: 'direct-database',
+          timestamp: new Date().toISOString()
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        })
+      } else {
+        console.log('[DEVICE EVENTS API] No events found in database for device:', deviceId)
+      }
+      
+    } catch (dbError) {
+      console.error('[DEVICE EVENTS API] Direct database fallback failed:', dbError)
+    }
+
+    // Return sample events as final fallback for the specific device
+    console.log('[DEVICE EVENTS API] Using sample events fallback for device:', deviceId)
     
     const sampleEvents = [
       {
