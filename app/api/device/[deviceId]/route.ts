@@ -374,6 +374,52 @@ export async function GET(
       }
       
       console.log('[DEVICE API] Returning CLEAN modular structure with', Object.keys(modules).length, 'modules')
+      
+      console.log('🔥🔥🔥 ABOUT TO DO TIMESTAMP SYNC 🔥🔥🔥')
+      
+      // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
+      try {
+        console.log('[DEVICE API] 🕐 Fetching device events for timestamp synchronization...')
+        const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+        console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
+        
+        const eventsResponse = await fetch(deviceEventsUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+        
+        if (eventsResponse.ok) {
+          const eventsData = await eventsResponse.json()
+          console.log('[DEVICE API] 🕐 Events response:', {
+            success: eventsData.success,
+            hasEvents: Array.isArray(eventsData.events),
+            eventsCount: eventsData.events?.length || 0,
+            firstEvent: eventsData.events?.[0] ? {
+              id: eventsData.events[0].id,
+              ts: eventsData.events[0].ts,
+              device: eventsData.events[0].device
+            } : null
+          })
+          
+          if (eventsData.success && eventsData.events && eventsData.events.length > 0) {
+            const latestEvent = eventsData.events[0] // Events should be sorted by timestamp desc
+            const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
+            
+            if (eventTimestamp) {
+              console.log('[DEVICE API] 🕐 ⚡ UPDATING lastSeen from', responseData.device.lastSeen, 'to', eventTimestamp)
+              responseData.device.lastSeen = eventTimestamp
+            }
+          }
+        } else {
+          console.log('[DEVICE API] 🕐 Failed to fetch events for timestamp sync:', eventsResponse.status)
+        }
+      } catch (eventsError) {
+        console.error('[DEVICE API] 🕐 Error fetching events for timestamp sync:', eventsError)
+        // Continue without timestamp sync if events fetch fails
+      }
+      
       return NextResponse.json(responseData, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -427,6 +473,49 @@ export async function GET(
         
         console.log('[DEVICE API] Returning Azure Functions format with', Object.keys(modules).length, 'modules')
         console.log('[DEVICE API] Device name from inventory:', deviceName)
+        
+        // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
+        try {
+          console.log('[DEVICE API] 🕐 Fetching device events for timestamp synchronization (Azure format)...')
+          const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+          console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
+          
+          const eventsResponse = await fetch(deviceEventsUrl, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            }
+          })
+          
+          if (eventsResponse.ok) {
+            const eventsData = await eventsResponse.json()
+            console.log('[DEVICE API] 🕐 Events response (Azure format):', {
+              success: eventsData.success,
+              hasEvents: Array.isArray(eventsData.events),
+              eventsCount: eventsData.events?.length || 0,
+              firstEvent: eventsData.events?.[0] ? {
+                id: eventsData.events[0].id,
+                ts: eventsData.events[0].ts,
+                device: eventsData.events[0].device
+              } : null
+            })
+            
+            if (eventsData.success && eventsData.events && eventsData.events.length > 0) {
+              const latestEvent = eventsData.events[0] // Events should be sorted by timestamp desc
+              const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
+              
+              if (eventTimestamp) {
+                console.log('[DEVICE API] 🕐 ⚡ UPDATING lastSeen (Azure format) from', responseData.lastSeen, 'to', eventTimestamp)
+                responseData.lastSeen = eventTimestamp
+              }
+            }
+          } else {
+            console.log('[DEVICE API] 🕐 Failed to fetch events for timestamp sync (Azure format):', eventsResponse.status)
+          }
+        } catch (eventsError) {
+          console.error('[DEVICE API] 🕐 Error fetching events for timestamp sync (Azure format):', eventsError)
+          // Continue without timestamp sync if events fetch fails
+        }
         
         return NextResponse.json(responseData, {
           headers: {

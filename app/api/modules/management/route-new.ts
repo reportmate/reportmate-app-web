@@ -79,20 +79,16 @@ export async function GET() {
     
     const apiBaseUrl = process.env.API_BASE_URL || process.env.AZURE_FUNCTIONS_BASE_URL
     if (!apiBaseUrl) {
-      console.error('[MANAGEMENT API] No API base URL configured')
       throw new Error('API_BASE_URL or AZURE_FUNCTIONS_BASE_URL not configured')
     }
     
-    console.log('[MANAGEMENT API] API Base URL:', apiBaseUrl)
     console.log('[MANAGEMENT API] Fetching from Azure Functions:', `${apiBaseUrl}/api/device/79349310-287D-8166-52FC-0644E27378F7`)
     
     // For now, let's directly fetch the device we know exists and extract management data
     const response = await fetch(`${apiBaseUrl}/api/device/79349310-287D-8166-52FC-0644E27378F7`, {
       method: 'GET',
       headers: {
-        'REPORTMATE_PASSPHRASE': process.env.REPORTMATE_PASSPHRASE || '',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'REPORTMATE_PASSPHRASE': process.env.REPORTMATE_PASSPHRASE || ''
       }
     })
     
