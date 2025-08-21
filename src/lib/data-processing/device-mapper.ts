@@ -5,6 +5,41 @@
 
 import { processApplicationsData, processPeripheralsData, processInstallsData } from './component-data'
 
+/**
+ * Validates that device data follows the standardized nested structure
+ * CRITICAL: Prevents flat structure access that causes inconsistencies
+ */
+export function validateDeviceStructure(rawDevice: any): void {
+  if (!rawDevice) {
+    throw new Error('🚨 VALIDATION FAILED: No device data provided')
+  }
+  
+  if (!rawDevice.modules) {
+    console.error('🚨 STRUCTURE VIOLATION: Device data is missing required modules object', {
+      deviceId: rawDevice.deviceId,
+      serialNumber: rawDevice.serialNumber,
+      hasInventory: !!rawDevice.inventory,
+      hasHardware: !!rawDevice.hardware,
+      availableKeys: Object.keys(rawDevice)
+    })
+    throw new Error('🚨 CRITICAL: Device data missing required modules structure. API must return nested format: device.modules.*')
+  }
+
+  // Development warnings for potential flat structure leakage
+  if (process.env.NODE_ENV === 'development') {
+    const flatProperties = ['inventory', 'hardware', 'security', 'applications', 'system', 'network', 'management']
+    const foundFlat = flatProperties.filter(prop => rawDevice[prop] && !rawDevice.modules[prop])
+    
+    if (foundFlat.length > 0) {
+      console.error('🚨 FLAT STRUCTURE DETECTED: Found flat properties that should be in modules:', {
+        flatProperties: foundFlat,
+        deviceId: rawDevice.deviceId,
+        serialNumber: rawDevice.serialNumber
+      })
+    }
+  }
+}
+
 export interface ProcessedDeviceInfo {
   deviceId: string     // Internal UUID (unique)
   serialNumber: string // Human-readable unique identifier
@@ -56,23 +91,27 @@ export interface ProcessedDeviceInfo {
 }
 
 /**
- * Maps raw device data from the clean API structure to component-friendly format
- * NEW APPROACH: Only essential data duplicated, everything else comes from modules
+ * Maps raw device data from the STANDARDIZED nested API structure to component-friendly format
+ * ENFORCED STRUCTURE: device.modules.* is the ONLY source of truth
+ * NO FALLBACKS: Components must expect consistent nested structure
  */
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
-  console.log('🚨🚨🚨 CLEAN DEVICE MAPPER CALLED! 🚨🚨🚨');
-  console.log('mapDeviceData input - NEW CLEAN STRUCTURE:', {
+  console.log('🚨 STANDARDIZED DEVICE MAPPER - Enforcing nested structure only');
+  console.log('mapDeviceData input - NESTED STRUCTURE REQUIRED:', {
     deviceId: rawDevice.deviceId,
     serialNumber: rawDevice.serialNumber,
     hasModules: !!rawDevice.modules,
     moduleKeys: rawDevice.modules ? Object.keys(rawDevice.modules) : [],
-    rawDeviceKeys: Object.keys(rawDevice),
+    structureValid: !!rawDevice.modules,
     sample: JSON.stringify(rawDevice).substring(0, 500)
   })
 
   if (!rawDevice) {
     throw new Error('No device data provided to mapper')
   }
+
+  // CRITICAL: Validate structure before processing
+  validateDeviceStructure(rawDevice)
 
   // Helper function to safely get nested values
   const getNestedValue = (obj: any, path: string) => {
@@ -120,11 +159,15 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     validLastSeen = typeof lastSeenValue === 'string' ? lastSeenValue : new Date(lastSeenValue).toISOString()
   }
 
-  // Use CLEAN structure - only deviceId and serialNumber, get everything else from modules
+  // STANDARDIZED STRUCTURE: Only nested modules access, no fallbacks to flat structure
+  if (!rawDevice.modules) {
+    throw new Error('🚨 CRITICAL: Device data missing required modules structure. API must return nested format: device.modules.*')
+  }
+
   const mappedDevice: ProcessedDeviceInfo = {
     deviceId: rawDevice.deviceId,                                    // Internal UUID
     serialNumber: rawDevice.serialNumber,                           // Human-readable ID  
-    name: rawDevice.name || rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
+    name: rawDevice.modules?.inventory?.deviceName || rawDevice.serialNumber || 'Unknown Device',
     
     // All other data comes from modules - no more duplication
     model: rawDevice.modules?.hardware?.model,
@@ -183,26 +226,26 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   }
 
   // Installs data processing - CRITICAL for managed installs display
-  // Check both old and new API structures
-  if (rawDevice.modules?.installs || rawDevice.installs) {
+  // STANDARDIZED: Only check nested modules structure
+  if (rawDevice.modules?.installs) {
     const installsData = processInstallsData(rawDevice);
     ;(mappedDevice as any).installs = installsData
-    console.log('🔧 DeviceMapper: Processed installs data:', {
+    console.log('🔧 DeviceMapper: Processed installs data from modules.installs:', {
       totalPackages: installsData.totalPackages,
       hasConfig: !!installsData.config,
-      systemName: installsData.systemName,
-      foundAt: rawDevice.modules?.installs ? 'modules.installs' : 'installs'
+      systemName: installsData.systemName
     })
   } else {
-    console.log('🔧 DeviceMapper: No installs data found in rawDevice.modules.installs or rawDevice.installs')
+    console.log('🔧 DeviceMapper: No installs data found in required location: rawDevice.modules.installs')
   }
 
-  console.log('DeviceMapper DEBUG - Clean mapped device:', {
+  console.log('DeviceMapper STANDARDIZED - Nested structure enforced:', {
     deviceId: mappedDevice.deviceId,
     serialNumber: mappedDevice.serialNumber,
     name: mappedDevice.name,
     hasModules: !!(mappedDevice as any).modules,
-    moduleKeys: (mappedDevice as any).modules ? Object.keys((mappedDevice as any).modules) : []
+    moduleKeys: (mappedDevice as any).modules ? Object.keys((mappedDevice as any).modules) : [],
+    structureCompliant: !!(mappedDevice as any).modules
   })
 
   return mappedDevice

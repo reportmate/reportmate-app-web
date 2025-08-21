@@ -124,8 +124,8 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
                     
                     {/* Secondary - Asset Tag and Serial Number */}
                     <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {(device.modules?.inventory?.assetTag || device.assetTag) && device.serialNumber ? (
-                        `${device.modules?.inventory?.assetTag || device.assetTag} | ${device.serialNumber}`
+                      {device.modules?.inventory?.assetTag && device.serialNumber ? (
+                        `${device.modules.inventory.assetTag} | ${device.serialNumber}`
                       ) : device.serialNumber ? (
                         device.serialNumber
                       ) : (

@@ -64,14 +64,14 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   
   // Debug the exact data paths we're looking for
   console.log('[INSTALLS TAB] Device installs structure:', {
-    hasDeviceInstalls: !!device?.installs,
-    deviceInstallsKeys: device?.installs ? Object.keys(device.installs) : [],
-    hasCimian: !!device?.installs?.cimian,
-    cimianKeys: device?.installs?.cimian ? Object.keys(device.installs.cimian) : [],
-    hasConfig: !!device?.installs?.cimian?.config,
-    hasSessions: !!device?.installs?.cimian?.sessions,
-    sessionsLength: device?.installs?.cimian?.sessions?.length || 0,
-    firstSessionKeys: device?.installs?.cimian?.sessions?.[0] ? Object.keys(device.installs.cimian.sessions[0]) : []
+    hasDeviceInstalls: !!device?.modules?.installs,
+    deviceInstallsKeys: device?.modules?.installs ? Object.keys(device.modules.installs) : [],
+    hasCimian: !!device?.modules?.installs?.cimian,
+    cimianKeys: device?.modules?.installs?.cimian ? Object.keys(device.modules.installs.cimian) : [],
+    hasConfig: !!device?.modules?.installs?.cimian?.config,
+    hasSessions: !!device?.modules?.installs?.cimian?.sessions,
+    sessionsLength: device?.modules?.installs?.cimian?.sessions?.length || 0,
+    firstSessionKeys: device?.modules?.installs?.cimian?.sessions?.[0] ? Object.keys(device.modules.installs.cimian.sessions[0]) : []
   })
   
   // Debug the processed data structure

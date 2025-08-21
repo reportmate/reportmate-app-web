@@ -60,7 +60,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
   })
 
   // Use inventory module data if available, fallback to device properties
-  const inventory = device.modules?.inventory || device.inventory || {}
+  const inventory = device.modules?.inventory || {}
   
   // Check if we have any assignment details for the right column
   const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location
@@ -107,14 +107,14 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             {/* Device Name */}
             <Stat 
               label="Device Name" 
-              value={inventory.deviceName || device.modules?.inventory?.deviceName || device.name} 
+              value={inventory.deviceName || 'Unknown Device'} 
             />
             
             {/* Asset Tag */}
-            {(inventory.assetTag || device.modules?.inventory?.assetTag || device.assetTag) && (
+            {inventory.assetTag && (
               <Stat 
                 label="Asset Tag" 
-                value={inventory.assetTag || device.modules?.inventory?.assetTag || device.assetTag} 
+                value={inventory.assetTag} 
                 isMono 
                 showCopyButton
               />

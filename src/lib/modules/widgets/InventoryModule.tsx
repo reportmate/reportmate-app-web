@@ -28,8 +28,8 @@ const InventoryOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device
             const inventoryData = modules.inventory || {}
             
             // Fallback to direct inventory property if modules.inventory is empty
-            if (Object.keys(inventoryData).length === 0 && data.device.inventory) {
-              setInventory(data.device.inventory)
+            if (Object.keys(inventoryData).length === 0 && data.device.modules?.inventory) {
+              setInventory(data.device.modules.inventory)
             } else {
               setInventory(inventoryData)
             }

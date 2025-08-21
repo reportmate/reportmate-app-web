@@ -118,7 +118,7 @@ interface ManagementWidgetProps {
 
 export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
-  const rawManagement = device.modules?.management || device.management
+  const rawManagement = device.modules?.management
 
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)

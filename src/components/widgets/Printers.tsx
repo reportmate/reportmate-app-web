@@ -33,8 +33,10 @@ interface PrintersData {
 interface Device {
   id: string
   name: string
-  // Modular printers data
-  printers?: PrintersData
+  // Modular structure
+  modules?: {
+    printers?: PrintersData
+  }
 }
 
 interface PrintersWidgetProps {
@@ -43,7 +45,7 @@ interface PrintersWidgetProps {
 
 export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
   // Access printers data from modular structure
-  const printers = device.printers
+  const printers = device.modules?.printers
   const hasPrintersInfo = printers && printers.printers && printers.printers.length > 0
 
   if (!hasPrintersInfo) {

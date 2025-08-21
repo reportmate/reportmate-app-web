@@ -91,9 +91,6 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   if (data?.installedApps?.length) {
     console.log('✅ Using data prop (processedData.applications)');
     installedApps = data.installedApps
-  } else if (device?.applications?.installedApps) {
-    console.log('✅ Using processed device.applications data');
-    installedApps = device.applications.installedApps
   } else if (device?.modules?.applications?.installedApplications) {
     console.log('⚠️ Falling back to raw module data (camelCase)');
     installedApps = device.modules.applications.installedApplications

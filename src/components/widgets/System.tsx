@@ -10,49 +10,6 @@ interface Device {
   id: string
   name: string
   serialNumber?: string
-  os?: string
-  platform?: string
-  architecture?: string
-  uptime?: string
-  // API response fields for operating system
-  osName?: string
-  osVersion?: string
-  osDisplayVersion?: string
-  osEdition?: string
-  osFeatureUpdate?: string
-  osInstallDate?: string
-  osLocale?: string
-  osTimeZone?: string
-  keyboardLayouts?: string[]
-  // Legacy interface fields for backward compatibility
-  operatingSystem?: {
-    name: string
-    edition?: string
-    version?: string
-    displayVersion?: string
-    build?: string
-    architecture?: string
-    locale?: string
-    timeZone?: string
-    activeKeyboardLayout?: string
-    featureUpdate?: string
-  }
-  // Modular system data
-  system?: {
-    operatingSystem?: {
-      name: string
-      edition?: string
-      version?: string
-      displayVersion?: string
-      build?: string
-      architecture?: string
-      locale?: string
-      timeZone?: string
-      activeKeyboardLayout?: string
-      featureUpdate?: string
-    }
-    uptimeString?: string
-  }
   // Modules structure
   modules?: {
     system?: {
@@ -78,39 +35,12 @@ interface SystemWidgetProps {
 }
 
 export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
-  // Try multiple data paths to find the operating system data
-  let operatingSystem = null
-  let uptimeString = null
-
-  // Path 1: device.system.operatingSystem (most likely based on API logs)
-  if (device.system?.operatingSystem) {
-    operatingSystem = device.system.operatingSystem
-    uptimeString = device.system.uptimeString || device.uptime
-  }
-  // Path 2: device.modules.system.operatingSystem
-  else if (device.modules?.system?.operatingSystem) {
-    operatingSystem = device.modules.system.operatingSystem
-    uptimeString = device.modules.system.uptimeString || device.uptime
-  }
-  // Path 3: Top-level device properties (fallback)
-  else {
-    operatingSystem = {
-      name: device.osName,
-      edition: device.osEdition,
-      version: device.osVersion,
-      displayVersion: device.osDisplayVersion,
-      build: device.osVersion?.split('.').pop(),
-      architecture: device.architecture,
-      locale: device.osLocale,
-      timeZone: device.osTimeZone,
-      activeKeyboardLayout: device.keyboardLayouts?.[0],
-      featureUpdate: device.osFeatureUpdate
-    }
-    uptimeString = device.uptime
-  }
+  // Use modules.system data only
+  const operatingSystem = device.modules?.system?.operatingSystem
+  const uptimeString = device.modules?.system?.uptimeString
 
   // Check if we have any system information
-  const hasSystemInfo = operatingSystem || device.os
+  const hasSystemInfo = operatingSystem
 
   if (!hasSystemInfo) {
     return (
@@ -141,7 +71,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
               label="Operating System" 
               value={operatingSystem?.name ? 
                 operatingSystem.name.replace('Microsoft ', '') : 
-                device.os || 'Unknown'
+                'Unknown'
               } 
             />          
             

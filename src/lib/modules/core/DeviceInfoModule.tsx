@@ -63,12 +63,12 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Device Name</dt>
-              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules?.inventory?.deviceName || device.name}</dd>
+              <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules?.inventory?.deviceName || 'Unknown Device'}</dd>
             </div>
-            {(device.modules?.inventory?.assetTag || device.assetTag) && (
+            {device.modules?.inventory?.assetTag && (
               <div>
                 <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Asset Tag</dt>
-                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.modules?.inventory?.assetTag || device.assetTag}</dd>
+                <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.modules?.inventory?.assetTag}</dd>
               </div>
             )}
             <div>
@@ -159,7 +159,7 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
       </div>
 
       {/* Hardware Information */}
-      {device.hardware && (
+      {device.modules?.hardware && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -168,28 +168,28 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
           </div>
           <div className="px-6 py-4">
             <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {device.hardware.cpu && (
+              {device.modules.hardware.cpu && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">CPU</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.hardware.cpu}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.hardware.cpu}</dd>
                 </div>
               )}
-              {device.hardware.memory && (
+              {device.modules.hardware.memory && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Memory</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.hardware.memory}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.hardware.memory}</dd>
                 </div>
               )}
-              {device.hardware.storage && (
+              {device.modules.hardware.storage && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Storage</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.hardware.storage}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.hardware.storage}</dd>
                 </div>
               )}
-              {device.hardware.architecture && (
+              {device.modules.hardware.architecture && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Architecture</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.hardware.architecture}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.hardware.architecture}</dd>
                 </div>
               )}
             </dl>
@@ -198,7 +198,7 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
       )}
 
       {/* Network Information */}
-      {device.network && (
+      {device.modules?.network && (
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">
@@ -207,10 +207,10 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
           </div>
           <div className="px-6 py-4">
             <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {device.network.hostname && (
+              {device.modules.network.hostname && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Hostname</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.network.hostname}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.network.hostname}</dd>
                 </div>
               )}
               {device.ipAddress && (
@@ -225,10 +225,10 @@ const DeviceInfoTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                   <dd className="mt-1 text-sm font-mono text-gray-900 dark:text-gray-100">{device.macAddress}</dd>
                 </div>
               )}
-              {device.network.connectionType && (
+              {device.modules.network.connectionType && (
                 <div>
                   <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">Connection Type</dt>
-                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.network.connectionType}</dd>
+                  <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100">{device.modules.network.connectionType}</dd>
                 </div>
               )}
             </dl>
