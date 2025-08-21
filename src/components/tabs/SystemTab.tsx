@@ -10,13 +10,21 @@ import { processSystemTabData } from '../../lib/data-processing/component-data'
 interface DeviceData {
   id: string;
   name: string;
-  system?: {
-    operatingSystem?: {
-      name?: string;
-      version?: string;
-      build?: string;
-      architecture?: string;
-      uptime?: string;
+  modules?: {
+    system?: {
+      operatingSystem?: {
+        name?: string;
+        version?: string;
+        displayVersion?: string;
+        edition?: string;
+        build?: string;
+        architecture?: string;
+        locale?: string;
+        timeZone?: string;
+        activeKeyboardLayout?: string;
+        featureUpdate?: string;
+      };
+      uptimeString?: string;
     };
     services?: Array<{
       name: string;
@@ -24,10 +32,6 @@ interface DeviceData {
       status?: string;
       start_type?: string;
     }>;
-  };
-  modules?: {
-    system?: Record<string, unknown>;
-    services?: Record<string, unknown>;
   };
   [key: string]: unknown;
 }
@@ -82,31 +86,9 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   }, []);
   
   // Get operating system information (same logic as SystemWidget)
-  let osInfo = null
-  let uptimeString = null
-
-  // Try multiple data paths to find the operating system data
-  if (device.system?.operatingSystem) {
-    osInfo = device.system.operatingSystem
-    uptimeString = device.system.uptimeString || device.uptime
-  } else if (device.modules?.system?.operatingSystem) {
-    osInfo = device.modules.system.operatingSystem
-    uptimeString = device.modules.system.uptimeString || device.uptime
-  } else {
-    osInfo = {
-      name: device.osName,
-      edition: device.osEdition,
-      version: device.osVersion,
-      displayVersion: device.osVersion, // Use clean version instead of displayVersion
-      build: device.osVersion?.split('.').pop(),
-      architecture: device.architecture,
-      locale: device.osLocale,
-      timeZone: device.osTimeZone,
-      activeKeyboardLayout: device.keyboardLayouts?.[0],
-      featureUpdate: device.osFeatureUpdate
-    }
-    uptimeString = device.uptime
-  }
+  // Use modules.system data only
+  const osInfo = device.modules?.system?.operatingSystem
+  const uptimeString = device.modules?.system?.uptimeString
 
   // Filter services based on search
   const filteredServices = useMemo(() => {
@@ -178,12 +160,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.edition || operatingSystem.edition || 'Unknown'}</p>
+              <p className="text-gray-900 dark:text-white">{osInfo?.edition || 'Unknown'}</p>
             </div>
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
-              <p className="text-gray-900 dark:text-white">{uptimeString || systemTabData.uptime || 'Unknown'}</p>
+              <p className="text-gray-900 dark:text-white">{uptimeString || 'Unknown'}</p>
             </div>
             
             {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' && (
@@ -200,12 +182,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Locale</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.locale || operatingSystem.locale || 'Unknown'}</p>
+              <p className="text-gray-900 dark:text-white">{osInfo?.locale || 'Unknown'}</p>
             </div>
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Zone</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.timeZone || operatingSystem.timeZone || 'Unknown'}</p>
+              <p className="text-gray-900 dark:text-white">{osInfo?.timeZone || 'Unknown'}</p>
             </div>
             
             <div>

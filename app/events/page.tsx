@@ -201,7 +201,7 @@ function EventsPageContent() {
           devices.forEach((device: any) => {
             if (device.serialNumber) {
               // Use inventory deviceName if available, otherwise fall back to name or serialNumber
-              const deviceName = device.modules?.inventory?.deviceName || device.name || device.serialNumber
+              const deviceName = device.modules?.inventory?.deviceName || device.serialNumber
               nameMap[device.serialNumber as string] = deviceName as string
             }
           })

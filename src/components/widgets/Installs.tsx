@@ -27,8 +27,10 @@ interface InstallsData {
 interface Device {
   id: string
   name: string
-  // Modular installs data
-  installs?: InstallsData
+  // Modular structure
+  modules?: {
+    installs?: InstallsData
+  }
 }
 
 interface InstallsWidgetProps {
@@ -37,7 +39,7 @@ interface InstallsWidgetProps {
 
 export const InstallsWidget: React.FC<InstallsWidgetProps> = ({ device }) => {
   // Access installs data from modular structure
-  const installs = device.installs
+  const installs = device.modules?.installs
   const hasInstallsInfo = installs && (installs.totalInstalls > 0 || installs.recentInstalls?.length > 0)
 
   if (!hasInstallsInfo) {
