@@ -471,9 +471,11 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
 ]
 
 export default function DeviceDetailPage() {
+  console.log('🚨🚨🚨 DEVICE PAGE COMPONENT STARTING 🚨🚨🚨')
   const params = useParams()
   const router = useRouter()
   const deviceId = params.deviceId as string
+  console.log('🚨🚨🚨 DEVICE ID FROM PARAMS:', deviceId, '🚨🚨🚨')
   const [activeTab, setActiveTab] = useState<TabType>('info')
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
@@ -776,17 +778,23 @@ export default function DeviceDetailPage() {
   }, [deviceId, router])
   
   useEffect(() => {
+    console.log('🔥🔥🔥 DEVICE DETAIL USEEFFECT STARTING 🔥🔥🔥')
+    console.log('🔥🔥🔥 isResolving:', isResolving, 'deviceId:', deviceId, '🔥🔥🔥')
     // Don't fetch device data if we're still resolving the identifier
     if (isResolving) {
+      console.log('🔥🔥🔥 EXITING USEEFFECT - STILL RESOLVING 🔥🔥🔥')
       return
     }
     
     // Only fetch if this is a serial number (resolved identifiers will redirect)
     const identifierType = identifyDeviceIdentifierType(deviceId)
+    console.log('🔥🔥🔥 IDENTIFIER TYPE:', identifierType, '🔥🔥🔥')
     if (identifierType !== 'serialNumber') {
+      console.log('🔥🔥🔥 EXITING USEEFFECT - NOT SERIAL NUMBER 🔥🔥🔥')
       return // Let the resolution effect handle this
     }
     const fetchDeviceData = async () => {
+      console.log('🚀🚀🚀 [DEVICE PAGE] FRONTEND FETCH STARTING FOR:', deviceId, ' 🚀🚀🚀')
       try {
         setLoading(true)
         
@@ -940,11 +948,94 @@ export default function DeviceDetailPage() {
         
         // Fetch events separately from the new device events endpoint
         try {
+          console.log('🔥🔥🔥 [DEVICE PAGE] FRONTEND EVENTS FETCH STARTING �🔥🔥')
+          console.log('[DEVICE PAGE] �🔄 Starting events fetch for device:', deviceId)
           const eventsResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}/events`)
+          console.log('[DEVICE PAGE] 🔄 Events response status:', eventsResponse.status)
+          console.log('🔥🔥🔥 [DEVICE PAGE] FRONTEND EVENTS RESPONSE RECEIVED 🔥🔥🔥')
+          
           if (eventsResponse.ok) {
             const eventsData = await eventsResponse.json()
+            console.log('[DEVICE PAGE] 🔄 Events data structure:', {
+              hasSuccess: 'success' in eventsData,
+              successValue: eventsData.success,
+              hasEvents: 'events' in eventsData,
+              eventsArray: Array.isArray(eventsData.events),
+              eventsLength: eventsData.events?.length || 0,
+              firstEventSample: eventsData.events?.[0] ? {
+                id: eventsData.events[0].id,
+                ts: eventsData.events[0].ts,
+                timestamp: eventsData.events[0].timestamp,
+                created_at: eventsData.events[0].created_at
+              } : 'no events'
+            })
+            
             if (eventsData.success && eventsData.events) {
               setEvents(eventsData.events)
+              
+              // Find the most recent event timestamp from this device's events
+              if (eventsData.events.length > 0) {
+                console.log('[DEVICE PAGE] 🕐 Processing', eventsData.events.length, 'events for timestamp update')
+                
+                const mostRecentEventTime = eventsData.events.reduce((latest: string, event: any) => {
+                  const eventTime = event.ts || event.timestamp || event.created_at
+                  console.log('[DEVICE PAGE] 🕐 Event time check:', {
+                    eventId: event.id,
+                    ts: event.ts,
+                    timestamp: event.timestamp,
+                    created_at: event.created_at,
+                    selectedTime: eventTime
+                  })
+                  
+                  if (!eventTime) return latest
+                  
+                  if (!latest) return eventTime
+                  
+                  // Compare timestamps and return the more recent one
+                  return new Date(eventTime) > new Date(latest) ? eventTime : latest
+                }, '')
+                
+                console.log('[DEVICE PAGE] 🕐 Most recent event time found:', mostRecentEventTime)
+                console.log('[DEVICE PAGE] 🕐 Device collected time:', deviceData.device?.metadata?.collectedAt || deviceData.device?.lastSeen)
+                
+                // Update the processed device info with the most recent event time
+                if (mostRecentEventTime) {
+                  console.log('[DEVICE PAGE] 🕐 ⚡ Updating device lastSeen to most recent event time:', mostRecentEventTime)
+                  
+                  // Update both the directDevice and processedDevice
+                  if (typeof mapDeviceData === 'function') {
+                    try {
+                      const processedDevice = mapDeviceData(deviceData.device)
+                      // Override the lastSeen with the most recent event time
+                      processedDevice.lastSeen = mostRecentEventTime
+                      processedDevice.lastEventTime = mostRecentEventTime
+                      setDeviceInfo(processedDevice)
+                      console.log('[DEVICE PAGE] 🕐 ✅ Updated processed device lastSeen to:', mostRecentEventTime)
+                    } catch (mappingError) {
+                      console.error('Error in mapDeviceData during lastSeen update:', mappingError)
+                      // Fallback: update direct device
+                      setDeviceInfo(prev => prev ? {
+                        ...prev,
+                        lastSeen: mostRecentEventTime,
+                        lastEventTime: mostRecentEventTime
+                      } : prev)
+                      console.log('[DEVICE PAGE] 🕐 ✅ Updated direct device lastSeen (fallback) to:', mostRecentEventTime)
+                    }
+                  } else {
+                    // Update direct device
+                    setDeviceInfo(prev => prev ? {
+                      ...prev,
+                      lastSeen: mostRecentEventTime,
+                      lastEventTime: mostRecentEventTime
+                    } : prev)
+                    console.log('[DEVICE PAGE] 🕐 ✅ Updated direct device lastSeen to:', mostRecentEventTime)
+                  }
+                } else {
+                  console.log('[DEVICE PAGE] 🕐 ❌ No mostRecentEventTime found!')
+                }
+              } else {
+                console.log('[DEVICE PAGE] 🕐 ❌ No events found in response (length:', eventsData.events?.length, ')')
+              }
               
               // Process events data for the component
               const eventsComponentData = processEventsData(deviceData.device, eventsData.events)
