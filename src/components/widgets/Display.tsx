@@ -33,7 +33,9 @@ interface Device {
   // Legacy display fields
   resolution?: string
   // Modular displays data
-  displays?: DisplaysData
+  modules?: {
+    displays?: DisplaysData
+  }
 }
 
 interface DisplayWidgetProps {
@@ -42,7 +44,7 @@ interface DisplayWidgetProps {
 
 export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
   // Access display data from modular structure
-  const displays = device.displays
+  const displays = device.modules?.displays
   const hasDisplayInfo = displays && displays.displays && displays.displays.length > 0
   
   // Fallback to legacy resolution field

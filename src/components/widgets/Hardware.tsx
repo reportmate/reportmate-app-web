@@ -120,34 +120,59 @@ const safeProcessorString = (processor: string | ProcessorInfo | unknown): strin
 export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   // Get hardware data from modules first, then fallback to device properties
   const hardwareModule = device.modules?.hardware
-  const legacyHardware = device.hardware || {}
+  const legacyHardware = device.modules?.hardware || {}
   
   console.log('[HardwareWidget] Debug data access:', {
     deviceId: device.id,
     hasModules: !!device.modules,
     hasHardwareModule: !!device.modules?.hardware,
-    hasLegacyHardware: !!device.hardware,
+    hasLegacyHardware: !!device.modules?.hardware,
     hardwareModuleKeys: hardwareModule ? Object.keys(hardwareModule) : [],
     legacyHardwareKeys: Object.keys(legacyHardware)
   })
 
+  // Helper function to format bytes to human readable format
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+  }
+
+  // Helper function to safely get a numeric value
+  const safeNumber = (value: unknown): number => {
+    if (value === null || value === undefined) return 0
+    if (typeof value === 'number') return value
+    if (typeof value === 'string') {
+      const parsed = parseFloat(value)
+      return isNaN(parsed) ? 0 : parsed
+    }
+    return 0
+  }
+
   // Build unified hardware info preferring module data over legacy
   const hardwareInfo = {
-    model: hardwareModule?.model || device.model || 'Unknown',
-    manufacturer: hardwareModule?.manufacturer || device.manufacturer || 'Unknown',
+    model: hardwareModule?.model || 'Unknown',
+    manufacturer: hardwareModule?.manufacturer || 'Unknown',
     processor: safeProcessorString(
       hardwareModule?.processor || 
       (typeof legacyHardware.processor === 'object' ? legacyHardware.processor?.name : legacyHardware.processor) || 
-      device.processor || 
       'Unknown'
     ),
-    cores: hardwareModule?.processor?.cores || device.cores,
-    memory: hardwareModule?.memory?.totalFormatted || device.memory || 'Unknown',
-    storage: hardwareModule?.storage?.[0]?.capacityFormatted || device.storage || 'Unknown',
-    graphics: hardwareModule?.graphics?.name || device.graphics || 'Unknown',
-    vram: hardwareModule?.graphics?.memoryFormatted || device.vram,
-    architecture: hardwareModule?.processor?.architecture || device.architecture || 'Unknown',
-    batteryLevel: hardwareModule?.battery?.chargePercent || device.batteryLevel,
+    cores: hardwareModule?.processor?.cores,
+    memory: hardwareModule?.memory?.totalPhysical ? formatBytes(safeNumber(hardwareModule.memory.totalPhysical)) : 'Unknown',
+    storage: hardwareModule?.storage?.[0]?.capacity && hardwareModule?.storage?.[0]?.freeSpace 
+      ? `${formatBytes(safeNumber(hardwareModule.storage[0].capacity))} • ${formatBytes(safeNumber(hardwareModule.storage[0].freeSpace))} free`
+      : hardwareModule?.storage?.[0]?.capacity 
+        ? formatBytes(safeNumber(hardwareModule.storage[0].capacity))
+        : 'Unknown',
+    graphics: hardwareModule?.graphics?.name && hardwareModule?.graphics?.memorySize
+      ? `${hardwareModule.graphics.name} • ${hardwareModule.graphics.memorySize} GB VRAM`
+      : hardwareModule?.graphics?.name || 'Unknown',
+    vram: hardwareModule?.graphics?.memorySize ? `${hardwareModule.graphics.memorySize} GB` : undefined,
+    architecture: hardwareModule?.processor?.architecture || 'Unknown',
+    batteryLevel: hardwareModule?.battery?.chargePercent,
     batteryHealth: hardwareModule?.battery?.health || device.batteryHealth,
     isCharging: hardwareModule?.battery?.isCharging ?? device.isCharging
   }
@@ -199,7 +224,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           <Stat 
             label="Graphics" 
             value={hardwareInfo.graphics}
-            sublabel={hardwareInfo.vram ? `${hardwareInfo.vram} VRAM` : undefined}
           />
           
           <Stat 

@@ -236,7 +236,7 @@ export function processNetworkData(rawDevice: any): NetworkData {
     networkKeys: rawDevice.network ? Object.keys(rawDevice.network) : []
   })
   
-  const networkModule = rawDevice.network || rawDevice.modules?.network || {}
+  const networkModule = rawDevice.modules?.network || {}
   const activeConnection = networkModule.activeConnection || {}
   
   console.log('Network module data:', {
@@ -796,7 +796,7 @@ export function processInstallsData(rawDevice: any): InstallsData {
   // Extract managed installs data from API response - enhanced for Cimian support
   // Check multiple possible locations for installs data
   // PRIORITY: Check installs FIRST since API structure changed from modules.installs to device.installs
-  const installs = rawDevice.installs || rawDevice.modules?.installs || rawDevice.managedInstalls || rawDevice.modules?.managedInstalls || {}
+  const installs = rawDevice.modules?.installs || {}
   
   console.log('🔧 FOUND INSTALLS DATA:', {
     sourceLocation: rawDevice.installs ? 'rawDevice.installs' : 

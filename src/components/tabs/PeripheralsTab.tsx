@@ -173,16 +173,14 @@ interface PeripheralsTabProps {
 export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) => {
   const [activeSection, setActiveSection] = useState<string>('all')
 
-  // Access peripherals data from multiple sources (modular structure, direct peripherals, legacy)
-  const peripheralsData = device.modules?.peripherals || device.peripherals
-  const legacyDisplays = device.displays
-  const legacyPrinters = device.printers
+  // STANDARDIZED: Access peripherals data only from nested modules structure
+  const peripheralsData = device.modules?.peripherals
+  
+  // Get displays and printers data from the modules structure only
+  const displaysModule = device.modules?.displays
+  const printersModule = device.modules?.printers
 
-  // Get displays and printers data from the modules structure
-  const displaysModule = device.modules?.displays || device.displays
-  const printersModule = device.modules?.printers || device.printers
-
-  console.log('PeripheralsTab Debug:', {
+  console.log('PeripheralsTab Debug - STANDARDIZED ACCESS:', {
     hasModules: !!device.modules,
     moduleKeys: device.modules ? Object.keys(device.modules) : [],
     hasDisplaysModule: !!displaysModule,
@@ -190,8 +188,8 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
     hasPeripheralsData: !!peripheralsData,
     displaysModuleKeys: displaysModule ? Object.keys(displaysModule) : [],
     printersModuleKeys: printersModule ? Object.keys(printersModule) : [],
-    displaysModulePreview: displaysModule ? JSON.stringify(displaysModule).substring(0, 200) : 'No displays',
-    printersModulePreview: printersModule ? JSON.stringify(printersModule).substring(0, 200) : 'No printers',
+    displaysModulePreview: displaysModule ? JSON.stringify(displaysModule).substring(0, 200) : 'No displays module',
+    printersModulePreview: printersModule ? JSON.stringify(printersModule).substring(0, 200) : 'No printers module',
     peripheralsDisplays: peripheralsData?.displays ? Object.keys(peripheralsData.displays) : 'No peripherals displays',
     monitorsCount: peripheralsData?.displays?.monitors?.length || 0
   })
@@ -205,12 +203,11 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
   
   const hasDisplays = displayDevices.length > 0
 
-  // Combine and process printer data from multiple sources
+  // STANDARDIZED: Combine and process printer data only from modules
   const printerDevices = peripheralsData?.printers?.installed_printers || 
                          peripheralsData?.printers?.installedPrinters || 
                          printersModule?.installedPrinters ||
-                         printersModule?.printers ||
-                         legacyPrinters?.printers || []
+                         printersModule?.printers || []
   const hasPrinters = printerDevices.length > 0
 
   // Process other peripheral devices
@@ -389,8 +386,8 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
           {(printerDevices as any[]).filter((p: any) => p.isShared).length > 0 && (
             <Stat label="Shared Printers" value={(printerDevices as any[]).filter((p: any) => p.isShared).length.toString()} />
           )}
-          {legacyPrinters?.activePrintJobs !== undefined && (
-            <Stat label="Active Print Jobs" value={legacyPrinters.activePrintJobs.toString()} />
+          {printersModule?.activePrintJobs !== undefined && (
+            <Stat label="Active Print Jobs" value={printersModule.activePrintJobs.toString()} />
           )}
         </StatBlock>
       </div>

@@ -26,7 +26,9 @@ interface Device {
   id: string
   name: string
   // Modular applications data
-  applications?: ApplicationsData
+  modules?: {
+    applications?: ApplicationsData
+  }
 }
 
 interface ApplicationsWidgetProps {
@@ -35,7 +37,7 @@ interface ApplicationsWidgetProps {
 
 export const ApplicationsWidget: React.FC<ApplicationsWidgetProps> = ({ device }) => {
   // Access applications data from modular structure
-  const applications = device.applications
+  const applications = device.modules?.applications
   const hasApplicationsInfo = applications && applications.installedApps && applications.installedApps.length > 0
 
   if (!hasApplicationsInfo) {

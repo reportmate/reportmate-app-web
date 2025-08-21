@@ -105,32 +105,23 @@ export async function GET() {
                 if (deviceResponse.ok) {
                   const deviceData = await deviceResponse.json()
                   
+                  // Extract data from standardized nested structure only
+                  const deviceModules = deviceData.device?.modules
+                  const inventoryData = deviceModules?.inventory
+                  
                   // Transform to match expected format
                   return {
-                    deviceId: deviceData.metadata?.deviceId || serial,
-                    serialNumber: serial,
-                    name: deviceData.inventory?.deviceName || serial,
-                    lastSeen: deviceData.metadata?.collectedAt,
+                    deviceId: deviceData.device?.deviceId || deviceData.metadata?.deviceId || serial,
+                    serialNumber: deviceData.device?.serialNumber || serial,
+                    name: inventoryData?.deviceName || 'Unknown Device',
+                    lastSeen: deviceData.device?.lastSeen || deviceData.metadata?.collectedAt,
                     status: 'active', // Default since we got recent events
-                    clientVersion: deviceData.metadata?.clientVersion || '1.0.0',
-                    assetTag: deviceData.inventory?.assetTag,
-                    location: deviceData.inventory?.location,
-                    modules: {
-                      inventory: deviceData.inventory,
-                      applications: deviceData.applications,
-                      security: deviceData.security,
-                      services: deviceData.services,
-                      system: deviceData.system,
-                      hardware: deviceData.hardware,
-                      network: deviceData.network,
-                      displays: deviceData.displays,
-                      printers: deviceData.printers,
-                      profiles: deviceData.profiles,
-                      management: deviceData.management,
-                      installs: deviceData.installs
-                    },
+                    clientVersion: deviceData.device?.clientVersion || deviceData.metadata?.clientVersion || '1.0.0',
+                    assetTag: inventoryData?.assetTag,
+                    location: inventoryData?.location,
+                    modules: deviceModules || {},
                     totalEvents: 0,
-                    lastEventTime: deviceData.metadata?.collectedAt
+                    lastEventTime: deviceData.device?.lastSeen || deviceData.metadata?.collectedAt
                   }
                 } else {
                   console.warn(`[DEVICES API] ${timestamp} - 🔄 DEGRADED: Failed to fetch device ${serial}: ${deviceResponse.status}`)
@@ -243,7 +234,7 @@ export async function GET() {
               
               if (deviceDetailResponse.ok) {
                 const deviceDetailData = await deviceDetailResponse.json()
-                if (deviceDetailData && (deviceDetailData.metadata || deviceDetailData.inventory || deviceDetailData.applications)) {
+                if (deviceDetailData && (deviceDetailData.metadata || deviceDetailData.device?.modules)) {
                   fullDeviceData = deviceDetailData
                   console.log('[DEVICES API] ✅ Got full device data with modules for:', serialNumber)
                 }
@@ -267,34 +258,53 @@ export async function GET() {
               else return 'missing'                 // 10+ days
             }
 
-            const lastSeenValue = sourceData.metadata?.collectedAt || device.last_seen
+            const lastSeenValue = sourceData.device?.lastSeen || sourceData.metadata?.collectedAt || device.last_seen
             const calculatedStatus = calculateDeviceStatus(lastSeenValue)
 
+            // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen (same as individual device API)
+            let finalLastSeen = lastSeenValue
+            try {
+              const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(sourceData.device?.serialNumber || sourceData.metadata?.serialNumber || device.serialNumber)}&limit=1`
+              const eventsResponse = await fetch(deviceEventsUrl, {
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Accept': 'application/json'
+                }
+              })
+              
+              if (eventsResponse.ok) {
+                const eventsData = await eventsResponse.json()
+                if (eventsData.success && eventsData.events && eventsData.events.length > 0) {
+                  const latestEvent = eventsData.events[0]
+                  const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
+                  
+                  if (eventTimestamp) {
+                    finalLastSeen = eventTimestamp
+                    console.log(`[DEVICES API] 🕐 Updated lastSeen for ${sourceData.device?.serialNumber || device.serialNumber} from ${lastSeenValue} to ${eventTimestamp}`)
+                  }
+                }
+              }
+            } catch (eventsError) {
+              console.warn(`[DEVICES API] 🕐 Failed to fetch events for timestamp sync for ${sourceData.device?.serialNumber || device.serialNumber}:`, eventsError)
+            }
+
+            // Extract data from standardized nested structure only
+            const deviceModules = sourceData.device?.modules
+            const inventoryData = deviceModules?.inventory
+            const systemData = deviceModules?.system
+
             return {
-              deviceId: sourceData.metadata?.deviceId || device.id || device.deviceId,
-              serialNumber: sourceData.metadata?.serialNumber || device.serialNumber || device.serial_number,
-              name: sourceData.inventory?.deviceName || sourceData.name || device.name || device.serialNumber || device.serial_number,
-              lastSeen: lastSeenValue,
+              deviceId: sourceData.device?.deviceId || sourceData.metadata?.deviceId || device.id,
+              serialNumber: sourceData.device?.serialNumber || sourceData.metadata?.serialNumber || device.serialNumber,
+              name: inventoryData?.deviceName || sourceData.name || device.name || 'Unknown Device',
+              lastSeen: finalLastSeen,
               status: calculatedStatus, // Use calculated status based on actual recent timestamps
-              clientVersion: sourceData.metadata?.clientVersion || device.client_version || '1.0.0',
-              assetTag: sourceData.inventory?.assetTag,
-              location: sourceData.inventory?.location,
-              modules: {
-                inventory: sourceData.inventory,
-                applications: sourceData.applications,
-                security: sourceData.security,
-                services: sourceData.services,
-                system: sourceData.system,
-                hardware: sourceData.hardware,
-                network: sourceData.network,
-                displays: sourceData.displays,
-                printers: sourceData.printers,
-                profiles: sourceData.profiles,
-                management: sourceData.management,
-                installs: sourceData.installs
-              },
+              clientVersion: sourceData.device?.clientVersion || sourceData.metadata?.clientVersion || '1.0.0',
+              assetTag: inventoryData?.assetTag,
+              location: inventoryData?.location,
+              modules: deviceModules || {},
               totalEvents: 0,
-              lastEventTime: sourceData.metadata?.collectedAt || device.last_seen
+              lastEventTime: finalLastSeen
             }
           })
       )

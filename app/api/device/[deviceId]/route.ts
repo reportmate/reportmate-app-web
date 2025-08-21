@@ -331,8 +331,94 @@ export async function GET(
       moduleKeys: Object.keys(data).filter(k => k !== 'metadata')
     }, null, 2).substring(0, 500) + '...')
     
-    // Handle new unified structure - data is the device info directly
-    if (data.metadata) {
+    // Handle new nested Azure Functions format: {success: true, device: {modules: {...}}}
+    if (data.success && data.device && data.device.modules) {
+      console.log('[DEVICE API] Handling new nested Azure Functions format')
+      
+      const device = data.device
+      const modules = device.modules
+      
+      console.log('[DEVICE API] Clean modular response - deviceId:', device.deviceId, 'serialNumber:', device.serialNumber)
+      
+      // Convert any PowerShell objects in the modules
+      console.log('[DEVICE API] Converting PowerShell objects...')
+      const cleanedModules = convertPowerShellObjects(modules) as Record<string, unknown>
+      console.log('[DEVICE API] PowerShell conversion complete')
+      
+      const responseData = {
+        success: true,
+        device: {
+          deviceId: device.deviceId,
+          serialNumber: device.serialNumber,
+          status: 'active',
+          lastSeen: device.lastSeen || device.collectedAt,
+          clientVersion: device.clientVersion || '1.0.0',
+          modules: cleanedModules
+        }
+      }
+      
+      console.log('[DEVICE API] Clean device response prepared:', {
+        deviceId: responseData.device.deviceId,
+        serialNumber: responseData.device.serialNumber,
+        moduleCount: Object.keys(responseData.device.modules).length,
+        moduleNames: Object.keys(responseData.device.modules)
+      })
+      
+      // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
+      try {
+        console.log('[DEVICE API] 🕐 Fetching device events for timestamp synchronization...')
+        const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+        console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
+        
+        const eventsResponse = await fetch(deviceEventsUrl, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+        
+        if (eventsResponse.ok) {
+          const eventsData = await eventsResponse.json()
+          console.log('[DEVICE API] 🕐 Events response:', {
+            success: eventsData.success,
+            hasEvents: Array.isArray(eventsData.events),
+            eventsCount: eventsData.events?.length || 0,
+            firstEvent: eventsData.events?.[0] ? {
+              id: eventsData.events[0].id,
+              ts: eventsData.events[0].ts,
+              device: eventsData.events[0].device
+            } : null
+          })
+          
+          if (eventsData.success && eventsData.events && eventsData.events.length > 0) {
+            const latestEvent = eventsData.events[0] // Events should be sorted by timestamp desc
+            const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
+            
+            if (eventTimestamp) {
+              console.log('[DEVICE API] 🕐 ⚡ UPDATING lastSeen from', responseData.device.lastSeen, 'to', eventTimestamp)
+              responseData.device.lastSeen = eventTimestamp
+            }
+          }
+        } else {
+          console.log('[DEVICE API] 🕐 Failed to fetch events for timestamp sync:', eventsResponse.status)
+        }
+      } catch (eventsError) {
+        console.error('[DEVICE API] 🕐 Error fetching events for timestamp sync:', eventsError)
+        // Continue without timestamp sync if events fetch fails
+      }
+      
+      console.log('[DEVICE API] Final device response prepared', responseData.device.deviceId)
+      
+      return NextResponse.json(responseData, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+    }
+    // Handle legacy unified structure - data is the device info directly
+    else if (data.metadata) {
       const metadata = data.metadata
       
       console.log('[DEVICE API] Clean modular response - deviceId:', metadata.deviceId, 'serialNumber:', metadata.serialNumber)
@@ -456,23 +542,27 @@ export async function GET(
           }
         })
         
-        // Build device name from inventory module
-        const deviceName = data.inventory?.deviceName || 'Unknown Device'
+        // Build device name from inventory module (for logging only)
+        const deviceIdentifier = data.inventory?.deviceName || deviceMetadata.serialNumber || 'Unknown Device'
         
-        // Return properly structured response
+        // Return properly structured response - STANDARDIZED NESTED FORMAT
         const responseData = {
           success: true,
-          name: deviceName,
-          deviceId: deviceMetadata.deviceId,
-          serialNumber: deviceMetadata.serialNumber,
-          status: 'active',
-          lastSeen: deviceMetadata.collectedAt,
-          clientVersion: deviceMetadata.clientVersion,
-          modules: modules
+          device: {
+            // Only essential identifiers and status - NO duplicate data
+            deviceId: deviceMetadata.deviceId,           // Internal UUID (unique)
+            serialNumber: deviceMetadata.serialNumber,   // Human-readable ID (unique) 
+            status: 'active', // Default status since we have recent data
+            lastSeen: deviceMetadata.collectedAt,
+            clientVersion: deviceMetadata.clientVersion,
+            
+            // ALL data comes from modules - frontend must use device.modules.{moduleName} for everything
+            modules: modules
+          }
         }
         
         console.log('[DEVICE API] Returning Azure Functions format with', Object.keys(modules).length, 'modules')
-        console.log('[DEVICE API] Device name from inventory:', deviceName)
+        console.log('[DEVICE API] Device identifier:', deviceIdentifier)
         
         // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
         try {
@@ -505,8 +595,8 @@ export async function GET(
               const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
               
               if (eventTimestamp) {
-                console.log('[DEVICE API] 🕐 ⚡ UPDATING lastSeen (Azure format) from', responseData.lastSeen, 'to', eventTimestamp)
-                responseData.lastSeen = eventTimestamp
+                console.log('[DEVICE API] 🕐 ⚡ UPDATING lastSeen (Azure format) from', responseData.device.lastSeen, 'to', eventTimestamp)
+                responseData.device.lastSeen = eventTimestamp
               }
             }
           } else {

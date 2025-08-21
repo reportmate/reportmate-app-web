@@ -472,7 +472,7 @@ function DevicesPageContent() {
                           {device.name || device.serialNumber}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                          <div>Asset: {device.modules?.inventory?.assetTag || device.assetTag || 'No asset tag'}</div>
+                          <div>Asset: {device.modules?.inventory?.assetTag || 'No asset tag'}</div>
                           <div className="font-mono">{device.serialNumber}</div>
                         </div>
                       </div>
@@ -701,7 +701,7 @@ function DevicesPageContent() {
                         </td>
                         <td className="w-32 px-4 lg:px-6 py-4">
                           <div className="text-sm text-gray-900 dark:text-white truncate">
-                            {device.modules?.inventory?.assetTag || device.assetTag || '-'}
+                            {device.modules?.inventory?.assetTag || '-'}
                           </div>
                         </td>
                         <td className="w-40 px-4 lg:px-6 py-4">

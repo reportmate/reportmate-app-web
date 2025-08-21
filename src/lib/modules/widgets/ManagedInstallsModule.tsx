@@ -29,16 +29,16 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
           const mappedDevice = mapDeviceData(data.device)
           
           console.log('ManagedInstalls: Mapped device data:', {
-            hasInstalls: !!mappedDevice.installs,
-            installsKeys: mappedDevice.installs ? Object.keys(mappedDevice.installs) : [],
-            totalPackages: mappedDevice.installs?.totalPackages || 0,
-            hasConfig: !!(mappedDevice.installs as any)?.config,
-            systemName: (mappedDevice.installs as any)?.systemName
+            hasInstalls: !!mappedDevice.modules?.installs,
+            installsKeys: mappedDevice.modules?.installs ? Object.keys(mappedDevice.modules.installs) : [],
+            totalPackages: mappedDevice.modules?.installs?.totalPackages || 0,
+            hasConfig: !!(mappedDevice.modules?.installs as any)?.config,
+            systemName: (mappedDevice.modules?.installs as any)?.systemName
           })
           
-          if (mappedDevice.installs) {
-            console.log('ManagedInstalls: Using processed installs data:', mappedDevice.installs)
-            setInstallsData(mappedDevice.installs)
+          if (mappedDevice.modules?.installs) {
+            console.log('ManagedInstalls: Using processed installs data:', mappedDevice.modules.installs)
+            setInstallsData(mappedDevice.modules.installs)
           } else {
             console.log('ManagedInstalls: No processed installs data found:', {
               rawHasInstalls: !!(data.device?.modules?.installs),
@@ -288,15 +288,15 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
           const { mapDeviceData } = await import('../../data-processing/device-mapper')
           const mappedDevice = mapDeviceData(data.device)
           
-          if (mappedDevice.installs && (mappedDevice.installs as any).packages) {
-            const packagesData = (mappedDevice.installs as any).packages
+          if (mappedDevice.modules?.installs && (mappedDevice.modules.installs as any).packages) {
+            const packagesData = (mappedDevice.modules.installs as any).packages
             console.log('ManagedPackages: Using processed packages:', packagesData.length, packagesData)
             setPackages(packagesData)
           } else {
             console.log('ManagedPackages: No processed packages found:', {
-              hasInstalls: !!mappedDevice.installs,
-              installsKeys: mappedDevice.installs ? Object.keys(mappedDevice.installs) : [],
-              totalPackages: (mappedDevice.installs as any)?.totalPackages || 0
+              hasInstalls: !!mappedDevice.modules?.installs,
+              installsKeys: mappedDevice.modules?.installs ? Object.keys(mappedDevice.modules.installs) : [],
+              totalPackages: (mappedDevice.modules?.installs as any)?.totalPackages || 0
             })
           }
         }
@@ -477,8 +477,8 @@ const CimianSessionsWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isExpande
         const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          if (data.success && data.device && data.device.installs && data.device.installs.recent_sessions) {
-            setSessions(data.device.installs.recent_sessions)
+          if (data.success && data.device && data.device.modules?.installs && data.device.modules.installs.recent_sessions) {
+            setSessions(data.device.modules.installs.recent_sessions)
           }
         }
       } catch (error) {
@@ -620,8 +620,8 @@ const ManagedInstallsErrorsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) 
           const { mapDeviceData } = await import('../../data-processing/device-mapper')
           const mappedDevice = mapDeviceData(data.device)
           
-          if (mappedDevice.installs && (mappedDevice.installs as any).messages) {
-            const messagesData = (mappedDevice.installs as any).messages
+          if (mappedDevice.modules?.installs && (mappedDevice.modules.installs as any).messages) {
+            const messagesData = (mappedDevice.modules.installs as any).messages
             setErrors(messagesData.errors || [])
             setWarnings(messagesData.warnings || [])
           }

@@ -97,7 +97,7 @@ interface NetworkWidgetProps {
 export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   // Access network data from modular structure or fallback to device level
   const networkModule = device.modules?.network as NetworkInfo | undefined
-  const network = networkModule || device.network
+  const network = networkModule
   
   // Get activeConnection data using the same structure as NetworkTab
   const activeConnectionData = (network as any)?.activeConnection || {
@@ -121,7 +121,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     deviceId: device.id,
     hasModules: !!device.modules,
     hasNetworkModule: !!device.modules?.network,
-    hasDirectNetwork: !!device.network,
+    hasDirectNetwork: false,
     networkKeys: network ? Object.keys(network) : [],
     activeConnectionData: activeConnectionData,
     dnsServers: dnsServers,
