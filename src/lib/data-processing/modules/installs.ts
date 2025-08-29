@@ -289,6 +289,24 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
 
+  // Extract run type and duration from latest session
+  let latestRunType = 'Unknown'
+  let latestDuration = 'Unknown'
+  
+  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
+    const latestSession = installs.cimian.sessions[0] // First session is most recent
+    latestRunType = latestSession.runType || 'Unknown'
+    latestDuration = latestSession.duration || 'Unknown'
+    
+    console.log('[INSTALLS MODULE] Latest session data:', {
+      sessionId: latestSession.sessionId,
+      runType: latestSession.runType,
+      duration: latestSession.duration,
+      durationSeconds: latestSession.durationSeconds,
+      status: latestSession.status
+    })
+  }
+
   const installsInfo: InstallsInfo = {
     totalPackages: packages.length,
     installed: statusCounts.installed,
@@ -301,7 +319,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       type: 'Cimian',
       version: installs.version,
       lastRun: installs.lastCheckIn,
-      duration: installs.cacheStatus?.mvp_last_run?.duration
+      runType: latestRunType,
+      duration: latestDuration
     },
     messages: {
       errors: [],
