@@ -17,10 +17,11 @@ export async function GET() {
       }, { status: 500 })
     }
     
-    let useLocalFallback = true
+    const useLocalFallback = true
     
     if (useLocalFallback) {
       try {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
         const { Pool } = require('pg')
         const pool = new Pool({
           connectionString: process.env.DATABASE_URL

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { formatRelativeTime } from '../../lib/time';
-import { InstallsData } from '../../lib/data-processing/component-data';
+import { InstallsInfo } from '../../lib/data-processing/modules';
 
 interface ManagedInstallsTableProps {
-  data: InstallsData;
+  data: InstallsInfo;
 }
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
@@ -64,6 +64,19 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  // UPDATED: Display proper capitalization while maintaining lowercase comparison
+  const getStatusDisplay = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'installed': return 'Installed';
+      case 'pending': return 'Pending';
+      case 'warning': return 'Warning';
+      case 'error': return 'Error';
+      case 'removed': return 'Removed';
+      default: return status || 'Unknown';
     }
   };
 
@@ -434,7 +447,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
-                            {(pkg.status || 'Unknown').replace(/_/g, ' ')}
+                            {getStatusDisplay(pkg.status || 'Unknown')}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

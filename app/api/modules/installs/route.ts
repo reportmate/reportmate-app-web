@@ -70,35 +70,51 @@ export async function GET() {
           if (eventsData.success && Array.isArray(eventsData.events)) {
             console.log(`[INSTALLS API] ${timestamp} - Extracting installs data from ${eventsData.events.length} events`)
             
-            // Find installs module events
+            // Find installs module events with actual data
             const installsEvents = eventsData.events.filter((event: any) => 
               event.payload && 
               typeof event.payload === 'object' && 
-              event.payload.module_id === 'installs'
+              event.payload.module_id === 'installs' &&
+              event.payload.data && 
+              Array.isArray(event.payload.data)
             )
             
-            const installsData = installsEvents.map((event: any) => ({
-              id: event.device,
-              deviceId: event.device,
-              deviceName: event.device,
-              serialNumber: event.device,
-              lastSeen: event.ts,
-              collectedAt: event.payload.timestamp,
-              dataSize: event.payload.data_size_kb,
-              collectionType: event.payload.collection_type,
-              eventId: event.id,
-              message: event.message
-            }))
+            // Get the most recent installs event with data
+            const latestInstallsEvent = installsEvents.length > 0 ? installsEvents[0] : null
             
-            console.log(`[INSTALLS API] ${timestamp} - Found ${installsData.length} installs events`)
+            if (latestInstallsEvent && latestInstallsEvent.payload.data) {
+              console.log(`[INSTALLS API] ${timestamp} - Found latest installs data with ${latestInstallsEvent.payload.data.length} packages`)
+              
+              return NextResponse.json({
+                success: true,
+                data: latestInstallsEvent.payload.data,
+                timestamp: latestInstallsEvent.ts,
+                device: latestInstallsEvent.device
+              }, {
+                headers: {
+                  'Cache-Control': 'no-cache, no-store, must-revalidate',
+                  'Pragma': 'no-cache', 
+                  'Expires': '0',
+                  'X-Fetched-At': timestamp,
+                  'X-Data-Source': 'azure-functions-events'
+                }
+              })
+            }
             
-            return NextResponse.json(installsData, {
+            // No installs data found in events
+            console.log(`[INSTALLS API] ${timestamp} - No installs data found in events`)
+            
+            return NextResponse.json({
+              success: true,
+              data: [],
+              message: 'No installs data available'
+            }, {
               headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache', 
                 'Expires': '0',
                 'X-Fetched-At': timestamp,
-                'X-Data-Source': 'azure-functions-events'
+                'X-Data-Source': 'azure-functions-events-empty'
               }
             })
           }

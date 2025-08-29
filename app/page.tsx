@@ -5,12 +5,16 @@ export const dynamic = 'force-dynamic'
 
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
+import { useSession } from 'next-auth/react'
 
 export default function HomePage() {
   const router = useRouter()
   
   // Development mode: skip authentication completely
   const isDevelopment = process.env.NODE_ENV === 'development'
+  
+  // Get session data (only used in production)
+  const { data: _session, status } = useSession()
   
   useEffect(() => {
     if (isDevelopment) {
@@ -20,15 +24,11 @@ export default function HomePage() {
       return
     }
     
-    // Production mode: use authentication (imported only when needed)
-    import('next-auth/react').then(({ useSession }) => {
-      const { data: session, status } = useSession()
-      
-      if (status === 'authenticated') {
-        router.push('/dashboard')
-      }
-    })
-  }, [router, isDevelopment])
+    // Production mode: use authentication
+    if (status === 'authenticated') {
+      router.push('/dashboard')
+    }
+  }, [router, isDevelopment, status])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

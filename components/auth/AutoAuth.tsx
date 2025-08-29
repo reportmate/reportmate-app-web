@@ -22,22 +22,24 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 export default function AutoAuth({ children }: AutoAuthProps) {
+  // Always call hooks at the top level
+  const { data: _session, status } = useSession()
+  const pathname = usePathname()
+  
   // In development mode, bypass all authentication
   const isDevelopment = process.env.NODE_ENV === 'development'
   
   console.log('[AutoAuth] NODE_ENV:', process.env.NODE_ENV, 'isDevelopment:', isDevelopment)
   
-  if (isDevelopment) {
-    console.log('[AutoAuth] Development mode - bypassing authentication')
-    return <>{children}</>
-  }
-
-  const { data: session, status } = useSession()
-  const pathname = usePathname()
-
-  console.log('[AutoAuth] Production mode - checking authentication', { status, pathname })
-
   useEffect(() => {
+    // Skip authentication logic in development
+    if (isDevelopment) {
+      console.log('[AutoAuth] Development mode - bypassing authentication')
+      return
+    }
+
+    console.log('[AutoAuth] Production mode - checking authentication', { status, pathname })
+
     // Don't redirect if we're already on a public route
     if (isPublicRoute(pathname)) {
       return
@@ -57,7 +59,12 @@ export default function AutoAuth({ children }: AutoAuthProps) {
       })
       return
     }
-  }, [status, pathname])
+  }, [isDevelopment, status, pathname])
+
+  // In development mode, always render children
+  if (isDevelopment) {
+    return <>{children}</>
+  }
 
   // Show loading for protected routes while checking authentication
   if (!isPublicRoute(pathname) && status === 'loading') {

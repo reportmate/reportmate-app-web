@@ -44,7 +44,7 @@ export default function ProtectedRoute({
           </div>
           <h2 className="text-2xl font-bold text-gray-900">Access Denied</h2>
           <p className="text-gray-600">
-            You don't have the required permissions to access this page.
+            You don&apos;t have the required permissions to access this page.
           </p>
         </div>
       </div>
