@@ -245,7 +245,7 @@ export async function GET() {
             
             const sourceData = fullDeviceData || device
             
-            // Calculate status based on last_seen timestamp
+            // Calculate status based on last_seen timestamp - match device-mapper thresholds
             const calculateDeviceStatus = (lastSeen: string | Date | null) => {
               if (!lastSeen) return 'missing'
               
@@ -253,13 +253,21 @@ export async function GET() {
               const lastSeenDate = new Date(lastSeen)
               const hours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
               
-              if (hours <= 72) return 'active'      // < 3 days
-              else if (hours <= 240) return 'stale' // 3-10 days
-              else return 'missing'                 // 10+ days
+              console.log(`[DEVICES API] [STATUS CALC] Device status calculation:`, {
+                serialNumber,
+                lastSeen,
+                now: now.toISOString(),
+                diffHours: hours.toFixed(2),
+                status: hours < 24 ? 'active' : hours < 24 * 7 ? 'stale' : 'missing'
+              })
+              
+              // Match device-mapper.ts thresholds exactly
+              if (hours < 24) return 'active'         // < 24 hours  
+              else if (hours < 24 * 7) return 'stale' // 24 hours - 7 days
+              else return 'missing'                   // 7+ days
             }
 
             const lastSeenValue = sourceData.device?.lastSeen || sourceData.metadata?.collectedAt || device.last_seen
-            const calculatedStatus = calculateDeviceStatus(lastSeenValue)
 
             // 🕐 TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen (same as individual device API)
             let finalLastSeen = lastSeenValue
@@ -287,6 +295,9 @@ export async function GET() {
             } catch (eventsError) {
               console.warn(`[DEVICES API] 🕐 Failed to fetch events for timestamp sync for ${sourceData.device?.serialNumber || device.serialNumber}:`, eventsError)
             }
+
+            // Calculate status AFTER timestamp synchronization using final timestamp
+            const calculatedStatus = calculateDeviceStatus(finalLastSeen)
 
             // Extract data from standardized nested structure only
             const deviceModules = sourceData.device?.modules

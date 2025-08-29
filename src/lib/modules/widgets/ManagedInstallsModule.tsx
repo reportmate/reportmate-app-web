@@ -18,32 +18,44 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
   useEffect(() => {
     const fetchInstallsData = async () => {
       try {
-        // Use Next.js API route - get PROCESSED device data
-        const response = await fetch(`/api/device/${deviceId}`)
+        // Add cache-busting parameter to ensure fresh data
+        const cacheBuster = `?t=${Date.now()}&fresh=true`
+        
+        // Use Next.js API route - get PROCESSED device data with cache busting
+        const response = await fetch(`/api/device/${deviceId}${cacheBuster}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        
         if (response.ok) {
           const data = await response.json()
-          console.log('ManagedInstalls: Full API response:', data)
-          
-          // Import device mapper to process raw data into structured format
-          const { mapDeviceData } = await import('../../data-processing/device-mapper')
-          const mappedDevice = mapDeviceData(data.device)
-          
-          console.log('ManagedInstalls: Mapped device data:', {
-            hasInstalls: !!mappedDevice.modules?.installs,
-            installsKeys: mappedDevice.modules?.installs ? Object.keys(mappedDevice.modules.installs) : [],
-            totalPackages: mappedDevice.modules?.installs?.totalPackages || 0,
-            hasConfig: !!(mappedDevice.modules?.installs as any)?.config,
-            systemName: (mappedDevice.modules?.installs as any)?.systemName
+          console.log('ManagedInstalls: Fresh API response:', {
+            timestamp: new Date().toISOString(),
+            hasDevice: !!data.device,
+            cacheHeaders: response.headers.get('X-Fetched-At'),
+            dataSource: response.headers.get('X-Data-Source')
           })
           
-          if (mappedDevice.modules?.installs) {
-            console.log('ManagedInstalls: Using processed installs data:', mappedDevice.modules.installs)
-            setInstallsData(mappedDevice.modules.installs)
+          // Import modular data processing functions
+          const { extractInstalls } = await import('../../data-processing/modules')
+          const installsData = extractInstalls(data.device)
+          
+          console.log('ManagedInstalls: Extracted modular data:', {
+            hasInstalls: !!installsData,
+            totalPackages: installsData?.totalPackages || 0,
+            hasConfig: !!installsData?.config,
+            systemName: installsData?.systemName
+          })
+          
+          if (installsData) {
+            console.log('ManagedInstalls: Using modular installs data:', installsData)
+            setInstallsData(installsData)
           } else {
-            console.log('ManagedInstalls: No processed installs data found:', {
-              rawHasInstalls: !!(data.device?.modules?.installs),
-              mappedKeys: Object.keys(mappedDevice),
-              rawInstallsKeys: data.device?.modules?.installs ? Object.keys(data.device.modules.installs) : []
+            console.log('ManagedInstalls: No modular installs data found:', {
+              rawHasInstalls: !!(data.device?.modules?.installs)
             })
           }
         }
@@ -285,18 +297,17 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
           console.log('ManagedPackages: Full API response:', data)
           
           // Import device mapper to process raw data into structured format
-          const { mapDeviceData } = await import('../../data-processing/device-mapper')
-          const mappedDevice = mapDeviceData(data.device)
+          const { extractInstalls } = await import('../../data-processing/modules')
+          const installsData = extractInstalls(data.device)
           
-          if (mappedDevice.modules?.installs && (mappedDevice.modules.installs as any).packages) {
-            const packagesData = (mappedDevice.modules.installs as any).packages
-            console.log('ManagedPackages: Using processed packages:', packagesData.length, packagesData)
+          if (installsData && installsData.packages) {
+            const packagesData = installsData.packages
+            console.log('ManagedPackages: Using modular packages:', packagesData.length, packagesData)
             setPackages(packagesData)
           } else {
-            console.log('ManagedPackages: No processed packages found:', {
-              hasInstalls: !!mappedDevice.modules?.installs,
-              installsKeys: mappedDevice.modules?.installs ? Object.keys(mappedDevice.modules.installs) : [],
-              totalPackages: (mappedDevice.modules?.installs as any)?.totalPackages || 0
+            console.log('ManagedPackages: No modular packages found:', {
+              hasInstalls: !!installsData,
+              totalPackages: installsData?.totalPackages || 0
             })
           }
         }
@@ -616,12 +627,12 @@ const ManagedInstallsErrorsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) 
         if (response.ok) {
           const data = await response.json()
           
-          // Import device mapper to process raw data into structured format
-          const { mapDeviceData } = await import('../../data-processing/device-mapper')
-          const mappedDevice = mapDeviceData(data.device)
+          // Import modular data processing functions
+          const { extractInstalls } = await import('../../data-processing/modules')
+          const installsData = extractInstalls(data.device)
           
-          if (mappedDevice.modules?.installs && (mappedDevice.modules.installs as any).messages) {
-            const messagesData = (mappedDevice.modules.installs as any).messages
+          if (installsData && installsData.messages) {
+            const messagesData = installsData.messages
             setErrors(messagesData.errors || [])
             setWarnings(messagesData.warnings || [])
           }

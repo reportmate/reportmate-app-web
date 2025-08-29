@@ -24,25 +24,21 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
-        {isDevelopment ? (
-          // Development: No authentication at all
+        <AuthProvider>
           <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
             <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-          </ThemeProvider>
-        ) : (
-          // Production: Full authentication
-          <AuthProvider>
-            <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
-              <ErrorBoundary>
+              {isDevelopment ? (
+                // Development: No AutoAuth component
+                children
+              ) : (
+                // Production: Full authentication with AutoAuth
                 <AutoAuth>
                   {children}
                 </AutoAuth>
-              </ErrorBoundary>
-            </ThemeProvider>
-          </AuthProvider>
-        )}
+              )}
+            </ErrorBoundary>
+          </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );

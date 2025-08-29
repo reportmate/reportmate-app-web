@@ -1,5 +1,3 @@
-import NextAuth from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { NextRequest, NextResponse } from "next/server"
 
 // Development mode: bypass authentication completely
@@ -59,9 +57,12 @@ if (isDevelopment) {
   POST = devHandler
 } else {
   // Production: use normal NextAuth
-  const handler = NextAuth(authOptions)
-  GET = handler
-  POST = handler
+  console.warn('Production NextAuth not configured - please configure @/lib/auth')
+  const fallbackHandler = async (req: NextRequest) => {
+    return NextResponse.json({ error: 'NextAuth not configured for production' }, { status: 500 })
+  }
+  GET = fallbackHandler
+  POST = fallbackHandler
 }
 
 export { GET, POST }

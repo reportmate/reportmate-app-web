@@ -358,7 +358,7 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
                 No monitor or display device information is currently available. This could mean:
               </p>
               <ul className="text-sm text-gray-600 dark:text-gray-400 list-disc list-inside">
-                <li>The display module hasn't collected monitor data yet</li>
+                <li>The display module hasn&apos;t collected monitor data yet</li>
                 <li>Display detection may need Windows client updates</li>
                 <li>Check the Hardware tab for graphics card information</li>
               </ul>

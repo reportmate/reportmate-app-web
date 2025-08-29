@@ -13,9 +13,8 @@ import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent 
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
-interface Event extends FleetEvent {
-  // Event structure is now consistent with FleetEvent
-}
+// Use FleetEvent type directly instead of empty interface
+type Event = FleetEvent
 
 // Interface for payload data
 interface EventPayload {

@@ -5,7 +5,7 @@
 
 import { formatExactTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { processSystemTabData } from '../../lib/data-processing/component-data'
+import { extractSystem } from '../../lib/data-processing/modules'
 
 interface DeviceData {
   id: string;
@@ -43,7 +43,7 @@ interface SystemTabProps {
 
 export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   // Process system data using the centralized data processing function
-  const systemTabData = processSystemTabData(device)
+  const systemTabData = extractSystem(device)
   const { services, environment, updates, runningServices, operatingSystem } = systemTabData
   
   // State for services search

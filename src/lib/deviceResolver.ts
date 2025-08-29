@@ -132,7 +132,7 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
     // Always use the local Next.js API which has proper fallback logic
     const baseUrl = process.env.NODE_ENV === 'production'   
       ? `https://${process.env.VERCEL_URL || 'localhost'}`
-      : 'http://localhost:3003'  // Use the actual dev server port
+      : 'http://localhost:3000'  // Use the actual dev server port
     
     // For UUID or Asset Tag, we need to query the local devices API (which handles fallbacks)
     const response = await fetch(`${baseUrl}/api/devices`, {

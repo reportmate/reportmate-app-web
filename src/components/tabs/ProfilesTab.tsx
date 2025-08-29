@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { processProfilesData } from '../../lib/data-processing/component-data'
+import { extractProfiles } from '../../lib/data-processing/modules'
 import { formatRelativeTime } from '../../lib/time'
 
 interface ProfileInfo {
@@ -78,7 +78,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   }, []);
 
   // Process profiles data from the modular device structure
-  const profilesModuleData = processProfilesData(device)
+  const profilesModuleData = extractProfiles(device)
   
   // Check if we have profiles data - prioritize data prop, then processed device data
   const hasProfilesData = data?.profiles?.length > 0 ||

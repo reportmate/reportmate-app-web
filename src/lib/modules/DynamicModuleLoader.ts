@@ -287,7 +287,14 @@ export class DynamicModuleLoader {
       this.modules.set(manifest.id, moduleRuntime)
       
       // Save to localStorage for persistence
-      const installedModules = JSON.parse(localStorage.getItem('reportmate_installed_modules') || '{}')
+      let installedModules: Record<string, any> = {}
+      try {
+        const stored = localStorage.getItem('reportmate_installed_modules') || '{}'
+        installedModules = JSON.parse(stored)
+      } catch (e) {
+        console.warn('[DynamicModuleLoader] Failed to parse installed modules from localStorage, using empty object:', e)
+        installedModules = {}
+      }
       installedModules[manifest.id] = {
         repository: repoUrl,
         branch,
@@ -574,7 +581,14 @@ export class DynamicModuleLoader {
       }
       
       // Save to repositories list
-      const repositories = JSON.parse(localStorage.getItem('reportmate_module_repositories') || '[]')
+      let repositories: ModuleRepository[] = []
+      try {
+        const stored = localStorage.getItem('reportmate_module_repositories') || '[]'
+        repositories = JSON.parse(stored)
+      } catch (e) {
+        console.warn('[DynamicModuleLoader] Failed to parse module repositories from localStorage, using empty array:', e)
+        repositories = []
+      }
       
       // Check if already exists
       const existingIndex = repositories.findIndex((r: ModuleRepository) => r.url === repoUrl)

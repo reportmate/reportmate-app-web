@@ -5,9 +5,9 @@
 
 import React, { useMemo } from 'react'
 import { ApplicationsTable } from '../tables'
-import { processApplicationsData } from '../../lib/data-processing/component-data'
+import { extractApplications } from '../../lib/data-processing/modules/applications'
 
-interface ApplicationInfo {
+interface TabApplicationInfo {
   id: string;
   name: string;
   displayName?: string;
@@ -42,14 +42,14 @@ interface ApplicationsTabProps {
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
   // Process applications data from the modular device structure
-  const applicationsModuleData = processApplicationsData(device)
+  const applicationsModuleData = extractApplications(device?.modules || {})
   
   // Check if we have applications data - prioritize data prop, then processed device data
   const hasApplicationsData = (data?.installedApps?.length ?? 0) > 0 ||
                               (device?.applications?.installedApps?.length ?? 0) > 0 ||
                               (device?.modules?.applications?.installed_applications?.length ?? 0) > 0 || 
                               (device?.modules?.applications?.installedApplications?.length ?? 0) > 0 || 
-                              (applicationsModuleData?.installedApps?.length ?? 0) > 0
+                              (applicationsModuleData?.applications?.length ?? 0) > 0
 
   console.log('🔍 ApplicationsTab Debug:', {
     hasDataProp: !!data,
@@ -59,7 +59,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     hasModuleApplications: !!device?.modules?.applications,
     moduleApplicationsLength: device?.modules?.applications?.installed_applications?.length,
     moduleApplicationsLengthCamelCase: device?.modules?.applications?.installedApplications?.length,
-    hasProcessedData: !!applicationsModuleData?.installedApps?.length,
+    hasProcessedData: !!applicationsModuleData?.applications?.length,
     hasApplicationsData,
     // More detailed debugging
     fullDevice: JSON.stringify(device).substring(0, 1000),
@@ -68,7 +68,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   });
 
   // Transform applications data for the table component
-  let installedApps: ApplicationInfo[] = []
+  let installedApps: any[] = []
   
   console.log('🔍 ApplicationsTab Data Sources Debug:', {
     hasDataProp: !!data?.installedApps?.length,
@@ -79,8 +79,8 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     rawModuleSnakeCaseCount: device?.modules?.applications?.installed_applications?.length || 0,
     hasRawModuleCamelCase: !!device?.modules?.applications?.installedApplications,
     rawModuleCamelCaseCount: device?.modules?.applications?.installedApplications?.length || 0,
-    hasProcessedModuleData: !!applicationsModuleData?.installedApps,
-    processedModuleDataCount: applicationsModuleData?.installedApps?.length || 0,
+    hasProcessedModuleData: !!applicationsModuleData?.applications,
+    processedModuleDataCount: applicationsModuleData?.applications?.length || 0,
     // Check for the actual Windows client field name
     hasWindowsClientField: !!device?.modules?.applications?.InstalledApplications,
     windowsClientFieldCount: device?.modules?.applications?.InstalledApplications?.length || 0,
@@ -100,13 +100,13 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   } else if (device?.modules?.applications?.installed_applications) {
     console.log('⚠️ Falling back to raw module data (snake_case)');
     installedApps = device.modules.applications.installed_applications
-  } else if (applicationsModuleData?.installedApps) {
+  } else if (applicationsModuleData?.applications) {
     console.log('⚠️ Using processed module data');
-    installedApps = applicationsModuleData.installedApps
+    installedApps = applicationsModuleData.applications
   }
 
   // Transform the data to match ApplicationsTable expected format
-  const processedApps = installedApps.map((app: ApplicationInfo, index: number) => ({
+  const processedApps = installedApps.map((app: any, index: number) => ({
     id: app.id || app.name || `app-${index}`,
     name: app.name || app.displayName || 'Unknown Application',
     displayName: app.displayName || app.name,

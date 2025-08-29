@@ -205,7 +205,8 @@ export async function HEAD() {
 async function processDeviceDataLocally(deviceData: any, timestamp: string) {
   console.log(`[LOCAL PROCESSING] ${timestamp} - Starting local device data processing`)
   
-  // Import database connection
+  // Import database connection - use require for dynamic import in function
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { Pool } = require('pg')
   const pool = new Pool({
     connectionString: 'postgresql://reportmate:2sSWbVxyqjXp9WUpeMmzRaC@reportmate-database.postgres.database.azure.com:5432/reportmate?sslmode=require'
@@ -240,13 +241,13 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
     const processedModules = []
     const eventIds = []
     
-    for (const module of enabledModules) {
-      if (deviceData[module]) {
-        console.log(`[LOCAL PROCESSING] ${timestamp} - Processing ${module} module`)
+    for (const moduleName of enabledModules) {
+      if (deviceData[moduleName]) {
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Processing ${moduleName} module`)
         
         // Store module data in module-specific table
         const moduleQuery = `
-          INSERT INTO ${module} (device_id, data, collected_at, created_at, updated_at)
+          INSERT INTO ${moduleName} (device_id, data, collected_at, created_at, updated_at)
           VALUES ($1, $2, NOW(), NOW(), NOW())
           ON CONFLICT (device_id) 
           DO UPDATE SET 
@@ -258,10 +259,10 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
         
         const moduleResult = await pool.query(moduleQuery, [
           deviceId,
-          JSON.stringify(deviceData[module])
+          JSON.stringify(deviceData[moduleName])
         ])
         
-        console.log(`[LOCAL PROCESSING] ${timestamp} - Updated ${module} table with ID: ${moduleResult.rows[0].id}`)
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Updated ${moduleName} table with ID: ${moduleResult.rows[0].id}`)
         
         // Create module-specific event
         const moduleEventQuery = `
@@ -272,30 +273,30 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
         
         // Create user-friendly messages for single and multiple modules
         let friendlyMessage;
-        if (module === 'installs') {
+        if (moduleName === 'installs') {
           friendlyMessage = "Installs module data reported"
-        } else if (module === 'network') {
+        } else if (moduleName === 'network') {
           friendlyMessage = "Network module data reported"
-        } else if (module === 'management') {
+        } else if (moduleName === 'management') {
           friendlyMessage = "Management module data reported"
-        } else if (module === 'system') {
+        } else if (moduleName === 'system') {
           friendlyMessage = "System module data reported"
-        } else if (module === 'hardware') {
+        } else if (moduleName === 'hardware') {
           friendlyMessage = "Hardware module data reported"
-        } else if (module === 'security') {
+        } else if (moduleName === 'security') {
           friendlyMessage = "Security module data reported"
-        } else if (module === 'applications') {
+        } else if (moduleName === 'applications') {
           friendlyMessage = "Applications module data reported"
-        } else if (module === 'inventory') {
+        } else if (moduleName === 'inventory') {
           friendlyMessage = "Inventory module data reported"
-        } else if (module === 'profiles') {
+        } else if (moduleName === 'profiles') {
           friendlyMessage = "Profiles module data reported"
-        } else if (module === 'displays') {
+        } else if (moduleName === 'displays') {
           friendlyMessage = "Displays module data reported"
-        } else if (module === 'printers') {
+        } else if (moduleName === 'printers') {
           friendlyMessage = "Printers module data reported"
         } else {
-          friendlyMessage = `${module.charAt(0).toUpperCase() + module.slice(1)} module data reported`
+          friendlyMessage = `${moduleName.charAt(0).toUpperCase() + moduleName.slice(1)} module data reported`
         }
         
         const moduleEventResult = await pool.query(moduleEventQuery, [
@@ -303,17 +304,17 @@ async function processDeviceDataLocally(deviceData: any, timestamp: string) {
           'info',
           friendlyMessage,
           JSON.stringify({
-            module_id: module,
+            module_id: moduleName,
             collection_type: 'modular',
-            data_size_kb: Math.round(JSON.stringify(deviceData[module]).length / 1024 * 10) / 10,
+            data_size_kb: Math.round(JSON.stringify(deviceData[moduleName]).length / 1024 * 10) / 10,
             processing_method: 'local_fallback',
             timestamp: timestamp
           })
         ])
         
-        processedModules.push(module)
+        processedModules.push(moduleName)
         eventIds.push(moduleEventResult.rows[0].id)
-        console.log(`[LOCAL PROCESSING] ${timestamp} - Created event for ${module} module with ID: ${moduleEventResult.rows[0].id}`)
+        console.log(`[LOCAL PROCESSING] ${timestamp} - Created event for ${moduleName} module with ID: ${moduleEventResult.rows[0].id}`)
       }
     }
     

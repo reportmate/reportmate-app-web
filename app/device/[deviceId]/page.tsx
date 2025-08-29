@@ -7,27 +7,18 @@ import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
-import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing/device-mapper"
+import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
-import { 
-  processApplicationsData,
-  processHardwareData,
-  processNetworkData,
-  processSecurityData,
-  processSystemData,
-  processEventsData,
-  processInstallsData,
-  processProfilesData,
-  ApplicationsData,
-  ApplicationInfo,
-  HardwareData,
-  NetworkData,
-  SecurityData,
-  SystemData,
-  EventsData,
-  InstallsData,
-  ProfilesData
-} from "../../../src/lib/data-processing/component-data"
+// Import modular data processors
+import { extractInstalls, type InstallsInfo } from "../../../src/lib/data-processing/modules/installs"
+import { extractHardware, type HardwareInfo } from "../../../src/lib/data-processing/modules/hardware"
+import { extractNetwork, type NetworkInfo } from "../../../src/lib/data-processing/modules/network"
+import { extractSecurity, type SecurityInfo } from "../../../src/lib/data-processing/modules/security"
+import { extractSystem, type SystemInfo } from "../../../src/lib/data-processing/modules/system"
+import { extractApplications, type ApplicationInfo } from "../../../src/lib/data-processing/modules/applications"
+import { extractPeripherals, type PeripheralInfo } from "../../../src/lib/data-processing/modules/peripherals"
+import { extractEvents, type EventsInfo } from "../../../src/lib/data-processing/modules/events"
+import { extractProfiles, type ProfilesInfo } from "../../../src/lib/data-processing/modules/profiles"
 import { 
   InfoTab,
   InstallsTab,
@@ -476,7 +467,18 @@ export default function DeviceDetailPage() {
   const router = useRouter()
   const deviceId = params.deviceId as string
   console.log('🚨🚨🚨 DEVICE ID FROM PARAMS:', deviceId, '🚨🚨🚨')
-  const [activeTab, setActiveTab] = useState<TabType>('info')
+  
+  // EMERGENCY FIX: Get initial tab from hash synchronously since useEffect doesn't work
+  const getInitialTab = (): TabType => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.replace('#', '') as TabType
+      console.log('🟦🟦🟦 INITIAL TAB FROM HASH:', hash, '🟦🟦🟦')
+      return hash || 'info'
+    }
+    return 'info'
+  }
+  
+  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab())
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
   const [loading, setLoading] = useState(true)
@@ -486,16 +488,18 @@ export default function DeviceDetailPage() {
   const [isResolving, setIsResolving] = useState(false) // Track if we're resolving a device identifier
   const [copySuccess, setCopySuccess] = useState(false) // Copy shareable link functionality
   
-  // Processed component data
+  console.log('🔵🔵🔵 COMPONENT STATE INITIALIZED - CHECKING IF USEEFFECTS RUN 🔵🔵🔵')
+  
+  // Processed component data using modular types
   const [processedData, setProcessedData] = useState<{
-    applications?: ApplicationsData
-    hardware?: HardwareData
-    network?: NetworkData
-    security?: SecurityData
-    system?: SystemData
-    events?: EventsData
-    installs?: InstallsData
-    profiles?: ProfilesData
+    applications?: ApplicationInfo
+    hardware?: HardwareInfo
+    network?: NetworkInfo
+    security?: SecurityInfo
+    system?: SystemInfo
+    events?: EventsInfo
+    installs?: InstallsInfo
+    profiles?: ProfilesInfo
   }>({});
   
   // Helper function to get accent color classes for tabs
@@ -743,6 +747,7 @@ export default function DeviceDetailPage() {
       
       if (identifierType === 'serialNumber') {
         console.log('[DEVICE DETAIL] Already a serial number, proceeding normally')
+        console.log('[DEVICE DETAIL] isResolving should remain false:', isResolving)
         return // This is already a serial number, no need to resolve
       }
       
@@ -777,169 +782,114 @@ export default function DeviceDetailPage() {
     resolveAndRedirect()
   }, [deviceId, router])
   
+  // TEST USEEFFECT - SIMPLE VERSION
+  console.log('🟡🟡🟡 PRE-USEEFFECT DEBUG - Component is rendering successfully and hot reload is working! 🟡🟡🟡')
+  useEffect(() => {
+    console.log('🟨🟨🟨 SIMPLE TEST USEEFFECT RUNNING 🟨🟨🟨')
+    console.log('🟨🟨🟨 deviceId in test useEffect:', deviceId, '🟨🟨🟨')
+  }, [deviceId])
+  
+  console.log('🟡🟡🟡 POST-FIRST-USEEFFECT DEBUG 🟡🟡🟡')
+  
+  // IMMEDIATE IDENTIFIER TYPE CHECK
+  console.log('🧪🧪🧪 IMMEDIATE IDENTIFIER TYPE CHECK:', identifyDeviceIdentifierType(deviceId), 'for deviceId:', deviceId, '🧪🧪🧪')
+  
   useEffect(() => {
     console.log('🔥🔥🔥 DEVICE DETAIL USEEFFECT STARTING 🔥🔥🔥')
     console.log('🔥🔥🔥 isResolving:', isResolving, 'deviceId:', deviceId, '🔥🔥🔥')
+    console.log('🔥🔥🔥 typeof isResolving:', typeof isResolving, 'typeof deviceId:', typeof deviceId, '🔥🔥🔥')
+    
     // Don't fetch device data if we're still resolving the identifier
     if (isResolving) {
       console.log('🔥🔥🔥 EXITING USEEFFECT - STILL RESOLVING 🔥🔥🔥')
       return
     }
     
-    // Only fetch if this is a serial number (resolved identifiers will redirect)
+    // Only fetch if this is a serial number, asset tag, or device name (resolved identifiers will redirect)
     const identifierType = identifyDeviceIdentifierType(deviceId)
     console.log('🔥🔥🔥 IDENTIFIER TYPE:', identifierType, '🔥🔥🔥')
-    if (identifierType !== 'serialNumber') {
-      console.log('🔥🔥🔥 EXITING USEEFFECT - NOT SERIAL NUMBER 🔥🔥🔥')
+    if (identifierType !== 'serialNumber' && identifierType !== 'assetTag' && identifierType !== 'deviceName') {
+      console.log('🔥🔥🔥 EXITING USEEFFECT - NOT SERIAL NUMBER, ASSET TAG, OR DEVICE NAME 🔥🔥🔥')
       return // Let the resolution effect handle this
     }
+    
+    console.log('🔥🔥🔥 USEEFFECT CONDITIONS PASSED - STARTING FETCH 🔥🔥🔥')
+    
     const fetchDeviceData = async () => {
       console.log('🚀🚀🚀 [DEVICE PAGE] FRONTEND FETCH STARTING FOR:', deviceId, ' 🚀🚀🚀')
+      console.log('🚀🚀🚀 FRONTEND FETCH FUNCTION EXECUTING 🚀🚀🚀')
       try {
         setLoading(true)
         
         // Fetch device info from Next.js API route
+        console.log('🚧🚧🚧 ABOUT TO FETCH DEVICE DATA FROM FRONTEND 🚧🚧🚧')
         const deviceResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}`)
+        console.log('🚧🚧🚧 FRONTEND FETCH COMPLETED - RESPONSE RECEIVED 🚧🚧🚧')
+        console.log('🚧🚧🚧 RESPONSE STATUS:', deviceResponse.status, 'OK:', deviceResponse.ok, '🚧🚧🚧')
+        
         if (!deviceResponse.ok) {
+          console.error('🚨 API RESPONSE NOT OK:', {
+            status: deviceResponse.status,
+            statusText: deviceResponse.statusText,
+            url: deviceResponse.url
+          })
+          
+          // Log response body for debugging
+          try {
+            const errorText = await deviceResponse.text()
+            console.error('🚨 ERROR RESPONSE BODY:', errorText.substring(0, 500))
+          } catch (e) {
+            console.error('🚨 Could not read error response body:', e)
+          }
+          
           if (deviceResponse.status === 404) {
             setError('Device not found')
             return
+          } else if (deviceResponse.status === 500) {
+            console.error('🚨 Server error (500) - API may have module loading issues')
+            setError('Server error - please try refreshing the page')
+            return
           }
-          throw new Error('Failed to fetch device information')
+          throw new Error(`Failed to fetch device information (${deviceResponse.status}: ${deviceResponse.statusText})`)
         }
         
-        const deviceData = await deviceResponse.json()
+        let deviceData
+        try {
+          console.log('🔥🔥🔥 ABOUT TO PARSE JSON FROM DEVICE RESPONSE 🔥🔥🔥')
+          deviceData = await deviceResponse.json()
+          console.log('🔥🔥🔥 JSON PARSING SUCCESSFUL 🔥🔥🔥')
+        } catch (jsonError) {
+          console.error('Failed to parse device response JSON:', jsonError)
+          setError('Invalid response from server')
+          return
+        }
+        
         console.log('Device API Response:', {
           hasSuccess: 'success' in deviceData,
           successValue: deviceData.success,
           hasDevice: 'device' in deviceData,
           deviceValue: !!deviceData.device,
-          responseKeys: Object.keys(deviceData),
-          responseSize: JSON.stringify(deviceData).length
+          responseKeys: Object.keys(deviceData)
         })
         
+        console.log('🔥🔥🔥 PARSED DEVICE DATA SUCCESSFULLY 🔥🔥🔥')
+        
+        console.log('🚀🚀🚀 DEVICE SUCCESS CHECK:', deviceData.success && deviceData.device, '🚀🚀🚀')
+        console.log('🚀🚀🚀 SUCCESS VALUE:', deviceData.success, 'DEVICE EXISTS:', !!deviceData.device, '🚀🚀🚀')
+        
         if (deviceData.success && deviceData.device) {
-          // TEMPORARY: Bypass device mapper for debugging
-          console.log('DEBUG: Device data received:', {
-            hasDevice: !!deviceData.device,
-            deviceKeys: Object.keys(deviceData.device || {}),
-            serialNumber: deviceData.device?.serialNumber,
-            hasModules: !!deviceData.device?.modules,
-            moduleKeys: deviceData.device?.modules ? Object.keys(deviceData.device.modules) : [],
-            inventoryDeviceName: deviceData.device?.modules?.inventory?.deviceName
-          });
+          console.log('✅ DEVICE DATA VALIDATION PASSED - ENTERING PROCESSING SECTION ✅')
+          console.log('🔧 USING MODULAR DEVICE MAPPER - PROCESSING DEVICE DATA')
           
-          // Use device data directly without mapper for now
-          const directDevice = {
-            ...deviceData.device,
-            id: deviceData.device.deviceId,  // Use deviceId as the primary identifier
-            name: deviceData.device.modules?.inventory?.deviceName || deviceData.device.serialNumber || 'Unknown Device',
-            totalEvents: 0,
-            lastEventTime: deviceData.device.lastSeen || new Date().toISOString()
-          };
+          // Use the proper modular device mapper
+          const processedDevice = mapDeviceData(deviceData.device);
           
-          console.log('🔍 DEBUG: Direct device creation detailed analysis:');
-          console.log('  📥 Raw device data modules:', JSON.stringify(deviceData.device?.modules, null, 2));
-          console.log('  🎯 Target inventory device name:', deviceData.device?.modules?.inventory?.deviceName);
-          console.log('  📋 Direct device properties:');
-          console.log('    - id:', directDevice.id);
-          console.log('    - name:', directDevice.name);
-          console.log('    - serialNumber:', directDevice.serialNumber);
-          console.log('    - modules present:', !!directDevice.modules);
-          console.log('  🧪 Module analysis:');
-          if (directDevice.modules) {
-            console.log('    - modules keys:', Object.keys(directDevice.modules));
-            // FIXED: Check specifically for hardware module
-            if (directDevice.modules.hardware) {
-              console.log('    - ✅ HARDWARE module present:', !!directDevice.modules.hardware);
-              console.log('    - hardware keys:', Object.keys(directDevice.modules.hardware));
-              console.log('    - hardware processor:', directDevice.modules.hardware.processor?.name);
-              console.log('    - hardware memory:', directDevice.modules.hardware.memory?.totalPhysical);
-              console.log('    - hardware storage count:', directDevice.modules.hardware.storage?.length);
-              console.log('  🔧 Full hardware data (first 1000 chars):', JSON.stringify(directDevice.modules.hardware, null, 2).substring(0, 1000));
-            } else {
-              console.log('    - ❌ NO hardware module found');
-            }
-            if (directDevice.modules.inventory) {
-              console.log('    - inventory module present:', !!directDevice.modules.inventory);
-              console.log('    - inventory deviceName:', directDevice.modules.inventory.deviceName);
-              console.log('  🔍 Full inventory data:', JSON.stringify(directDevice.modules.inventory, null, 2));
-            } else {
-              console.log('    - ❌ NO inventory module found');
-            }
-          } else {
-            console.log('    - ❌ NO modules found on directDevice');
-          }
+          console.log('🔍 PROCESSED DEVICE:', processedDevice);
           
-          // Process the raw device data through our mapper
-          console.log('About to call mapDeviceData with:', {
-            deviceData: !!deviceData.device,
-            mapDeviceDataType: typeof mapDeviceData,
-            mapDeviceDataExists: !!mapDeviceData
-          });
+          // Set the processed device data
+          setDeviceInfo(processedDevice);
           
-          // Test if the function is available
-          if (typeof mapDeviceData !== 'function') {
-            console.error('mapDeviceData is not a function!', { mapDeviceData });
-            // Fallback to direct device if mapper not available
-            setDeviceInfo(directDevice)
-          } else {
-            try {
-              // Process the raw device data through our mapper
-              const processedDevice = mapDeviceData(deviceData.device)
-              console.log('🎯 Processed device with mapDeviceData:', {
-                hasApplications: !!processedDevice.applications,
-                applicationsLength: processedDevice.applications?.length,
-                originalModules: !!deviceData.device?.modules?.applications,
-                processedKeys: Object.keys(processedDevice)
-              });
-              setDeviceInfo(processedDevice)
-            } catch (mappingError) {
-              console.error('Error in mapDeviceData:', mappingError);
-              // Fallback to direct device if mapping fails
-              setDeviceInfo(directDevice)
-            }
-          }
-          
-          // Process component-specific data with error handling
-          try {
-            console.log('[COMPONENT DATA] About to process device data:', {
-              hasDevice: !!deviceData.device,
-              deviceKeys: Object.keys(deviceData.device || {}),
-              hasInstalls: !!deviceData.device?.installs,
-              installsKeys: deviceData.device?.installs ? Object.keys(deviceData.device.installs) : [],
-              installsData: deviceData.device?.installs
-            })
-            
-            console.log('🚨🚨🚨 CALLING PROCESS INSTALLS DATA v2 🚨🚨🚨')
-            console.log('[COMPONENT DATA] Processing installs data...')
-            const installsData = processInstallsData(deviceData.device)
-            console.log('🚨🚨🚨 PROCESS INSTALLS DATA RESULT v2 🚨🚨🚨')
-            console.log('[COMPONENT DATA] Processed installs result:', installsData)
-            
-            const componentData = {
-              applications: processApplicationsData(deviceData.device),
-              hardware: processHardwareData(deviceData.device),
-              network: processNetworkData(deviceData.device),
-              security: processSecurityData(deviceData.device),
-              system: processSystemData(deviceData.device),
-              installs: installsData,
-              profiles: processProfilesData(deviceData.device)
-            }
-            setProcessedData(componentData)
-          } catch (dataProcessingError) {
-            console.error('Error processing component data:', dataProcessingError);
-            // Set empty defaults if processing fails
-            setProcessedData({
-              applications: { totalApps: 0, installedApps: [], recentlyUpdated: 0, categoryBreakdown: {} },
-              hardware: { cpu: 'Unknown', memory: 'Unknown', storage: 'Unknown', graphics: 'Unknown', architecture: 'Unknown' },
-              network: { connectionType: 'Unknown', ipAddress: 'Unknown', macAddress: 'Unknown', hostname: 'Unknown', gateway: 'Unknown', dns: 'Unknown', primaryInterface: 'Unknown', vpnActive: false, interfaces: [], wifiNetworks: [], vpnConnections: [], routes: [] },
-              security: { overallScore: 0, issues: 0, compliant: 0, warnings: 0, lastScan: 'Unknown', features: [] },
-              system: { osVersion: 'Unknown', uptime: 'Unknown', bootTime: 'Unknown', kernelVersion: 'Unknown', processes: 0, services: 0, patches: 0 },
-              installs: { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] },
-              profiles: { totalProfiles: 0, systemProfiles: 0, userProfiles: 0, profiles: [] }
-            })
-          }
+          // Processing complete - all data is now in the processed device object
         } else {
           console.error('Invalid device data structure:', deviceData)
           setError('Invalid device data received')
@@ -955,7 +905,15 @@ export default function DeviceDetailPage() {
           console.log('🔥🔥🔥 [DEVICE PAGE] FRONTEND EVENTS RESPONSE RECEIVED 🔥🔥🔥')
           
           if (eventsResponse.ok) {
-            const eventsData = await eventsResponse.json()
+            let eventsData
+            try {
+              eventsData = await eventsResponse.json()
+            } catch (jsonError) {
+              console.error('Failed to parse events response JSON:', jsonError)
+              setEvents([])
+              return
+            }
+            
             console.log('[DEVICE PAGE] 🔄 Events data structure:', {
               hasSuccess: 'success' in eventsData,
               successValue: eventsData.success,
@@ -1037,11 +995,11 @@ export default function DeviceDetailPage() {
                 console.log('[DEVICE PAGE] 🕐 ❌ No events found in response (length:', eventsData.events?.length, ')')
               }
               
-              // Process events data for the component
-              const eventsComponentData = processEventsData(deviceData.device, eventsData.events)
+              // Use modular events processing
+              const eventsModularData = extractEvents(deviceData.device?.modules || {}, eventsData.events)
               setProcessedData(prev => ({
                 ...prev,
-                events: eventsComponentData
+                events: eventsModularData
               }))
             }
           } else {
@@ -1065,8 +1023,32 @@ export default function DeviceDetailPage() {
     fetchDeviceData()
   }, [deviceId, isResolving])
   
+  // IMMEDIATE FIX: Compute install data directly from deviceInfo when available
+  const computedInstallsData = (deviceInfo as any)?.installs ? (() => {
+    try {
+      console.log('💥 COMPUTED INSTALLS - Processing installs data directly from deviceInfo')
+      console.log('💥 COMPUTED INSTALLS - deviceInfo.installs:', (deviceInfo as any).installs)
+      const result = (deviceInfo as any).installs
+      console.log('💥 COMPUTED INSTALLS - Processed result:', result)
+      return result
+    } catch (error) {
+      console.error('💥 COMPUTED INSTALLS - Error processing:', error)
+      return { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] }
+    }
+  })() : { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] }
+
+  console.log('💥 COMPUTED INSTALLS - Final computed data:', computedInstallsData)
+  console.log('💥 DEBUG STATE - deviceInfo:', deviceInfo)
+  console.log('💥 DEBUG STATE - loading:', loading)
+  console.log('💥 DEBUG STATE - isResolving:', isResolving)
+  console.log('💥 DEBUG STATE - error:', error)
+
   if (loading || isResolving) {
-    return <DeviceDetailSkeleton activeTab={activeTab} />
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <DeviceDetailSkeleton />
+      </div>
+    )
   }
   
   if (error || !deviceInfo) {
@@ -1305,13 +1287,13 @@ export default function DeviceDetailPage() {
           <InfoTab device={deviceInfo} />
         </div>
         <div className={activeTab === 'installs' ? 'block' : 'hidden'}>
-          <InstallsTab device={deviceInfo} data={processedData.installs} />
+          <InstallsTab device={deviceInfo} data={computedInstallsData} />
         </div>
         <div className={activeTab === 'profiles' ? 'block' : 'hidden'}>
           <ProfilesTab device={deviceInfo} data={processedData.profiles} />
         </div>
         <div className={activeTab === 'applications' ? 'block' : 'hidden'}>
-          <ApplicationsTab device={deviceInfo} data={processedData.applications} />
+          <ApplicationsTab device={deviceInfo} data={undefined} />
         </div>
         <div className={activeTab === 'management' ? 'block' : 'hidden'}>
           <ManagementTab device={deviceInfo} />
@@ -1332,7 +1314,7 @@ export default function DeviceDetailPage() {
           <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
         </div>
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
-          <EventsTab device={deviceInfo} events={events} data={processedData.events} />
+          <EventsTab device={deviceInfo} events={events} data={processedData.events as unknown as Record<string, unknown>} />
         </div>
       </div>
     </div>

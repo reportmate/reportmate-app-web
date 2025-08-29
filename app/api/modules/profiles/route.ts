@@ -6,6 +6,7 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { Pool } = require('pg')
     const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 
