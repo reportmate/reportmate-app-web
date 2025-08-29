@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react'
 import { NetworkTable } from '../tables'
+import { extractNetwork } from '../../lib/data-processing/modules'
 
 interface NetworkTabProps {
   device: any
@@ -82,22 +83,28 @@ const CopyableValue: React.FC<{
 }
 
 export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
-  // Use processed network data if available, otherwise use device data
-  const networkData = data || device?.network || {}
+  console.log('🌐🌐🌐🌐🌐 NETWORK TAB COMPONENT RENDERING 🌐🌐🌐🌐🌐');
+  console.log('🌐🌐🌐 NETWORK TAB - Component starting with device:', device?.deviceId || 'undefined');
+  console.log('🌐🌐🌐 NETWORK TAB - Data prop:', data);
+  console.log('🌐🌐🌐 NETWORK TAB - Device object keys:', device ? Object.keys(device) : 'no device');
   
-  console.log('NetworkTab rendering with data:', {
-    hasData: !!data,
-    hasDeviceNetwork: !!device?.network,
-    dataKeys: data ? Object.keys(data) : [],
+  // Process network data directly like ApplicationsTab does
+  const processedNetworkData = data || extractNetwork(device)
+  console.log('🌐🌐🌐 NETWORK TAB - Processed data from processNetworkData:', processedNetworkData)
+  
+  // Use processed data as primary source, fallback to data prop
+  const networkData = processedNetworkData || data || {}
+  
+  console.log('🌐🌐🌐 NetworkTab rendering with final networkData:', {
+    hasProcessedData: !!processedNetworkData,
+    hasDataProp: !!data,
     connectionType: networkData.connectionType,
     interfacesCount: networkData.interfaces?.length || 0,
+    wifiNetworksCount: networkData.wifiNetworks?.length || 0,
+    vpnConnectionsCount: networkData.vpnConnections?.length || 0,
     macAddress: networkData.macAddress,
-    activeConnectionData: data ? {
-      interfaceName: data.interfaceName,
-      friendlyName: data.friendlyName,
-      ipAddress: data.ipAddress,
-      gateway: data.gateway
-    } : null
+    ipAddress: networkData.ipAddress,
+    ssid: networkData.ssid
   })
 
   return (
@@ -175,7 +182,14 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
             <div className="text-sm text-gray-500 dark:text-gray-500">DNS Servers</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
-                value={networkData.dns} 
+                value={Array.isArray(networkData.dns) 
+                  ? networkData.dns.join(', ') 
+                  : typeof networkData.dns === 'object' && networkData.dns?.servers 
+                    ? networkData.dns.servers.join(', ')
+                    : typeof networkData.dns === 'string' 
+                      ? networkData.dns 
+                      : undefined
+                } 
                 className="justify-center" 
                 placeholder="N/A"
               />
@@ -212,7 +226,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 <div className="flex justify-between">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Active Interfaces:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-white">
-                    {networkData.interfaces?.filter((iface: any) => iface.status === 'Connected').length || 0}
+                    {networkData.interfaces?.filter((iface: any) => iface.status === 'Active' || iface.status === 'Connected').length || 0}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -289,7 +303,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {network.channel}
+                        {network.channel && network.channel !== 'Unknown' ? network.channel : ''}
                       </td>
                     </tr>
                   ))}
@@ -333,65 +347,90 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {networkData.interfaces
                   .sort((a: any, b: any) => {
-                    // First priority: Connected status (Connected before Disconnected/Down)
-                    const aConnected = a.status === 'Connected' ? 1 : 0;
-                    const bConnected = b.status === 'Connected' ? 1 : 0;
-                    if (aConnected !== bConnected) {
-                      return bConnected - aConnected; // Connected first
+                    // First priority: Active status (Active/Connected before Disconnected)
+                    const aActive = (a.status === 'Active' || a.status === 'Connected') ? 1 : 0;
+                    const bActive = (b.status === 'Active' || b.status === 'Connected') ? 1 : 0;
+                    if (aActive !== bActive) {
+                      return bActive - aActive; // Active first
                     }
                     
-                    // Second priority: Wireless interfaces first (among connected interfaces)
-                    const aWireless = (a.type?.toLowerCase().includes('wireless') || a.type?.toLowerCase().includes('802.11')) ? 1 : 0;
-                    const bWireless = (b.type?.toLowerCase().includes('wireless') || b.type?.toLowerCase().includes('802.11')) ? 1 : 0;
-                    if (aWireless !== bWireless) {
-                      return bWireless - aWireless; // Wireless first
+                    // Second priority: Wired/Ethernet interfaces first (among active interfaces)
+                    const aWired = (a.type?.toLowerCase().includes('ethernet') || a.type?.toLowerCase().includes('wired')) ? 1 : 0;
+                    const bWired = (b.type?.toLowerCase().includes('ethernet') || b.type?.toLowerCase().includes('wired')) ? 1 : 0;
+                    if (aWired !== bWired) {
+                      return bWired - aWired; // Wired/Ethernet first
                     }
                     
                     // Third priority: Sort by interface name
                     return (a.name || '').localeCompare(b.name || '');
                   })
-                  .map((iface: any, index: number) => (
-                  <tr key={iface.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white">{iface.name}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        iface.type?.toLowerCase().includes('wireless') || iface.type?.toLowerCase().includes('802.11')
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                      }`}>
-                        {iface.type || 'Unknown'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        iface.status === 'Connected'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {iface.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                      <CopyableValue 
-                        value={iface.ipAddress} 
-                        className="font-mono" 
-                        placeholder="N/A"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-white">
-                      <CopyableValue 
-                        value={iface.macAddress} 
-                        className="font-mono" 
-                        placeholder="N/A"
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {iface.mtu || 'N/A'}
-                    </td>
-                  </tr>
-                ))}
+                  .map((iface: any, index: number) => {
+                    const isActive = iface.status === 'Connected' || iface.status === 'Active';
+                    const isDisconnected = iface.status === 'Disconnected';
+                    
+                    return (
+                    <tr key={iface.name || index} className={`${
+                      isDisconnected 
+                        ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700' 
+                        : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}>
+                      <td className="px-6 py-4">
+                        <div className={`text-sm font-medium ${
+                          isDisconnected 
+                            ? 'text-gray-400 dark:text-gray-500' 
+                            : 'text-gray-900 dark:text-white'
+                        }`}>
+                          {iface.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {isActive ? (
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            iface.type?.toLowerCase().includes('wireless') || iface.type?.toLowerCase().includes('802.11')
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                          }`}>
+                            {iface.type || 'Unknown'}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">
+                            {iface.type || 'Unknown'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {isActive ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Active
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">
+                            Disconnected
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                        <CopyableValue 
+                          value={iface.ipAddress && iface.ipAddress !== 'N/A' ? iface.ipAddress : ''} 
+                          className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                          placeholder=""
+                          showCopy={iface.ipAddress && iface.ipAddress !== 'N/A'}
+                        />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+                        <CopyableValue 
+                          value={iface.macAddress && iface.macAddress !== 'N/A' ? iface.macAddress : ''} 
+                          className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                          placeholder=""
+                          showCopy={iface.macAddress && iface.macAddress !== 'N/A'}
+                        />
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
+                      </td>
+                    </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>

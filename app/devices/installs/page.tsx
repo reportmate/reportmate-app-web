@@ -158,8 +158,8 @@ function InstallsPageContent() {
             }
             
             // Process the device's installs data using the same logic as individual device pages
-            const { processInstallsData } = await import('../../../src/lib/data-processing/component-data')
-            const installsData = processInstallsData(deviceData.device)
+            const { extractInstalls } = await import('../../../src/lib/data-processing/modules')
+            const installsData = extractInstalls(deviceData.device)
             
             // Include devices that have a managed installs system (config) OR packages
             // This shows devices with Cimian/Munki configured even if no packages currently assigned

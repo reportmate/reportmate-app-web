@@ -135,108 +135,21 @@ export async function GET(
     if (!response.ok) {
       console.error('[DEVICE API] Azure Functions API error:', response.status, response.statusText)
       
+      // TEMPORARILY DISABLED - DATABASE FALLBACK CAUSING WEBPACK ISSUES
+      console.log('[DEVICE API] Database fallback temporarily disabled due to webpack module loading issues')
+      /*
       // Try direct database fallback first (for development/troubleshooting)
       console.log('[DEVICE API] Trying direct database fallback...')
       
       try {
         const { pool } = await import('../../../../src/lib/db')
         
-        // Query device basic info
-        const deviceQuery = `
-          SELECT 
-            id, device_id, name, serial_number, os, status, last_seen, 
-            model, manufacturer, created_at, updated_at
-          FROM devices 
-          WHERE id = $1 OR serial_number = $1
-          LIMIT 1`
-        
-        const deviceResult = await pool.query(deviceQuery, [deviceId])
-        
-        if (deviceResult.rows.length > 0) {
-          const deviceRow = deviceResult.rows[0]
-          
-          // Get module data for this device
-          const validModules = [
-            'applications', 'displays', 'hardware', 'installs', 'inventory',
-            'management', 'network', 'peripherals', 'printers', 'profiles', 'security', 'system'
-          ]
-          
-          const modules: Record<string, unknown> = {}
-          let latestCollectionTime = null
-          
-          // Query each module table for this device's data
-          for (const moduleName of validModules) {
-            try {
-              const moduleQuery = `
-                SELECT data, collected_at, created_at
-                FROM ${moduleName} 
-                WHERE device_id = $1
-                ORDER BY created_at DESC
-                LIMIT 1`
-              
-              const moduleResult = await pool.query(moduleQuery, [deviceRow.id])
-              
-              if (moduleResult.rows.length > 0 && moduleResult.rows[0].data) {
-                let moduleData = moduleResult.rows[0].data
-                
-                // Convert PowerShell object strings to proper JSON objects
-                moduleData = convertPowerShellObjects(moduleData)
-                
-                if (moduleResult.rows[0].collected_at) {
-                  moduleData.collectedAt = moduleResult.rows[0].collected_at.toISOString()
-                  
-                  if (!latestCollectionTime || moduleResult.rows[0].collected_at > latestCollectionTime) {
-                    latestCollectionTime = moduleResult.rows[0].collected_at
-                  }
-                }
-                
-                modules[moduleName] = moduleData
-                console.log(`[DEVICE API] ✅ Retrieved and processed ${moduleName} data from database`)
-              }
-            } catch (moduleError) {
-              console.warn(`[DEVICE API] ❌ Failed to query ${moduleName} table:`, moduleError)
-              continue
-            }
-          }
-          
-          // Build metadata
-          const metadata = {
-            deviceId: deviceRow.device_id,
-            serialNumber: deviceRow.serial_number,
-            collectedAt: latestCollectionTime ? latestCollectionTime.toISOString() : deviceRow.last_seen?.toISOString(),
-            clientVersion: '1.0.0'
-          }
-          
-          // Return device data in expected format
-          const responseData = {
-            success: true,
-            device: {
-              deviceId: metadata.deviceId,
-              serialNumber: metadata.serialNumber,
-              status: 'active',
-              lastSeen: metadata.collectedAt,
-              clientVersion: metadata.clientVersion,
-              modules: modules
-            },
-            source: 'direct-database'
-          }
-          
-          console.log(`[DEVICE API] ✅ Successfully retrieved device data from database with ${Object.keys(modules).length} modules`)
-          
-          return NextResponse.json(responseData, {
-            headers: {
-              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
-          })
-        } else {
-          console.log('[DEVICE API] Device not found in direct database query')
-        }
+        // [Database fallback code temporarily commented out]
         
       } catch (dbError) {
         console.error('[DEVICE API] Direct database fallback failed:', dbError)
       }
+      */
       
       // If database fallback failed, try sample data
       console.log('[DEVICE API] Falling back to sample data')
@@ -350,7 +263,7 @@ export async function GET(
         device: {
           deviceId: device.deviceId,
           serialNumber: device.serialNumber,
-          status: 'active',
+          // Let frontend calculate status based on lastSeen timestamp
           lastSeen: device.lastSeen || device.collectedAt,
           clientVersion: device.clientVersion || '1.0.0',
           modules: cleanedModules
@@ -409,6 +322,22 @@ export async function GET(
       
       console.log('[DEVICE API] Final device response prepared', responseData.device.deviceId)
       
+      // DEBUG: Log network module structure for debugging
+      if (responseData.device.modules.network) {
+        const networkModule = responseData.device.modules.network as any
+        console.log('[DEVICE API] 🔍 NETWORK MODULE DEBUG:', {
+          hasNetwork: !!responseData.device.modules.network,
+          networkKeys: Object.keys(responseData.device.modules.network || {}),
+          networkStructure: JSON.stringify(responseData.device.modules.network, null, 2).substring(0, 1000),
+          interfaces: networkModule?.interfaces,
+          wifiNetworks: networkModule?.wifiNetworks,
+          vpnConnections: networkModule?.vpnConnections,
+          dnsConfiguration: networkModule?.dnsConfiguration
+        })
+      } else {
+        console.log('[DEVICE API] 🔍 NETWORK MODULE DEBUG: No network module found in response')
+      }
+      
       return NextResponse.json(responseData, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -447,10 +376,10 @@ export async function GET(
       const responseData = {
         success: true,
         device: {
-          // Only essential identifiers and status - NO duplicate data
+          // Only essential identifiers - NO duplicate data
           deviceId: metadata.deviceId,           // Internal UUID (unique)
           serialNumber: metadata.serialNumber,   // Human-readable ID (unique)
-          status: 'active', // Default status since we have recent data
+          // Let frontend calculate status based on lastSeen timestamp
           lastSeen: metadata.collectedAt,
           clientVersion: metadata.clientVersion,
           
@@ -549,10 +478,10 @@ export async function GET(
         const responseData = {
           success: true,
           device: {
-            // Only essential identifiers and status - NO duplicate data
+            // Only essential identifiers - NO duplicate data
             deviceId: deviceMetadata.deviceId,           // Internal UUID (unique)
             serialNumber: deviceMetadata.serialNumber,   // Human-readable ID (unique) 
-            status: 'active', // Default status since we have recent data
+            // Let frontend calculate status based on lastSeen timestamp
             lastSeen: deviceMetadata.collectedAt,
             clientVersion: deviceMetadata.clientVersion,
             
