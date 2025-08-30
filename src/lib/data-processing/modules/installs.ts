@@ -163,9 +163,10 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
 /**
  * Extract install status information from device modules
  * FIXES: Status capitalization issues by enforcing standard format
+ * VERSION: 2025-08-30 22:25 - Force refresh to verify duration extraction
  */
 export function extractInstalls(deviceModules: any): InstallsInfo {
-  console.log('[INSTALLS MODULE] === STARTING EXTRACT INSTALLS ===')
+  console.log('[INSTALLS MODULE] === STARTING EXTRACT INSTALLS v2025-08-30 ===')
   console.log('[INSTALLS MODULE] Input deviceModules:', {
     hasDeviceModules: !!deviceModules,
     deviceModulesType: typeof deviceModules,
@@ -289,22 +290,39 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
 
-  // Extract run type and duration from latest session
+  // Extract run type and duration from latest COMPLETED session
   let latestRunType = 'Unknown'
   let latestDuration = 'Unknown'
   
   if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    const latestSession = installs.cimian.sessions[0] // First session is most recent
-    latestRunType = latestSession.runType || 'Unknown'
-    latestDuration = latestSession.duration || 'Unknown'
+    // Find the most recent completed session (not running)
+    const completedSession = installs.cimian.sessions.find((session: any) => 
+      session.status === 'completed' && session.duration && session.duration !== '00:00:00'
+    )
     
-    console.log('[INSTALLS MODULE] Latest session data:', {
-      sessionId: latestSession.sessionId,
-      runType: latestSession.runType,
-      duration: latestSession.duration,
-      durationSeconds: latestSession.durationSeconds,
-      status: latestSession.status
-    })
+    if (completedSession) {
+      latestRunType = completedSession.runType || 'Unknown'
+      latestDuration = completedSession.duration || 'Unknown'
+      
+      console.log('[INSTALLS MODULE] Using completed session data:', {
+        sessionId: completedSession.sessionId,
+        runType: completedSession.runType,
+        duration: completedSession.duration,
+        status: completedSession.status
+      })
+    } else {
+      // Fallback to first session if no completed sessions found
+      const latestSession = installs.cimian.sessions[0]
+      latestRunType = latestSession.runType || 'Unknown'
+      latestDuration = latestSession.duration || 'Unknown'
+      
+      console.log('[INSTALLS MODULE] Using latest session data (may be running):', {
+        sessionId: latestSession.sessionId,
+        runType: latestSession.runType,
+        duration: latestSession.duration,
+        status: latestSession.status
+      })
+    }
   }
 
   const installsInfo: InstallsInfo = {
