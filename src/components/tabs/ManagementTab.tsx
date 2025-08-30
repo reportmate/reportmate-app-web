@@ -133,7 +133,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             </svg>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Device Management Services</h1>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Device Management Service</h1>
             <p className="text-base text-gray-600 dark:text-gray-400">Enrollment, Policies, and Identity Status</p>
           </div>
         </div>
