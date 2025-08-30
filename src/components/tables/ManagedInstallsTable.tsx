@@ -312,6 +312,14 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       Managed Packages:
                       <span className="text-sm font-semibold text-gray-900 dark:text-white"> {data.totalPackages || 0}</span>
+                      {data.cacheSizeMb && (
+                        <>
+                          <span className="text-gray-500 dark:text-gray-400 mx-2">•</span>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            Cache: {data.cacheSizeMb.toFixed(1)} MB
+                          </span>
+                        </>
+                      )}
                     </h3>
                   </div>
                 </div>
