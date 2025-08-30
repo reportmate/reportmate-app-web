@@ -68,7 +68,7 @@ const NetworkOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, device }
         </div>
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Network Configuration</h2>
-          <p className="text-gray-600 dark:text-gray-400">Network connectivity and configuration details</p>
+          <p className="text-gray-600 dark:text-gray-400">Connectivity and configuration details</p>
         </div>
       </div>
       

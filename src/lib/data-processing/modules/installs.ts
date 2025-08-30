@@ -398,35 +398,45 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     })
   }
 
-  // Extract session-level errors and warnings
+  // Extract session-level errors and warnings - ONLY FROM LATEST SESSION
   const sessionErrors: ErrorMessage[] = []
   const sessionWarnings: WarningMessage[] = []
   
-  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions)) {
-    for (const session of installs.cimian.sessions) {
-      // Add errors for failed sessions
-      if (session.failures > 0 || (session.failedItems && session.failedItems.length > 0)) {
-        sessionErrors.push({
-          id: `session-${session.sessionId}-failures`,
-          message: `Session ${session.sessionId} had ${session.failures} failure(s)${session.failedItems?.length ? ` affecting items: ${session.failedItems.join(', ')}` : ''}`,
-          timestamp: session.endTime || session.startTime,
-          code: 'SESSION_FAILURES',
-          package: 'System',
-          context: { runType: session.runType }
-        })
-      }
-      
-      // Add warnings for sessions with issues
-      if (session.packagesPending > 0 && session.status === 'completed') {
-        sessionWarnings.push({
-          id: `session-${session.sessionId}-pending`,
-          message: `Session ${session.sessionId} completed with ${session.packagesPending} packages still pending`,
-          timestamp: session.endTime || session.startTime,
-          code: 'PENDING_PACKAGES',
-          package: 'System',
-          context: { runType: session.runType }
-        })
-      }
+  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
+    // Get only the most recent session (first in array)
+    const latestSession = installs.cimian.sessions[0]
+    
+    console.log('[INSTALLS MODULE] Latest session data:', {
+      sessionId: latestSession.sessionId,
+      status: latestSession.status,
+      failures: latestSession.failures,
+      failedItems: latestSession.failedItems,
+      endTime: latestSession.endTime,
+      startTime: latestSession.startTime
+    })
+    
+    // Only add errors/warnings from this latest session
+    if (latestSession.failures > 0 || (latestSession.failedItems && latestSession.failedItems.length > 0)) {
+      sessionErrors.push({
+        id: `session-${latestSession.sessionId}-failures`,
+        message: `Session ${latestSession.sessionId} had ${latestSession.failures} failure(s)${latestSession.failedItems?.length ? ` affecting items: ${latestSession.failedItems.join(', ')}` : ''}`,
+        timestamp: latestSession.endTime || latestSession.startTime,
+        code: 'SESSION_FAILURES',
+        package: 'System',
+        context: { runType: latestSession.runType }
+      })
+    }
+    
+    // Only add warnings from this latest session
+    if (latestSession.packagesPending > 0 && latestSession.status === 'completed') {
+      sessionWarnings.push({
+        id: `session-${latestSession.sessionId}-pending`,
+        message: `Session ${latestSession.sessionId} completed with ${latestSession.packagesPending} packages still pending`,
+        timestamp: latestSession.endTime || latestSession.startTime,
+        code: 'PENDING_PACKAGES',
+        package: 'System',
+        context: { runType: latestSession.runType }
+      })
     }
   }
 
@@ -442,42 +452,14 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       packageWarnings.push(...pkg.warnings)
     }
   }
-
-  // INTELLIGENT FAILURE DETECTION: When structured data doesn't capture failures but logs do
-  // Detect packages that are pending but should have failed based on patterns
-  const knownFailedItems = ['Chrome', 'DotNetRuntime', 'Zoom']
-  const pendingFailedItems = packages.filter(pkg => 
-    knownFailedItems.includes(pkg.name) && pkg.status === 'Pending'
-  )
   
-  // If we have multiple known failure-prone items as Pending and no other errors detected
-  if (pendingFailedItems.length >= 2 && sessionErrors.length === 0 && packageErrors.length === 0) {
-    const failureTimestamp = '2025-08-30T12:57:18-07:00'
-    
-    // Add specific error messages for the failed installations
-    for (const item of pendingFailedItems) {
-      sessionErrors.push({
-        id: `install-failure-${item.id}`,
-        message: `Installation failed: ${item.name} could not be installed during recent session`,
-        timestamp: failureTimestamp,
-        code: 'INSTALL_FAILURE',
-        package: item.name,
-        context: { runType: latestRunType },
-        details: `Package ${item.name} failed to install. Status remains pending despite installation attempt.`
-      })
-    }
-    
-    // Add a summary error
-    sessionErrors.push({
-      id: 'session-install-failures',
-      message: `Installation session had ${pendingFailedItems.length} package failures`,
-      timestamp: failureTimestamp,
-      code: 'SESSION_FAILURES',
-      package: 'System',
-      context: { runType: latestRunType },
-      details: `Session completed with failures for: ${pendingFailedItems.map(p => p.name).join(', ')}. These packages could not be installed successfully.`
-    })
-  }
+  console.log('[INSTALLS MODULE] Latest session only - Errors/Warnings:', {
+    sessionErrors: sessionErrors.length,
+    sessionWarnings: sessionWarnings.length,
+    packageErrors: packageErrors.length,
+    packageWarnings: packageWarnings.length,
+    latestSessionId: installs.cimian?.sessions?.[0]?.sessionId
+  })
 
   const installsInfo: InstallsInfo = {
     totalPackages: packages.length,
