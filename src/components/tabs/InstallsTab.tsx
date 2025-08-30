@@ -102,7 +102,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   
   // CRITICAL FIX: Always process raw device data directly to ensure we get the rich Cimian data
   // The data prop might be empty or not processed correctly, so we handle it ourselves
-  const installsData = effectiveDevice ? extractInstalls(effectiveDevice) : null
+  const installsData = effectiveDevice ? extractInstalls(effectiveDevice.modules) : null
   
   // Debug logging for error messages
   console.log('🔍 InstallsTab Debug:', {
@@ -166,9 +166,23 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   
   // Process raw Cimian data to ensure proper version and duration fields
   const processedInstallsData = useMemo(() => {
-    if (!installsData || (installsData.totalPackages > 0 && installsData.packages?.length > 0)) {
-      return installsData // If already processed correctly, return as-is
+    console.log('[INSTALLS TAB] Processing installsData:', {
+      hasInstallsData: !!installsData,
+      totalPackages: installsData?.totalPackages,
+      packagesLength: installsData?.packages?.length,
+      cacheSizeMb: installsData?.cacheSizeMb,
+      hasCacheSizeMb: !!installsData?.cacheSizeMb
+    })
+    
+    if (!installsData) {
+      console.log('[INSTALLS TAB] No installsData - returning null')
+      return null
     }
+    
+    // ALWAYS return the installsData as processed data (even if it looks complete)
+    // The extractInstalls function should have already processed everything including cacheSizeMb
+    console.log('[INSTALLS TAB] Returning installsData with cache size:', installsData.cacheSizeMb)
+    return installsData
     
     // If we have raw device data but no processed packages, create them
     const cimianData = effectiveDevice?.modules?.installs?.cimian
@@ -454,7 +468,16 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
 
       {/* Managed Installs with Configuration */}
       {processedInstallsData ? (
-        <ManagedInstallsTable data={processedInstallsData} />
+        <>
+          {console.log('[INSTALLS TAB] Passing data to ManagedInstallsTable:', {
+            hasData: !!processedInstallsData,
+            totalPackages: processedInstallsData.totalPackages,
+            cacheSizeMb: processedInstallsData.cacheSizeMb,
+            hasCacheSizeMb: !!processedInstallsData.cacheSizeMb,
+            dataKeys: Object.keys(processedInstallsData)
+          })}
+          <ManagedInstallsTable data={processedInstallsData} />
+        </>
       ) : (
         <div className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg p-4">
           <div className="text-gray-600 dark:text-gray-400">No install data available</div>
