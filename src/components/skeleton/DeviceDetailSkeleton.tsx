@@ -471,31 +471,122 @@ function ManagementTabSkeleton() {
 function InstallsTabSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Install stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {['Total', 'Installed', 'Pending', 'Failed'].map((status, i) => (
-          <div key={status} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
-            <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto mb-2" style={{ animationDelay: `${i * 0.1}s` }}></div>
-            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+      {/* Header with Icon */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+          <div>
+            <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
           </div>
-        ))}
+        </div>
+        {/* Last Run - Top Right */}
+        <div className="text-right mr-8">
+          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+          <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
       </div>
 
-      {/* Packages list */}
+      {/* Configuration Card - Single large card with 6 items in 3 columns */}
+      <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="flex gap-8 items-end">
+          {/* Column 1 - 45% - Manifest & Repo */}
+          <div className="flex-[0_0_45%] space-y-4">
+            <div>
+              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-10 w-full bg-gray-100 dark:bg-gray-700 rounded border animate-pulse" style={{ animationDelay: '0.1s' }}></div>
+            </div>
+            <div>
+              <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-10 w-full bg-gray-100 dark:bg-gray-700 rounded border animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            </div>
+          </div>
+
+          {/* Column 2 - 25% - Run Type & Version - Center Aligned */}
+          <div className="flex-[0_0_25%] space-y-4 text-center">
+            <div>
+              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 mx-auto"></div>
+              <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse mx-auto" style={{ animationDelay: '0.3s' }}></div>
+            </div>
+            <div>
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 mx-auto"></div>
+              <div className="h-10 w-32 bg-gray-100 dark:bg-gray-700 rounded border animate-pulse mx-auto" style={{ animationDelay: '0.4s' }}></div>
+            </div>
+          </div>
+
+          {/* Column 3 - 25% - Duration & Last Seen - Right Aligned */}
+          <div className="flex-[0_0_25%] space-y-4 text-right pr-[2%]">
+            <div>
+              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 ml-auto"></div>
+              <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-auto" style={{ animationDelay: '0.5s' }}></div>
+            </div>
+            <div>
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1 ml-auto"></div>
+              <div className="h-10 w-40 bg-gray-100 dark:bg-gray-700 rounded border animate-pulse ml-auto" style={{ animationDelay: '0.6s' }}></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Managed Installs Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-        </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="p-6 flex justify-between items-center">
-              <div className="flex-1">
-                <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.1}s` }}></div>
-                <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {/* Managed Items: X • Cache: Y MB */}
+              <div className="flex items-center gap-2">
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-5 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="w-1 h-1 bg-gray-300 dark:bg-gray-600 rounded-full animate-pulse"></div>
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
               </div>
-              <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
             </div>
-          ))}
+            
+            {/* Status Filters */}
+            <div className="flex items-center gap-2">
+              {['All', 'Installed', 'Pending', 'Warning', 'Error', 'Removed'].map((filter, i) => (
+                <div key={filter} className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" 
+                     style={{ animationDelay: `${i * 0.05}s` }}></div>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                {['Package', 'Version', 'Status', 'Last Update'].map((header, i) => (
+                  <th key={header} className="px-6 py-3 text-left">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+                         style={{ animationDelay: `${i * 0.05}s` }}></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+                         style={{ animationDelay: `${i * 0.1}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+                         style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" 
+                         style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" 
+                         style={{ animationDelay: `${i * 0.1 + 0.3}s` }}></div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
