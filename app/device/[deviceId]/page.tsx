@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for dynamic device page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef } from "react"
+import { useEffect, useState, useRef, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
@@ -462,33 +462,51 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
 ]
 
 export default function DeviceDetailPage() {
-  console.log('🚨🚨🚨 DEVICE PAGE COMPONENT STARTING 🚨🚨🚨')
   const params = useParams()
   const router = useRouter()
   const deviceId = params.deviceId as string
-  console.log('🚨🚨🚨 DEVICE ID FROM PARAMS:', deviceId, '🚨🚨🚨')
   
-  // EMERGENCY FIX: Get initial tab from hash synchronously since useEffect doesn't work
+  // Get initial tab from hash
   const getInitialTab = (): TabType => {
     if (typeof window !== 'undefined' && window.location.hash) {
       const hash = window.location.hash.replace('#', '') as TabType
-      console.log('🟦🟦🟦 INITIAL TAB FROM HASH:', hash, '🟦🟦🟦')
-      return hash || 'info'
+      if (tabs.some(tab => tab.id === hash)) {
+        return hash
+      }
     }
     return 'info'
   }
   
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab())
+  
+  // CRITICAL FIX: Handle hash changes after component mounts (client-side)
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (typeof window !== 'undefined') {
+        const hash = window.location.hash.replace('#', '') as TabType
+        if (hash && tabs.some(tab => tab.id === hash) && hash !== activeTab) {
+          setActiveTab(hash)
+        }
+      }
+    }
+    
+    // Check hash immediately on mount
+    handleHashChange()
+    
+    // Listen for hash changes
+    if (typeof window !== 'undefined') {
+      window.addEventListener('hashchange', handleHashChange)
+      return () => window.removeEventListener('hashchange', handleHashChange)
+    }
+  }, [])
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length) // Show all tabs by default
+  const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
   const tabsContainerRef = useRef<HTMLElement>(null)
-  const [isResolving, setIsResolving] = useState(false) // Track if we're resolving a device identifier
-  const [copySuccess, setCopySuccess] = useState(false) // Copy shareable link functionality
-  
-  console.log('🔵🔵🔵 COMPONENT STATE INITIALIZED - CHECKING IF USEEFFECTS RUN 🔵🔵🔵')
+  const [isResolving, setIsResolving] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
   
   // Processed component data using modular types
   const [processedData, setProcessedData] = useState<{
@@ -583,7 +601,14 @@ export default function DeviceDetailPage() {
     const handleHashChange = () => {
       if (typeof window !== 'undefined') {
         const hash = window.location.hash.replace('#', '') as TabType
+        console.log('🧭 HASH NAVIGATION DEBUG:', {
+          currentHash: hash,
+          currentActiveTab: activeTab,
+          validTabs: tabs.map(t => t.id),
+          isValidHash: hash && tabs.some(tab => tab.id === hash)
+        })
         if (hash && tabs.some(tab => tab.id === hash)) {
+          console.log('🧭 Setting activeTab to:', hash)
           setActiveTab(hash)
         }
       }
@@ -736,35 +761,56 @@ export default function DeviceDetailPage() {
     }
   }
   
+  // Compute installs data for InstallsTab
+  const computedInstallsData = useMemo(() => {
+    console.log('🔄 Computing installs data:', {
+      hasDeviceInfo: !!deviceInfo,
+      hasInstallsModule: !!deviceInfo?.modules?.installs,
+      hasProcessedInstalls: !!deviceInfo?.installs
+    })
+    
+    if (!deviceInfo?.modules?.installs && !deviceInfo?.installs) {
+      console.log('❌ No installs data available in device')
+      return undefined
+    }
+    
+    // Check if we already have processed installs data
+    if (deviceInfo.installs) {
+      console.log('✅ Using already processed installs data')
+      return deviceInfo.installs
+    }
+    
+    // Otherwise, extract from raw module - FIXED: pass full modules, not just installs
+    if (deviceInfo.modules?.installs) {
+      console.log('🔧 Extracting installs from raw modules')
+      return extractInstalls(deviceInfo.modules)  // CRITICAL FIX: Pass full modules
+    }
+    
+    return undefined
+  }, [deviceInfo?.modules?.installs, deviceInfo?.installs])
+  
   // Device identifier resolution effect
   useEffect(() => {
     const resolveAndRedirect = async () => {
-      console.log('[DEVICE DETAIL] Checking device identifier:', deviceId)
-      
       // Check if this is already a serial number
       const identifierType = identifyDeviceIdentifierType(deviceId)
-      console.log('[DEVICE DETAIL] Identifier type:', identifierType)
       
       if (identifierType === 'serialNumber') {
-        console.log('[DEVICE DETAIL] Already a serial number, proceeding normally')
-        console.log('[DEVICE DETAIL] isResolving should remain false:', isResolving)
+        setIsResolving(false)
         return // This is already a serial number, no need to resolve
       }
       
       // This is a UUID or Asset Tag, we need to resolve it
-      console.log(`[DEVICE DETAIL] Resolving ${identifierType}: ${deviceId}`)
       setIsResolving(true)
       
       try {
         const result = await resolveDeviceIdentifier(deviceId)
         
         if (result.found && result.serialNumber) {
-          console.log(`[DEVICE DETAIL] ✅ Resolved to serial number: ${result.serialNumber}`)
           // Redirect to the serial number-based URL
           router.replace(`/device/${encodeURIComponent(result.serialNumber)}`)
           return
         } else {
-          console.log(`[DEVICE DETAIL] ❌ Could not resolve ${identifierType}: ${deviceId}`)
           setError(`Device not found for ${identifierType}: ${deviceId}`)
           setLoading(false)
           setIsResolving(false)
@@ -782,71 +828,30 @@ export default function DeviceDetailPage() {
     resolveAndRedirect()
   }, [deviceId, router])
   
-  // TEST USEEFFECT - SIMPLE VERSION
-  console.log('🟡🟡🟡 PRE-USEEFFECT DEBUG - Component is rendering successfully and hot reload is working! 🟡🟡🟡')
   useEffect(() => {
-    console.log('🟨🟨🟨 SIMPLE TEST USEEFFECT RUNNING 🟨🟨🟨')
-    console.log('🟨🟨🟨 deviceId in test useEffect:', deviceId, '🟨🟨🟨')
-  }, [deviceId])
-  
-  console.log('🟡🟡🟡 POST-FIRST-USEEFFECT DEBUG 🟡🟡🟡')
-  
-  // IMMEDIATE IDENTIFIER TYPE CHECK
-  console.log('🧪🧪🧪 IMMEDIATE IDENTIFIER TYPE CHECK:', identifyDeviceIdentifierType(deviceId), 'for deviceId:', deviceId, '🧪🧪🧪')
-  
-  useEffect(() => {
-    console.log('🔥🔥🔥 DEVICE DETAIL USEEFFECT STARTING 🔥🔥🔥')
-    console.log('🔥🔥🔥 isResolving:', isResolving, 'deviceId:', deviceId, '🔥🔥🔥')
-    console.log('🔥🔥🔥 typeof isResolving:', typeof isResolving, 'typeof deviceId:', typeof deviceId, '🔥🔥🔥')
-    
     // Don't fetch device data if we're still resolving the identifier
     if (isResolving) {
-      console.log('🔥🔥🔥 EXITING USEEFFECT - STILL RESOLVING 🔥🔥🔥')
       return
     }
     
     // Only fetch if this is a serial number, asset tag, or device name (resolved identifiers will redirect)
     const identifierType = identifyDeviceIdentifierType(deviceId)
-    console.log('🔥🔥🔥 IDENTIFIER TYPE:', identifierType, '🔥🔥🔥')
     if (identifierType !== 'serialNumber' && identifierType !== 'assetTag' && identifierType !== 'deviceName') {
-      console.log('🔥🔥🔥 EXITING USEEFFECT - NOT SERIAL NUMBER, ASSET TAG, OR DEVICE NAME 🔥🔥🔥')
       return // Let the resolution effect handle this
     }
     
-    console.log('🔥🔥🔥 USEEFFECT CONDITIONS PASSED - STARTING FETCH 🔥🔥🔥')
-    
     const fetchDeviceData = async () => {
-      console.log('🚀🚀🚀 [DEVICE PAGE] FRONTEND FETCH STARTING FOR:', deviceId, ' 🚀🚀🚀')
-      console.log('🚀🚀🚀 FRONTEND FETCH FUNCTION EXECUTING 🚀🚀🚀')
       try {
         setLoading(true)
         
         // Fetch device info from Next.js API route
-        console.log('🚧🚧🚧 ABOUT TO FETCH DEVICE DATA FROM FRONTEND 🚧🚧🚧')
         const deviceResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}`)
-        console.log('🚧🚧🚧 FRONTEND FETCH COMPLETED - RESPONSE RECEIVED 🚧🚧🚧')
-        console.log('🚧🚧🚧 RESPONSE STATUS:', deviceResponse.status, 'OK:', deviceResponse.ok, '🚧🚧🚧')
         
         if (!deviceResponse.ok) {
-          console.error('🚨 API RESPONSE NOT OK:', {
-            status: deviceResponse.status,
-            statusText: deviceResponse.statusText,
-            url: deviceResponse.url
-          })
-          
-          // Log response body for debugging
-          try {
-            const errorText = await deviceResponse.text()
-            console.error('🚨 ERROR RESPONSE BODY:', errorText.substring(0, 500))
-          } catch (e) {
-            console.error('🚨 Could not read error response body:', e)
-          }
-          
           if (deviceResponse.status === 404) {
             setError('Device not found')
             return
           } else if (deviceResponse.status === 500) {
-            console.error('🚨 Server error (500) - API may have module loading issues')
             setError('Server error - please try refreshing the page')
             return
           }
@@ -855,41 +860,19 @@ export default function DeviceDetailPage() {
         
         let deviceData
         try {
-          console.log('🔥🔥🔥 ABOUT TO PARSE JSON FROM DEVICE RESPONSE 🔥🔥🔥')
           deviceData = await deviceResponse.json()
-          console.log('🔥🔥🔥 JSON PARSING SUCCESSFUL 🔥🔥🔥')
         } catch (jsonError) {
           console.error('Failed to parse device response JSON:', jsonError)
           setError('Invalid response from server')
           return
         }
         
-        console.log('Device API Response:', {
-          hasSuccess: 'success' in deviceData,
-          successValue: deviceData.success,
-          hasDevice: 'device' in deviceData,
-          deviceValue: !!deviceData.device,
-          responseKeys: Object.keys(deviceData)
-        })
-        
-        console.log('🔥🔥🔥 PARSED DEVICE DATA SUCCESSFULLY 🔥🔥🔥')
-        
-        console.log('🚀🚀🚀 DEVICE SUCCESS CHECK:', deviceData.success && deviceData.device, '🚀🚀🚀')
-        console.log('🚀🚀🚀 SUCCESS VALUE:', deviceData.success, 'DEVICE EXISTS:', !!deviceData.device, '🚀🚀🚀')
-        
         if (deviceData.success && deviceData.device) {
-          console.log('✅ DEVICE DATA VALIDATION PASSED - ENTERING PROCESSING SECTION ✅')
-          console.log('🔧 USING MODULAR DEVICE MAPPER - PROCESSING DEVICE DATA')
-          
           // Use the proper modular device mapper
           const processedDevice = mapDeviceData(deviceData.device);
           
-          console.log('🔍 PROCESSED DEVICE:', processedDevice);
-          
           // Set the processed device data
           setDeviceInfo(processedDevice);
-          
-          // Processing complete - all data is now in the processed device object
         } else {
           console.error('Invalid device data structure:', deviceData)
           setError('Invalid device data received')
@@ -898,11 +881,7 @@ export default function DeviceDetailPage() {
         
         // Fetch events separately from the new device events endpoint
         try {
-          console.log('🔥🔥🔥 [DEVICE PAGE] FRONTEND EVENTS FETCH STARTING �🔥🔥')
-          console.log('[DEVICE PAGE] �🔄 Starting events fetch for device:', deviceId)
           const eventsResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}/events`)
-          console.log('[DEVICE PAGE] 🔄 Events response status:', eventsResponse.status)
-          console.log('🔥🔥🔥 [DEVICE PAGE] FRONTEND EVENTS RESPONSE RECEIVED 🔥🔥🔥')
           
           if (eventsResponse.ok) {
             let eventsData
@@ -914,36 +893,13 @@ export default function DeviceDetailPage() {
               return
             }
             
-            console.log('[DEVICE PAGE] 🔄 Events data structure:', {
-              hasSuccess: 'success' in eventsData,
-              successValue: eventsData.success,
-              hasEvents: 'events' in eventsData,
-              eventsArray: Array.isArray(eventsData.events),
-              eventsLength: eventsData.events?.length || 0,
-              firstEventSample: eventsData.events?.[0] ? {
-                id: eventsData.events[0].id,
-                ts: eventsData.events[0].ts,
-                timestamp: eventsData.events[0].timestamp,
-                created_at: eventsData.events[0].created_at
-              } : 'no events'
-            })
-            
             if (eventsData.success && eventsData.events) {
               setEvents(eventsData.events)
               
               // Find the most recent event timestamp from this device's events
               if (eventsData.events.length > 0) {
-                console.log('[DEVICE PAGE] 🕐 Processing', eventsData.events.length, 'events for timestamp update')
-                
                 const mostRecentEventTime = eventsData.events.reduce((latest: string, event: any) => {
                   const eventTime = event.ts || event.timestamp || event.created_at
-                  console.log('[DEVICE PAGE] 🕐 Event time check:', {
-                    eventId: event.id,
-                    ts: event.ts,
-                    timestamp: event.timestamp,
-                    created_at: event.created_at,
-                    selectedTime: eventTime
-                  })
                   
                   if (!eventTime) return latest
                   
@@ -953,13 +909,8 @@ export default function DeviceDetailPage() {
                   return new Date(eventTime) > new Date(latest) ? eventTime : latest
                 }, '')
                 
-                console.log('[DEVICE PAGE] 🕐 Most recent event time found:', mostRecentEventTime)
-                console.log('[DEVICE PAGE] 🕐 Device collected time:', deviceData.device?.metadata?.collectedAt || deviceData.device?.lastSeen)
-                
                 // Update the processed device info with the most recent event time
                 if (mostRecentEventTime) {
-                  console.log('[DEVICE PAGE] 🕐 ⚡ Updating device lastSeen to most recent event time:', mostRecentEventTime)
-                  
                   // Update both the directDevice and processedDevice
                   if (typeof mapDeviceData === 'function') {
                     try {
@@ -968,7 +919,6 @@ export default function DeviceDetailPage() {
                       processedDevice.lastSeen = mostRecentEventTime
                       processedDevice.lastEventTime = mostRecentEventTime
                       setDeviceInfo(processedDevice)
-                      console.log('[DEVICE PAGE] 🕐 ✅ Updated processed device lastSeen to:', mostRecentEventTime)
                     } catch (mappingError) {
                       console.error('Error in mapDeviceData during lastSeen update:', mappingError)
                       // Fallback: update direct device
@@ -977,7 +927,6 @@ export default function DeviceDetailPage() {
                         lastSeen: mostRecentEventTime,
                         lastEventTime: mostRecentEventTime
                       } : prev)
-                      console.log('[DEVICE PAGE] 🕐 ✅ Updated direct device lastSeen (fallback) to:', mostRecentEventTime)
                     }
                   } else {
                     // Update direct device
@@ -986,13 +935,8 @@ export default function DeviceDetailPage() {
                       lastSeen: mostRecentEventTime,
                       lastEventTime: mostRecentEventTime
                     } : prev)
-                    console.log('[DEVICE PAGE] 🕐 ✅ Updated direct device lastSeen to:', mostRecentEventTime)
                   }
-                } else {
-                  console.log('[DEVICE PAGE] 🕐 ❌ No mostRecentEventTime found!')
                 }
-              } else {
-                console.log('[DEVICE PAGE] 🕐 ❌ No events found in response (length:', eventsData.events?.length, ')')
               }
               
               // Use modular events processing
@@ -1021,28 +965,9 @@ export default function DeviceDetailPage() {
     }
     
     fetchDeviceData()
-  }, [deviceId, isResolving])
-  
-  // IMMEDIATE FIX: Compute install data directly from deviceInfo when available
-  const computedInstallsData = (deviceInfo as any)?.installs ? (() => {
-    try {
-      console.log('💥 COMPUTED INSTALLS - Processing installs data directly from deviceInfo')
-      console.log('💥 COMPUTED INSTALLS - deviceInfo.installs:', (deviceInfo as any).installs)
-      const result = (deviceInfo as any).installs
-      console.log('💥 COMPUTED INSTALLS - Processed result:', result)
-      return result
-    } catch (error) {
-      console.error('💥 COMPUTED INSTALLS - Error processing:', error)
-      return { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] }
-    }
-  })() : { totalPackages: 0, installed: 0, pending: 0, failed: 0, lastUpdate: '', packages: [] }
+  }, [deviceId, isResolving]) // Force re-execution when isResolving changes
 
-  console.log('💥 COMPUTED INSTALLS - Final computed data:', computedInstallsData)
-  console.log('💥 DEBUG STATE - deviceInfo:', deviceInfo)
-  console.log('💥 DEBUG STATE - loading:', loading)
-  console.log('💥 DEBUG STATE - isResolving:', isResolving)
-  console.log('💥 DEBUG STATE - error:', error)
-
+  // Early returns AFTER all useEffects are defined
   if (loading || isResolving) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
