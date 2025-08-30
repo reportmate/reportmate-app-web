@@ -36,6 +36,8 @@ export interface NetworkInterface {
   bytesSent?: number
   bytesReceived?: number
   linkSpeed?: string
+  wirelessProtocol?: string
+  wirelessBand?: string
 }
 
 /**
@@ -129,7 +131,9 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         mtu: iface.mtu,
         bytesSent: iface.bytesSent,
         bytesReceived: iface.bytesReceived,
-        linkSpeed: iface.linkSpeed
+        linkSpeed: iface.linkSpeed,
+        wirelessProtocol: iface.wirelessProtocol,
+        wirelessBand: iface.wirelessBand
       }
     })
 
