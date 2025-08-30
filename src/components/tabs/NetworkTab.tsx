@@ -119,7 +119,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Network Status</h1>
-            <p className="text-base text-gray-600 dark:text-gray-400">Network connectivity and configuration details</p>
+            <p className="text-base text-gray-600 dark:text-gray-400">Connectivity and configuration details</p>
           </div>
         </div>
         {/* Connection Type - Top Right */}
@@ -226,7 +226,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                 <div className="flex justify-between">
                   <dt className="text-sm text-gray-600 dark:text-gray-400">Active Interfaces:</dt>
                   <dd className="text-sm font-medium text-gray-900 dark:text-white">
-                    {networkData.interfaces?.filter((iface: any) => iface.status === 'Active' || iface.status === 'Connected').length || 0}
+                    {networkData.interfaces?.filter((iface: any) => iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected').length || 0}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -342,14 +342,15 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MAC Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link Speed</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {networkData.interfaces
                   .sort((a: any, b: any) => {
-                    // First priority: Active status (Active/Connected before Disconnected)
-                    const aActive = (a.status === 'Active' || a.status === 'Connected') ? 1 : 0;
-                    const bActive = (b.status === 'Active' || b.status === 'Connected') ? 1 : 0;
+                    // First priority: Active status (use isActive property + status check)
+                    const aActive = (a.isActive === true || a.status === 'Active' || a.status === 'Connected') ? 1 : 0;
+                    const bActive = (b.isActive === true || b.status === 'Active' || b.status === 'Connected') ? 1 : 0;
                     if (aActive !== bActive) {
                       return bActive - aActive; // Active first
                     }
@@ -365,8 +366,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                     return (a.name || '').localeCompare(b.name || '');
                   })
                   .map((iface: any, index: number) => {
-                    const isActive = iface.status === 'Connected' || iface.status === 'Active';
-                    const isDisconnected = iface.status === 'Disconnected';
+                    const isActive = iface.isActive === true || iface.status === 'Connected' || iface.status === 'Active';
+                    const isDisconnected = !isActive;
                     
                     return (
                     <tr key={iface.name || index} className={`${
@@ -427,6 +428,9 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                         {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.linkSpeed || ''}
                       </td>
                     </tr>
                     );
