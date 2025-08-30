@@ -326,13 +326,19 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
   
-  // Extract cache size from the latest session
+  // Extract cache size from the cacheStatus or latest session
   let cacheSizeMb: number | undefined
-  if (installs.cimian?.sessions && installs.cimian.sessions.length > 0) {
+  
+  // First try to get from cacheStatus (primary source)
+  if (installs.cacheStatus?.cache_size_mb) {
+    cacheSizeMb = installs.cacheStatus.cache_size_mb
+    console.log('[INSTALLS MODULE] Extracted cache size from cacheStatus:', cacheSizeMb)
+  }
+  // Fallback to sessions if needed
+  else if (installs.cimian?.sessions && installs.cimian.sessions.length > 0) {
     const latestSession = installs.cimian.sessions[0]
     cacheSizeMb = latestSession.cacheSizeMb
-    
-    console.log('[INSTALLS MODULE] Extracted cache size:', {
+    console.log('[INSTALLS MODULE] Extracted cache size from session:', {
       sessionId: latestSession.sessionId,
       cacheSizeMb: latestSession.cacheSizeMb
     })
@@ -349,7 +355,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     cacheSizeMb,
     config: {
       type: 'Cimian',
-      version: installs.version,
+      version: installs.cimian?.version || installs.version,
       lastRun: installs.lastCheckIn,
       runType: latestRunType,
       duration: latestDuration

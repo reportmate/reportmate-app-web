@@ -19,8 +19,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     hasConfig: !!data?.config,
     configType: data?.config?.type,
     systemName: data?.systemName,
+    cacheSizeMb: data?.cacheSizeMb,
+    hasCacheSizeMb: !!data?.cacheSizeMb,
+    cacheSizeMbType: typeof data?.cacheSizeMb,
     firstPackage: data?.packages?.[0],
-    samplePackageFields: data?.packages?.[0] ? Object.keys(data.packages[0]) : []
+    samplePackageFields: data?.packages?.[0] ? Object.keys(data.packages[0]) : [],
+    allDataKeys: data ? Object.keys(data) : []
   });
 
   // Check if this is truly no managed installs system vs. no packages
@@ -310,7 +314,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                 <div className="flex items-center gap-2">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                      Managed Packages:
+                      Managed Items:
                       <span className="text-sm font-semibold text-gray-900 dark:text-white"> {data.totalPackages || 0}</span>
                       {data.cacheSizeMb && (
                         <>
