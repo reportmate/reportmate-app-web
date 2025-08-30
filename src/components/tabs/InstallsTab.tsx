@@ -52,6 +52,44 @@ const formatCompactRelativeTime = (timestamp: string): string => {
   }
 }
 
+// Helper function to format duration from HH:MM:SS to readable format (e.g., "20m 34s" or "1h 5m")
+const formatDuration = (duration: string): string => {
+  if (!duration || duration === 'Unknown' || duration === 'null' || duration === 'undefined') {
+    return 'Unknown'
+  }
+
+  // Parse HH:MM:SS format
+  const parts = duration.split(':')
+  if (parts.length !== 3) {
+    console.log('🕐 Duration format unexpected:', duration)
+    return duration // Return as-is if not in expected format
+  }
+
+  const hours = parseInt(parts[0], 10)
+  const minutes = parseInt(parts[1], 10)
+  const seconds = parseInt(parts[2], 10)
+
+  console.log(`🕐 Formatting duration: ${duration} -> ${hours}h ${minutes}m ${seconds}s`)
+
+  // Build formatted string
+  const parts_formatted: string[] = []
+  
+  if (hours > 0) {
+    parts_formatted.push(`${hours}h`)
+  }
+  if (minutes > 0) {
+    parts_formatted.push(`${minutes}m`)
+  }
+  if (seconds > 0 || (hours === 0 && minutes === 0)) {
+    // Always show seconds if it's the only unit, or if there are seconds to show
+    parts_formatted.push(`${seconds}s`)
+  }
+
+  const formatted = parts_formatted.join(' ')
+  console.log(`🕐 Final formatted duration: "${formatted}"`)
+  return formatted
+}
+
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   const params = useParams()
   const [selfFetchedDevice, setSelfFetchedDevice] = useState<any>(null)
@@ -374,7 +412,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
             <div>
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Duration</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {processedInstallsData?.config?.duration || 'Unknown'}
+                {formatDuration(processedInstallsData?.config?.duration || 'Unknown')}
               </div>
             </div>
             <div>
