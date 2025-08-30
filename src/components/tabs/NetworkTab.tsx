@@ -10,6 +10,7 @@ import { extractNetwork } from '../../lib/data-processing/modules'
 interface NetworkTabProps {
   device: any
   data?: any
+  isLoading?: boolean
 }
 
 // CopyableValue component for consistent copy functionality - inline style like widgets
@@ -82,7 +83,7 @@ const CopyableValue: React.FC<{
   )
 }
 
-export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
+export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading = false }) => {
   console.log('🌐🌐🌐🌐🌐 NETWORK TAB COMPONENT RENDERING 🌐🌐🌐🌐🌐');
   console.log('🌐🌐🌐 NETWORK TAB - Component starting with device:', device?.deviceId || 'undefined');
   console.log('🌐🌐🌐 NETWORK TAB - Data prop:', data);
@@ -165,20 +166,6 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
             </div>
           </div>
           <div className="text-center">
-            <div className="text-sm text-gray-500 dark:text-gray-500">Hostname</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.hostname || 'N/A'}
-            </div>
-          </div>
-          {networkData.signalStrength && (
-            <div className="text-center">
-              <div className="text-sm text-gray-500 dark:text-gray-500">Signal Strength</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {networkData.signalStrength}
-              </div>
-            </div>
-          )}
-          <div className="text-center">
             <div className="text-sm text-gray-500 dark:text-gray-500">DNS Servers</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
@@ -195,6 +182,20 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
               />
             </div>
           </div>
+          <div className="text-center">
+            <div className="text-sm text-gray-500 dark:text-gray-500">Hostname</div>
+            <div className="text-lg font-semibold text-gray-900 dark:text-white">
+              {networkData.hostname || 'N/A'}
+            </div>
+          </div>
+          {networkData.signalStrength && (
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Signal Strength</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {networkData.signalStrength}
+              </div>
+            </div>
+          )}
           {networkData.interfaceName && (
             <div className="text-center">
               <div className="text-sm text-gray-500 dark:text-gray-500">Interface</div>
@@ -326,8 +327,15 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
         )}
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="text-blue-800 dark:text-blue-200">Loading network data...</div>
+        </div>
+      )}
+
       {/* Network Interfaces Table */}
-      {networkData.interfaces && networkData.interfaces.length > 0 && (
+      {!isLoading && networkData.interfaces && networkData.interfaces.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Interfaces</h3>
@@ -343,6 +351,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MAC Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link Speed</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Band</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -432,6 +442,12 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                         {iface.linkSpeed || ''}
                       </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.wirelessProtocol || ''}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.wirelessBand || ''}
+                      </td>
                     </tr>
                     );
                   })}
@@ -442,7 +458,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data }) => {
       )}
 
       {/* Legacy Network Table for compatibility */}
-      {!networkData.interfaces && <NetworkTable data={networkData} />}
+      {!isLoading && !networkData.interfaces && <NetworkTable data={networkData} />}
     </div>
   )
 }
