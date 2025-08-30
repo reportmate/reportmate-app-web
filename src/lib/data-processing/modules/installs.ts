@@ -14,6 +14,7 @@ export interface InstallsInfo {
   lastUpdate: string
   packages: InstallPackage[]
   systemName?: string
+  cacheSizeMb?: number
   config?: {
     type: string
     version?: string
@@ -324,6 +325,18 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       })
     }
   }
+  
+  // Extract cache size from the latest session
+  let cacheSizeMb: number | undefined
+  if (installs.cimian?.sessions && installs.cimian.sessions.length > 0) {
+    const latestSession = installs.cimian.sessions[0]
+    cacheSizeMb = latestSession.cacheSizeMb
+    
+    console.log('[INSTALLS MODULE] Extracted cache size:', {
+      sessionId: latestSession.sessionId,
+      cacheSizeMb: latestSession.cacheSizeMb
+    })
+  }
 
   const installsInfo: InstallsInfo = {
     totalPackages: packages.length,
@@ -333,6 +346,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     lastUpdate: installs.lastCheckIn || installs.collected_at || '',
     packages,
     systemName: installs.cimian?.config?.systemName || 'Cimian',
+    cacheSizeMb,
     config: {
       type: 'Cimian',
       version: installs.version,
