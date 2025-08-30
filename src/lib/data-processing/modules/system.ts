@@ -70,17 +70,23 @@ export function extractSystem(deviceModules: any): SystemInfo {
 
   const modules = deviceModules.modules
 
-  // Extract services data
-  if (modules?.services?.services) {
-    const rawServices = modules.services.services
-    systemInfo.services = Array.isArray(rawServices) ? rawServices.map((service: any) => ({
+  // Extract services data - check both system.services and separate services module
+  let rawServices = null
+  if (modules?.system?.services) {
+    rawServices = modules.system.services
+  } else if (modules?.services?.services) {
+    rawServices = modules.services.services
+  }
+
+  if (rawServices && Array.isArray(rawServices)) {
+    systemInfo.services = rawServices.map((service: any) => ({
       name: service.name || service.serviceName || '',
       displayName: service.displayName || service.display_name || '',
       description: service.description || '',
       status: service.status || service.state || 'Unknown',
       startType: service.startType || service.start_type || '',
       start_type: service.start_type || service.startType || ''
-    })) : []
+    }))
     
     systemInfo.runningServices = systemInfo.services.filter(s => 
       s.status?.toLowerCase().includes('running') || 
@@ -88,25 +94,37 @@ export function extractSystem(deviceModules: any): SystemInfo {
     ).length
   }
 
-  // Extract environment variables
-  if (modules?.environment?.environment) {
-    const rawEnv = modules.environment.environment
-    systemInfo.environment = Array.isArray(rawEnv) ? rawEnv.map((env: any) => ({
-      name: env.name || env.key || '',
-      value: env.value || ''
-    })) : []
+  // Extract environment variables - check both system.environment and separate environment module
+  let rawEnv = null
+  if (modules?.system?.environment) {
+    rawEnv = modules.system.environment
+  } else if (modules?.environment?.environment) {
+    rawEnv = modules.environment.environment
   }
 
-  // Extract Windows updates
-  if (modules?.updates?.updates) {
-    const rawUpdates = modules.updates.updates
-    systemInfo.updates = Array.isArray(rawUpdates) ? rawUpdates.map((update: any) => ({
+  if (rawEnv && Array.isArray(rawEnv)) {
+    systemInfo.environment = rawEnv.map((env: any) => ({
+      name: env.name || env.key || '',
+      value: env.value || ''
+    }))
+  }
+
+  // Extract Windows updates - check both system.updates and separate updates module
+  let rawUpdates = null
+  if (modules?.system?.updates) {
+    rawUpdates = modules.system.updates
+  } else if (modules?.updates?.updates) {
+    rawUpdates = modules.updates.updates
+  }
+
+  if (rawUpdates && Array.isArray(rawUpdates)) {
+    systemInfo.updates = rawUpdates.map((update: any) => ({
       id: update.id || update.updateId || '',
       title: update.title || update.name || '',
       category: update.category || '',
       installDate: update.installDate || update.installed_date || '',
       requiresRestart: update.requiresRestart || update.requires_restart || false
-    })) : []
+    }))
   }
 
   // Extract operating system info
@@ -126,8 +144,10 @@ export function extractSystem(deviceModules: any): SystemInfo {
     }
   }
 
-  // Boot time
-  if (modules?.system?.bootTime) {
+  // Boot time - check various possible locations
+  if (modules?.system?.lastBootTime) {
+    systemInfo.bootTime = modules.system.lastBootTime
+  } else if (modules?.system?.bootTime) {
     systemInfo.bootTime = modules.system.bootTime
   }
 
