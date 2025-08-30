@@ -188,58 +188,52 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
     const failed = packages.filter(p => p.status === 'failed').length
     const errors = packages.filter(p => p.status === 'error').length
     
-    // Calculate duration from recent events timestamps
+    // Get duration from latest COMPLETED session instead of calculating from events
     let duration = 'Unknown'
-    if (cimianData.recentEvents && cimianData.recentEvents.length > 0) {
-      // Find the earliest and latest event timestamps to calculate session duration
-      const eventTimes = cimianData.recentEvents
-        .map((event: any) => event.timestamp)
-        .filter((timestamp: any) => timestamp)
-        .sort()
+    console.log('🔥🔥🔥 DURATION EXTRACTION STARTING - CIMIAN SESSIONS 🔥🔥🔥')
+    console.log('🔥 Sessions data exists:', !!(cimianData.sessions))
+    console.log('🔥 Sessions is array:', Array.isArray(cimianData.sessions))
+    console.log('🔥 Sessions length:', cimianData.sessions?.length || 0)
+    
+    if (cimianData.sessions && Array.isArray(cimianData.sessions) && cimianData.sessions.length > 0) {
+      console.log('🔍 DEBUGGING ALL SESSIONS:', cimianData.sessions.slice(0, 5).map((s: any) => ({
+        sessionId: s.sessionId,
+        duration: s.duration,
+        status: s.status,
+        hasCompletedStatus: s.status === 'completed',
+        hasDuration: !!s.duration,
+        durationNotZero: s.duration !== '00:00:00'
+      })))
       
-      if (eventTimes.length >= 2) {
-        try {
-          const start = new Date(eventTimes[0])
-          const end = new Date(eventTimes[eventTimes.length - 1])
-          const diffMs = end.getTime() - start.getTime()
-          
-          if (diffMs > 0) {
-            const hours = Math.floor(diffMs / 3600000)
-            const minutes = Math.floor((diffMs % 3600000) / 60000)
-            const seconds = Math.floor((diffMs % 60000) / 1000)
-            
-            if (hours > 0) {
-              duration = `${hours}h ${minutes}m ${seconds}s`
-            } else if (minutes > 0) {
-              duration = `${minutes}m ${seconds}s`
-            } else {
-              duration = `${seconds}s`
-            }
-          }
-        } catch (e) {
-          console.log('Error calculating duration from events:', e)
-        }
-      } else if (eventTimes.length === 1) {
-        // Single event, calculate from event time to now for running sessions
-        try {
-          const eventTime = new Date(eventTimes[0])
-          const now = new Date()
-          const diffMs = now.getTime() - eventTime.getTime()
-          
-          if (diffMs > 0) {
-            const hours = Math.floor(diffMs / 3600000)
-            const minutes = Math.floor((diffMs % 3600000) / 60000)
-            
-            if (hours > 0) {
-              duration = `${hours}h ${minutes}m (since last event)`
-            } else {
-              duration = `${minutes}m (since last event)`
-            }
-          }
-        } catch (e) {
-          console.log('Error calculating duration from single event:', e)
+      // Find the most recent completed session (not running)
+      const completedSession = cimianData.sessions.find((session: any) => 
+        session.status === 'completed' && session.duration && session.duration !== '00:00:00'
+      )
+      
+      if (completedSession) {
+        duration = completedSession.duration
+        console.log('🕐 Using completed session duration:', duration, 'from session:', completedSession.sessionId)
+        console.log('🔥🔥🔥 DURATION FOUND AND SET TO:', duration, '🔥🔥🔥')
+      } else {
+        // Try to find any session with a non-zero duration
+        const sessionWithDuration = cimianData.sessions.find((session: any) => 
+          session.duration && session.duration !== '00:00:00'
+        )
+        
+        if (sessionWithDuration) {
+          duration = sessionWithDuration.duration
+          console.log('🕐 Using session with duration:', duration, 'from session:', sessionWithDuration.sessionId, 'status:', sessionWithDuration.status)
+          console.log('🔥🔥🔥 FALLBACK DURATION FOUND AND SET TO:', duration, '🔥🔥🔥')
+        } else {
+          // Fallback to first session if no sessions with duration found
+          const latestSession = cimianData.sessions[0]
+          duration = latestSession.duration || 'Unknown'
+          console.log('⚠️ Using latest session duration (may be running):', duration, 'from session:', latestSession.sessionId)
+          console.log('🔥🔥🔥 LAST RESORT DURATION SET TO:', duration, '🔥🔥🔥')
         }
       }
+    } else {
+      console.log('❌ No sessions data available for duration extraction')
     }
     
     const processedData = {
