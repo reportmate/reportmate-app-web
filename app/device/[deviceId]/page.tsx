@@ -770,7 +770,6 @@ export default function DeviceDetailPage() {
     })
     
     if (!deviceInfo?.modules?.installs && !deviceInfo?.installs) {
-      console.log('❌ No installs data available in device')
       return undefined
     }
     
