@@ -6,6 +6,226 @@
 
 export type StandardInstallStatus = 'Installed' | 'Pending' | 'Warning' | 'Error' | 'Removed'
 
+export enum ErrorCategory {
+  ARCHITECTURE = 'architecture',
+  MSI_INSTALLER = 'msi_installer', 
+  EXE_INSTALLER = 'exe_installer',
+  CHOCOLATEY = 'chocolatey',
+  POWERSHELL = 'powershell',
+  TIMEOUT = 'timeout',
+  DEPENDENCY = 'dependency',
+  SYSTEM = 'system'
+}
+
+interface ErrorCodeMapping {
+  description: string
+  severity: 'error' | 'warning'
+  action: string
+  category: ErrorCategory
+}
+
+const ERROR_CODE_MAPPINGS: Record<string, ErrorCodeMapping> = {
+  // MSI Error Codes
+  '1603': { 
+    description: 'Fatal Installation Error', 
+    severity: 'error', 
+    action: 'Check system requirements and installer logs',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  '1618': { 
+    description: 'Installer Conflict', 
+    severity: 'error', 
+    action: 'Another installation is in progress - wait and retry',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  '3010': { 
+    description: 'Reboot Required', 
+    severity: 'warning', 
+    action: 'System restart needed to complete installation',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  
+  // Architecture Errors
+  'ARCH_MISMATCH': { 
+    description: 'Architecture Incompatibility', 
+    severity: 'error', 
+    action: 'Package not compatible with system architecture',
+    category: ErrorCategory.ARCHITECTURE
+  },
+  'architecture_check': { 
+    description: 'Architecture Validation Failed', 
+    severity: 'error', 
+    action: 'Package architecture not supported on this system',
+    category: ErrorCategory.ARCHITECTURE
+  },
+  
+  // Chocolatey Errors  
+  'CHOCO_DEPENDENCY': { 
+    description: 'Dependency Resolution Failed', 
+    severity: 'error', 
+    action: 'Required dependencies unavailable or incompatible',
+    category: ErrorCategory.CHOCOLATEY
+  },
+  'chocolatey_install': { 
+    description: 'Chocolatey Installation Failed', 
+    severity: 'error', 
+    action: 'Check Chocolatey logs and package availability',
+    category: ErrorCategory.CHOCOLATEY
+  },
+  'chocolatey_upgrade': { 
+    description: 'Chocolatey Upgrade Failed', 
+    severity: 'error', 
+    action: 'Check package version compatibility',
+    category: ErrorCategory.CHOCOLATEY
+  },
+  
+  // EXE Errors
+  'EXE_TIMEOUT': { 
+    description: 'Installation Timeout', 
+    severity: 'error', 
+    action: 'Installation process exceeded time limit',
+    category: ErrorCategory.TIMEOUT
+  },
+  'exe_timeout': { 
+    description: 'EXE Installer Timeout', 
+    severity: 'error', 
+    action: 'Installer did not complete within expected time',
+    category: ErrorCategory.TIMEOUT
+  },
+  'exe_exit_code_error': { 
+    description: 'EXE Installer Failed', 
+    severity: 'error', 
+    action: 'Check installer exit code and system requirements',
+    category: ErrorCategory.EXE_INSTALLER
+  },
+  
+  // PowerShell Errors
+  'PS_SCRIPT_FAILED': { 
+    description: 'Script Execution Failed', 
+    severity: 'error', 
+    action: 'Pre/post installation script encountered an error',
+    category: ErrorCategory.POWERSHELL
+  },
+  
+  // MSI Specific Actions
+  'msi_fatal_error': { 
+    description: 'MSI Fatal Error', 
+    severity: 'error', 
+    action: 'Critical MSI installation failure - check Windows Event Log',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  'msi_conflict_error': { 
+    description: 'MSI Installation Conflict', 
+    severity: 'error', 
+    action: 'Another MSI installation is currently running',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  'msi_reboot_required': { 
+    description: 'MSI Reboot Required', 
+    severity: 'warning', 
+    action: 'Installation successful but requires system restart',
+    category: ErrorCategory.MSI_INSTALLER
+  },
+  'msi_timeout': { 
+    description: 'MSI Installation Timeout', 
+    severity: 'error', 
+    action: 'MSI installer did not respond within timeout period',
+    category: ErrorCategory.TIMEOUT
+  }
+}
+
+/**
+ * Get enhanced error information from error code
+ */
+export function getErrorCodeInfo(code?: string): ErrorCodeMapping | null {
+  if (!code) return null
+  return ERROR_CODE_MAPPINGS[code.toLowerCase()] || ERROR_CODE_MAPPINGS[code] || null
+}
+
+/**
+ * Categorize error based on code and message content
+ */
+export function categorizeError(error: ErrorMessage): ErrorCategory {
+  const code = error.code?.toLowerCase() || ''
+  const message = error.message.toLowerCase()
+  
+  // Check code-based categorization first
+  const codeInfo = getErrorCodeInfo(code)
+  if (codeInfo) return codeInfo.category
+  
+  // Fallback to message-based categorization
+  if (message.includes('architecture') || message.includes('arch')) return ErrorCategory.ARCHITECTURE
+  if (message.includes('msi') || ['1603', '1618', '3010'].includes(code)) return ErrorCategory.MSI_INSTALLER
+  if (message.includes('exe') || message.includes('executable')) return ErrorCategory.EXE_INSTALLER
+  if (message.includes('chocolatey') || message.includes('choco')) return ErrorCategory.CHOCOLATEY
+  if (message.includes('powershell') || message.includes('script')) return ErrorCategory.POWERSHELL
+  if (message.includes('timeout') || message.includes('timed out')) return ErrorCategory.TIMEOUT
+  if (message.includes('dependency') || message.includes('depends')) return ErrorCategory.DEPENDENCY
+  
+  return ErrorCategory.SYSTEM
+}
+
+/**
+ * Get user-friendly error description
+ */
+export function getErrorDescription(error: ErrorMessage): string {
+  const codeInfo = getErrorCodeInfo(error.code)
+  if (codeInfo) return codeInfo.description
+  
+  // Fallback descriptions based on category
+  const category = categorizeError(error)
+  switch (category) {
+    case ErrorCategory.ARCHITECTURE:
+      return 'Architecture Compatibility Issue'
+    case ErrorCategory.MSI_INSTALLER:
+      return 'MSI Installation Error'
+    case ErrorCategory.EXE_INSTALLER:
+      return 'Executable Installation Error'
+    case ErrorCategory.CHOCOLATEY:
+      return 'Chocolatey Package Error'
+    case ErrorCategory.POWERSHELL:
+      return 'Script Execution Error'
+    case ErrorCategory.TIMEOUT:
+      return 'Installation Timeout'
+    case ErrorCategory.DEPENDENCY:
+      return 'Dependency Resolution Error'
+    default:
+      return 'Installation Error'
+  }
+}
+
+/**
+ * Get recommended action for error
+ */
+export function getRecommendedAction(error: ErrorMessage): string {
+  const codeInfo = getErrorCodeInfo(error.code)
+  if (codeInfo) return codeInfo.action
+  
+  // Enhanced context-based recommendations
+  if (error.context?.recommendedAction) return error.context.recommendedAction
+  
+  // Fallback recommendations based on category
+  const category = categorizeError(error)
+  switch (category) {
+    case ErrorCategory.ARCHITECTURE:
+      return 'Verify package architecture compatibility with your system'
+    case ErrorCategory.MSI_INSTALLER:
+      return 'Check Windows Event Log and verify system requirements'
+    case ErrorCategory.EXE_INSTALLER:
+      return 'Run installer manually with administrator privileges'
+    case ErrorCategory.CHOCOLATEY:
+      return 'Check Chocolatey logs and package repository availability'
+    case ErrorCategory.POWERSHELL:
+      return 'Review script execution policy and permissions'
+    case ErrorCategory.TIMEOUT:
+      return 'Retry installation or increase timeout settings'
+    case ErrorCategory.DEPENDENCY:
+      return 'Install required dependencies manually first'
+    default:
+      return 'Check system logs and contact support if issue persists'
+  }
+}
+
 export interface InstallsInfo {
   totalPackages: number
   installed: number
@@ -35,6 +255,7 @@ export interface InstallPackage {
   name: string
   displayName: string
   version: string
+  installedVersion?: string
   status: string // Mapped ReportMate status
   type: string
   lastUpdate: string
@@ -45,6 +266,20 @@ export interface InstallPackage {
   recentAttempts?: any[]
 }
 
+export interface ErrorContext {
+  runType?: string
+  exitCode?: string
+  exitMeaning?: string
+  installerPath?: string
+  recommendedAction?: string
+  systemArch?: string
+  supportedArch?: string[]
+  packageId?: string
+  packageVersion?: string
+  commandUsed?: string
+  timeoutDuration?: number
+}
+
 export interface ErrorMessage {
   id?: string
   code?: string
@@ -52,7 +287,7 @@ export interface ErrorMessage {
   timestamp?: string
   level?: string
   package?: string
-  context?: { runType?: string }
+  context?: ErrorContext
   details?: string
 }
 
@@ -62,7 +297,7 @@ export interface WarningMessage {
   message: string
   timestamp?: string
   package?: string
-  context?: { runType?: string }
+  context?: ErrorContext
   details?: string
 }
 
