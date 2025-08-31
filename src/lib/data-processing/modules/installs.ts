@@ -525,13 +525,40 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         warnings: []
       }
 
-      // Extract errors and warnings from recent attempts
+      // Extract errors and warnings from recent attempts - ONLY FROM LATEST COMPLETED SESSION
       if (item.recentAttempts && Array.isArray(item.recentAttempts)) {
-        for (const attempt of item.recentAttempts) {
+        // First, determine what the latest completed session ID is
+        let latestCompletedSessionId: string | null = null
+        if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions)) {
+          const latestCompletedSession = installs.cimian.sessions.find((session: any) => 
+            session.status === 'completed' && session.endTime
+          )
+          latestCompletedSessionId = latestCompletedSession?.sessionId || null
+        }
+        
+        console.log('[INSTALLS MODULE] 🔍 Filtering package attempts for latest completed session:', {
+          packageName: item.name,
+          totalAttempts: item.recentAttempts.length,
+          latestCompletedSessionId,
+          allSessionIds: item.recentAttempts.map((a: any) => a.session_id).slice(0, 5) // Show first 5
+        })
+        
+        // Only process attempts from the latest completed session
+        const latestSessionAttempts = latestCompletedSessionId 
+          ? item.recentAttempts.filter((attempt: any) => attempt.session_id === latestCompletedSessionId)
+          : [] // If no completed session found, don't show any errors
+        
+        console.log('[INSTALLS MODULE] 🎯 Attempts from latest completed session:', {
+          packageName: item.name,
+          latestSessionAttempts: latestSessionAttempts.length,
+          filteredAttempts: latestSessionAttempts.map((a: any) => ({ action: a.action, status: a.status, session_id: a.session_id }))
+        })
+        
+        for (const attempt of latestSessionAttempts) {
           if (attempt.status === 'Error' || attempt.status === 'Failed' || attempt.status === 'Failure') {
             packageInfo.errors?.push({
               id: `${item.id || item.name}-${attempt.timestamp || Date.now()}`,
-              message: `${attempt.action || 'Operation'} failed${attempt.timestamp ? ` at ${attempt.timestamp}` : ''}`,
+              message: `${attempt.action || 'Operation'} failed in session ${attempt.session_id}${attempt.timestamp ? ` at ${attempt.timestamp}` : ''}`,
               timestamp: attempt.timestamp,
               code: attempt.errorCode || attempt.action,
               package: item.name || item.displayName,
@@ -541,7 +568,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           if (attempt.status === 'Warning' || attempt.warnings) {
             packageInfo.warnings?.push({
               id: `${item.id || item.name}-warning-${attempt.timestamp || Date.now()}`,
-              message: `${attempt.action || 'Operation'} warning${attempt.timestamp ? ` at ${attempt.timestamp}` : ''}`,
+              message: `${attempt.action || 'Operation'} warning in session ${attempt.session_id}${attempt.timestamp ? ` at ${attempt.timestamp}` : ''}`,
               timestamp: attempt.timestamp,
               code: attempt.warningCode || attempt.action,
               package: item.name || item.displayName,
@@ -551,15 +578,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         }
       }
 
-      // If item has failure count but no specific errors, add a generic error
-      if (item.failureCount > 0 && (!packageInfo.errors || packageInfo.errors.length === 0)) {
-        packageInfo.errors?.push({
-          id: `${item.id || item.name}-generic-failure`,
-          message: `Package has ${item.failureCount} failure(s) recorded`,
-          level: 'error',
-          package: item.name || item.displayName
-        })
-      }
+      // Note: No longer adding generic errors based on failureCount 
+      // since failureCount includes historical failures, not just latest session
 
       packages.push(packageInfo)
 
@@ -633,45 +653,63 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     })
   }
 
-  // Extract session-level errors and warnings - ONLY FROM LATEST SESSION
+  // Extract session-level errors and warnings - ONLY FROM LATEST COMPLETED SESSION
   const sessionErrors: ErrorMessage[] = []
   const sessionWarnings: WarningMessage[] = []
   
   if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    // Get only the most recent session (first in array)
-    const latestSession = installs.cimian.sessions[0]
+    // Find the most recent COMPLETED session (not running, partial_failure, etc.)
+    // We want errors ONLY from the last successful run, not accumulated from all history
+    const latestCompletedSession = installs.cimian.sessions.find((session: any) => 
+      session.status === 'completed' && session.endTime
+    )
     
-    console.log('[INSTALLS MODULE] Latest session data:', {
-      sessionId: latestSession.sessionId,
-      status: latestSession.status,
-      failures: latestSession.failures,
-      failedItems: latestSession.failedItems,
-      endTime: latestSession.endTime,
-      startTime: latestSession.startTime
+    console.log('[INSTALLS MODULE] 🎯 FILTERING TO LATEST COMPLETED SESSION ONLY:', {
+      totalSessions: installs.cimian.sessions.length,
+      latestCompletedFound: !!latestCompletedSession,
+      latestCompletedSessionId: latestCompletedSession?.sessionId,
+      latestCompletedStatus: latestCompletedSession?.status,
+      latestCompletedFailures: latestCompletedSession?.failures,
+      latestCompletedPackagesFailed: latestCompletedSession?.packagesFailed
     })
     
-    // Only add errors/warnings from this latest session
-    if (latestSession.failures > 0 || (latestSession.failedItems && latestSession.failedItems.length > 0)) {
-      sessionErrors.push({
-        id: `session-${latestSession.sessionId}-failures`,
-        message: `Session ${latestSession.sessionId} had ${latestSession.failures} failure(s)${latestSession.failedItems?.length ? ` affecting items: ${latestSession.failedItems.join(', ')}` : ''}`,
-        timestamp: latestSession.endTime || latestSession.startTime,
-        code: 'SESSION_FAILURES',
-        package: 'System',
-        context: { runType: latestSession.runType }
+    // CRITICAL: Only process errors from the latest COMPLETED session
+    if (latestCompletedSession) {
+      console.log('[INSTALLS MODULE] ✅ Processing errors from latest completed session:', {
+        sessionId: latestCompletedSession.sessionId,
+        status: latestCompletedSession.status,
+        failures: latestCompletedSession.failures,
+        packagesFailed: latestCompletedSession.packagesFailed,
+        failedItems: latestCompletedSession.failedItems,
+        endTime: latestCompletedSession.endTime
       })
-    }
-    
-    // Only add warnings from this latest session
-    if (latestSession.packagesPending > 0 && latestSession.status === 'completed') {
-      sessionWarnings.push({
-        id: `session-${latestSession.sessionId}-pending`,
-        message: `Session ${latestSession.sessionId} completed with ${latestSession.packagesPending} packages still pending`,
-        timestamp: latestSession.endTime || latestSession.startTime,
-        code: 'PENDING_PACKAGES',
-        package: 'System',
-        context: { runType: latestSession.runType }
-      })
+      
+      // Only add errors if this latest completed session had failures
+      if (latestCompletedSession.failures > 0 || latestCompletedSession.packagesFailed > 0 || 
+          (latestCompletedSession.failedItems && latestCompletedSession.failedItems.length > 0)) {
+        sessionErrors.push({
+          id: `session-${latestCompletedSession.sessionId}-failures`,
+          message: `Latest session ${latestCompletedSession.sessionId} had ${latestCompletedSession.failures || latestCompletedSession.packagesFailed || 0} failure(s)${latestCompletedSession.failedItems?.length ? ` affecting items: ${latestCompletedSession.failedItems.join(', ')}` : ''}`,
+          timestamp: latestCompletedSession.endTime || latestCompletedSession.startTime,
+          code: 'SESSION_FAILURES',
+          package: 'System',
+          context: { runType: latestCompletedSession.runType }
+        })
+      }
+      
+      // Only add warnings from this latest completed session
+      if (latestCompletedSession.packagesPending > 0) {
+        sessionWarnings.push({
+          id: `session-${latestCompletedSession.sessionId}-pending`,
+          message: `Latest session ${latestCompletedSession.sessionId} completed with ${latestCompletedSession.packagesPending} packages still pending`,
+          timestamp: latestCompletedSession.endTime || latestCompletedSession.startTime,
+          code: 'PENDING_PACKAGES',
+          package: 'System',
+          context: { runType: latestCompletedSession.runType }
+        })
+      }
+    } else {
+      console.log('[INSTALLS MODULE] ⚠️ No completed sessions found - no session errors to report')
     }
   }
 
@@ -688,12 +726,12 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
   
-  console.log('[INSTALLS MODULE] Latest session only - Errors/Warnings:', {
+  console.log('[INSTALLS MODULE] ✅ Latest completed session only - Errors/Warnings:', {
     sessionErrors: sessionErrors.length,
     sessionWarnings: sessionWarnings.length,
     packageErrors: packageErrors.length,
     packageWarnings: packageWarnings.length,
-    latestSessionId: installs.cimian?.sessions?.[0]?.sessionId
+    latestCompletedSessionId: installs.cimian?.sessions?.find((s: any) => s.status === 'completed' && s.endTime)?.sessionId || 'none'
   })
 
   const installsInfo: InstallsInfo = {
