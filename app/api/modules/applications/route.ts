@@ -23,22 +23,14 @@ export async function GET() {
     let response
     let useLocalFallback = false
     
-    // Check if REPORTMATE_PASSPHRASE is configured
-    if (!process.env.REPORTMATE_PASSPHRASE) {
-      console.error(`[APPLICATIONS API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
-      return NextResponse.json({
-        error: 'Configuration error',
-        details: 'REPORTMATE_PASSPHRASE environment variable not configured'
-      }, { status: 500 })
-    }
-
     try {
+      // Use Azure Managed Identity for authentication (no passphrase needed for internal Azure-to-Azure communication)
       response = await fetch(`${apiBaseUrl}/api/applications`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+          'User-Agent': 'ReportMate-Frontend/1.0'
         }
       })
       

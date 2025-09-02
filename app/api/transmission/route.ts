@@ -19,52 +19,30 @@ export async function POST(request: NextRequest) {
     console.log(`[TRANSMISSION] ${timestamp} - Received device data transmission`);
     
     try {
-        // Get the request body
-        const body = await request.json();
-        
-        // Log for development debugging
-        if (process.env.NODE_ENV === 'development') {
-            console.log(`[TRANSMISSION] ${timestamp} - Request body keys:`, Object.keys(body));
-            if (body.metadata) {
-                console.log(`[TRANSMISSION] ${timestamp} - Device: ${body.metadata.serialNumber} (${body.metadata.deviceId})`);
-            }
-        }
-        
-        // Check if REPORTMATE_PASSPHRASE is configured
-        if (!process.env.REPORTMATE_PASSPHRASE) {
-            console.error(`[TRANSMISSION] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`);
-            return NextResponse.json({
-                success: false,
-                error: 'Configuration error',
-                details: 'REPORTMATE_PASSPHRASE environment variable not configured',
-                timestamp
-            }, { status: 500 });
-        }
-        
-        // Forward the request to production Azure Functions API
-        const productionUrl = `${PRODUCTION_API_BASE}/api/transmission`;
+        // Forward the entire request without consuming the body
+        const productionUrl = `${PRODUCTION_API_BASE}/api/device`;
         console.log(`[TRANSMISSION] ${timestamp} - Forwarding to production API: ${productionUrl}`);
         
+        // Create headers for forwarding (using Azure Managed Identity)
+        const forwardHeaders = new Headers();
+        forwardHeaders.set('Content-Type', request.headers.get('content-type') || 'application/json');
+        forwardHeaders.set('User-Agent', 'ReportMate-Frontend/1.0');
+        
+        // Forward request using the raw body
         const response = await fetch(productionUrl, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!,
-                'User-Agent': 'ReportMate-Frontend-Dev/1.0'
-            },
-            body: JSON.stringify(body)
+            headers: forwardHeaders,
+            body: request.body
         });
         
         if (!response.ok) {
             console.error(`[TRANSMISSION] ${timestamp} - Production API error: ${response.status} ${response.statusText}`);
             
-            // Try to get error details
             let errorDetails = 'No additional details';
             try {
-                const errorBody = await response.json();
-                errorDetails = errorBody.message || errorBody.error || JSON.stringify(errorBody);
+                errorDetails = await response.text();
             } catch {
-                errorDetails = await response.text() || errorDetails;
+                errorDetails = `HTTP ${response.status} ${response.statusText}`;
             }
             
             return NextResponse.json({

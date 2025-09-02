@@ -83,77 +83,90 @@ export async function GET() {
       throw new Error('API_BASE_URL or AZURE_FUNCTIONS_BASE_URL not configured')
     }
     
-    console.log('[MANAGEMENT API] API Base URL:', apiBaseUrl)
-    console.log('[MANAGEMENT API] Fetching from Azure Functions:', `${apiBaseUrl}/api/device/79349310-287D-8166-52FC-0644E27378F7`)
+    console.log('[MANAGEMENT API] Fetching devices from:', `${apiBaseUrl}/api/devices`)
     
-    // For now, let's directly fetch the device we know exists and extract management data
-    const response = await fetch(`${apiBaseUrl}/api/device/79349310-287D-8166-52FC-0644E27378F7`, {
+    // First get the list of all devices
+    const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
       method: 'GET',
       headers: {
-        'REPORTMATE_PASSPHRASE': process.env.REPORTMATE_PASSPHRASE || '',
+        'User-Agent': 'ReportMate/1.0.0',
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
     })
     
-    if (!response.ok) {
-      throw new Error(`Azure Functions API error: ${response.status} ${response.statusText}`)
+    if (!devicesResponse.ok) {
+      throw new Error(`Azure Functions API error: ${devicesResponse.status} ${devicesResponse.statusText}`)
     }
     
-    const deviceData = await response.json()
-    console.log('[MANAGEMENT API] Got device data:', {
-      hasData: !!deviceData.data,
-      dataType: typeof deviceData.data,
-      deviceId: deviceData.metadata?.deviceId
-    })
+    const devices = await devicesResponse.json()
+    console.log('[MANAGEMENT API] Found', devices.length, 'devices')
     
-    if (!deviceData.data) {
-      console.log('[MANAGEMENT API] No device data found')
-      return NextResponse.json([])
+    const managementData = []
+    
+    // Get management data for each device
+    for (const device of devices) {
+      try {
+        const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${device.serialNumber}`, {
+          method: 'GET',
+          headers: {
+            'User-Agent': 'ReportMate/1.0.0',
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+        })
+        
+        if (!deviceResponse.ok) {
+          console.warn('[MANAGEMENT API] Failed to fetch device:', device.serialNumber)
+          continue
+        }
+        
+        const deviceData = await deviceResponse.json()
+        const managementModule = deviceData.device?.modules?.management
+        
+        if (managementModule) {
+          // Convert PowerShell objects to proper JSON
+          const processedManagement = convertPowerShellObjects(managementModule) as any
+          
+          // Extract management information
+          const provider = processedManagement?.mdmEnrollment?.provider
+          const isEnrolled = processedManagement?.mdmEnrollment?.isEnrolled || false
+          const enrollmentType = processedManagement?.mdmEnrollment?.enrollmentType
+          const enrollmentStatus = isEnrolled ? 'Enrolled' : 'Not Enrolled'
+          const intuneId = processedManagement?.deviceDetails?.intuneDeviceId
+          const tenantName = processedManagement?.tenantDetails?.tenantName
+          
+          // Only include devices with management data
+          if (provider || isEnrolled || enrollmentType || intuneId) {
+            managementData.push({
+              id: device.deviceId,
+              deviceId: device.deviceId,
+              deviceName: device.name || device.serialNumber,
+              serialNumber: device.serialNumber,
+              lastSeen: device.lastSeen,
+              collectedAt: device.lastSeen,
+              provider: provider || 'Unknown',
+              enrollmentStatus: enrollmentStatus,
+              enrollmentType: enrollmentType || '-',
+              intuneId: intuneId || '-',
+              tenantName: tenantName || '-',
+              isEnrolled: isEnrolled,
+              raw: processedManagement
+            })
+          }
+        }
+      } catch (error) {
+        console.warn('[MANAGEMENT API] Error processing device:', device.serialNumber, error)
+        continue
+      }
     }
     
-    // Parse the unified data structure
-    const unifiedData = typeof deviceData.data === 'string' ? JSON.parse(deviceData.data) : deviceData.data
-    
-    if (!unifiedData || !unifiedData.management) {
-      console.log('[MANAGEMENT API] No management data in unified structure')
-      return NextResponse.json([])
-    }
-    
-    console.log('[MANAGEMENT API] Found management data, processing...')
-    
-    // Convert PowerShell objects to proper JSON
-    const managementModule = convertPowerShellObjects(unifiedData.management) as any
-    
-    // Extract management information
-    const provider = managementModule?.mdmEnrollment?.provider
-    const isEnrolled = managementModule?.mdmEnrollment?.isEnrolled || false
-    const enrollmentType = managementModule?.mdmEnrollment?.enrollmentType
-    const enrollmentStatus = isEnrolled ? 'Enrolled' : 'Not Enrolled'
-    const intuneId = managementModule?.deviceDetails?.intuneDeviceId
-    const tenantName = managementModule?.tenantDetails?.tenantName
-    
-    const managementData = [{
-      id: deviceData.metadata?.deviceId || 'unknown',
-      deviceId: deviceData.metadata?.deviceId || 'unknown',
-      deviceName: unifiedData.inventory?.deviceName || 'Unknown Device',
-      serialNumber: deviceData.metadata?.serialNumber || 'Unknown',
-      lastSeen: deviceData.metadata?.collectedAt,
-      collectedAt: deviceData.metadata?.collectedAt,
-      provider: provider || 'Unknown',
-      enrollmentStatus: enrollmentStatus,
-      enrollmentType: enrollmentType || '-',
-      intuneId: intuneId || '-',
-      tenantName: tenantName || '-',
-      isEnrolled: isEnrolled,
-      raw: managementModule
-    }]
-    
-    console.log('[MANAGEMENT API] Returning management data:', managementData.length, 'devices')
+    console.log('[MANAGEMENT API] Returning management data for', managementData.length, 'devices')
     
     return NextResponse.json(managementData, {
       headers: {
-        'x-devices-total': '1',
+        'x-devices-total': devices.length.toString(),
+        'x-management-devices': managementData.length.toString(),
         'x-data-source': 'azure-functions'
       }
     })
