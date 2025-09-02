@@ -1,13 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
+import { extractInstalls } from '@/src/lib/data-processing/modules/installs'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const timestamp = new Date().toISOString()
     console.log(`[INSTALLS API] ${timestamp} - Fetching installs data`)
+
+    // Get device parameter from URL
+    const { searchParams } = new URL(request.url)
+    const deviceId = searchParams.get('device')
+    
+    if (!deviceId) {
+      console.error(`[INSTALLS API] ${timestamp} - Device ID parameter required`)
+      return NextResponse.json({
+        error: 'Device ID required',
+        details: 'Please provide device parameter in query string'
+      }, { status: 400 })
+    }
 
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -19,144 +32,77 @@ export async function GET() {
       }, { status: 500 })
     }
     
-    let response
-    let useLocalFallback = false
+    // Fetch device data first to get the installs module data
+    console.log(`[INSTALLS API] ${timestamp} - Fetching device data for: ${deviceId}`)
     
-    // Check if REPORTMATE_PASSPHRASE is configured
-    if (!process.env.REPORTMATE_PASSPHRASE) {
-      console.error(`[INSTALLS API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
-      return NextResponse.json({
-        error: 'Configuration error',
-        details: 'REPORTMATE_PASSPHRASE environment variable not configured'
-      }, { status: 500 })
-    }
-
     try {
-      response = await fetch(`${apiBaseUrl}/api/installs`, {
+      const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+          'User-Agent': 'ReportMate-Frontend/1.0'
         }
       })
       
-      if (!response.ok) {
-        console.error(`[INSTALLS API] ${timestamp} - Azure Functions API error:`, response.status, response.statusText)
-        useLocalFallback = true
+      if (!deviceResponse.ok) {
+        console.error(`[INSTALLS API] ${timestamp} - Device API error:`, deviceResponse.status, deviceResponse.statusText)
+        return NextResponse.json({
+          error: 'Failed to fetch device data',
+          details: `Device API returned ${deviceResponse.status}: ${deviceResponse.statusText}`
+        }, { status: 502 })
       }
-    } catch (fetchError) {
-      console.error(`[INSTALLS API] ${timestamp} - Failed to reach Azure Functions API:`, fetchError)
-      useLocalFallback = true
-    }
-    
-    if (useLocalFallback) {
-      console.log(`[INSTALLS API] ${timestamp} - Azure Functions /api/installs not found - extracting from events`)
       
-      try {
-        // Try to get installs data from events
-        const eventsResponse = await fetch(`${apiBaseUrl}/api/events`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
-          }
+      const deviceData = await deviceResponse.json()
+      console.log(`[INSTALLS API] ${timestamp} - Device data received successfully`)
+      
+      // Extract installs data using the ReportMate processing module
+      if (deviceData.success && deviceData.device && deviceData.device.modules) {
+        console.log(`[INSTALLS API] ${timestamp} - Processing installs data with ReportMate module`)
+        const installsInfo = extractInstalls(deviceData.device.modules)
+        
+        console.log(`[INSTALLS API] ${timestamp} - Installs processing complete:`, {
+          totalPackages: installsInfo.totalPackages,
+          installed: installsInfo.installed,
+          pending: installsInfo.pending,
+          failed: installsInfo.failed,
+          errorsFound: installsInfo.messages?.errors.length || 0,
+          warningsFound: installsInfo.messages?.warnings.length || 0
         })
         
-        if (eventsResponse.ok) {
-          const eventsData = await eventsResponse.json()
-          
-          if (eventsData.success && Array.isArray(eventsData.events)) {
-            console.log(`[INSTALLS API] ${timestamp} - Extracting installs data from ${eventsData.events.length} events`)
-            
-            // Find installs module events with actual data
-            const installsEvents = eventsData.events.filter((event: any) => 
-              event.payload && 
-              typeof event.payload === 'object' && 
-              event.payload.module_id === 'installs' &&
-              event.payload.data && 
-              Array.isArray(event.payload.data)
-            )
-            
-            // Get the most recent installs event with data
-            const latestInstallsEvent = installsEvents.length > 0 ? installsEvents[0] : null
-            
-            if (latestInstallsEvent && latestInstallsEvent.payload.data) {
-              console.log(`[INSTALLS API] ${timestamp} - Found latest installs data with ${latestInstallsEvent.payload.data.length} packages`)
-              
-              return NextResponse.json({
-                success: true,
-                data: latestInstallsEvent.payload.data,
-                timestamp: latestInstallsEvent.ts,
-                device: latestInstallsEvent.device
-              }, {
-                headers: {
-                  'Cache-Control': 'no-cache, no-store, must-revalidate',
-                  'Pragma': 'no-cache', 
-                  'Expires': '0',
-                  'X-Fetched-At': timestamp,
-                  'X-Data-Source': 'azure-functions-events'
-                }
-              })
-            }
-            
-            // No installs data found in events
-            console.log(`[INSTALLS API] ${timestamp} - No installs data found in events`)
-            
-            return NextResponse.json({
-              success: true,
-              data: [],
-              message: 'No installs data available'
-            }, {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache', 
-                'Expires': '0',
-                'X-Fetched-At': timestamp,
-                'X-Data-Source': 'azure-functions-events-empty'
-              }
-            })
+        return NextResponse.json({
+          success: true,
+          data: installsInfo,
+          timestamp: timestamp,
+          device: deviceId
+        }, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'device-api-processed'
           }
-        }
-        
-        console.error(`[INSTALLS API] ${timestamp} - Events fallback also failed`)
-      } catch (eventsError) {
-        console.error(`[INSTALLS API] ${timestamp} - Events fallback error:`, eventsError)
+        })
+      } else {
+        console.error(`[INSTALLS API] ${timestamp} - Invalid device data structure`)
+        return NextResponse.json({
+          error: 'Invalid device data structure',
+          details: 'Device data does not contain expected modules structure'
+        }, { status: 502 })
       }
       
-      // If events fallback also fails, return 503
-      return NextResponse.json(
-        { error: 'Service temporarily unavailable - cloud infrastructure error' },
-        { status: 503 }
-      )
+    } catch (deviceError) {
+      console.error(`[INSTALLS API] ${timestamp} - Failed to fetch device data:`, deviceError)
+      return NextResponse.json({
+        error: 'Failed to fetch device data',
+        details: deviceError instanceof Error ? deviceError.message : String(deviceError)
+      }, { status: 502 })
     }
-    
-    // Continue with Azure Functions API response processing if we have a valid response
-    if (response) {
-      const data = await response.json()
-      console.log(`[INSTALLS API] ${timestamp} - Successfully received data from Azure Functions API`)
-      
-      return NextResponse.json(data, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Fetched-At': timestamp,
-          'X-Data-Source': 'azure-functions'
-        }
-      })
-    }
-    
-    // This should not be reached since we handle the fallback above
-    return NextResponse.json({
-      error: 'Unexpected error in API routing'
-    }, { status: 500 })
-
   } catch (error) {
-    console.error('[INSTALLS API] Error fetching installs:', error)
+    console.error('[INSTALLS API] Error processing installs data:', error)
     return NextResponse.json({
-      error: 'Failed to fetch installs data',
+      error: 'Failed to process installs data',
       details: error instanceof Error ? error.message : String(error)
     }, { 
       status: 500,

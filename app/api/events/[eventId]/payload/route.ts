@@ -20,7 +20,7 @@ export async function GET(
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+          'User-Agent': 'ReportMate-Frontend/1.0'
         },
         cache: 'no-store',
         signal: AbortSignal.timeout(10000)

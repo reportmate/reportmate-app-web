@@ -40,9 +40,9 @@ export async function GET() {
     try {
       console.log('[EVENTS API] Attempting to fetch from:', `${AZURE_FUNCTIONS_BASE_URL}/api/events`);
       
-      // Use shorter timeout (3 seconds) to avoid long waits
+      // Use longer timeout (15 seconds) for Azure Functions
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
       const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events`, {
         method: 'GET',
@@ -105,7 +105,7 @@ export async function GET() {
     } catch (fetchError) {
       if (fetchError instanceof Error) {
         if (fetchError.name === 'AbortError') {
-          console.log('[EVENTS API] Azure Functions API timed out after 3 seconds - using fallback data');
+          console.log('[EVENTS API] Azure Functions API timed out after 15 seconds - using fallback data');
         } else {
           console.log('[EVENTS API] Azure Functions API fetch error:', fetchError.message);
         }
@@ -116,96 +116,22 @@ export async function GET() {
     }
 
     // Try direct database query as backup
+    console.log('[EVENTS API] Azure Functions timeout - attempting direct database query');
+    
     try {
-      console.log('[EVENTS API] Database fallback disabled - returning error instead');
+      // TODO: Implement direct database query here
+      console.log('[EVENTS API] Direct database query not yet implemented');
       return NextResponse.json(
-        { error: 'Service temporarily unavailable - cloud infrastructure error' },
+        { error: 'Azure Functions API unavailable and direct database fallback not implemented' },
         { status: 503 }
       );
-      
     } catch (error) {
-      console.error('[EVENTS API] Error in events processing:', error);
+      console.error('[EVENTS API] Database query failed:', error);
       return NextResponse.json(
-        { error: 'Internal server error' },
-        { status: 500 }
+        { error: 'Service temporarily unavailable - both Azure Functions and database failed' },
+        { status: 503 }
       );
     }
-
-    // Return events based on actual device IDs in the database as fallback
-    console.log('[EVENTS API] Using local fallback data with real device IDs');
-    
-    const fallbackEvents = [
-      // Events for device 0F33V9G25083HJ (primary test device)
-      {
-        id: 'sample-evt-001',
-        device: '0F33V9G25083HJ',
-        kind: 'info',
-        ts: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        message: 'Peripherals module data reported', // User-friendly message from database
-        payload: {
-          summary: 'Peripherals module data reported',
-          message: 'Peripherals module data reported',
-          module_id: 'peripherals'
-        }
-      },
-      {
-        id: 'sample-evt-002',
-        device: '0F33V9G25083HJ', 
-        kind: 'info',
-        ts: new Date(Date.now() - 1800000).toISOString(), // 30 minutes ago
-        message: 'Inventory, System modules data reported', // User-friendly message from database
-        payload: {
-          summary: 'Data collection completed for 2 modules',
-          modules: ['inventory', 'system'],
-          collection_type: 'routine',
-          module_id: 'system'
-        }
-      },
-      {
-        id: 'sample-evt-003',
-        device: '0F33V9G25083HJ',
-        kind: 'success',
-        ts: new Date(Date.now() - 900000).toISOString(), // 15 minutes ago
-        message: 'System module data reported', // User-friendly message from database
-        payload: {
-          message: 'System module data reported',
-          operating_system: 'Windows 11 Pro',
-          module_status: 'success'
-        }
-      },
-      // Events for FINAL-TEST-456
-      {
-        id: 'sample-evt-004',
-        device: 'FINAL-TEST-456',
-        kind: 'info',
-        ts: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-        payload: {
-          message: 'Data collection completed for 2 modules',
-          modules_processed: ['system', 'inventory'],
-          collection_type: 'routine'
-        }
-      },
-      // Events for TEST123
-      {
-        id: 'sample-evt-005',
-        device: 'TEST123',
-        kind: 'info',
-        ts: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-        payload: {
-          message: 'Test device check-in',
-          component: 'reportmate-client'
-        }
-      }
-    ];
-
-    return NextResponse.json({
-      success: true,
-      events: fallbackEvents,
-      count: fallbackEvents.length,
-      source: 'fallback',
-      note: 'Azure Functions API unavailable - using fallback events with real device IDs',
-      timestamp: new Date().toISOString()
-    });
   } catch (error) {
     console.error('[EVENTS API] Error fetching events:', error);
     return NextResponse.json(

@@ -41,7 +41,7 @@ export async function GET(
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+          'User-Agent': 'ReportMate-Frontend/1.0'
         },
         signal: AbortSignal.timeout(10000)
       })

@@ -1,4 +1,6 @@
+import NextAuth from "next-auth"
 import { NextRequest, NextResponse } from "next/server"
+import { authOptions } from "@/lib/auth"
 
 // Development mode: bypass authentication completely
 const isDevelopment = process.env.NODE_ENV === 'development'
@@ -56,13 +58,11 @@ if (isDevelopment) {
   GET = devHandler
   POST = devHandler
 } else {
-  // Production: use normal NextAuth
-  console.warn('Production NextAuth not configured - please configure @/lib/auth')
-  const fallbackHandler = async (req: NextRequest) => {
-    return NextResponse.json({ error: 'NextAuth not configured for production' }, { status: 500 })
-  }
-  GET = fallbackHandler
-  POST = fallbackHandler
+  // Production: use proper NextAuth
+  console.log('NextAuth configured for production with Azure AD')
+  const handler = NextAuth(authOptions)
+  GET = handler
+  POST = handler
 }
 
 export { GET, POST }

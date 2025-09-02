@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // Helper function to convert PowerShell object strings to JSON objects
-function parsePowerShellObject(str: string): unknown {
+function parsePowerShellObject(str: string, parentKey?: string, originalObj?: unknown): unknown {
   if (typeof str !== 'string' || !str.startsWith('@{') || !str.endsWith('}')) {
     return str
   }
@@ -44,10 +44,13 @@ function parsePowerShellObject(str: string): unknown {
         result[key] = parseFloat(valueStr)
       } else if (valueStr.startsWith('@{') && valueStr.endsWith('}')) {
         // Nested PowerShell object
-        result[key] = parsePowerShellObject(valueStr)
+        result[key] = parsePowerShellObject(valueStr, key, originalObj)
       } else if (valueStr.startsWith('System.Object[]')) {
-        // PowerShell array - simplified to empty array for now
-        result[key] = []
+        // PowerShell array - this contains actual data that needs to be preserved
+        // TODO: Implement proper PowerShell array parsing
+        // For now, mark as array for downstream processing instead of discarding
+        console.warn('[DEVICE API] 🚨 PowerShell array detected but not parsed:', key, '- preserving for processing')
+        result[key] = { _powershellArray: true, _rawValue: valueStr }
       } else {
         result[key] = valueStr
       }
@@ -61,15 +64,23 @@ function parsePowerShellObject(str: string): unknown {
 }
 
 // Recursively process object to convert PowerShell object strings
-function convertPowerShellObjects(obj: unknown): unknown {
+function convertPowerShellObjects(obj: unknown, parentKey?: string, originalObj?: unknown): unknown {
   if (typeof obj === 'string') {
-    return parsePowerShellObject(obj)
+    // Pass context to parsePowerShellObject for better array handling
+    return parsePowerShellObject(obj, parentKey, originalObj)
   } else if (Array.isArray(obj)) {
-    return obj.map(convertPowerShellObjects)
+    // Preserve arrays as-is, but process their contents
+    return obj.map((item, index) => convertPowerShellObjects(item, `${parentKey}[${index}]`, obj))
   } else if (obj && typeof obj === 'object') {
     const result: Record<string, unknown> = {}
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = convertPowerShellObjects(value)
+      // For known array fields, preserve original data if available
+      if (['events', 'items', 'sessions'].includes(key) && Array.isArray(value)) {
+        console.log(`[DEVICE API] Preserving original ${key} array with ${value.length} items`)
+        result[key] = value // Preserve original array data
+      } else {
+        result[key] = convertPowerShellObjects(value, key, obj)
+      }
     }
     return result
   }
@@ -128,7 +139,7 @@ export async function GET(
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
-        'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+        'User-Agent': 'ReportMate-Frontend/1.0'
       }
     })
     
@@ -151,56 +162,8 @@ export async function GET(
       }
       */
       
-      // If database fallback failed, try sample data
-      console.log('[DEVICE API] Falling back to sample data')
-      
-      try {
-        // Read sample data from file
-        const workingDir = process.cwd()
-        console.log('[DEVICE API] Working directory:', workingDir)
-        
-        // Try multiple possible paths
-        const possiblePaths = [
-          path.join(workingDir, 'sample-api-data.json'),
-          path.join(workingDir, '../../sample-api-data.json'),
-          path.join(workingDir, '../../../sample-api-data.json'),
-          path.join(__dirname, '../../../../../../sample-api-data.json')
-        ]
-        
-        let sampleDataPath = null
-        for (const testPath of possiblePaths) {
-          console.log('[DEVICE API] Testing path:', testPath)
-          if (fs.existsSync(testPath)) {
-            sampleDataPath = testPath
-            console.log('[DEVICE API] Found sample data at:', testPath)
-            break
-          }
-        }
-        
-        if (sampleDataPath) {
-          const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'))
-          console.log('[DEVICE API] Using sample data fallback')
-          
-          // Return sample data in the expected format
-          // If sample data has nested device structure, flatten it
-          const deviceData = sampleData.device || sampleData
-          return NextResponse.json({
-            success: true,
-            device: deviceData,
-            source: 'sample-data'
-          }, {
-            headers: {
-              'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-              'Pragma': 'no-cache',
-              'Expires': '0'
-            }
-          })
-        } else {
-          console.log('[DEVICE API] Sample data file not found in any of the expected locations')
-        }
-      } catch (sampleError) {
-        console.error('[DEVICE API] Failed to load sample data:', sampleError)
-      }
+      // No fallback data - return error if Azure Functions API fails
+      console.log('[DEVICE API] Azure Functions API failed, no fallback available')
       
       if (response.status === 404) {
         return NextResponse.json({
@@ -255,7 +218,7 @@ export async function GET(
       
       // Convert any PowerShell objects in the modules
       console.log('[DEVICE API] Converting PowerShell objects...')
-      const cleanedModules = convertPowerShellObjects(modules) as Record<string, unknown>
+      const cleanedModules = convertPowerShellObjects(modules, 'modules', data) as Record<string, unknown>
       console.log('[DEVICE API] PowerShell conversion complete')
       
       const responseData = {

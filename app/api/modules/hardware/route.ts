@@ -22,22 +22,13 @@ export async function GET() {
     let response
     let useLocalFallback = false
     
-    // Check if REPORTMATE_PASSPHRASE is configured
-    if (!process.env.REPORTMATE_PASSPHRASE) {
-      console.error(`[HARDWARE API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
-      return NextResponse.json({
-        error: 'Configuration error',
-        details: 'REPORTMATE_PASSPHRASE environment variable not configured'
-      }, { status: 500 })
-    }
-
     try {
       response = await fetch(`${apiBaseUrl}/api/hardware`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+          'User-Agent': 'ReportMate-Frontend/1.0'
         }
       })
       
@@ -60,7 +51,7 @@ export async function GET() {
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache',
-            'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+            'User-Agent': 'ReportMate-Frontend/1.0'
           }
         })
         
