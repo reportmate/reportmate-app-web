@@ -199,26 +199,22 @@ function HardwarePageContent() {
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Hardware</h1>
               </div>
             </div>
-            
-            <div className="flex items-center gap-4 flex-shrink-0">
-              {/* Processor Filter */}
-              <select
-                value={processorFilter}
-                onChange={(e) => setProcessorFilter(e.target.value)}
-                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-              >
-                <option value="all">All Processors</option>
-                {processorFamilies.map(family => (
-                  <option key={family} value={family}>{family}</option>
-                ))}
-              </select>
+
+            {/* Right side - Navigation */}
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Navigation */}
+              <div className="hidden lg:flex">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
+
+              {/* Mobile Navigation */}
+              <div className="lg:hidden">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
             </div>
           </div>
         </div>
       </header>
-
-      {/* Navigation */}
-      <DevicePageNavigation />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
