@@ -28,25 +28,15 @@ export async function GET() {
     
   console.log(`[DEVICES API] ${timestamp} - Using API base URL:`, apiBaseUrl)
   
-  // Check if REPORTMATE_PASSPHRASE is configured
-  if (!process.env.REPORTMATE_PASSPHRASE) {
-    console.error(`[DEVICES API] ${timestamp} - Missing REPORTMATE_PASSPHRASE environment variable`)
-    return NextResponse.json({
-      success: false,
-      error: 'Configuration error',
-      details: 'REPORTMATE_PASSPHRASE environment variable not configured',
-      timestamp
-    }, { status: 500 })
-  }
-  
   // 🚨 CLOUD-FIRST: No fallbacks, fail immediately on API errors
   try {
+    // Use Azure Managed Identity for authentication (no passphrase needed for internal Azure-to-Azure communication)
     const response = await fetch(`${apiBaseUrl}/api/devices`, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache',
-        'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+        'User-Agent': 'ReportMate-Frontend/1.0'
       }
     })
     
@@ -63,7 +53,7 @@ export async function GET() {
             headers: {
               'Cache-Control': 'no-cache',
               'Pragma': 'no-cache',
-              'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+              'User-Agent': 'ReportMate-Frontend/1.0'
             }
           })
           
@@ -98,7 +88,7 @@ export async function GET() {
                   headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache',
-                    'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+                    'User-Agent': 'ReportMate-Frontend/1.0'
                   }
                 })
                 
@@ -228,7 +218,7 @@ export async function GET() {
                 headers: {
                   'Cache-Control': 'no-cache',
                   'Pragma': 'no-cache',
-                  'X-API-PASSPHRASE': process.env.REPORTMATE_PASSPHRASE!
+                  'User-Agent': 'ReportMate-Frontend/1.0'
                 }
               })
               
