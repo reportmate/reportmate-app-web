@@ -221,14 +221,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           </div>
         </div>
 
-        {/* Storage Usage */}
+        {/* Storage Available */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
-          <div className="text-3xl font-bold text-orange-600 dark:text-orange-400">
-            {storageUsagePercent}%
+          <div className="text-3xl font-bold text-green-600 dark:text-green-400">
+            {totalStorage > 0 ? Math.round((freeStorage / totalStorage) * 100) : 0}%
           </div>
-          <div className="text-base text-gray-500 dark:text-gray-400">Storage Used</div>
+          <div className="text-base text-gray-500 dark:text-gray-400">Storage Available</div>
           <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-            {formatBytes(usedStorage)} / {formatBytes(totalStorage)}
+            {formatBytes(freeStorage)} free / {formatBytes(totalStorage)} total
           </div>
         </div>
 

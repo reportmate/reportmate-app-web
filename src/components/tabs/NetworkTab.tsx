@@ -89,6 +89,23 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
   console.log('🌐🌐🌐 NETWORK TAB - Data prop:', data);
   console.log('🌐🌐🌐 NETWORK TAB - Device object keys:', device ? Object.keys(device) : 'no device');
   
+  // Helper function to filter IPv6 addresses and return only IPv4
+  const getIPv4Address = (ipAddress: string | undefined): string | undefined => {
+    if (!ipAddress || ipAddress === 'N/A') return undefined;
+    
+    // If it's a single IP, check if it's IPv4
+    if (!ipAddress.includes(',')) {
+      // IPv4 pattern: xxx.xxx.xxx.xxx
+      const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+      return ipv4Pattern.test(ipAddress.trim()) ? ipAddress.trim() : undefined;
+    }
+    
+    // If it's multiple IPs, find the first IPv4
+    const ips = ipAddress.split(',').map(ip => ip.trim());
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    return ips.find(ip => ipv4Pattern.test(ip));
+  };
+  
   // Process network data directly like ApplicationsTab does
   const processedNetworkData = data || extractNetwork(device)
   console.log('🌐🌐🌐 NETWORK TAB - Processed data from processNetworkData:', processedNetworkData)
@@ -182,12 +199,36 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
               />
             </div>
           </div>
-          <div className="text-center">
-            <div className="text-sm text-gray-500 dark:text-gray-500">Hostname</div>
-            <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {networkData.hostname || 'N/A'}
-            </div>
-          </div>
+          {/* Find active interface with wireless protocol */}
+          {(() => {
+            const activeInterface = networkData.interfaces?.find((iface: any) => 
+              (iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected') && 
+              iface.wirelessProtocol
+            );
+            return activeInterface?.wirelessProtocol && (
+              <div className="text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-500">Protocol</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {activeInterface.wirelessProtocol}
+                </div>
+              </div>
+            );
+          })()}
+          {/* Find active interface with wireless band */}
+          {(() => {
+            const activeInterface = networkData.interfaces?.find((iface: any) => 
+              (iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected') && 
+              iface.wirelessBand
+            );
+            return activeInterface?.wirelessBand && (
+              <div className="text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-500">Band</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {activeInterface.wirelessBand}
+                </div>
+              </div>
+            );
+          })()}
           {networkData.signalStrength && (
             <div className="text-center">
               <div className="text-sm text-gray-500 dark:text-gray-500">Signal Strength</div>
@@ -204,16 +245,47 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
               </div>
             </div>
           )}
-          {networkData.vpnName && (
+        </div>
+      </div>
+
+      {/* VPN Connection Card - Only show if VPN is active */}
+      {networkData.vpnActive && networkData.vpnName && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">VPN Connection</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Secure tunnel active</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="text-center">
-              <div className="text-sm text-gray-500 dark:text-gray-500">VPN Connection</div>
+              <div className="text-sm text-gray-500 dark:text-gray-500">VPN Name</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {networkData.vpnName}
               </div>
             </div>
-          )}
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Status</div>
+              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                Connected
+              </div>
+            </div>
+            {networkData.vpnConnections && networkData.vpnConnections.length > 0 && (
+              <div className="text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-500">Total VPN Configs</div>
+                <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {networkData.vpnConnections.length}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Network Configuration and WiFi Networks - Side by Side */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
@@ -346,13 +418,13 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interface</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Band</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MAC Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link Speed</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Band</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -409,6 +481,12 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                           </span>
                         )}
                       </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.wirelessProtocol || ''}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+                        {iface.wirelessBand || ''}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {isActive ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
@@ -422,10 +500,10 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
                         <CopyableValue 
-                          value={iface.ipAddress && iface.ipAddress !== 'N/A' ? iface.ipAddress : ''} 
+                          value={getIPv4Address(iface.ipAddress)} 
                           className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
                           placeholder=""
-                          showCopy={iface.ipAddress && iface.ipAddress !== 'N/A'}
+                          showCopy={!!getIPv4Address(iface.ipAddress)}
                         />
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
@@ -437,16 +515,10 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                         />
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
                         {iface.linkSpeed || ''}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.wirelessProtocol || ''}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.wirelessBand || ''}
+                        {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
                       </td>
                     </tr>
                     );
