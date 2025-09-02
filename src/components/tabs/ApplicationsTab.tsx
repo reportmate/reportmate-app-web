@@ -7,17 +7,29 @@ import React, { useMemo } from 'react'
 import { ApplicationsTable } from '../tables'
 import { extractApplications } from '../../lib/data-processing/modules/applications'
 
-interface TabApplicationInfo {
+// Import ApplicationInfo from the table component
+interface ApplicationInfo {
   id: string;
   name: string;
   displayName?: string;
-  version?: string;
+  path?: string;
+  version: string;
+  bundle_version?: string;
+  last_modified?: number;
+  obtained_from?: string;
+  runtime_environment?: string;
+  info?: string;
+  has64bit?: boolean;
+  signed_by?: string;
   publisher?: string;
   category?: string;
   installDate?: string;
   size?: string;
-  path?: string;
-  [key: string]: unknown; // Allow additional properties from API
+  bundleId?: string;
+  install_location?: string;
+  description?: string;
+  status?: string;
+  startType?: string;
 }
 
 interface DeviceData {
@@ -41,6 +53,8 @@ interface ApplicationsTabProps {
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
+  console.log('🔍 APPLICATIONS TAB RENDERED - About to import ApplicationsTable', new Date().toISOString());
+  
   // Process applications data from the modular device structure
   const applicationsModuleData = extractApplications(device?.modules || {})
   
@@ -67,9 +81,6 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     applicationsModuleData: JSON.stringify(applicationsModuleData).substring(0, 500)
   });
 
-  // Transform applications data for the table component
-  let installedApps: any[] = []
-  
   console.log('🔍 ApplicationsTab Data Sources Debug:', {
     hasDataProp: !!data?.installedApps?.length,
     dataPropsAppsCount: data?.installedApps?.length || 0,
@@ -87,42 +98,54 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     applicationModuleKeys: device?.modules?.applications ? Object.keys(device.modules.applications) : []
   });
   
-  // Prioritize data prop, then processed device data, then fallback to raw module data
-  if (data?.installedApps?.length) {
-    console.log('✅ Using data prop (processedData.applications)');
-    installedApps = data.installedApps
-  } else if (device?.modules?.applications?.installedApplications) {
-    console.log('⚠️ Falling back to raw module data (camelCase)');
-    installedApps = device.modules.applications.installedApplications
-  } else if (device?.modules?.applications?.InstalledApplications) {
-    console.log('⚠️ Falling back to raw module data (PascalCase - Windows Client)');
-    installedApps = device.modules.applications.InstalledApplications
-  } else if (device?.modules?.applications?.installed_applications) {
-    console.log('⚠️ Falling back to raw module data (snake_case)');
-    installedApps = device.modules.applications.installed_applications
-  } else if (applicationsModuleData?.applications) {
-    console.log('⚠️ Using processed module data');
-    installedApps = applicationsModuleData.applications
-  }
+  // Memoize the selection of installed apps to avoid unnecessary recalculations
+  const installedApps = useMemo(() => {
+    // Prioritize data prop, then processed device data, then fallback to raw module data
+    if (data?.installedApps?.length) {
+      console.log('✅ Using data prop (processedData.applications)');
+      return data.installedApps
+    } else if (device?.modules?.applications?.installedApplications) {
+      console.log('⚠️ Falling back to raw module data (camelCase)');
+      return device.modules.applications.installedApplications
+    } else if (device?.modules?.applications?.InstalledApplications) {
+      console.log('⚠️ Falling back to raw module data (PascalCase - Windows Client)');
+      return device.modules.applications.InstalledApplications
+    } else if (device?.modules?.applications?.installed_applications) {
+      console.log('⚠️ Falling back to raw module data (snake_case)');
+      return device.modules.applications.installed_applications
+    } else if (applicationsModuleData?.applications) {
+      console.log('⚠️ Using processed module data');
+      return applicationsModuleData.applications
+    }
+    return []
+  }, [
+    data?.installedApps, 
+    device?.modules?.applications?.installedApplications,
+    device?.modules?.applications?.InstalledApplications,
+    device?.modules?.applications?.installed_applications,
+    applicationsModuleData?.applications
+  ])
 
   // Transform the data to match ApplicationsTable expected format
-  const processedApps = installedApps.map((app: any, index: number) => ({
-    id: app.id || app.name || `app-${index}`,
-    name: app.name || app.displayName || 'Unknown Application',
-    displayName: app.displayName || app.name,
-    version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
-    publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
-    category: app.category || 'Uncategorized',
-    installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
-    size: app.size,
-    path: app.path || (app as unknown as Record<string, unknown>).install_location as string,
-    bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string,
-    info: (app as unknown as Record<string, unknown>).info as string,
-    obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
-    runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
-    has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
-    signed_by: (app as unknown as Record<string, unknown>).signed_by as string
-  }))
+  const processedApps = useMemo(() => {
+    return installedApps.map((app: any, index: number) => ({
+      id: app.id || app.name || `app-${index}`,
+      name: app.name || app.displayName || 'Unknown Application',
+      displayName: app.displayName || app.name,
+      version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
+      publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
+      category: app.category || 'Uncategorized',
+      installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
+      size: app.size,
+      path: app.path || (app as unknown as Record<string, unknown>).install_location as string,
+      bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string,
+      info: (app as unknown as Record<string, unknown>).info as string,
+      obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
+      runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
+      has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
+      signed_by: (app as unknown as Record<string, unknown>).signed_by as string
+    }))
+  }, [installedApps])
 
   // Calculate summary statistics
   const totalApps = processedApps.length
@@ -205,7 +228,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
         )}
       </div>
 
-      <ApplicationsTable key="applications-table" data={applicationsData} />
+      <ApplicationsTable data={applicationsData} />
     </div>
   )
 }
