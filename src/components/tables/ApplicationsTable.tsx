@@ -16,12 +16,11 @@ interface ApplicationInfo {
   signed_by?: string;
   publisher?: string;
   category?: string;
-  installDate?: string;  // Windows install date format
+  installDate?: string;
   size?: string;
   bundleId?: string;
   install_location?: string;
   description?: string;
-  // Service-specific fields
   status?: string;
   startType?: string;
 }
@@ -43,65 +42,74 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
   const [searchTerm, setSearchTerm] = useState('');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   
-  // Component mount tracking
-  useEffect(() => {
-    const mountId = Math.random().toString(36).substr(2, 9);
-    console.log('🔍 ApplicationsTable: Component mounted with ID:', mountId);
-    
-    return () => {
-      console.log('🔍 ApplicationsTable: Component unmounted, ID:', mountId);
-    };
-  }, []);
-  
-  // Debug effect to track search term changes
-  useEffect(() => {
-    console.log('🔍 ApplicationsTable: Search term state changed to:', searchTerm);
-    console.log('🔍 ApplicationsTable: Current data.installedApps length:', data?.installedApps?.length || 0);
-  }, [searchTerm, data?.installedApps?.length]);
-  
-  // Debug effect to track data changes
-  useEffect(() => {
-    console.log('🔍 ApplicationsTable: Data prop changed, apps count:', data?.installedApps?.length || 0);
-    console.log('🔍 ApplicationsTable: Sample app:', data?.installedApps?.[0]);
-  }, [data?.installedApps]);
-  
-  // Filter applications based on search term
+  // Filter applications based on search term with relevance scoring
   const filteredApps = useMemo(() => {
-    if (!data?.installedApps) {
-      console.log('🔍 ApplicationsTable: No data.installedApps available');
-      return [];
-    }
+    // First deduplicate applications by name + publisher, keeping latest version
+    const appMap = new Map<string, ApplicationInfo & { originalIndex: number }>();
     
-    const apps = data.installedApps;
-    
-    if (!searchTerm.trim()) {
-      console.log('🔍 ApplicationsTable: No search term, returning all', apps.length, 'apps');
-      return apps;
-    }
-    
-    const searchLower = searchTerm.toLowerCase().trim();
-    console.log('🔍 ApplicationsTable: Filtering with search term:', searchLower);
-    
-    const filtered = apps.filter(app => {
-      const matches = (
-        (app.displayName && app.displayName.toLowerCase().includes(searchLower)) ||
-        (app.name && app.name.toLowerCase().includes(searchLower)) ||
-        (app.publisher && app.publisher.toLowerCase().includes(searchLower)) ||
-        (app.signed_by && app.signed_by.toLowerCase().includes(searchLower)) ||
-        (app.version && app.version.toLowerCase().includes(searchLower)) ||
-        (app.bundle_version && app.bundle_version.toLowerCase().includes(searchLower)) ||
-        (app.path && app.path.toLowerCase().includes(searchLower)) ||
-        (app.install_location && app.install_location.toLowerCase().includes(searchLower)) ||
-        (app.category && app.category.toLowerCase().includes(searchLower)) ||
-        (app.info && app.info.toLowerCase().includes(searchLower)) ||
-        (app.description && app.description.toLowerCase().includes(searchLower))
-      );
+    (data?.installedApps || []).forEach((app: ApplicationInfo, index: number) => {
+      const nameKey = `${app.name || 'unknown'}-${app.publisher || 'unknown'}`;
+      const existing = appMap.get(nameKey);
       
-      return matches;
+      if (!existing) {
+        appMap.set(nameKey, { ...app, originalIndex: index });
+      } else {
+        // Keep the one with newer version or later in the list (more recent)
+        const currentVersion = app.version || '0.0.0';
+        const existingVersion = existing.version || '0.0.0';
+        
+        // Simple version comparison - if current seems newer, replace
+        if (currentVersion > existingVersion || index > existing.originalIndex) {
+          appMap.set(nameKey, { ...app, originalIndex: index });
+        }
+      }
     });
     
-    console.log('🔍 ApplicationsTable: Filtered', filtered.length, 'out of', apps.length, 'apps');
-    return filtered;
+    const deduplicatedApps = Array.from(appMap.values());
+    
+    if (!searchTerm.trim()) {
+      return deduplicatedApps;
+    }
+    
+    const searchLower = searchTerm.toLowerCase();
+    
+    // Filter and score results for relevance
+    const filteredWithScores = deduplicatedApps
+      .map((app: ApplicationInfo) => {
+        let relevanceScore = 0;
+        const name = app.name?.toLowerCase() || '';
+        const displayName = app.displayName?.toLowerCase() || '';
+        const publisher = app.publisher?.toLowerCase() || '';
+        const signedBy = app.signed_by?.toLowerCase() || '';
+        const version = app.version?.toLowerCase() || '';
+        const path = app.path?.toLowerCase() || '';
+        
+        // Exact matches get highest score
+        if (name === searchLower || displayName === searchLower) relevanceScore += 100;
+        // Starts with search term gets high score
+        else if (name.startsWith(searchLower) || displayName.startsWith(searchLower)) relevanceScore += 50;
+        // Contains search term gets medium score
+        else if (name.includes(searchLower) || displayName.includes(searchLower)) relevanceScore += 25;
+        
+        // Lower priority matches
+        if (publisher.includes(searchLower)) relevanceScore += 10;
+        if (signedBy.includes(searchLower)) relevanceScore += 8;
+        if (version.includes(searchLower)) relevanceScore += 5;
+        if (path.includes(searchLower)) relevanceScore += 3;
+        
+        return { app, relevanceScore };
+      })
+      .filter(item => item.relevanceScore > 0)
+      .sort((a, b) => {
+        // Sort by relevance score (descending), then by name (ascending)
+        if (b.relevanceScore !== a.relevanceScore) {
+          return b.relevanceScore - a.relevanceScore;
+        }
+        return (a.app.displayName || a.app.name || '').localeCompare(b.app.displayName || b.app.name || '');
+      })
+      .map(item => item.app);
+    
+    return filteredWithScores;
   }, [data?.installedApps, searchTerm]);
 
   // Handle scrollbar visibility
@@ -109,89 +117,47 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
     const container = scrollContainerRef.current;
     if (!container) return;
 
-    let scrollTimeout: NodeJS.Timeout;
+    const hasScrollbar = container.scrollHeight > container.clientHeight;
     
-    const handleScroll = () => {
-      container.classList.add('scrolling');
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        container.classList.remove('scrolling');
-      }, 1000);
-    };
+    if (hasScrollbar) {
+      container.classList.add('overlay-scrollbar');
+    } else {
+      container.classList.remove('overlay-scrollbar');
+    }
+  }, [filteredApps]);
 
-    const handleMouseEnter = () => {
-      container.classList.add('scrolling');
-    };
-
-    const handleMouseLeave = () => {
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        container.classList.remove('scrolling');
-      }, 300);
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    container.addEventListener('mouseenter', handleMouseEnter);
-    container.addEventListener('mouseleave', handleMouseLeave);
-
-    return () => {
-      container.removeEventListener('scroll', handleScroll);
-      container.removeEventListener('mouseenter', handleMouseEnter);
-      container.removeEventListener('mouseleave', handleMouseLeave);
-      clearTimeout(scrollTimeout);
-    };
-  }, []);
-
-  if (!data || !data.installedApps || data.installedApps.length === 0) {
+  if (!data?.installedApps?.length) {
     return (
       <div className="text-center py-16">
         <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
           <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
           </svg>
         </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Applications Data</h3>
-        <p className="text-gray-600 dark:text-gray-400">Application information is not available for this device.</p>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Applications Found</h3>
+        <p className="text-gray-600 dark:text-gray-400">No applications are installed on this device.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Applications Table */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        {/* Search Header */}
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-end">
-            {/* Search Field */}
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                 </svg>
               </div>
               <input
                 type="text"
-                placeholder="Search apps..."
+                className="block w-64 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                placeholder="Search applications..."
                 value={searchTerm}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  console.log('🔍 ApplicationsTable: INPUT CHANGE EVENT - before setState, current searchTerm:', searchTerm);
-                  console.log('🔍 ApplicationsTable: INPUT CHANGE EVENT - new value:', newValue);
-                  
-                  setSearchTerm(newValue);
-                  
-                  console.log('🔍 ApplicationsTable: INPUT CHANGE EVENT - setState called with:', newValue);
-                  
-                  // Test if filtering works with the new value directly
-                  if (data?.installedApps && newValue.trim()) {
-                    const testFiltered = data.installedApps.filter(app => 
-                      (app.name && app.name.toLowerCase().includes(newValue.toLowerCase())) ||
-                      (app.displayName && app.displayName.toLowerCase().includes(newValue.toLowerCase()))
-                    );
-                    console.log('🔍 ApplicationsTable: DIRECT FILTER TEST - found', testFiltered.length, 'matches for:', newValue);
-                  }
-                }}
-                className="block w-64 pl-10 pr-10 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
               {searchTerm && (
                 <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
@@ -216,10 +182,10 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
           </div>
         )}
         
-        {/* Table with overlay scrolling and no reserved space */}
+        {/* Table with overlay scrolling */}
         <div 
           ref={scrollContainerRef}
-          className="h-[600px] overflow-auto table-scrollbar"
+          className="h-[600px] overflow-auto"
         >
           <table className="w-full min-w-full">
             <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
@@ -231,15 +197,17 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredApps.length === 0 ? (
+              {filteredApps.length === 0 && searchTerm ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                    {searchTerm ? 'No applications match your search' : 'No applications found'}
+                    No applications found matching "{searchTerm}"
                   </td>
                 </tr>
               ) : (
-                filteredApps.map((app, index) => (
-                  <tr key={app.id || app.name || `app-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                filteredApps.map((app, index) => {
+                  const uniqueKey = `${app.name || 'unknown'}-${app.version || 'unknown'}-${app.publisher || 'unknown'}-${index}`;
+                  return (
+                  <tr key={uniqueKey} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
@@ -283,7 +251,8 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
                       )}
                     </td>
                   </tr>
-                ))
+                );
+                })
               )}
             </tbody>
           </table>
@@ -292,3 +261,5 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
     </div>
   );
 };
+
+export default ApplicationsTable;

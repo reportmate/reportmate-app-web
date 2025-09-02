@@ -1,8 +1,8 @@
 /**
  * Device Resolution Service
  * 
- * This service provides functionality to resolve device identifiers (UUID, Asset Tag, or Serial Number)
- * to the canonical serial number-based URL for ReportMate device pages.
+ * Simplified approach: Try direct lookup first, then search all fields.
+ * No more brittle regex patterns that can crash pages.
  */
 
 interface DeviceIdentifiers {
@@ -19,7 +19,7 @@ interface DeviceResolutionResult {
 }
 
 /**
- * Determines the type of device identifier based on its format
+ * Simple identifier type detection - only used for logging, not routing
  */
 export function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' | 'serialNumber' | 'deviceName' {
   // UUID pattern: 8-4-4-4-12 hexadecimal characters
@@ -29,22 +29,13 @@ export function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'asse
     return 'uuid'
   }
   
-  // Asset Tag pattern: typically starts with letters and contains numbers
-  // Common patterns: A004733, AT123456, etc. - must contain at least one digit
-  const assetTagPattern = /^[A-Z][0-9A-Z]*[0-9][0-9A-Z]*$/i
-  
-  if (assetTagPattern.test(identifier)) {
-    return 'assetTag'
-  }
-  
-  // Device Name pattern: contains letters, may have spaces or special characters
-  const deviceNamePattern = /^[A-Za-z][A-Za-z0-9\s\-_.]*$/
-  
-  if (deviceNamePattern.test(identifier) && !identifier.match(/^[0-9A-F]{10,}$/i)) {
+  // If it contains spaces, it's probably a device name
+  if (identifier.includes(' ')) {
     return 'deviceName'
   }
   
-  // Assume everything else is a serial number
+  // For everything else, just call it a serialNumber
+  // The backend will try all fields anyway
   return 'serialNumber'
 }
 

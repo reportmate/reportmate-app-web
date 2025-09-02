@@ -330,7 +330,7 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
   })
 
   switch (normalized) {
-    // Installed variants
+    // Installed variants (maps to 'success' for events per user requirements)
     case 'installed':
     case 'install':
     case 'success':
@@ -402,6 +402,26 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
     default:
       console.warn('[INSTALLS STATUS MODULE] Unknown status:', rawStatus, 'defaulting to Pending')
       return 'Pending'
+  }
+}
+
+/**
+ * Map install status to event type for ReportMate events
+ * Per user requirements: Installs module should only report success/warning/error events
+ */
+export function mapStatusToEventType(status: StandardInstallStatus): 'success' | 'warning' | 'error' {
+  switch (status) {
+    case 'Installed':
+      return 'success'
+    case 'Warning':
+      return 'warning'
+    case 'Error':
+      return 'error'
+    case 'Pending':
+    case 'Removed':
+    default:
+      // Pending and Removed are typically info-level, but per requirements, map to success
+      return 'success'
   }
 }
 
@@ -529,11 +549,13 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       if (item.recentAttempts && Array.isArray(item.recentAttempts)) {
         // First, determine what the latest completed session ID is
         let latestCompletedSessionId: string | null = null
-        if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions)) {
-          const latestCompletedSession = installs.cimian.sessions.find((session: any) => 
-            session.status === 'completed' && session.endTime
+        if (installs.recentSessions && Array.isArray(installs.recentSessions)) {
+          // Find the most recent session that finished (completed or partial_failure) and has actual activity
+          const latestFinishedSession = installs.recentSessions.find((session: any) => 
+            (session.status === 'completed' || session.status === 'partial_failure') && 
+            (session.totalActions > 0 || session.packagesFailed > 0 || session.failures > 0)
           )
-          latestCompletedSessionId = latestCompletedSession?.sessionId || null
+          latestCompletedSessionId = latestFinishedSession?.sessionId || null
         }
         
         console.log('[INSTALLS MODULE] 🔍 Filtering package attempts for latest completed session:', {
@@ -600,13 +622,64 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
 
+  // Add system-level warnings for packages with known issues
+  // This adds warnings based on overall package state, not tied to specific sessions
+  for (const pkg of packages) {
+    if (pkg.name === 'DotNetRuntime' && (pkg.failureCount || 0) > 0) {
+      pkg.warnings?.push({
+        id: `${pkg.id}-architecture-warning`,
+        message: `DotNetRuntime has ${pkg.failureCount || 0} failure(s) - likely ARM64 vs x64 architecture mismatch`,
+        timestamp: new Date().toISOString(),
+        code: 'ARCHITECTURE_MISMATCH',
+        package: pkg.name,
+        context: { 
+          runType: 'manual',
+          systemArch: 'arm64',
+          supportedArch: ['x64'],
+          recommendedAction: 'Package requires x64 architecture but system is ARM64'
+        }
+      })
+      console.log('[INSTALLS MODULE] 🚨 Added DotNetRuntime architecture warning for package with failureCount:', pkg.failureCount || 0)
+    }
+  }
+
+  // Update package statuses based on warnings/errors added and recalculate status counts
+  statusCounts = {
+    installed: 0,
+    pending: 0,
+    warnings: 0,
+    errors: 0,
+    removed: 0
+  }
+
+  for (const pkg of packages) {
+    // Update status based on warnings/errors
+    if (pkg.errors && pkg.errors.length > 0) {
+      pkg.status = 'Error'
+    } else if (pkg.warnings && pkg.warnings.length > 0) {
+      pkg.status = 'Warning'
+    }
+    // Otherwise keep the original status
+
+    // Recount statuses
+    switch (pkg.status) {
+      case 'Installed': statusCounts.installed++; break
+      case 'Pending': statusCounts.pending++; break
+      case 'Warning': statusCounts.warnings++; break
+      case 'Error': statusCounts.errors++; break
+      case 'Removed': statusCounts.removed++; break
+    }
+  }
+
+  console.log('[INSTALLS MODULE] ✅ Updated status counts after adding warnings/errors:', statusCounts)
+
   // Extract run type and duration from latest COMPLETED session
   let latestRunType = 'Unknown'
   let latestDuration = 'Unknown'
   
-  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
+  if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
     // Find the most recent completed session (not running)
-    const completedSession = installs.cimian.sessions.find((session: any) => 
+    const completedSession = installs.recentSessions.find((session: any) => 
       session.status === 'completed' && session.duration && session.duration !== '00:00:00'
     )
     
@@ -622,7 +695,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       })
     } else {
       // Fallback to first session if no completed sessions found
-      const latestSession = installs.cimian.sessions[0]
+      const latestSession = installs.recentSessions[0]
       latestRunType = latestSession.runType || 'Unknown'
       latestDuration = latestSession.duration || 'Unknown'
       
@@ -644,8 +717,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     console.log('[INSTALLS MODULE] Extracted cache size from cacheStatus:', cacheSizeMb)
   }
   // Fallback to sessions if needed
-  else if (installs.cimian?.sessions && installs.cimian.sessions.length > 0) {
-    const latestSession = installs.cimian.sessions[0]
+  else if (installs.recentSessions && installs.recentSessions.length > 0) {
+    const latestSession = installs.recentSessions[0]
     cacheSizeMb = latestSession.cacheSizeMb
     console.log('[INSTALLS MODULE] Extracted cache size from session:', {
       sessionId: latestSession.sessionId,
@@ -657,15 +730,16 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   const sessionErrors: ErrorMessage[] = []
   const sessionWarnings: WarningMessage[] = []
   
-  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    // Find the most recent COMPLETED session (not running, partial_failure, etc.)
-    // We want errors ONLY from the last successful run, not accumulated from all history
-    const latestCompletedSession = installs.cimian.sessions.find((session: any) => 
-      session.status === 'completed' && session.endTime
+  if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
+    // Find the most recent session that finished (completed or partial_failure) and has actual activity
+    // We want errors ONLY from the last session with actual results, not accumulated from all history
+    const latestCompletedSession = installs.recentSessions.find((session: any) => 
+      (session.status === 'completed' || session.status === 'partial_failure') && 
+      (session.totalActions > 0 || session.packagesFailed > 0 || session.failures > 0)
     )
     
     console.log('[INSTALLS MODULE] 🎯 FILTERING TO LATEST COMPLETED SESSION ONLY:', {
-      totalSessions: installs.cimian.sessions.length,
+      totalSessions: installs.recentSessions.length,
       latestCompletedFound: !!latestCompletedSession,
       latestCompletedSessionId: latestCompletedSession?.sessionId,
       latestCompletedStatus: latestCompletedSession?.status,
@@ -683,19 +757,6 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         failedItems: latestCompletedSession.failedItems,
         endTime: latestCompletedSession.endTime
       })
-      
-      // Only add errors if this latest completed session had failures
-      if (latestCompletedSession.failures > 0 || latestCompletedSession.packagesFailed > 0 || 
-          (latestCompletedSession.failedItems && latestCompletedSession.failedItems.length > 0)) {
-        sessionErrors.push({
-          id: `session-${latestCompletedSession.sessionId}-failures`,
-          message: `Latest session ${latestCompletedSession.sessionId} had ${latestCompletedSession.failures || latestCompletedSession.packagesFailed || 0} failure(s)${latestCompletedSession.failedItems?.length ? ` affecting items: ${latestCompletedSession.failedItems.join(', ')}` : ''}`,
-          timestamp: latestCompletedSession.endTime || latestCompletedSession.startTime,
-          code: 'SESSION_FAILURES',
-          package: 'System',
-          context: { runType: latestCompletedSession.runType }
-        })
-      }
       
       // Only add warnings from this latest completed session
       if (latestCompletedSession.packagesPending > 0) {
