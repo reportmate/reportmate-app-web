@@ -1,56 +1,85 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { getToken } from 'next-auth/jwt'
 
-// NUCLEAR OPTION: Complete authentication bypass for localhost development
-export default function middleware(request: NextRequest) {
+// Define routes that should not trigger auto-redirect
+const publicRoutes = [
+  '/api/auth',
+  '/api/transmission',  // Device data transmission endpoint
+  '/auth',
+  '/_next',
+  '/favicon.ico',
+  '/public',
+  '/manifest.json',
+  '/.well-known'
+]
+
+function isPublicRoute(pathname: string): boolean {
+  return publicRoutes.some(route => pathname.startsWith(route))
+}
+
+export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.nextUrl.hostname
   
-  // LOCALHOST BYPASS - NO AUTHENTICATION FOR LOCAL DEVELOPMENT
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname.includes('localhost')) {
+  // Log all requests for debugging
+  console.log('[MIDDLEWARE] Request:', {
+    url: request.url,
+    hostname: hostname,
+    pathname: pathname,
+    nodeEnv: process.env.NODE_ENV
+  })
+  
+  // STRICT LOCALHOST BYPASS - ONLY FOR ACTUAL LOCAL DEVELOPMENT
+  const isActualLocalhost = (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') && process.env.NODE_ENV === 'development'
+  
+  if (isActualLocalhost) {
     console.log('[MIDDLEWARE] LOCALHOST DETECTED - COMPLETE BYPASS - NO AUTH REQUIRED')
-    console.log('[MIDDLEWARE] URL:', request.url)
-    console.log('[MIDDLEWARE] Pathname:', pathname)
-    
-    // Handle device routes (existing logic for localhost too)
-    if (pathname.startsWith('/device/') && pathname.split('/').length === 3) {
-      const deviceId = pathname.split('/')[2]
-      
-      // Check if this looks like a UUID or Asset Tag that might need forwarding
-      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      const assetTagPattern = /^[A-Z][0-9A-Z]{3,}$/i
-      
-      // If it looks like a UUID or Asset Tag, let the client-side resolution handle it
-      if (uuidPattern.test(deviceId) || assetTagPattern.test(deviceId)) {
-        const response = NextResponse.next()
-        response.headers.set('X-Device-Resolution-Needed', 'true')
-        response.headers.set('X-Device-Identifier-Type', 
-          uuidPattern.test(deviceId) ? 'uuid' : 'assetTag'
-        )
-        console.log('[MIDDLEWARE] Device route with resolution needed for localhost')
-        return response
-      }
-    }
-    
-    // For localhost, just pass everything through without any auth checks
-    console.log('[MIDDLEWARE] LOCALHOST - ALLOWING ALL ROUTES')
     return NextResponse.next()
   }
   
-  // For production, use simple redirect to Azure AD (we'll fix this later)
-  console.log('[MIDDLEWARE] Production request - redirecting to Azure AD')
-  return NextResponse.redirect(new URL('/api/auth/signin/azure-ad', request.url))
+  // Don't redirect public routes
+  if (isPublicRoute(pathname)) {
+    console.log('[MIDDLEWARE] Public route, allowing through')
+    return NextResponse.next()
+  }
+  
+  // PRODUCTION: Check if user has valid session
+  console.log('[MIDDLEWARE] Production request - checking authentication')
+  
+  try {
+    const token = await getToken({ 
+      req: request, 
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: process.env.NODE_ENV === 'production'
+    })
+    
+    if (token) {
+      console.log('[MIDDLEWARE] Valid session found - allowing access')
+      return NextResponse.next()
+    }
+    
+    console.log('[MIDDLEWARE] No valid session - redirecting to sign in')
+    const callbackUrl = encodeURIComponent(request.url)
+    return NextResponse.redirect(
+      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, request.url)
+    )
+  } catch (error) {
+    console.error('[MIDDLEWARE] Error checking session:', error)
+    // If there's an error checking the session, redirect to sign in
+    const callbackUrl = encodeURIComponent(request.url)
+    return NextResponse.redirect(
+      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, request.url)
+    )
+  }
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
+     * Match all request paths to enforce authentication everywhere
+     * except for static assets and authentication endpoints
      */
-    '/((?!_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth).*)',
   ],
 }
