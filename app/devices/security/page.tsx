@@ -168,14 +168,23 @@ function SecurityPageContent() {
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Security</h1>
               </div>
             </div>
-            
+
+            {/* Right side - Navigation */}
+            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              {/* Navigation */}
+              <div className="hidden lg:flex">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
+
+              {/* Mobile Navigation */}
+              <div className="lg:hidden">
+                <DevicePageNavigation className="flex items-center gap-2" />
+              </div>
+            </div>
           </div>
         </div>
       </header>
-
-      {/* Navigation */}
-      <DevicePageNavigation />
-
+      
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">

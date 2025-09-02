@@ -6,6 +6,10 @@ import { ThemeProvider } from "../src/components/theme-provider";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 
+// Force dynamic rendering to ensure middleware runs
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
