@@ -277,6 +277,7 @@ function Invoke-BuildImage {
         "--platform", "linux/amd64"
         "--build-arg", "DOCKER_BUILD=true"
         "--build-arg", "NODE_ENV=production"
+        "--progress", "plain"
     )
     
     # Add cache args if available
@@ -296,12 +297,66 @@ function Invoke-BuildImage {
 
     Write-LogVerbose "Build command: docker $($BuildArgs -join ' ')"
     
-    $Process = Start-Process -FilePath "docker" -ArgumentList $BuildArgs -Wait -PassThru -NoNewWindow
-    if ($Process.ExitCode -eq 0) {
-        Write-LogSuccess "Image built successfully: $FullImageName"
-    } else {
-        Write-LogError "Failed to build Docker image"
-        exit 1
+    # Use Start-Process with proper output handling to prevent hanging
+    Write-LogInfo "Starting Docker build process..."
+    try {
+        $psi = New-Object System.Diagnostics.ProcessStartInfo
+        $psi.FileName = "docker"
+        $psi.Arguments = $BuildArgs -join " "
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardOutput = $true
+        $psi.RedirectStandardError = $true
+        $psi.CreateNoWindow = $true
+        
+        $process = New-Object System.Diagnostics.Process
+        $process.StartInfo = $psi
+        
+        # Setup output handling
+        $outputBuilder = New-Object System.Text.StringBuilder
+        $errorBuilder = New-Object System.Text.StringBuilder
+        
+        $outputHandler = {
+            if (-not [string]::IsNullOrEmpty($EventArgs.Data)) {
+                Write-Host $EventArgs.Data
+                [void]$outputBuilder.AppendLine($EventArgs.Data)
+            }
+        }
+        
+        $errorHandler = {
+            if (-not [string]::IsNullOrEmpty($EventArgs.Data)) {
+                Write-Host $EventArgs.Data -ForegroundColor Yellow
+                [void]$errorBuilder.AppendLine($EventArgs.Data)
+            }
+        }
+        
+        Register-ObjectEvent -InputObject $process -EventName OutputDataReceived -Action $outputHandler | Out-Null
+        Register-ObjectEvent -InputObject $process -EventName ErrorDataReceived -Action $errorHandler | Out-Null
+        
+        $process.Start() | Out-Null
+        $process.BeginOutputReadLine()
+        $process.BeginErrorReadLine()
+        
+        # Wait for completion with timeout (30 minutes)
+        $timeout = 30 * 60 * 1000  # 30 minutes in milliseconds
+        if (-not $process.WaitForExit($timeout)) {
+            Write-LogError "Docker build timed out after 30 minutes"
+            $process.Kill()
+            throw "Build process timed out"
+        }
+        
+        # Clean up event handlers
+        Get-EventSubscriber | Where-Object { $_.SourceObject -eq $process } | Unregister-Event
+        
+        if ($process.ExitCode -eq 0) {
+            Write-LogSuccess "Image built successfully: $FullImageName"
+        } else {
+            Write-LogError "Failed to build Docker image (Exit Code: $($process.ExitCode))"
+            Write-LogError "Error output: $($errorBuilder.ToString())"
+            throw "Docker build failed with exit code $($process.ExitCode)"
+        }
+    } catch {
+        Write-LogError "Docker build process failed: $($_.Exception.Message)"
+        throw $_
     }
 }
 

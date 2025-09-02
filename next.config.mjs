@@ -11,40 +11,18 @@ export default {
   // Enable standalone output for Docker deployment
   output: 'standalone',
   
-  // Webpack configuration to prevent module loading issues
-  webpack: (config, { isServer, dev }) => {
-    // Fix export/import issues in server-side code
+  // Simplified webpack configuration to prevent build hangs
+  webpack: (config, { isServer }) => {
+    // Minimal configuration to prevent build issues
     if (isServer) {
       config.externals = [...(config.externals || []), 'canvas', 'jsdom']
     }
     
-    // Fix webpack module loading issues
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
       net: false,
       tls: false,
-    }
-    
-    // Optimize chunks to prevent module loading issues
-    if (!dev && !isServer) {
-      config.optimization.splitChunks = {
-        ...config.optimization.splitChunks,
-        cacheGroups: {
-          ...config.optimization.splitChunks.cacheGroups,
-          default: {
-            minChunks: 2,
-            priority: -20,
-            reuseExistingChunk: true,
-          },
-          vendor: {
-            test: /[\\/]node_modules[\\/]/,
-            name: 'vendors',
-            priority: -10,
-            chunks: 'all',
-          },
-        },
-      }
     }
     
     return config
