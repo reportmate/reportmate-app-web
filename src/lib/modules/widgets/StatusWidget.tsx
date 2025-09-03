@@ -34,6 +34,21 @@ interface StatusWidgetProps {
 }
 
 export const StatusWidget: React.FC<StatusWidgetProps> = ({ devices, loading }) => {
+  // Debug logging to track what data the widget receives
+  console.log('[STATUS WIDGET] Received props:', {
+    devicesCount: devices.length,
+    loading,
+    firstDevice: devices[0] ? {
+      name: devices[0].name,
+      status: devices[0].status,
+      serialNumber: devices[0].serialNumber
+    } : null,
+    deviceStatuses: devices.length > 0 ? devices.reduce((acc, d) => {
+      acc[d.status] = (acc[d.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>) : {}
+  })
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <Link href="/devices" className="block">

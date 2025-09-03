@@ -1,26 +1,41 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 
-// Force dynamic rendering and disable caching
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
-interface DeviceData {
-  deviceId: string
-  serialNumber: string
-  lastSeen: string
-  modules?: {
-    applications?: {
-      installedApplications?: any[]
-      InstalledApplications?: any[]
-      installed_applications?: any[]
-    }
-  }
+// 30-second cache for applications data
+let applicationsCache: {
+  data: any[] | null
+  timestamp: number
+  ttl: number
+} = {
+  data: null,
+  timestamp: 0,
+  ttl: 30000
 }
 
-export async function GET() {
+// Clear cache for fresh data from all devices
+applicationsCache.data = null
+applicationsCache.timestamp = 0
+
+export async function GET(request: NextRequest) {
+  const timestamp = new Date().toISOString()
+  console.log(`[APPLICATIONS API] ${timestamp} - Applications data requested`)
+
   try {
-    const timestamp = new Date().toISOString()
-    console.log(`[APPLICATIONS API] ${timestamp} - Fetching applications data from all devices`)
+    const now = Date.now()
+    
+    // Check cache first
+    if (applicationsCache.data && (now - applicationsCache.timestamp) < applicationsCache.ttl) {
+      console.log(`[APPLICATIONS API] ${timestamp} - Returning cached data (${applicationsCache.data.length} applications)`)
+      return NextResponse.json(applicationsCache.data, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0',
+          'X-Fetched-At': timestamp,
+          'X-Data-Source': 'memory-cache',
+          'X-Cache-Hit': 'true'
+        }
+      })
+    }
 
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
@@ -33,38 +48,29 @@ export async function GET() {
       }, { status: 500 })
     }
     
+    console.log(`[APPLICATIONS API] ${timestamp} - Using API base URL: ${apiBaseUrl}`)
+    
     try {
       // First, get all devices
-      console.log(`[APPLICATIONS API] ${timestamp} - Fetching devices list`)
+      console.log(`[APPLICATIONS API] ${timestamp} - Fetching devices list from ${apiBaseUrl}/api/devices`)
       const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
+          'User-Agent': 'ReportMate-Frontend/1.0',
+          'Accept': 'application/json'
         }
       })
       
       if (!devicesResponse.ok) {
-        throw new Error(`Devices API error: ${devicesResponse.status}`)
+        throw new Error(`Devices API error: ${devicesResponse.status} ${devicesResponse.statusText}`)
       }
       
       const devicesData = await devicesResponse.json()
-      console.log(`[APPLICATIONS API] ${timestamp} - Devices API response structure:`, {
-        type: typeof devicesData,
-        isArray: Array.isArray(devicesData),
-        hasDevicesProperty: !!devicesData.devices,
-        keysOrLength: Array.isArray(devicesData) ? devicesData.length : Object.keys(devicesData || {})
-      })
+      console.log(`[APPLICATIONS API] ${timestamp} - Found ${devicesData.length} devices`)
       
-      // Handle both array format and object format with devices property
-      let devicesList: any[] = []
-      if (Array.isArray(devicesData)) {
-        devicesList = devicesData
-      } else if (devicesData.devices && Array.isArray(devicesData.devices)) {
-        devicesList = devicesData.devices
-      } else {
-        console.warn(`[APPLICATIONS API] ${timestamp} - Unexpected devices API response format`)
+      if (devicesData.length === 0) {
         return NextResponse.json([], {
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -72,64 +78,75 @@ export async function GET() {
             'Expires': '0',
             'X-Fetched-At': timestamp,
             'X-Data-Source': 'azure-functions',
-            'X-Warning': 'unexpected-devices-format'
-          }
-        })
-      }
-      
-      console.log(`[APPLICATIONS API] ${timestamp} - Found ${devicesList.length} devices`)
-      
-      if (devicesList.length === 0) {
-        return NextResponse.json([], {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Fetched-At': timestamp,
-            'X-Data-Source': 'azure-functions'
+            'X-Total-Devices': '0'
           }
         })
       }
       
       // Collect applications from all devices
       const allApplications: any[] = []
+      let processedDevices = 0
+      let devicesWithApps = 0
       
-      for (const device of devicesList) {
-        const deviceSerial = device.serialNumber || device.serial_number || device.id || 'unknown'
-        try {
-          console.log(`[APPLICATIONS API] ${timestamp} - Fetching device ${deviceSerial} data`)
-          
-          const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${deviceSerial}`, {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache',
-              'User-Agent': 'ReportMate-Frontend/1.0'
+      console.log(`[APPLICATIONS API] ${timestamp} - Processing applications from ${devicesData.length} devices`)
+      
+      // Process devices in batches to avoid overwhelming the API
+      const batchSize = 10
+      for (let i = 0; i < devicesData.length; i += batchSize) {
+        const batch = devicesData.slice(i, i + batchSize)
+        
+        await Promise.all(batch.map(async (device: any) => {
+          const deviceSerial = device.serialNumber || device.serial_number || device.id || 'unknown'
+          try {
+            const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${deviceSerial}`, {
+              cache: 'no-store',
+              headers: {
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache',
+                'User-Agent': 'ReportMate-Frontend/1.0',
+                'Accept': 'application/json'
+              }
+            })
+            
+            if (!deviceResponse.ok) {
+              console.warn(`[APPLICATIONS API] ${timestamp} - Failed to fetch device ${deviceSerial}: ${deviceResponse.status}`)
+              return
             }
-          })
-          
-          if (!deviceResponse.ok) {
-            console.warn(`[APPLICATIONS API] ${timestamp} - Failed to fetch device ${deviceSerial}: ${deviceResponse.status}`)
-            continue
+            
+            const deviceData = await deviceResponse.json()
+            
+            // Extract applications from device modules
+            const applications = getApplicationsFromDevice(deviceData, deviceSerial)
+            
+            if (applications.length > 0) {
+              console.log(`[APPLICATIONS API] ${timestamp} - Found ${applications.length} applications on device ${deviceSerial}`)
+              allApplications.push(...applications)
+              devicesWithApps++
+            }
+            
+            processedDevices++
+            
+          } catch (deviceError) {
+            console.warn(`[APPLICATIONS API] ${timestamp} - Error fetching device ${deviceSerial}:`, deviceError)
           }
-          
-          const deviceData = await deviceResponse.json()
-          
-          // Extract applications from device modules
-          const applications = getApplicationsFromDevice(deviceData, deviceSerial)
-          
-          if (applications.length > 0) {
-            console.log(`[APPLICATIONS API] ${timestamp} - Found ${applications.length} applications on device ${deviceSerial}`)
-            allApplications.push(...applications)
-          }
-          
-        } catch (deviceError) {
-          console.warn(`[APPLICATIONS API] ${timestamp} - Error fetching device ${deviceSerial}:`, deviceError)
-          continue
+        }))
+        
+        // Brief pause between batches to be gentle on the API
+        if (i + batchSize < devicesData.length) {
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
       }
       
-      console.log(`[APPLICATIONS API] ${timestamp} - Successfully aggregated ${allApplications.length} applications from all devices`)
+      console.log(`[APPLICATIONS API] ${timestamp} - Successfully processed ${processedDevices}/${devicesData.length} devices`)
+      console.log(`[APPLICATIONS API] ${timestamp} - Found applications on ${devicesWithApps} devices`)
+      console.log(`[APPLICATIONS API] ${timestamp} - Total applications collected: ${allApplications.length}`)
+      
+      // Cache the successful result
+      applicationsCache = {
+        data: allApplications,
+        timestamp: now,
+        ttl: 30000 // 30 seconds
+      }
       
       return NextResponse.json(allApplications, {
         headers: {
@@ -138,6 +155,9 @@ export async function GET() {
           'Expires': '0',
           'X-Fetched-At': timestamp,
           'X-Data-Source': 'azure-functions',
+          'X-Total-Devices': devicesData.length.toString(),
+          'X-Processed-Devices': processedDevices.toString(),
+          'X-Devices-With-Apps': devicesWithApps.toString(),
           'X-Total-Applications': allApplications.length.toString()
         }
       })

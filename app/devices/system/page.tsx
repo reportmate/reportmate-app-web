@@ -7,34 +7,21 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
+import { extractSystem } from "../../../src/lib/data-processing/modules"
 
-interface System {
+interface SystemDevice {
   id: string
   deviceId: string
   deviceName: string
   serialNumber: string
   lastSeen: string
   collectedAt: string
-  platform: string
-  osVersion: string
-  buildVersion: string
-  kernelVersion: string
-  hostname: string
-  computerName: string
-  localHostname: string
-  uptime: number
-  timezone: string
-  lastBootTime: string
-  cpuLogicalCores: number
-  cpuPhysicalCores: number
-  cpuBrand: string
-  cpuSubtype: string
-  hardwareModel: string
-  hardwareSerial: string
-  physicalMemory: number
-  uuid: string
-  bootVolume: string
-  systemVolume: string
+  operatingSystem: string
+  osVersion: string | null
+  buildNumber: string | null
+  uptime: number | null
+  bootTime: string | null
+  raw: any
 }
 
 function LoadingSkeleton() {
@@ -50,14 +37,6 @@ function LoadingSkeleton() {
       ))}
     </div>
   )
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 function formatUptime(seconds: number): string {
@@ -78,7 +57,7 @@ function SystemPageContent() {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [systems, setSystems] = useState<System[]>([])
+  const [systems, setSystems] = useState<SystemDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [platformFilter, setPlatformFilter] = useState('all')
 
@@ -110,30 +89,46 @@ function SystemPageContent() {
     fetchSystems()
   }, [])
 
-  // Get unique platforms
-  const platforms = Array.from(new Set(
-    systems.map(s => s.platform).filter(Boolean)
+  // Get unique operating systems for filtering
+  const operatingSystems = Array.from(new Set(
+    systems.map(s => s.operatingSystem).filter(Boolean)
   )).sort()
 
   // Filter systems
   const filteredSystems = systems.filter(s => {
     if (platformFilter !== 'all') {
-      if (s.platform !== platformFilter) return false
+      if (s.operatingSystem !== platformFilter) return false
     }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
         s.deviceName?.toLowerCase().includes(query) ||
-        s.hostname?.toLowerCase().includes(query) ||
+        s.operatingSystem?.toLowerCase().includes(query) ||
         s.osVersion?.toLowerCase().includes(query) ||
-        s.hardwareModel?.toLowerCase().includes(query) ||
-        s.cpuBrand?.toLowerCase().includes(query) ||
+        s.buildNumber?.toLowerCase().includes(query) ||
         s.serialNumber?.toLowerCase().includes(query)
       )
     }
     
     return true
+  })
+
+  // Process system info for each device using extractSystem
+  const processedSystems = filteredSystems.map(systemDevice => {
+    // Create a device object in the format expected by extractSystem
+    const deviceData = {
+      id: systemDevice.deviceId,
+      name: systemDevice.deviceName,
+      modules: systemDevice.raw ? { system: systemDevice.raw } : undefined
+    }
+    
+    const systemInfo = extractSystem(deviceData)
+    
+    return {
+      ...systemDevice,
+      systemInfo
+    }
   })
 
   if (loading) {
@@ -227,7 +222,7 @@ function SystemPageContent() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">System Information</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Operating system and hardware details • {filteredSystems.length} systems
+                  Operating system and system details • {processedSystems.length} systems
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -237,9 +232,9 @@ function SystemPageContent() {
                   onChange={(e) => setPlatformFilter(e.target.value)}
                   className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
                 >
-                  <option value="all">All Platforms</option>
-                  {platforms.map(platform => (
-                    <option key={platform} value={platform}>{platform}</option>
+                  <option value="all">All Operating Systems</option>
+                  {operatingSystems.map(os => (
+                    <option key={os} value={os}>{os}</option>
                   ))}
                 </select>
 
@@ -266,21 +261,20 @@ function SystemPageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">OS Version</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Hardware</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">CPU</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Memory</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Operating System</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">System Info</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Locale</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Uptime</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredSystems.length === 0 ? (
+                {processedSystems.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.50 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No system records found</h3>
                         <p className="text-sm text-gray-500 dark:text-gray-400">No system records match your current search.</p>
@@ -288,61 +282,60 @@ function SystemPageContent() {
                     </td>
                   </tr>
                 ) : (
-                  filteredSystems.map((sys) => (
+                  processedSystems.map((sys) => (
                     <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
-                          href={`/device/${sys.deviceId}`}
+                          href={`/device/${sys.deviceId}#system`}
                           className="flex items-center hover:text-purple-600 dark:hover:text-purple-400"
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sys.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{sys.hostname}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{sys.serialNumber}</div>
                           </div>
                         </Link>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
                           <div className="text-gray-900 dark:text-white font-medium">
-                            {sys.platform} {sys.osVersion}
+                            {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
                           </div>
                           <div className="text-gray-500 dark:text-gray-400">
-                            Build: {sys.buildVersion}
+                            {sys.systemInfo.operatingSystem.displayVersion || sys.systemInfo.operatingSystem.version || sys.osVersion || 'Unknown Version'}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white">
-                            {sys.hardwareModel}
-                          </div>
-                          <div className="text-gray-500 dark:text-gray-400">
-                            {sys.hardwareSerial}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white">
-                            {sys.cpuBrand}
-                          </div>
-                          <div className="text-gray-500 dark:text-gray-400">
-                            {sys.cpuPhysicalCores} cores / {sys.cpuLogicalCores} threads
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {formatBytes(sys.physicalMemory)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white">
-                            {formatUptime(sys.uptime)}
-                          </div>
-                          {sys.lastBootTime && (
-                            <div className="text-gray-500 dark:text-gray-400">
-                              Boot: {formatRelativeTime(sys.lastBootTime)}
+                        <div className="text-sm space-y-1">
+                          {sys.systemInfo.operatingSystem.build || sys.buildNumber ? (
+                            <div className="text-gray-900 dark:text-white">
+                              Build: {sys.systemInfo.operatingSystem.build || sys.buildNumber}
                             </div>
+                          ) : null}
+                          {sys.systemInfo.operatingSystem.edition ? (
+                            <div className="text-gray-500 dark:text-gray-400">
+                              {sys.systemInfo.operatingSystem.edition}
+                            </div>
+                          ) : null}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {sys.systemInfo.operatingSystem.locale || 'Unknown'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm">
+                          {sys.raw?.uptimeString ? (
+                            <div className="text-gray-900 dark:text-white">
+                              {sys.raw.uptimeString}
+                            </div>
+                          ) : sys.uptime ? (
+                            <div className="text-gray-900 dark:text-white">
+                              {formatUptime(sys.uptime)}
+                            </div>
+                          ) : (
+                            <div className="text-gray-500 dark:text-gray-400">Unknown</div>
                           )}
                         </div>
                       </td>

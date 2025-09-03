@@ -6,6 +6,8 @@ import { getToken } from 'next-auth/jwt'
 const publicRoutes = [
   '/api/auth',
   '/api/transmission',  // Device data transmission endpoint
+  '/api/healthz',       // Health check endpoint for Front Door
+  '/api/health',        // Alternative health check endpoint
   '/auth',
   '/_next',
   '/favicon.ico',
@@ -78,8 +80,8 @@ export const config = {
   matcher: [
     /*
      * Match all request paths to enforce authentication everywhere
-     * except for static assets and authentication endpoints
+     * except for static assets, authentication endpoints, and health endpoints
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/healthz|api/health).*)',
   ],
 }

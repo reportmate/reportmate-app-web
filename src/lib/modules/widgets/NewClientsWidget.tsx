@@ -14,6 +14,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
+  createdAt?: string    // Registration date - when device first appeared in ReportMate
   status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
   uptime?: string
   location?: string
@@ -55,6 +56,13 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
       default: return 'bg-gray-500'
     }
   }
+
+  // Sort devices by registration date (createdAt) descending to show newest registrations first
+  const sortedDevices = [...devices].sort((a, b) => {
+    const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return dateB - dateA  // Newest registrations first
+  })
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[600px] flex flex-col">
@@ -105,7 +113,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
       ) : (
         <div className="flex-1 overflow-auto overlay-scrollbar">
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {devices.slice(0, 10).map((device) => (
+            {sortedDevices.slice(0, 10).map((device) => (
               <Link
                 key={device.deviceId}
                 href={`/device/${encodeURIComponent(device.serialNumber)}`}
@@ -133,9 +141,9 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
                       )}
                     </div>
                     
-                    {/* Last Seen */}
+                    {/* Registration Date - Static based on when device first appeared */}
                     <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
-                      Last seen: {formatRelativeTime(device.lastSeen)}
+                      Registered: {device.createdAt ? formatRelativeTime(device.createdAt) : 'Unknown'}
                     </div>
                   </div>
                 </div>

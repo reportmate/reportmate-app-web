@@ -7,26 +7,25 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
+import { extractNetwork } from "../../../src/lib/data-processing/modules"
 
-interface NetworkRecord {
+interface NetworkDevice {
   id: string
   deviceId: string
   deviceName: string
   serialNumber: string
   lastSeen: string
   collectedAt: string
-  interfaces: any[]
-  primaryInterface?: any
-  ipAddresses: string[]
-  dnsServers: string[]
-  gateway?: string
-  hostname?: string
-  domain?: string
-  raw?: any
+  operatingSystem: string
+  osVersion: string | null
+  buildNumber: string | null
+  uptime: number | null
+  bootTime: string | null
+  raw: any
 }
 
 function NetworkPageContent() {
-  const [network, setNetwork] = useState<NetworkRecord[]>([])
+  const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -38,9 +37,10 @@ function NetworkPageContent() {
   }, [searchParams])
 
   useEffect(() => {
-    const fetchNetwork = async () => {
+    const fetchNetworkDevices = async () => {
       try {
-        const response = await fetch('/api/modules/network', {
+        // Use the same API as the system page to get device data with modules
+        const response = await fetch('/api/modules/system', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         })
@@ -52,47 +52,92 @@ function NetworkPageContent() {
         const data = await response.json()
         
         if (Array.isArray(data)) {
-          setNetwork(data)
+          setNetworkDevices(data)
           setError(null)
         } else {
           throw new Error('Invalid API response format')
         }
         
       } catch (error) {
-        console.error('❌ Failed to fetch network:', error)
+        console.error('❌ Failed to fetch network devices:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
-        setNetwork([])
+        setNetworkDevices([])
       } finally {
         setLoading(false)
       }
     }
 
-    fetchNetwork()
+    fetchNetworkDevices()
   }, [])
 
-  // Filter network data
-  const filteredNetwork = network.filter(n => {
+  // Filter and process network devices
+  const processedNetworkDevices = networkDevices.map(networkDevice => {
+    // Create a device object in the format expected by extractNetwork
+    const deviceData = {
+      id: networkDevice.deviceId,
+      name: networkDevice.deviceName,
+      modules: networkDevice.raw ? { network: networkDevice.raw } : undefined
+    }
+    
+    const networkInfo = extractNetwork(deviceData)
+    
+    return {
+      ...networkDevice,
+      networkInfo
+    }
+  })
+
+  const filteredNetworkDevices = processedNetworkDevices.filter(n => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
         n.deviceName?.toLowerCase().includes(query) ||
-        n.hostname?.toLowerCase().includes(query) ||
-        n.domain?.toLowerCase().includes(query) ||
-        n.gateway?.toLowerCase().includes(query) ||
-        n.ipAddresses?.some(ip => ip.toLowerCase().includes(query)) ||
-        n.serialNumber?.toLowerCase().includes(query)
+        n.networkInfo.ipAddress?.toLowerCase().includes(query) ||
+        n.networkInfo.macAddress?.toLowerCase().includes(query) ||
+        n.networkInfo.ssid?.toLowerCase().includes(query) ||
+        n.networkInfo.connectionType?.toLowerCase().includes(query) ||
+        n.serialNumber?.toLowerCase().includes(query) ||
+        n.networkInfo.interfaces?.some((iface: any) => 
+          iface.name?.toLowerCase().includes(query) ||
+          iface.ipAddress?.toLowerCase().includes(query) ||
+          iface.macAddress?.toLowerCase().includes(query)
+        )
       )
     }
     return true
   })
 
+  // Helper function to get IPv4 address
+  const getIPv4Address = (ipAddress: string | undefined): string | undefined => {
+    if (!ipAddress || ipAddress === 'N/A') return undefined;
+    
+    // If it's a single IP, check if it's IPv4
+    if (!ipAddress.includes(',')) {
+      // IPv4 pattern: xxx.xxx.xxx.xxx
+      const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+      return ipv4Pattern.test(ipAddress.trim()) ? ipAddress.trim() : undefined;
+    }
+    
+    // If it's multiple IPs, find the first IPv4
+    const ips = ipAddress.split(',').map(ip => ip.trim());
+    const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+    return ips.find(ip => ipv4Pattern.test(ip));
+  };
+
+  const getActiveInterface = (interfaces: any[]) => {
+    if (!interfaces || !Array.isArray(interfaces)) return null;
+    return interfaces.find((iface: any) => 
+      iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected'
+    );
+  }
+
   const getInterfaceType = (iface: any) => {
-    if (!iface.name) return 'Unknown'
-    const name = iface.name.toLowerCase()
-    if (name.includes('ethernet') || name.includes('eth')) return 'Ethernet'
-    if (name.includes('wifi') || name.includes('wireless') || name.includes('wlan')) return 'Wi-Fi'
-    if (name.includes('bluetooth') || name.includes('bt')) return 'Bluetooth'
-    if (name.includes('loopback') || name.includes('lo')) return 'Loopback'
+    if (!iface?.type) return 'Unknown'
+    const type = iface.type.toLowerCase()
+    if (type.includes('ethernet') || type.includes('wired')) return 'Ethernet'
+    if (type.includes('wireless') || type.includes('802.11') || type.includes('wifi')) return 'Wi-Fi'
+    if (type.includes('bluetooth')) return 'Bluetooth'
+    if (type.includes('loopback')) return 'Loopback'
     return 'Other'
   }
 
@@ -191,7 +236,7 @@ function NetworkPageContent() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Network interfaces and connectivity • {filteredNetwork.length} devices
+                  Network interfaces and connectivity • {filteredNetworkDevices.length} devices
                 </p>
               </div>
               <div className="relative">
@@ -216,83 +261,103 @@ function NetworkPageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Hostname</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IP Addresses</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Connection</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IP Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">MAC Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Network Name</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Interfaces</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Gateway</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Domain</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredNetwork.length === 0 ? (
+                {filteredNetworkDevices.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
                       </svg>
-                      <p className="text-lg font-medium mb-1">No network data found</p>
+                      <p className="text-lg font-medium mb-1">No network devices found</p>
                       <p className="text-sm">Try adjusting your search criteria.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredNetwork.map((net) => (
-                    <tr key={net.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                      <td className="px-6 py-4">
-                        <Link
-                          href={`/device/${encodeURIComponent(net.serialNumber)}`}
-                          className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                        >
-                          {net.deviceName}
-                        </Link>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                          {net.serialNumber}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {net.hostname || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="space-y-1">
-                          {net.ipAddresses?.slice(0, 3).map((ip, idx) => (
-                            <div key={idx} className="text-sm text-gray-900 dark:text-white font-mono">
-                              {ip}
-                            </div>
-                          ))}
-                          {net.ipAddresses?.length > 3 && (
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              +{net.ipAddresses.length - 3} more
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {net.interfaces?.slice(0, 3).map((iface, idx) => (
-                            <span key={idx} className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              getInterfaceType(iface) === 'Ethernet' 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                : getInterfaceType(iface) === 'Wi-Fi'
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                            }`}>
-                              {getInterfaceType(iface)}
-                            </span>
-                          ))}
-                          {net.interfaces?.length > 3 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                              +{net.interfaces.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
-                        {net.gateway || '-'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {net.domain || '-'}
-                      </td>
-                    </tr>
-                  ))
+                  filteredNetworkDevices.map((networkDevice: NetworkDevice & { networkInfo: any }) => {
+                    const activeInterface = getActiveInterface(networkDevice.networkInfo.interfaces)
+                    const ipv4Address = getIPv4Address(networkDevice.networkInfo.ipAddress)
+                    
+                    return (
+                      <tr key={networkDevice.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4">
+                          <Link
+                            href={`/device/${encodeURIComponent(networkDevice.deviceId)}`}
+                            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                          >
+                            {networkDevice.deviceName || 'Unknown Device'}
+                          </Link>
+                          <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                            {networkDevice.serialNumber}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {networkDevice.networkInfo.connectionType ? (
+                              <>
+                                <div className={`w-2 h-2 rounded-full ${
+                                  networkDevice.networkInfo.connectionType.toLowerCase().includes('wireless') || 
+                                  networkDevice.networkInfo.connectionType.toLowerCase().includes('wifi') 
+                                    ? 'bg-blue-400' 
+                                    : networkDevice.networkInfo.connectionType.toLowerCase().includes('ethernet') || 
+                                      networkDevice.networkInfo.connectionType.toLowerCase().includes('wired')
+                                    ? 'bg-green-400'
+                                    : 'bg-gray-400'
+                                }`} />
+                                <span className="text-sm text-gray-900 dark:text-white">
+                                  {networkDevice.networkInfo.connectionType}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-sm text-gray-500 dark:text-gray-400">Unknown</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
+                          {ipv4Address || networkDevice.networkInfo.ipAddress || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
+                          {networkDevice.networkInfo.macAddress || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                          {networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName || 'N/A'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm">
+                            {networkDevice.networkInfo.interfaces && Array.isArray(networkDevice.networkInfo.interfaces) ? (
+                              <div className="space-y-1">
+                                {networkDevice.networkInfo.interfaces.slice(0, 2).map((iface: any, idx: number) => (
+                                  <div key={idx} className="flex items-center gap-2">
+                                    <div className={`w-1.5 h-1.5 rounded-full ${
+                                      iface.isActive || iface.status === 'Active' || iface.status === 'Connected' 
+                                        ? 'bg-green-400' 
+                                        : 'bg-gray-400'
+                                    }`} />
+                                    <span className="text-gray-900 dark:text-white text-xs">
+                                      {iface.name || 'Unknown'} ({getInterfaceType(iface)})
+                                    </span>
+                                  </div>
+                                ))}
+                                {networkDevice.networkInfo.interfaces.length > 2 && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    +{networkDevice.networkInfo.interfaces.length - 2} more
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-500 dark:text-gray-400">No interfaces</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

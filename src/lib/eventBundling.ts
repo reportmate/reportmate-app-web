@@ -6,6 +6,7 @@
 export interface FleetEvent {
   id: string
   device: string
+  deviceName?: string  // Enhanced with actual device name from API
   kind: string
   ts: string
   message?: string

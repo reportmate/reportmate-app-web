@@ -6,6 +6,7 @@ interface VersionInfo {
   version: string
   buildId: string
   buildTime: string
+  imageTag: string
   nodeVersion: string
   platform: string
   arch: string
@@ -44,6 +45,7 @@ export function VersionDisplay() {
     const containerInfo = `Container Info:
 Version: ${versionInfo.version}
 Build ID: ${versionInfo.buildId}
+Image Tag: ${versionInfo.imageTag}
 Node Version: ${versionInfo.nodeVersion}
 Platform: ${versionInfo.platform}/${versionInfo.arch}
 Built: ${new Date(versionInfo.buildTime).toISOString()}
@@ -105,6 +107,10 @@ Timestamp: ${new Date().toISOString()}`
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Build ID:</span>
               <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.buildId.slice(0, 8)}...</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-600 dark:text-gray-400">Image:</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.imageTag.split(':')[1] || versionInfo.imageTag}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Node:</span>
