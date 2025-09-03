@@ -66,15 +66,22 @@ async function getDeviceNames(): Promise<Map<string, string>> {
       const newDeviceNames = new Map<string, string>()
       
       if (Array.isArray(inventoryData)) {
+        console.log(`[EVENTS API] Processing ${inventoryData.length} inventory items for device names`)
+        
         inventoryData.forEach((item: any) => {
           if (item.serialNumber) {
             let deviceName = item.serialNumber
             
-            // Use inventory deviceName if available
-            if (item.deviceName && item.deviceName !== item.serialNumber) {
-              deviceName = item.deviceName
-            } else if (item.manufacturer && item.model) {
-              // Fallback to manufacturer + model if deviceName is same as serial
+            // Priority 1: Use inventory deviceName if available and meaningful
+            if (item.deviceName && 
+                item.deviceName.trim() !== '' && 
+                item.deviceName !== item.serialNumber &&
+                !item.deviceName.toLowerCase().includes('unknown')) {
+              deviceName = item.deviceName.trim()
+              console.log(`[EVENTS API] Found deviceName for ${item.serialNumber}: "${deviceName}"`)
+            } 
+            // Priority 2: Fallback to manufacturer + model if deviceName is empty/same as serial
+            else if (item.manufacturer && item.model) {
               const manufacturer = item.manufacturer.replace(/Unknown/gi, '').trim()
               const model = item.model.replace(/Unknown/gi, '').trim()
               if (manufacturer && model) {
@@ -93,11 +100,14 @@ async function getDeviceNames(): Promise<Map<string, string>> {
       
       deviceNamesCache = newDeviceNames
       deviceNamesCacheTimestamp = now
-      console.log('[EVENTS API] Cached device names for', newDeviceNames.size, 'devices')
+      console.log('[EVENTS API] Successfully cached device names for', newDeviceNames.size, 'devices')
+      console.log('[EVENTS API] Sample device names:', Array.from(newDeviceNames.entries()).slice(0, 3))
       return newDeviceNames
+    } else {
+      console.error('[EVENTS API] Inventory API returned error:', inventoryResponse.status, inventoryResponse.statusText)
     }
   } catch (error) {
-    console.warn('[EVENTS API] Failed to fetch device names:', error)
+    console.error('[EVENTS API] Failed to fetch device names:', error)
   }
   
   return deviceNamesCache // Return existing cache even if fetch failed
