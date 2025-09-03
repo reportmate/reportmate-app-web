@@ -87,6 +87,30 @@ export async function GET() {
       console.warn(`[DEVICES API CACHED] ${timestamp} - Inventory API failed: ${inventoryResponse.status}`)
     }
     
+    // Get system module data from local database
+    let systemData = []
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Pool } = require('pg')
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+      
+      const result = await pool.query(`
+        SELECT DISTINCT ON (d.serial_number)
+          d.serial_number, s.data, s.collected_at, s.updated_at
+        FROM system s
+        JOIN devices d ON s.device_id = d.id
+        WHERE d.serial_number IS NOT NULL
+        ORDER BY d.serial_number, s.updated_at DESC
+      `)
+      
+      systemData = result.rows
+      console.log(`[DEVICES API CACHED] ${timestamp} - Got ${systemData.length} system records from database`)
+      
+      await pool.end()
+    } catch (dbError) {
+      console.warn(`[DEVICES API CACHED] ${timestamp} - Database query failed:`, dbError)
+    }
+    
     // Build inventory lookup map for fast device name resolution (same as inventory page)
     const inventoryMap = new Map<string, any>()
     if (Array.isArray(inventoryData)) {
@@ -98,15 +122,27 @@ export async function GET() {
       console.log(`[DEVICES API CACHED] ${timestamp} - Built inventory map for ${inventoryMap.size} devices`)
     }
     
+    // Build system data lookup map for OS information
+    const systemMap = new Map<string, any>()
+    if (Array.isArray(systemData)) {
+      systemData.forEach((item: any) => {
+        if (item.serial_number && item.data) {
+          systemMap.set(item.serial_number, item.data)
+        }
+      })
+      console.log(`[DEVICES API CACHED] ${timestamp} - Built system map for ${systemMap.size} devices`)
+    }
+    
     console.log(`[DEVICES API CACHED] ${timestamp} - Raw Azure Functions response:`, {
-      success: devicesData.success,
-      deviceCount: devicesData.devices?.length || 0,
+      isArray: Array.isArray(devicesData),
+      deviceCount: Array.isArray(devicesData) ? devicesData.length : (devicesData.devices?.length || 0),
       keys: Object.keys(devicesData || {}),
-      firstDeviceKeys: devicesData.devices?.[0] ? Object.keys(devicesData.devices[0]) : []
+      firstDeviceKeys: Array.isArray(devicesData) && devicesData[0] ? Object.keys(devicesData[0]) : (devicesData.devices?.[0] ? Object.keys(devicesData.devices[0]) : [])
     })
     
     // Extract devices array from Azure Functions response structure
-    const devicesArray = devicesData.devices || devicesData || []
+    // Azure Functions returns array directly, not wrapped in devices property
+    const devicesArray = Array.isArray(devicesData) ? devicesData : (devicesData.devices || devicesData || [])
     console.log(`[DEVICES API CACHED] ${timestamp} - Got ${devicesArray.length} devices from optimized endpoint`)
     
     // Enhanced transformation using inventory data (same logic as inventory page)
@@ -133,14 +169,18 @@ export async function GET() {
         // Get inventory info for this device (same as inventory page)
         const inventoryInfo = inventoryMap.get(serialNumber) || {}
         
+        // Get system module data from database (includes OS info for charts)
+        const systemModuleData = systemMap.get(serialNumber) || {}
+        
         // Build proper device name using EXACT SAME logic as inventory page
         const deviceName = inventoryInfo.deviceName || inventoryInfo.computerName || serialNumber || 'Unknown Device'
         
         // Debug logging for specific device
         if (serialNumber === '8LD0BZ2') {
           console.log(`[DEVICES API DEBUG] Processing device ${serialNumber}:`)
-          console.log(`[DEVICES API DEBUG] - inventoryInfo.deviceName: "${inventoryInfo?.deviceName}"`)
-          console.log(`[DEVICES API DEBUG] - inventoryInfo.computerName: "${inventoryInfo?.computerName}"`)
+          console.log(`[DEVICES API DEBUG] - Device keys: ${Object.keys(device).join(', ')}`)
+          console.log(`[DEVICES API DEBUG] - Has inventory: ${inventoryInfo !== undefined}`)
+          console.log(`[DEVICES API DEBUG] - Has systemModuleData: ${Object.keys(systemModuleData).length > 0}`)
           console.log(`[DEVICES API DEBUG] - Final deviceName: "${deviceName}"`)
         }
         
@@ -154,9 +194,24 @@ export async function GET() {
           clientVersion: device.clientVersion || '1.0.0',
           assetTag: inventoryInfo?.assetTag,
           location: inventoryInfo?.location,
-          os: inventoryInfo?.operatingSystem || device.os,
+          os: systemModuleData?.operatingSystem?.name || inventoryInfo?.operatingSystem || device.os,
           modules: {
-            inventory: inventoryInfo
+            inventory: {
+              catalog: inventoryInfo?.catalog || 'Unknown',
+              usage: inventoryInfo?.usage || 'Unknown',
+              ...inventoryInfo // Include all other inventory fields
+            },
+            system: {
+              operatingSystem: systemModuleData?.operatingSystem ? {
+                name: systemModuleData.operatingSystem.name,
+                version: systemModuleData.operatingSystem.version,
+                build: systemModuleData.operatingSystem.build,
+                architecture: systemModuleData.operatingSystem.architecture,
+                displayVersion: systemModuleData.operatingSystem.displayVersion,
+                edition: systemModuleData.operatingSystem.edition,
+                featureUpdate: systemModuleData.operatingSystem.featureUpdate
+              } : undefined
+            }
           },
           totalEvents: device.totalEvents || 0,
           lastEventTime: lastSeenValue
