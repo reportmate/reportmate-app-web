@@ -92,6 +92,36 @@ const processStatusData = (devices: Device[]): StatusData[] => {
 export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loading }) => {
   const router = useRouter()
 
+  // Debug logging
+  console.log('[STATUS DONUT CHART] Rendering with:', {
+    devicesCount: devices.length,
+    loading,
+    deviceStatuses: devices.length > 0 ? devices.reduce((acc, d) => {
+      acc[d.status] = (acc[d.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>) : {},
+    hasDevicesWithStatus: devices.filter(d => d.status).length
+  })
+
+  // Show loading state with a placeholder chart
+  if (loading && devices.length === 0) {
+    return (
+      <div className="flex items-center justify-center py-8">
+        <div className="text-center">
+          <div className="w-48 h-48 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full animate-pulse flex items-center justify-center">
+            <div className="w-32 h-32 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-8 h-8 mx-auto mb-2 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                <div className="text-sm text-gray-600 dark:text-gray-400">Loading...</div>
+              </div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Loading device status data...</p>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
@@ -104,6 +134,7 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
   }
 
   if (devices.length === 0) {
+    console.log('[STATUS DONUT CHART] No devices found, showing empty state')
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
@@ -117,6 +148,9 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
           </h3>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             Devices will appear here when they report in
+          </p>
+          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+            Debug: {loading ? 'Loading...' : 'Not loading'}
           </p>
         </div>
       </div>

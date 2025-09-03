@@ -196,7 +196,32 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
       .sort((a, b) => {
         if (a.version === 'Unknown') return 1
         if (b.version === 'Unknown') return -1
-        return parseFloat(b.version) - parseFloat(a.version)
+        
+        // Parse macOS versions like "15.2.0", "14.7.2", etc.
+        const parseVersion = (ver: string) => {
+          const parts = ver.split('.').map(part => parseInt(part) || 0)
+          return {
+            major: parts[0] || 0,
+            minor: parts[1] || 0,
+            patch: parts[2] || 0
+          }
+        }
+        
+        const versionA = parseVersion(a.version)
+        const versionB = parseVersion(b.version)
+        
+        // Compare major version first
+        if (versionA.major !== versionB.major) {
+          return versionB.major - versionA.major
+        }
+        
+        // Then minor version
+        if (versionA.minor !== versionB.minor) {
+          return versionB.minor - versionA.minor
+        }
+        
+        // Finally patch version
+        return versionB.patch - versionA.patch
       })
   } else {
     return Object.entries(versions)
@@ -208,18 +233,47 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
         if (a.version === 'Unknown') return 1
         if (b.version === 'Unknown') return -1
         
-        // Simple version comparison for clean version strings
-        // Extract version numbers for comparison
-        const extractVersionNumber = (ver: string) => {
-          const match = ver.match(/Windows\s+(\d+)/)
-          return match ? parseInt(match[1]) : 0
+        // Parse Windows versions like "11.26100.4652", "10.19045.3803", or "Windows 11"
+        const parseWindowsVersion = (ver: string) => {
+          // Handle simple "Windows X" format
+          const simpleMatch = ver.match(/Windows\s+(\d+)$/)
+          if (simpleMatch) {
+            return {
+              major: parseInt(simpleMatch[1]),
+              build: 0,
+              feature: 0
+            }
+          }
+          
+          // Handle detailed format like "11.26100.4652" or "Windows 11.26100.4652"
+          const detailedMatch = ver.match(/(?:Windows\s+)?(\d+)\.(\d+)\.(\d+)/)
+          if (detailedMatch) {
+            return {
+              major: parseInt(detailedMatch[1]),
+              build: parseInt(detailedMatch[2]),
+              feature: parseInt(detailedMatch[3])
+            }
+          }
+          
+          // Fallback
+          return { major: 0, build: 0, feature: 0 }
         }
         
-        const versionA = extractVersionNumber(a.version)
-        const versionB = extractVersionNumber(b.version)
+        const versionA = parseWindowsVersion(a.version)
+        const versionB = parseWindowsVersion(b.version)
         
-        // Sort by Windows version number (11, 10, 8, 7, etc.)
-        return versionB - versionA
+        // Compare major version first (11 > 10 > 8 > 7)
+        if (versionA.major !== versionB.major) {
+          return versionB.major - versionA.major
+        }
+        
+        // Then build number (newer builds first)
+        if (versionA.build !== versionB.build) {
+          return versionB.build - versionA.build
+        }
+        
+        // Finally feature update (newer first)
+        return versionB.feature - versionA.feature
       })
   }
 }

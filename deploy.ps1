@@ -277,6 +277,9 @@ function Invoke-BuildImage {
         "--platform", "linux/amd64"
         "--build-arg", "DOCKER_BUILD=true"
         "--build-arg", "NODE_ENV=production"
+        "--build-arg", "IMAGE_TAG=$Tag"
+        "--build-arg", "BUILD_TIME=$((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ss.fffZ'))"
+        "--build-arg", "BUILD_ID=$($GitHash)"
         "--progress", "plain"
     )
     

@@ -126,7 +126,7 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
       : 'http://localhost:3000'  // Use the actual dev server port
     
     // For UUID or Asset Tag, we need to query the local devices API (which handles fallbacks)
-    const response = await fetch(`${baseUrl}/api/devices`, {
+    const response = await fetch(`${baseUrl}/api/devices?limit=1000`, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
