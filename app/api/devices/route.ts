@@ -52,15 +52,25 @@ export async function GET() {
     
     console.log(`[DEVICES API CACHED] ${timestamp} - Fetching fresh data from Azure Functions`)
   
-    // Use the optimized devices endpoint that includes all module data
-    const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
-      }
-    })
+    // Fetch both devices and inventory data to get complete device information (same as inventory page)
+    const [devicesResponse, inventoryResponse] = await Promise.all([
+      fetch(`${apiBaseUrl}/api/devices`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'User-Agent': 'ReportMate-Frontend/1.0'
+        }
+      }),
+      fetch(`${apiBaseUrl}/api/inventory`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache',
+          'User-Agent': 'ReportMate-Frontend/1.0'
+        }
+      })
+    ])
     
     if (!devicesResponse.ok) {
       throw new Error(`Devices API failed: ${devicesResponse.status} ${devicesResponse.statusText}`)
@@ -68,10 +78,39 @@ export async function GET() {
     
     const devicesData = await devicesResponse.json()
     
-    console.log(`[DEVICES API CACHED] ${timestamp} - Got ${devicesData.length || 0} devices from optimized endpoint`)
+    // Get inventory data for device names (same as inventory page uses)
+    let inventoryData = []
+    if (inventoryResponse.ok) {
+      inventoryData = await inventoryResponse.json()
+      console.log(`[DEVICES API CACHED] ${timestamp} - Got ${inventoryData.length} inventory items`)
+    } else {
+      console.warn(`[DEVICES API CACHED] ${timestamp} - Inventory API failed: ${inventoryResponse.status}`)
+    }
     
-    // Enhanced transformation using modules data from the device response
-    const transformedDevices = (Array.isArray(devicesData) ? devicesData : [])
+    // Build inventory lookup map for fast device name resolution (same as inventory page)
+    const inventoryMap = new Map<string, any>()
+    if (Array.isArray(inventoryData)) {
+      inventoryData.forEach((item: any) => {
+        if (item.serialNumber) {
+          inventoryMap.set(item.serialNumber, item)
+        }
+      })
+      console.log(`[DEVICES API CACHED] ${timestamp} - Built inventory map for ${inventoryMap.size} devices`)
+    }
+    
+    console.log(`[DEVICES API CACHED] ${timestamp} - Raw Azure Functions response:`, {
+      success: devicesData.success,
+      deviceCount: devicesData.devices?.length || 0,
+      keys: Object.keys(devicesData || {}),
+      firstDeviceKeys: devicesData.devices?.[0] ? Object.keys(devicesData.devices[0]) : []
+    })
+    
+    // Extract devices array from Azure Functions response structure
+    const devicesArray = devicesData.devices || devicesData || []
+    console.log(`[DEVICES API CACHED] ${timestamp} - Got ${devicesArray.length} devices from optimized endpoint`)
+    
+    // Enhanced transformation using inventory data (same logic as inventory page)
+    const transformedDevices = (Array.isArray(devicesArray) ? devicesArray : [])
       .filter((device: RawDevice) => {
         const serialNumber = device.serialNumber || device.serial_number
         return serialNumber && 
@@ -91,16 +130,18 @@ export async function GET() {
 
         const lastSeenValue = (device.lastSeen || device.last_seen) as string | null
         
-        // Use existing modules data from the Azure Functions response
-        const inventoryInfo = device.modules?.inventory || {}
-        const systemInfo = device.modules?.system || {}
+        // Get inventory info for this device (same as inventory page)
+        const inventoryInfo = inventoryMap.get(serialNumber) || {}
         
-        // Build proper device name - prioritize inventory deviceName
-        let deviceName = device.name || serialNumber
+        // Build proper device name using EXACT SAME logic as inventory page
+        const deviceName = inventoryInfo.deviceName || inventoryInfo.computerName || serialNumber || 'Unknown Device'
         
-        // Use inventory deviceName if available
-        if (inventoryInfo?.deviceName && inventoryInfo.deviceName !== serialNumber) {
-          deviceName = inventoryInfo.deviceName
+        // Debug logging for specific device
+        if (serialNumber === '8LD0BZ2') {
+          console.log(`[DEVICES API DEBUG] Processing device ${serialNumber}:`)
+          console.log(`[DEVICES API DEBUG] - inventoryInfo.deviceName: "${inventoryInfo?.deviceName}"`)
+          console.log(`[DEVICES API DEBUG] - inventoryInfo.computerName: "${inventoryInfo?.computerName}"`)
+          console.log(`[DEVICES API DEBUG] - Final deviceName: "${deviceName}"`)
         }
         
         return {
@@ -113,10 +154,9 @@ export async function GET() {
           clientVersion: device.clientVersion || '1.0.0',
           assetTag: inventoryInfo?.assetTag,
           location: inventoryInfo?.location,
-          os: systemInfo?.operatingSystem?.name || inventoryInfo?.operatingSystem || device.os,
+          os: inventoryInfo?.operatingSystem || device.os,
           modules: {
-            inventory: inventoryInfo,
-            system: systemInfo
+            inventory: inventoryInfo
           },
           totalEvents: device.totalEvents || 0,
           lastEventTime: lastSeenValue
