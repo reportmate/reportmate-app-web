@@ -18,10 +18,14 @@ interface RecentEventsTableProps {
 }
 
 // Helper function to get device display name
-const getDeviceName = (deviceId: string, deviceNameMap: Record<string, string>) => {
-  // Enhanced device name resolution with multiple fallback strategies
+const getDeviceName = (event: FleetEvent, deviceNameMap: Record<string, string>) => {
+  // First priority: Use deviceName from enhanced events API
+  if (event.deviceName && event.deviceName !== event.device) {
+    return event.deviceName
+  }
   
-  // First, try the device name map (preferred)
+  // Second priority: Use device name map (legacy)
+  const deviceId = event.device
   if (deviceNameMap[deviceId]) {
     return deviceNameMap[deviceId]
   }
@@ -372,7 +376,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                               href={`/device/${encodeURIComponent(bundledEvent.device)}`}
                               className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                             >
-                              {getDeviceName(bundledEvent.device, deviceNameMap)}
+                              {getDeviceName(bundledEvent, deviceNameMap)}
                             </Link>
                           </td>
                           <td className="px-3 py-2.5 hidden md:table-cell">

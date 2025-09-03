@@ -63,9 +63,7 @@ export async function GET() {
             d.name as deviceName,
             d.last_seen as lastSeen,
             i.data,
-            i.collected_at as collectedAt,
-            d.manufacturer,
-            d.model
+            i.collected_at as collectedAt
           FROM devices d
           LEFT JOIN inventory i ON d.id = i.device_id
           WHERE d.serial_number IS NOT NULL 
@@ -96,8 +94,8 @@ export async function GET() {
             computerName: inventoryJsonData.computerName || inventoryJsonData.computer_name || row.devicename,
             domain: inventoryJsonData.domain || null,
             organizationalUnit: inventoryJsonData.organizationalUnit || inventoryJsonData.organizational_unit || null,
-            manufacturer: row.manufacturer || inventoryJsonData.manufacturer || null,
-            model: row.model || inventoryJsonData.model || null,
+            manufacturer: (inventoryJsonData.manufacturer && inventoryJsonData.manufacturer !== 'Unknown' && inventoryJsonData.manufacturer !== '') ? inventoryJsonData.manufacturer : null,
+            model: (inventoryJsonData.model && inventoryJsonData.model !== 'Unknown' && inventoryJsonData.model !== '') ? inventoryJsonData.model : null,
             uuid: inventoryJsonData.uuid || inventoryJsonData.device_id || null,
             raw: inventoryJsonData
           }

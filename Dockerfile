@@ -27,6 +27,16 @@ RUN npm install -g pnpm
 # Set environment variable for Docker build
 ENV DOCKER_BUILD=true
 
+# Accept build args for version tracking
+ARG IMAGE_TAG=unknown
+ARG BUILD_TIME=""
+ARG BUILD_ID=""
+
+# Set build-time environment variables
+ENV CONTAINER_IMAGE_TAG=${IMAGE_TAG}
+ENV BUILD_TIME=${BUILD_TIME}
+ENV BUILD_ID=${BUILD_ID}
+
 # Build the app
 RUN pnpm build
 
@@ -37,6 +47,16 @@ WORKDIR /app
 ENV NODE_ENV=production
 # Uncomment the following line in case you want to disable telemetry during runtime.
 # ENV NEXT_TELEMETRY_DISABLED 1
+
+# Copy build args from builder stage for runtime
+ARG IMAGE_TAG=unknown
+ARG BUILD_TIME=""
+ARG BUILD_ID=""
+
+# Set runtime environment variables for version tracking
+ENV CONTAINER_IMAGE_TAG=${IMAGE_TAG}
+ENV BUILD_TIME=${BUILD_TIME}
+ENV BUILD_ID=${BUILD_ID}
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs

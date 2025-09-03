@@ -26,6 +26,7 @@ interface Device {
   model?: string
   os?: string
   lastSeen: string
+  createdAt?: string    // Registration date - when device first appeared in ReportMate
   status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
   uptime?: string
   location?: string
@@ -76,12 +77,22 @@ export default function Dashboard() {
 
   // Fetch devices data (same as original dashboard)
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout
+
     const fetchDevices = async () => {
       console.log('[DASHBOARD] 🚀 Starting fetchDevices...')
       console.log('[DASHBOARD] Current state - devices.length:', devices.length, 'devicesLoading:', devicesLoading)
+      
+      // Set a timeout to prevent waiting forever
+      timeoutId = setTimeout(() => {
+        console.log('[DASHBOARD] ⏰ Timeout reached - setting loading to false')
+        setDevicesLoading(false)
+        setDevices([])
+      }, 15000) // 15 second timeout
+
       try {
         console.log('[DASHBOARD] Fetching from /api/devices...')
-        // Use Next.js API route
+        // Use production API 
         const response = await fetch('/api/devices', {
           cache: 'no-store',
           headers: {
@@ -94,7 +105,22 @@ export default function Dashboard() {
         
         if (response.ok) {
           console.log('[DASHBOARD] Response OK, parsing JSON...')
-          const data = await response.json()
+          const text = await response.text()
+          console.log('[DASHBOARD] Raw response text length:', text.length)
+          
+          if (!text.trim()) {
+            console.error('[DASHBOARD] Empty response body!')
+            throw new Error('Empty response from API')
+          }
+          
+          let data
+          try {
+            data = JSON.parse(text)
+          } catch (jsonError) {
+            console.error('[DASHBOARD] JSON Parse Error:', jsonError)
+            console.error('[DASHBOARD] Raw response:', text.substring(0, 500))
+            throw new Error('Invalid JSON response from API')
+          }
           
           console.log('[DASHBOARD] Received device data:', data)
           console.log('[DASHBOARD] Is array?', Array.isArray(data))
@@ -142,7 +168,22 @@ export default function Dashboard() {
             try {
               setDevices(sortedDevices)
               setDevicesLoading(false)
+              
+              // Clear the timeout since we got data
+              if (timeoutId) {
+                clearTimeout(timeoutId)
+              }
+              
               console.log('[DASHBOARD] Successfully called setDevices and setDevicesLoading(false)')
+              console.log('[DASHBOARD] Final devices state will be:', {
+                count: sortedDevices.length,
+                loading: false,
+                firstDeviceStatus: sortedDevices[0]?.status,
+                statusCounts: sortedDevices.reduce((acc, d) => {
+                  acc[d.status] = (acc[d.status] || 0) + 1
+                  return acc
+                }, {} as Record<string, number>)
+              })
             } catch (error) {
               console.error('[DASHBOARD] Error setting devices:', error)
             }
@@ -249,13 +290,33 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error('[DASHBOARD] ❌ Error in fetchDevices:', error)
+        console.error('[DASHBOARD] Error details:', {
+          message: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          name: error instanceof Error ? error.name : 'Unknown'
+        })
         console.log('[DASHBOARD] Setting devicesLoading(false) due to error')
+        
+        // Clear the timeout
+        if (timeoutId) {
+          clearTimeout(timeoutId)
+        }
+        
         setDevicesLoading(false)
+        // Set empty devices array to prevent widgets from waiting indefinitely
+        setDevices([])
       }
     }
 
     console.log('[DASHBOARD] useEffect triggered, calling fetchDevices()...')
     fetchDevices()
+
+    // Cleanup function
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
     
     // TEMPORARY FIX: Direct API call to ensure devices data is loaded
     const loadDevicesDirectly = async () => {
@@ -302,6 +363,17 @@ export default function Dashboard() {
   if (devicesLoading) {
     return <DashboardSkeleton />
   }
+
+  // Debug log for render
+  console.log('[DASHBOARD] Rendering with:', {
+    devicesCount: devices.length,
+    devicesLoading,
+    firstDevice: devices[0] ? {
+      name: devices[0].name,
+      status: devices[0].status,
+      serialNumber: devices[0].serialNumber
+    } : null
+  })
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>

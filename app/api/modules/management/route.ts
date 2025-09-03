@@ -85,8 +85,8 @@ export async function GET() {
     
     console.log('[MANAGEMENT API] Fetching devices from:', `${apiBaseUrl}/api/devices`)
     
-    // First get the list of all devices
-    const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
+    // First get the list of all devices (with high limit to avoid pagination)
+    const devicesResponse = await fetch(`${apiBaseUrl}/api/devices?limit=1000`, {
       method: 'GET',
       headers: {
         'User-Agent': 'ReportMate/1.0.0',

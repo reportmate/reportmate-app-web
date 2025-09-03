@@ -563,7 +563,14 @@ function InventoryPageContent() {
                               {item.deviceName || item.computerName || item.serialNumber || 'Unknown Device'}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                              {item.manufacturer && item.model ? `${item.manufacturer} ${item.model}` : (item.manufacturer || item.model || '')}
+                              {(() => {
+                                const manufacturer = item.manufacturer && item.manufacturer !== 'Unknown' ? item.manufacturer : null;
+                                const model = item.model && item.model !== 'Unknown' ? item.model : null;
+                                if (manufacturer && model) return `${manufacturer} ${model}`;
+                                if (manufacturer) return manufacturer;
+                                if (model) return model;
+                                return '';
+                              })()}
                             </div>
                           </div>
                         </Link>

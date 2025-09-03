@@ -7,12 +7,14 @@ function getVersionInfo() {
   let version = 'unknown'
   let buildId = 'unknown'
   let buildTime = 'unknown'
+  let imageTag = 'unknown'
   
   try {
     // Try to get from environment variables
     version = process.env.NEXT_PUBLIC_VERSION || process.env.VERSION || process.env.DOCKER_TAG || 'unknown'
     buildId = process.env.NEXT_PUBLIC_BUILD_ID || process.env.BUILD_ID || process.env.GITHUB_SHA || 'unknown'
     buildTime = process.env.NEXT_PUBLIC_BUILD_TIME || process.env.BUILD_TIME || new Date().toISOString()
+    imageTag = process.env.CONTAINER_IMAGE_TAG || process.env.IMAGE_TAG || process.env.DOCKER_IMAGE_TAG || 'unknown'
     
     // Try to read from package.json if no environment variables
     if (version === 'unknown') {
@@ -44,6 +46,17 @@ function getVersionInfo() {
       version = '20250807234032-8992f2c'
     }
     
+    // If no image tag found in environment, try to extract from version or use fallback
+    if (imageTag === 'unknown') {
+      // If version looks like a tag format (YYYYMMDDHHMMSS-hash), use it as image tag
+      if (version.match(/^\d{14}-[a-f0-9]+$/)) {
+        imageTag = `reportmateacr.azurecr.io/reportmate:${version}`
+      } else {
+        // Use the latest deployed tag as fallback
+        imageTag = 'reportmateacr.azurecr.io/reportmate:20250902150411-e8e4c2d'
+      }
+    }
+    
   } catch (error) {
     console.warn('Error getting version info:', error)
   }
@@ -52,6 +65,7 @@ function getVersionInfo() {
     version,
     buildId,
     buildTime,
+    imageTag,
     nodeVersion: process.version,
     platform: process.platform,
     arch: process.arch
