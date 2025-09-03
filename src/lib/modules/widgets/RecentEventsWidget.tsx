@@ -374,7 +374,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                           <td className="w-56 px-3 py-2.5">
                             <Link
                               href={`/device/${encodeURIComponent(bundledEvent.device)}`}
-                              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                             >
                               {getDeviceName(bundledEvent, deviceNameMap)}
                             </Link>
