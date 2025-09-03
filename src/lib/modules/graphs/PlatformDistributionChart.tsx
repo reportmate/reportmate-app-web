@@ -100,10 +100,10 @@ const normalizeArchitecture = (arch: string): string => {
   const normalized = arch.toLowerCase().trim()
   
   // Normalize common architecture variations - check specific strings first
-  if (normalized === 'arm 64-bit processor') return 'ARM64'
-  if (normalized.includes('arm64') || normalized.includes('aarch64')) return 'ARM64'
-  if (normalized.includes('arm') && normalized.includes('64')) return 'ARM64'
-  if (normalized.includes('x64') || normalized.includes('amd64') || normalized.includes('x86_64')) return 'x64'
+  if (normalized === 'arm x64 processor') return 'arm64'
+  if (normalized.includes('arm64') || normalized.includes('aarch64')) return 'arm64'
+  if (normalized.includes('arm') && normalized.includes('64')) return 'arm64'
+  if (normalized === '64-bit' || normalized.includes('x64') || normalized.includes('amd64') || normalized.includes('x86_64')) return 'x64'
   if (normalized.includes('x86') && !normalized.includes('64')) return 'x86'
   if (normalized.includes('ia64')) return 'IA64'
   
@@ -190,15 +190,19 @@ const processPlatformData = (devices: Device[], filters?: any): PlatformStats[] 
     }
   })
 
-  // Calculate percentages
-  const totalDevices = filteredDevices.length
+  // Calculate percentages based on known platforms only (excluding Unknown)
+  const knownDevices = filteredDevices.filter(device => detectPlatform(device) !== 'Unknown')
+  const totalKnownDevices = knownDevices.length
+  
   Object.values(platformCounts).forEach(stats => {
-    stats.percentage = totalDevices > 0 ? Math.round((stats.count / totalDevices) * 100) : 0
+    if (stats.platform !== 'Unknown') {
+      stats.percentage = totalKnownDevices > 0 ? Math.round((stats.count / totalKnownDevices) * 100) : 0
+    }
   })
 
-  // Return only platforms with devices, sorted by count
+  // Return only platforms with devices, sorted by count, and exclude "Unknown" platforms
   return Object.values(platformCounts)
-    .filter(stats => stats.count > 0)
+    .filter(stats => stats.count > 0 && stats.platform !== 'Unknown')
     .sort((a, b) => b.count - a.count)
 }
 
@@ -377,27 +381,32 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
         {onFilterChange && (availableFilters.architectures.length > 0 || availableFilters.catalogs.length > 0 || availableFilters.usages.length > 0) && (
           <div className="w-64 flex-shrink-0 space-y-4">
             
-            {/* Architecture Filter */}
-            {availableFilters.architectures.length > 0 && (
+            {/* Usage Filter */}
+            {availableFilters.usages.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Architecture</h4>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usage</h4>
                 <div className="flex flex-wrap gap-2">
-                  {availableFilters.architectures.map(arch => {
-                    const isSelected = filters?.architecture?.includes(arch) || false
+                  {availableFilters.usages.slice(0, 6).map(usage => {
+                    const isSelected = filters?.usage?.includes(usage) || false
                     return (
                       <button
-                        key={arch}
-                        onClick={() => handleFilterChange('architecture', arch, !isSelected)}
+                        key={usage}
+                        onClick={() => handleFilterChange('usage', usage, !isSelected)}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-700'
+                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border border-purple-200 dark:border-purple-700'
                             : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                       >
-                        {arch}
+                        {usage}
                       </button>
                     )
                   })}
+                  {availableFilters.usages.length > 6 && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                      +{availableFilters.usages.length - 6} more
+                    </span>
+                  )}
                 </div>
               </div>
             )}
@@ -432,32 +441,27 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
               </div>
             )}
 
-            {/* Usage Filter */}
-            {availableFilters.usages.length > 0 && (
+            {/* Architecture Filter */}
+            {availableFilters.architectures.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Usage</h4>
+                <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Architecture</h4>
                 <div className="flex flex-wrap gap-2">
-                  {availableFilters.usages.slice(0, 6).map(usage => {
-                    const isSelected = filters?.usage?.includes(usage) || false
+                  {availableFilters.architectures.map(arch => {
+                    const isSelected = filters?.architecture?.includes(arch) || false
                     return (
                       <button
-                        key={usage}
-                        onClick={() => handleFilterChange('usage', usage, !isSelected)}
+                        key={arch}
+                        onClick={() => handleFilterChange('architecture', arch, !isSelected)}
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                           isSelected
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border border-purple-200 dark:border-purple-700'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border border-blue-200 dark:border-blue-700'
                             : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600'
                         }`}
                       >
-                        {usage}
+                        {arch}
                       </button>
                     )
                   })}
-                  {availableFilters.usages.length > 6 && (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                      +{availableFilters.usages.length - 6} more
-                    </span>
-                  )}
                 </div>
               </div>
             )}

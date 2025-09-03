@@ -167,6 +167,70 @@ const RecentEventsWidgetSkeleton: React.FC = () => (
   </div>
 )
 
+// Platform Distribution Widget Skeleton
+const PlatformDistributionWidgetSkeleton: React.FC = () => (
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+        </div>
+        <div>
+          <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+      </div>
+    </div>
+    
+    <div className="p-6">
+      <div className="space-y-6">
+        <div className="flex gap-6">
+          {/* Platform bars */}
+          <div className="flex-1 space-y-3">
+            {[...Array(2)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 bg-blue-200 dark:bg-blue-700 rounded-full animate-pulse"></div>
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-blue-200 dark:bg-blue-700 animate-pulse flex items-center justify-end pr-2"
+                    style={{ width: `${i === 0 ? 100 : Math.random() * 50 + 10}%` }}
+                  >
+                    <div className="w-4 h-3 bg-white rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="ml-7 text-xs space-y-1">
+                  <div className="h-3 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+          
+          {/* Filter controls */}
+          <div className="w-64 flex-shrink-0 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i}>
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(3)].map((_, j) => (
+                    <div key={j} className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+)
+
 // OS Version Widget Skeleton
 const OSVersionWidgetSkeleton: React.FC<{ osType: 'macOS' | 'Windows' }> = ({ osType }) => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -273,10 +337,13 @@ export const DashboardSkeleton: React.FC = () => {
             <NewClientsWidgetSkeleton />
           </div>
 
-          {/* Column B (70% width) - Recent Events + OS Version Charts */}
+          {/* Column B (70% width) - Recent Events + Platform Distribution + OS Version Charts */}
           <div className="lg:col-span-7 space-y-8">
             {/* Recent Events Table */}
             <RecentEventsWidgetSkeleton />
+
+            {/* Platform Distribution - Full Width */}
+            <PlatformDistributionWidgetSkeleton />
 
             {/* OS Version Tracking - 50/50 Split */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
