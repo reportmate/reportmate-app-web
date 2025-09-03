@@ -461,6 +461,11 @@ export default function Dashboard() {
               />
             </ErrorBoundary>
 
+            {/* Platform Distribution - Full Width */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
+              <PlatformDistributionWidget devices={devices as any} loading={devicesLoading} />
+            </ErrorBoundary>
+
             {/* OS Version Tracking - 50/50 Split */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -470,11 +475,6 @@ export default function Dashboard() {
                 {/* Windows Versions */}
                 <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
               </div>
-            </ErrorBoundary>
-
-            {/* Platform Distribution - Full Width */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
-              <PlatformDistributionWidget devices={devices as any} loading={devicesLoading} />
             </ErrorBoundary>
           </div>
         </div>
