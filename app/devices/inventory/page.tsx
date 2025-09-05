@@ -8,6 +8,25 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
+// Import the shared hook for accessing device data with inventory
+import { useDeviceData } from "../../../src/hooks/useDeviceData"
+
+/**
+ * INVENTORY DATA ACCESS:
+ * 
+ * This page now has access to comprehensive device data including inventory through
+ * the useDeviceData hook. To use it, simply add:
+ * 
+ * const { devices, devicesLoading } = useDeviceData()
+ * 
+ * The devices array includes:
+ * - Complete device information
+ * - Inventory data (catalog, usage, etc.) in modules.inventory
+ * - System data in modules.system  
+ * - All other module data
+ * 
+ * This ensures all device pages have consistent access to inventory data.
+ */
 
 interface InventoryItem {
   id: string

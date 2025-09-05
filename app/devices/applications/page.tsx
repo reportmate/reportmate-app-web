@@ -323,7 +323,7 @@ function ApplicationsPageContent() {
           })
         }, 200) // Update every 200ms
 
-        const response = await fetch('/api/applications', {
+        const response = await fetch('/api/devices/applications', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',

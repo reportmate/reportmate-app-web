@@ -7,6 +7,12 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
+import { 
+  ArchitectureDonutChart, 
+  MemoryBreakdownChart, 
+  HardwareModelChart,
+  DeviceTypeDonutChart 
+} from "../../../src/lib/modules/graphs"
 
 interface HardwareRecord {
   id: string
@@ -15,19 +21,22 @@ interface HardwareRecord {
   serialNumber: string
   lastSeen: string
   collectedAt: string
-  processor: string
+  processor: string | object | any
   processorSpeed?: string
   processorCores?: number
-  memory: string
+  memory: string | number | object | any
   memoryModules: any[]
   storage: any[]
-  graphics: any[]
+  graphics: any[] | object | string | any
   motherboard?: any
+  architecture?: string
+  assetTag?: string
   raw?: any
 }
 
 function HardwarePageContent() {
   const [hardware, setHardware] = useState<HardwareRecord[]>([])
+  const [devices, setDevices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -43,72 +52,312 @@ function HardwarePageContent() {
   }, [searchParams])
 
   useEffect(() => {
-    const fetchHardware = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/modules/hardware', {
+        console.log('🚀 Fetching hardware data using optimized bulk API...')
+        
+        // Use the new bulk hardware API - single call instead of multiple individual calls
+        const hardwareResponse = await fetch('/api/devices/hardware', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         })
         
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status}`)
+        if (!hardwareResponse.ok) {
+          throw new Error(`Hardware API request failed: ${hardwareResponse.status}`)
         }
         
-        const data = await response.json()
+        const hardwareData = await hardwareResponse.json()
         
-        if (Array.isArray(data)) {
-          setHardware(data)
+        console.log(`✅ Loaded ${hardwareData.length} devices with hardware data in single API call`)
+        console.log('📊 Cache headers:', {
+          dataSource: hardwareResponse.headers.get('X-Data-Source'),
+          fetchedAt: hardwareResponse.headers.get('X-Fetched-At')
+        })
+        
+        // Still fetch devices for additional name mapping (this is already cached)
+        const devicesResponse = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        })
+        
+        let devicesData = []
+        if (devicesResponse.ok) {
+          devicesData = await devicesResponse.json()
+        }
+        
+        if (Array.isArray(hardwareData)) {
+          setHardware(hardwareData)
           setError(null)
         } else {
-          throw new Error('Invalid API response format')
+          throw new Error('Invalid hardware API response format')
+        }
+        
+        if (Array.isArray(devicesData)) {
+          setDevices(devicesData)
+        } else {
+          console.warn('Invalid devices API response format')
+          setDevices([])
         }
         
       } catch (error) {
-        console.error('❌ Failed to fetch hardware:', error)
+        console.error('❌ Failed to fetch data:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
         setHardware([])
+        setDevices([])
       } finally {
         setLoading(false)
       }
     }
 
-    fetchHardware()
+    fetchData()
   }, [])
+
+  // Process hardware info for each device to get proper device names
+  const processedHardware = hardware.map(hardwareRecord => {
+    // Find the corresponding device from the main devices API to get the proper name
+    const deviceFromMainAPI = devices.find(d => 
+      d.deviceId === hardwareRecord.deviceId || 
+      d.serialNumber === hardwareRecord.serialNumber
+    )
+    
+    // Debug logging to verify device name mapping
+    if (deviceFromMainAPI && deviceFromMainAPI.name !== hardwareRecord.deviceName) {
+      console.log(`[HARDWARE PAGE] Device name mapping: "${hardwareRecord.deviceName}" -> "${deviceFromMainAPI.name}"`)
+    }
+    
+    // Extract architecture from various sources
+    let architecture = 'Unknown'
+    
+    // First try from the hardware module architecture field
+    if (hardwareRecord.architecture) {
+      architecture = hardwareRecord.architecture
+    }
+    // Try from device modules if available
+    else if (deviceFromMainAPI?.modules?.hardware?.processor?.architecture) {
+      architecture = deviceFromMainAPI.modules.hardware.processor.architecture
+    }
+    // Try from system module
+    else if (deviceFromMainAPI?.modules?.system?.operatingSystem?.architecture) {
+      architecture = deviceFromMainAPI.modules.system.operatingSystem.architecture
+    }
+    // Try from raw hardware data
+    else if (hardwareRecord.raw?.processor?.architecture) {
+      architecture = hardwareRecord.raw.processor.architecture
+    }
+    // Try from raw data architecture field
+    else if (hardwareRecord.raw?.architecture) {
+      architecture = hardwareRecord.raw.architecture
+    }
+    
+    // Check for ARM64 indicators in processor and graphics data
+    const processorText = (hardwareRecord.processor || '').toString().toLowerCase()
+    const graphicsText = (hardwareRecord.graphics || '').toString().toLowerCase()
+    
+    // Check if this is an ARM64 device based on processor/graphics
+    const isARM64Device = processorText.includes('snapdragon') || 
+                         processorText.includes('apple m') || 
+                         processorText.includes('apple silicon') ||
+                         graphicsText.includes('qualcomm adreno') ||
+                         graphicsText.includes('apple gpu')
+    
+    // Comprehensive debug logging for ARM64 detection
+    if (hardwareRecord.serialNumber === '0F33V9G25083HJ') {
+      console.log(`[ARM64 COMPREHENSIVE DEBUG] Device ${hardwareRecord.serialNumber}:`, {
+        rawProcessor: hardwareRecord.processor,
+        rawGraphics: hardwareRecord.graphics,
+        processorText,
+        graphicsText,
+        snapdragonCheck: processorText.includes('snapdragon'),
+        qualcommCheck: graphicsText.includes('qualcomm adreno'),
+        isARM64Device,
+        originalArch: hardwareRecord.architecture,
+        finalArch: isARM64Device ? 'ARM64' : architecture,
+        completeHardwareRecord: hardwareRecord
+      })
+    }
+
+    // Debug logging for ARM64 detection
+    if (processorText.includes('snapdragon') || graphicsText.includes('qualcomm adreno')) {
+      console.log(`[ARM64 DEBUG] Device ${hardwareRecord.serialNumber}:`, {
+        processorText,
+        graphicsText,
+        isARM64Device,
+        originalArch: hardwareRecord.architecture,
+        finalArch: isARM64Device ? 'ARM64' : architecture
+      })
+    }
+    
+    // If we detected ARM64 indicators, override the architecture
+    if (isARM64Device) {
+      architecture = 'ARM64'
+    }
+    // Otherwise, normalize architecture names
+    else if (architecture && architecture !== 'Unknown') {
+      const normalizedArch = architecture.toLowerCase().trim()
+      if (normalizedArch.includes('arm64') || normalizedArch.includes('aarch64')) {
+        architecture = 'ARM64'
+      } else if (normalizedArch.includes('x64') || normalizedArch.includes('amd64') || normalizedArch.includes('x86_64') || normalizedArch.includes('64-bit')) {
+        architecture = 'x64'
+      } else if (normalizedArch.includes('x86') && !normalizedArch.includes('64')) {
+        architecture = 'x86'
+      } else if (normalizedArch.includes('ia64')) {
+        architecture = 'IA64'
+      }
+    }
+    
+    return {
+      ...hardwareRecord,
+      // Use the device name from the main API if available, fallback to hardware module data
+      deviceName: deviceFromMainAPI?.name || hardwareRecord.deviceName || hardwareRecord.serialNumber,
+      // Include assetTag from inventory data if available
+      assetTag: deviceFromMainAPI?.modules?.inventory?.assetTag,
+      // Include processed architecture
+      architecture: architecture,
+    }
+  })
+
+  // Debug logging for chart data  
+  console.log('Hardware Page Debug:', {
+    devicesCount: devices.length,
+    hardwareCount: hardware.length,
+    sampleDevice: devices[0],
+    sampleHardware: hardware[0],
+    processedHardwareSample: processedHardware[0]
+  })
+  
+  // Search for the ARM64 device specifically
+  const targetDevice = hardware.find(h => h.serialNumber === '0F33V9G25083HJ')
+  const targetDeviceInMainAPI = devices.find(d => d.serialNumber === '0F33V9G25083HJ')
+  if (targetDevice) {
+    console.log('[DEVICE FOUND] 0F33V9G25083HJ hardware record:', targetDevice)
+  } else {
+    const allHardwareSerials = hardware.map(h => h.serialNumber || h.deviceId);
+    const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
+    
+    console.log('[DEVICE NOT FOUND] 0F33V9G25083HJ not in hardware array.');
+    console.log('[HARDWARE SERIALS] Total hardware devices:', allHardwareSerials.length);
+    console.log('[HARDWARE SERIALS] Sample serials:', allHardwareSerials.slice(0, 20));
+    
+    // Check for partial matches in hardware
+    const partialHardwareMatches = allHardwareSerials.filter(serial => 
+      serial && (serial.includes('0F33') || serial.includes('V9G2') || serial.includes('5083'))
+    );
+    if (partialHardwareMatches.length > 0) {
+      console.log('[PARTIAL MATCH] Found potential matches in hardware:', partialHardwareMatches);
+    }
+  }
+  if (targetDeviceInMainAPI) {
+    console.log('[MAIN API] 0F33V9G25083HJ found in devices API:', {
+      deviceId: targetDeviceInMainAPI.deviceId,
+      serialNumber: targetDeviceInMainAPI.serialNumber,
+      name: targetDeviceInMainAPI.name,
+      hasHardwareModule: !!targetDeviceInMainAPI.modules?.hardware,
+      hardwareModuleKeys: targetDeviceInMainAPI.modules?.hardware ? Object.keys(targetDeviceInMainAPI.modules.hardware) : 'none',
+      processorInfo: targetDeviceInMainAPI.modules?.hardware?.processor || 'no processor info',
+      graphicsInfo: targetDeviceInMainAPI.modules?.hardware?.graphics || 'no graphics info'
+    })
+  } else {
+    const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
+    
+    console.log('[MAIN API] 0F33V9G25083HJ not found in devices API either.');
+    console.log('[DEVICE SERIALS] Total devices:', allDeviceSerials.length);
+    console.log('[DEVICE SERIALS] Sample serials:', allDeviceSerials.slice(0, 20));
+    
+    // Check for partial matches in main API
+    const partialDeviceMatches = allDeviceSerials.filter(serial => 
+      serial && (serial.includes('0F33') || serial.includes('V9G2') || serial.includes('5083'))
+    );
+    if (partialDeviceMatches.length > 0) {
+      console.log('[PARTIAL MATCH] Found potential matches in devices:', partialDeviceMatches);
+    }
+  }
 
   // Get unique processor families for filter
   const processorFamilies = Array.from(new Set(
-    hardware.map(h => {
-      if (h.processor.toLowerCase().includes('intel')) return 'Intel'
-      if (h.processor.toLowerCase().includes('amd')) return 'AMD'
-      if (h.processor.toLowerCase().includes('apple')) return 'Apple'
+    processedHardware.map(h => {
+      let processorStr = ''
+      if (typeof h.processor === 'string') {
+        processorStr = h.processor.toLowerCase()
+      } else if (typeof h.processor === 'object' && h.processor) {
+        processorStr = ((h.processor as any).name || (h.processor as any).model || '').toLowerCase()
+      }
+      
+      if (processorStr.includes('intel')) return 'Intel'
+      if (processorStr.includes('amd')) return 'AMD'
+      if (processorStr.includes('apple')) return 'Apple'
       return 'Other'
     })
   )).sort()
 
   // Filter hardware
-  const filteredHardware = hardware.filter(h => {
+  const filteredHardware = processedHardware.filter(h => {
     if (processorFilter !== 'all') {
-      const family = h.processor.toLowerCase().includes(processorFilter.toLowerCase())
+      let processorStr = ''
+      if (typeof h.processor === 'string') {
+        processorStr = h.processor.toLowerCase()
+      } else if (typeof h.processor === 'object' && h.processor) {
+        processorStr = ((h.processor as any).name || (h.processor as any).model || '').toLowerCase()
+      }
+      
+      const family = processorStr.includes(processorFilter.toLowerCase())
       if (!family) return false
     }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
+      
+      let processorSearchStr = ''
+      if (typeof h.processor === 'string') {
+        processorSearchStr = h.processor.toLowerCase()
+      } else if (typeof h.processor === 'object' && h.processor) {
+        processorSearchStr = ((h.processor as any).name || (h.processor as any).model || '').toLowerCase()
+      }
+      
+      let memorySearchStr = ''
+      if (typeof h.memory === 'string') {
+        memorySearchStr = h.memory.toLowerCase()
+      } else if (typeof h.memory === 'object' && h.memory) {
+        // Convert memory object to searchable string
+        const memObj = h.memory as any
+        memorySearchStr = `${memObj.totalPhysical || ''} ${memObj.totalVirtual || ''} ${memObj.availablePhysical || ''}`.toLowerCase()
+      }
+      
       return (
         h.deviceName?.toLowerCase().includes(query) ||
-        h.processor?.toLowerCase().includes(query) ||
-        h.memory?.toLowerCase().includes(query) ||
-        h.serialNumber?.toLowerCase().includes(query)
+        processorSearchStr.includes(query) ||
+        memorySearchStr.includes(query) ||
+        h.serialNumber?.toLowerCase().includes(query) ||
+        h.assetTag?.toLowerCase().includes(query)
       )
     }
     
     return true
   })
 
-  const formatMemory = (memory: string | number) => {
+  const formatMemory = (memory: string | number | object | any) => {
+    // Handle memory object with physical/virtual properties
+    if (typeof memory === 'object' && memory !== null) {
+      const memObj = memory as any
+      if (memObj.totalPhysical) {
+        const physicalGB = typeof memObj.totalPhysical === 'number' 
+          ? (memObj.totalPhysical / 1073741824).toFixed(1)
+          : memObj.totalPhysical
+        return `${physicalGB} GB`
+      }
+      // Fallback to any numeric property in the object
+      const numericValue = Object.values(memObj).find(val => typeof val === 'number') as number
+      if (numericValue) {
+        return numericValue >= 1000000000 ? `${(numericValue / 1073741824).toFixed(1)} GB` : `${Math.round(numericValue / 1048576)} MB`
+      }
+      return 'Unknown'
+    }
+    
+    // Handle numeric memory values
     if (typeof memory === 'number') {
       return memory >= 1000000000 ? `${(memory / 1073741824).toFixed(1)} GB` : `${Math.round(memory / 1048576)} MB`
     }
+    
+    // Handle string memory values
     return memory || 'Unknown'
   }
 
@@ -216,6 +465,32 @@ function HardwarePageContent() {
         </div>
       </header>
 
+      {/* Hardware Analytics Charts */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          <HardwareModelChart 
+            devices={processedHardware} 
+            loading={loading}
+            className=""
+          />
+          <MemoryBreakdownChart 
+            devices={processedHardware} 
+            loading={loading}
+            className=""
+          />
+          <ArchitectureDonutChart 
+            devices={processedHardware} 
+            loading={loading}
+            className=""
+          />
+          <DeviceTypeDonutChart 
+            devices={processedHardware} 
+            loading={loading}
+            className=""
+          />
+        </div>
+      </div>
+
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -236,7 +511,7 @@ function HardwarePageContent() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search hardware..."
+                  placeholder="Search by device, serial, asset tag, processor..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -260,17 +535,18 @@ function HardwarePageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Device</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Model</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Processor</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Graphics</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Memory</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Storage</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Graphics</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Last Collected</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Arch</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredHardware.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
                       </svg>
@@ -283,23 +559,116 @@ function HardwarePageContent() {
                     <tr key={hw.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td className="px-6 py-4">
                         <Link
-                          href={`/device/${encodeURIComponent(hw.serialNumber)}`}
+                          href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`}
                           className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                         >
-                          {hw.deviceName}
+                          {hw.deviceName || hw.serialNumber || 'Unknown Device'}
                         </Link>
                         <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
                           {hw.serialNumber}
+                          {hw.assetTag ? ` | ${hw.assetTag}` : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">{hw.processor}</div>
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {(() => {
+                            // Try to get model from device data
+                            const deviceFromMainAPI = devices.find(d => 
+                              d.deviceId === hw.deviceId || 
+                              d.serialNumber === hw.serialNumber
+                            )
+                            
+                            // Debug log to see what data is available
+                            if (process.env.NODE_ENV === 'development') {
+                              console.log('Model debug for device:', hw.serialNumber, {
+                                hardwareRaw: hw.raw,
+                                deviceFromMainAPI: deviceFromMainAPI,
+                                hardwareModuleData: deviceFromMainAPI?.modules?.hardware
+                              })
+                            }
+                            
+                            return deviceFromMainAPI?.model || 
+                                   deviceFromMainAPI?.modules?.hardware?.model ||
+                                   deviceFromMainAPI?.modules?.system?.hardwareInfo?.model ||
+                                   hw.raw?.model ||
+                                   hw.raw?.system?.hardwareInfo?.model ||
+                                   hw.raw?.hardware?.model ||
+                                   'Unknown Model'
+                          })()}
+                        </div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {(() => {
+                            // Try to get manufacturer from device data
+                            const deviceFromMainAPI = devices.find(d => 
+                              d.deviceId === hw.deviceId || 
+                              d.serialNumber === hw.serialNumber
+                            )
+                            
+                            return deviceFromMainAPI?.manufacturer || 
+                                   deviceFromMainAPI?.modules?.hardware?.manufacturer ||
+                                   deviceFromMainAPI?.modules?.system?.hardwareInfo?.manufacturer ||
+                                   hw.raw?.manufacturer ||
+                                   hw.raw?.system?.hardwareInfo?.manufacturer ||
+                                   hw.raw?.hardware?.manufacturer ||
+                                   'Unknown Manufacturer'
+                          })()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {typeof hw.processor === 'object' && hw.processor ? 
+                            (hw.processor as any).name || (hw.processor as any).model || 'Unknown Processor' : 
+                            hw.processor || 'Unknown Processor'
+                          }
+                        </div>
                         {hw.processorCores && (
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             {hw.processorCores} cores
                             {hw.processorSpeed && ` • ${hw.processorSpeed}`}
                           </div>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        {(() => {
+                          // Handle graphics as array
+                          if (Array.isArray(hw.graphics) && hw.graphics.length > 0) {
+                            const firstGraphics = hw.graphics[0]
+                            const displayName = firstGraphics?.name || firstGraphics?.model || firstGraphics?.description || 'Graphics Card'
+                            return (
+                              <div>
+                                <div>{displayName}</div>
+                                {hw.graphics.length > 1 && (
+                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                    +{hw.graphics.length - 1} more
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          }
+                          
+                          // Handle graphics as object
+                          if (typeof hw.graphics === 'object' && hw.graphics !== null && !Array.isArray(hw.graphics)) {
+                            const graphicsObj = hw.graphics as any
+                            return graphicsObj.name || graphicsObj.model || graphicsObj.description || 'Graphics Card'
+                          }
+                          
+                          // Handle graphics as string
+                          if (typeof hw.graphics === 'string' && (hw.graphics as string).trim()) {
+                            return hw.graphics
+                          }
+                          
+                          // Check if graphics info is in raw data
+                          if (hw.raw?.graphics) {
+                            if (Array.isArray(hw.raw.graphics) && hw.raw.graphics.length > 0) {
+                              return hw.raw.graphics[0].name || hw.raw.graphics[0].model || 'Graphics Card'
+                            }
+                            if (typeof hw.raw.graphics === 'string') {
+                              return hw.raw.graphics
+                            }
+                          }
+                          
+                          return 'Unknown'
+                        })()}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                         {formatMemory(hw.memory)}
@@ -313,19 +682,21 @@ function HardwarePageContent() {
                         {formatStorage(hw.storage)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {hw.graphics?.length > 0 ? (
-                          <div>
-                            <div>{hw.graphics[0].name || hw.graphics[0].model || 'Graphics Card'}</div>
-                            {hw.graphics.length > 1 && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                +{hw.graphics.length - 1} more
-                              </div>
-                            )}
-                          </div>
-                        ) : 'Unknown'}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {hw.collectedAt ? formatRelativeTime(hw.collectedAt) : '-'}
+                        {(() => {
+                          // Debug log architecture for specific devices
+                          if (process.env.NODE_ENV === 'development' && hw.serialNumber === '0F33V9G25083HJ') {
+                            console.log(`[ARCHITECTURE RENDER DEBUG] Device ${hw.serialNumber}:`, {
+                              displayedArchitecture: hw.architecture || 'Unknown',
+                              originalArchitecture: hw.raw?.architecture,
+                              processor: hw.processor,
+                              graphics: hw.graphics,
+                              processorAsString: typeof hw.processor === 'string' ? hw.processor : JSON.stringify(hw.processor),
+                              graphicsAsString: typeof hw.graphics === 'string' ? hw.graphics : JSON.stringify(hw.graphics),
+                              allHardwareData: hw
+                            })
+                          }
+                          return hw.architecture || 'Unknown'
+                        })()}
                       </td>
                     </tr>
                   ))

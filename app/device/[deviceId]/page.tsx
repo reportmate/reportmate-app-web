@@ -501,12 +501,14 @@ export default function DeviceDetailPage() {
   }, [])
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true) // Start with loading true to prevent flash
   const [error, setError] = useState<string | null>(null)
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
   const tabsContainerRef = useRef<HTMLElement>(null)
   const [isResolving, setIsResolving] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [initializing, setInitializing] = useState(true) // Track initial loading state
+  const [minimumLoadTime, setMinimumLoadTime] = useState(false) // Ensure minimum load time
   
   // Processed component data using modular types
   const [processedData, setProcessedData] = useState<{
@@ -761,6 +763,15 @@ export default function DeviceDetailPage() {
     }
   }
   
+  // Minimum loading time to prevent flash
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinimumLoadTime(true)
+    }, 300) // Show loading for at least 300ms to prevent flash
+    
+    return () => clearTimeout(timer)
+  }, [])
+  
   // Compute installs data for InstallsTab
   const computedInstallsData = useMemo(() => {
     console.log('🔄 Computing installs data:', {
@@ -796,11 +807,13 @@ export default function DeviceDetailPage() {
       
       if (identifierType === 'serialNumber') {
         setIsResolving(false)
+        setInitializing(false) // Clear initializing flag for serial numbers
         return // This is already a serial number, no need to resolve
       }
       
       // This is a UUID or Asset Tag, we need to resolve it
       setIsResolving(true)
+      setInitializing(false) // Clear initializing since we're now resolving
       
       try {
         const result = await resolveDeviceIdentifier(deviceId)
@@ -810,16 +823,22 @@ export default function DeviceDetailPage() {
           router.replace(`/device/${encodeURIComponent(result.serialNumber)}`)
           return
         } else {
-          setError(`Device not found for ${identifierType}: ${deviceId}`)
-          setLoading(false)
-          setIsResolving(false)
+          // Add a slight delay before showing error to prevent flash
+          setTimeout(() => {
+            setError(`Device not found for ${identifierType}: ${deviceId}`)
+            setLoading(false)
+            setIsResolving(false)
+          }, 100)
           return
         }
       } catch (error) {
         console.error('[DEVICE DETAIL] Error resolving device identifier:', error)
-        setError(`Failed to resolve device identifier: ${error}`)
-        setLoading(false)
-        setIsResolving(false)
+        // Add a slight delay before showing error to prevent flash
+        setTimeout(() => {
+          setError(`Failed to resolve device identifier: ${error}`)
+          setLoading(false)
+          setIsResolving(false)
+        }, 100)
         return
       }
     }
@@ -828,8 +847,8 @@ export default function DeviceDetailPage() {
   }, [deviceId, router])
   
   useEffect(() => {
-    // Don't fetch device data if we're still resolving the identifier
-    if (isResolving) {
+    // Don't fetch device data if we're still initializing or resolving the identifier
+    if (initializing || isResolving) {
       return
     }
     
@@ -848,10 +867,11 @@ export default function DeviceDetailPage() {
         
         if (!deviceResponse.ok) {
           if (deviceResponse.status === 404) {
-            setError('Device not found')
+            // Add a slight delay before showing 404 error to prevent flash
+            setTimeout(() => setError('Device not found'), 100)
             return
           } else if (deviceResponse.status === 500) {
-            setError('Server error - please try refreshing the page')
+            setTimeout(() => setError('Server error - please try refreshing the page'), 100)
             return
           }
           throw new Error(`Failed to fetch device information (${deviceResponse.status}: ${deviceResponse.statusText})`)
@@ -862,7 +882,7 @@ export default function DeviceDetailPage() {
           deviceData = await deviceResponse.json()
         } catch (jsonError) {
           console.error('Failed to parse device response JSON:', jsonError)
-          setError('Invalid response from server')
+          setTimeout(() => setError('Invalid response from server'), 100)
           return
         }
         
@@ -874,7 +894,7 @@ export default function DeviceDetailPage() {
           setDeviceInfo(processedDevice);
         } else {
           console.error('Invalid device data structure:', deviceData)
-          setError('Invalid device data received')
+          setTimeout(() => setError('Invalid device data received'), 100)
           return
         }
         
@@ -957,17 +977,18 @@ export default function DeviceDetailPage() {
         
       } catch (error) {
         console.error('Failed to fetch device data:', error)
-        setError((error as Error).message)
+        // Add a slight delay before showing error to prevent flash
+        setTimeout(() => setError((error as Error).message), 100)
       } finally {
         setLoading(false)
       }
     }
     
     fetchDeviceData()
-  }, [deviceId, isResolving]) // Force re-execution when isResolving changes
+  }, [deviceId, isResolving, initializing]) // Force re-execution when initializing or isResolving changes
 
   // Early returns AFTER all useEffects are defined
-  if (loading || isResolving) {
+  if (loading || isResolving || initializing || !minimumLoadTime) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <DeviceDetailSkeleton />
@@ -976,33 +997,43 @@ export default function DeviceDetailPage() {
   }
   
   if (error || !deviceInfo) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+    // Only show error if we're not in initial states and minimum load time has passed
+    if (!initializing && !isResolving && !loading && minimumLoadTime) {
+      return (
+        <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              {error === 'Device not found' ? 'Device Not Found' : 'Error Loading Device'}
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
+              {error === 'Device not found' 
+                ? `The device "${deviceId}" could not be found.` 
+                : error?.includes('resolve') || error?.includes('UUID') || error?.includes('Asset Tag')
+                  ? `${error} You can access devices using their serial number, UUID, or asset tag.`
+                  : `Failed to load device information: ${error}`}
+            </p>
+            <Link
+              href="/devices"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+            >
+              ← Back to Devices
+            </Link>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-            {error === 'Device not found' ? 'Device Not Found' : 'Error Loading Device'}
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            {error === 'Device not found' 
-              ? `The device "${deviceId}" could not be found.` 
-              : error?.includes('resolve') || error?.includes('UUID') || error?.includes('Asset Tag')
-                ? `${error} You can access devices using their serial number, UUID, or asset tag.`
-                : `Failed to load device information: ${error}`}
-          </p>
-          <Link
-            href="/devices"
-            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
-            ← Back to Devices
-          </Link>
         </div>
-      </div>
-    )
+      )
+    } else {
+      // Still in loading state, show skeleton
+      return (
+        <div className="min-h-screen bg-gray-50 dark:bg-black">
+          <DeviceDetailSkeleton />
+        </div>
+      )
+    }
   }
 
   const _getStatusColor = (status: string) => {
@@ -1220,13 +1251,13 @@ export default function DeviceDetailPage() {
           <ApplicationsTab device={deviceInfo} data={undefined} />
         </div>
         <div className={activeTab === 'management' ? 'block' : 'hidden'}>
-          <ManagementTab device={deviceInfo} />
+          <ManagementTab device={deviceInfo as unknown as Record<string, unknown>} />
         </div>
         <div className={activeTab === 'system' ? 'block' : 'hidden'}>
           <SystemTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} data={processedData.system as unknown as Record<string, unknown>} />
         </div>
         <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
-          <HardwareTab device={deviceInfo} />
+          <HardwareTab device={deviceInfo as any} />
         </div>
         <div className={activeTab === 'network' ? 'block' : 'hidden'}>
           <NetworkTab device={deviceInfo} data={processedData.network} />
@@ -1238,7 +1269,7 @@ export default function DeviceDetailPage() {
           <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
         </div>
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
-          <EventsTab device={deviceInfo} events={events} data={processedData.events as unknown as Record<string, unknown>} />
+          <EventsTab device={deviceInfo as any} events={events} data={processedData.events as unknown as Record<string, unknown>} />
         </div>
       </div>
     </div>
