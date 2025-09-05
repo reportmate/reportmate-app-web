@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { extractProfiles } from '../../lib/data-processing/modules'
+import { extractProfiles } from '../../lib/data-processing/modules/profiles'
 import { formatRelativeTime } from '../../lib/time'
 
 interface ProfileInfo {
