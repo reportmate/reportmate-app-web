@@ -3,7 +3,16 @@
  * Centralized exports for all graph components
  */
 
-export { OSVersionBarChart } from './OSVersionBarChart'
+// Status Charts
 export { StatusDonutChart } from './StatusDonutChart'
+
+// System Charts
+export { OSVersionBarChart } from './OSVersionBarChart'
 export { PlatformDistributionChart } from './PlatformDistributionChart'
+
+// Hardware Charts
 export { HardwareArchDistributionChart } from './HardwareArchDistributionChart'
+export { ArchitectureDonutChart } from './ArchitectureDonutChart'
+export { MemoryBreakdownChart } from './MemoryBreakdownChart'
+export { HardwareModelChart } from './HardwareTypeChart'
+export { DeviceTypeDonutChart } from './DeviceTypeDonutChart'
