@@ -113,6 +113,11 @@ export async function GET() {
     
     const data = await response.json()
     console.log(`[HARDWARE API] ${timestamp} - Successfully received data from Azure Functions API`)
+    console.log(`[HARDWARE API] ${timestamp} - Data type:`, typeof data)
+    console.log(`[HARDWARE API] ${timestamp} - Is array:`, Array.isArray(data))
+    console.log(`[HARDWARE API] ${timestamp} - Data length:`, Array.isArray(data) ? data.length : 'N/A')
+    console.log(`[HARDWARE API] ${timestamp} - First item keys:`, Array.isArray(data) && data.length > 0 ? Object.keys(data[0]) : 'N/A')
+    console.log(`[HARDWARE API] ${timestamp} - Sample item:`, Array.isArray(data) && data.length > 0 ? data[0] : 'N/A')
     
     return NextResponse.json(data, {
       headers: {
