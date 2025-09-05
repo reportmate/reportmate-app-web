@@ -120,21 +120,35 @@ export async function GET(
 ) {
   try {
     const { deviceId } = await params
-    console.log('[DEVICE API] Fetching device data for:', deviceId)
+    console.log('[DEVICE API] 🚀 Starting API call for device:', deviceId)
+    console.log('[DEVICE API] 🔧 Environment check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      hasAPIBaseURL: !!process.env.API_BASE_URL,
+      apiBaseUrl: process.env.API_BASE_URL,
+      allEnvKeys: Object.keys(process.env).filter(k => k.includes('API')),
+    })
 
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
-      console.error('[DEVICE API] API_BASE_URL environment variable not configured')
+      console.error('[DEVICE API] ❌ API_BASE_URL environment variable not configured')
+      console.error('[DEVICE API] Available env vars:', Object.keys(process.env))
       return NextResponse.json({
         error: 'API configuration error',
-        details: 'API_BASE_URL environment variable not configured'
+        details: 'API_BASE_URL environment variable not configured',
+        debug: {
+          envVars: Object.keys(process.env).filter(k => k.includes('API')),
+          nodeEnv: process.env.NODE_ENV
+        }
       }, { status: 500 })
     }
     
-    console.log('[DEVICE API] Using API base URL:', apiBaseUrl)
-    const response = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
+    console.log('[DEVICE API] ✅ Using API base URL:', apiBaseUrl)
+    const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
+    console.log('[DEVICE API] 🌐 About to fetch from Azure Functions:', azureFunctionsUrl)
+    
+    const response = await fetch(azureFunctionsUrl, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
@@ -143,8 +157,12 @@ export async function GET(
       }
     })
     
+    console.log('[DEVICE API] 📡 Azure Functions response status:', response.status, response.statusText)
+    console.log('[DEVICE API] 📡 Azure Functions response headers:', Object.fromEntries(response.headers.entries()))
+    
     if (!response.ok) {
-      console.error('[DEVICE API] Azure Functions API error:', response.status, response.statusText)
+      console.error('[DEVICE API] ❌ Azure Functions API error:', response.status, response.statusText)
+      console.error('[DEVICE API] ❌ Response headers:', Object.fromEntries(response.headers.entries()))
       
       // TEMPORARILY DISABLED - DATABASE FALLBACK CAUSING WEBPACK ISSUES
       console.log('[DEVICE API] Database fallback temporarily disabled due to webpack module loading issues')
@@ -191,12 +209,16 @@ export async function GET(
     }
 
     const data = await response.json()
-    console.log('[DEVICE API] Successfully fetched device data from Azure Functions')
-    console.log('[DEVICE API] Response structure:', {
+    console.log('[DEVICE API] ✅ Successfully fetched device data from Azure Functions')
+    console.log('[DEVICE API] 📊 Response structure:', {
       hasMetadata: 'metadata' in data,
       metadataKeys: data.metadata ? Object.keys(data.metadata) : [],
       responseKeys: Object.keys(data),
-      responseSize: JSON.stringify(data).length
+      responseSize: JSON.stringify(data).length,
+      hasSuccess: 'success' in data,
+      successValue: data.success,
+      hasDevice: 'device' in data,
+      deviceKeys: data.device ? Object.keys(data.device) : []
     })
     
     // DEBUG: Log the raw response to understand the structure
@@ -284,22 +306,6 @@ export async function GET(
       }
       
       console.log('[DEVICE API] Final device response prepared', responseData.device.deviceId)
-      
-      // DEBUG: Log network module structure for debugging
-      if (responseData.device.modules.network) {
-        const networkModule = responseData.device.modules.network as any
-        console.log('[DEVICE API] 🔍 NETWORK MODULE DEBUG:', {
-          hasNetwork: !!responseData.device.modules.network,
-          networkKeys: Object.keys(responseData.device.modules.network || {}),
-          networkStructure: JSON.stringify(responseData.device.modules.network, null, 2).substring(0, 1000),
-          interfaces: networkModule?.interfaces,
-          wifiNetworks: networkModule?.wifiNetworks,
-          vpnConnections: networkModule?.vpnConnections,
-          dnsConfiguration: networkModule?.dnsConfiguration
-        })
-      } else {
-        console.log('[DEVICE API] 🔍 NETWORK MODULE DEBUG: No network module found in response')
-      }
       
       return NextResponse.json(responseData, {
         headers: {
