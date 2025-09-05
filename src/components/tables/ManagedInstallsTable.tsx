@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { formatRelativeTime } from '../../lib/time';
-import { InstallsInfo } from '../../lib/data-processing/modules';
-import { getErrorCodeInfo, categorizeError, getErrorDescription, getRecommendedAction, ErrorCategory, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
+import { InstallsInfo, getErrorCodeInfo, categorizeError, getErrorDescription, getRecommendedAction, ErrorCategory, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
 
 interface ManagedInstallsTableProps {
   data: InstallsInfo;
@@ -28,9 +27,25 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     allDataKeys: data ? Object.keys(data) : []
   });
 
+  // Early return for completely missing data
+  if (!data) {
+    console.warn('🚨 [MANAGED INSTALLS TABLE] No data provided - returning empty state');
+    return (
+      <div className="text-center py-16">
+        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Install Data</h3>
+        <p className="text-gray-600 dark:text-gray-400">No managed install data is available.</p>
+      </div>
+    );
+  }
+
   // Check if this is truly no managed installs system vs. no packages
   const hasManagementSystem = data?.config || data?.systemName;
-  const hasPackages = data?.packages && data.packages.length > 0;
+  const hasPackages = data?.packages && Array.isArray(data.packages) && data.packages.length > 0;
 
   console.log('🔍 [MANAGED INSTALLS TABLE] System status:', {
     hasManagementSystem,
@@ -108,10 +123,18 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   };
 
   const getFilteredPackages = () => {
-    if (!data.packages || data.packages.length === 0) return [];
+    if (!data || !data.packages || !Array.isArray(data.packages) || data.packages.length === 0) {
+      console.log('🔍 [MANAGED INSTALLS TABLE] No packages to filter:', {
+        hasData: !!data,
+        hasPackages: !!data?.packages,
+        isArray: Array.isArray(data?.packages),
+        length: data?.packages?.length
+      });
+      return [];
+    }
     if (statusFilter === 'all') return data.packages;
     
-    return data.packages.filter(pkg => {
+    return data.packages.filter((pkg: any) => {
       const status = pkg.status?.toLowerCase() || '';
       switch (statusFilter) {
         case 'installed':
@@ -133,21 +156,22 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const filteredPackages = getFilteredPackages();
 
   // Calculate counts for each status (handle empty packages array)
-  const installedCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'installed').length : 0;
-  const pendingCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'pending').length : 0;
-  const warningCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'warning').length : 0;
-  const errorCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'error').length : 0;
-  const removedCount = data.packages ? data.packages.filter(pkg => pkg.status?.toLowerCase() === 'removed').length : 0;
+  const packages = data?.packages && Array.isArray(data.packages) ? data.packages : [];
+  const installedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
+  const pendingCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length;
+  const warningCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length;
+  const errorCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length;
+  const removedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length;
 
   return (
     <div className="space-y-6">
       {/* Full Width Packages Table */}
       <div className="space-y-4">
         {/* Error and Warning Messages - Above Packages Table Only */}
-        {data.messages && (data.messages.errors.length > 0 || data.messages.warnings.length > 0) && (
+        {data.messages && ((data.messages.errors?.length > 0) || (data.messages.warnings?.length > 0)) && (
           <div className="space-y-4">
               {/* Errors Section */}
-              {data.messages.errors.length > 0 && (
+              {data.messages.errors?.length > 0 && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
                   <div 
                     className="p-4 cursor-pointer select-none"
@@ -161,7 +185,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           </svg>
                         </div>
                         <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
-                          {data.messages.errors.length} Error{data.messages.errors.length !== 1 ? 's' : ''} Detected
+                          {data.messages.errors?.length || 0} Error{(data.messages.errors?.length || 0) !== 1 ? 's' : ''} Detected
                         </h3>
                       </div>
                       <div className="flex items-center text-red-600 dark:text-red-400">
@@ -178,12 +202,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     </div>
                     
                     {/* Preview - show first error when collapsed */}
-                    {!expandedErrors && data.messages.errors.length > 0 && (
+                    {!expandedErrors && data.messages.errors?.length > 0 && (
                       <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                        <span className="font-medium">{data.messages.errors[0].package}:</span> {data.messages.errors[0].message}
-                        {data.messages.errors.length > 1 && (
+                        <span className="font-medium">{data.messages.errors?.[0]?.package}:</span> {data.messages.errors?.[0]?.message}
+                        {(data.messages.errors?.length || 0) > 1 && (
                           <span className="ml-2 text-red-600 dark:text-red-400 font-medium">
-                            +{data.messages.errors.length - 1} more
+                            +{(data.messages.errors?.length || 0) - 1} more
                           </span>
                         )}
                       </div>
@@ -304,7 +328,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
               )}
               
               {/* Warnings Section */}
-              {data.messages.warnings.length > 0 && (
+              {data.messages.warnings?.length > 0 && (
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <div 
                     className="p-4 cursor-pointer select-none"
@@ -318,7 +342,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           </svg>
                         </div>
                         <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
-                          {data.messages.warnings.length} Warning{data.messages.warnings.length !== 1 ? 's' : ''} Detected
+                          {data.messages.warnings?.length || 0} Warning{(data.messages.warnings?.length || 0) !== 1 ? 's' : ''} Detected
                         </h3>
                       </div>
                       <div className="flex items-center text-yellow-600 dark:text-yellow-400">
@@ -335,12 +359,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     </div>
                     
                     {/* Preview - show first warning when collapsed */}
-                    {!expandedWarnings && data.messages.warnings.length > 0 && (
+                    {!expandedWarnings && data.messages.warnings?.length > 0 && (
                       <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <span className="font-medium">{data.messages.warnings[0].package}:</span> {data.messages.warnings[0].message}
-                        {data.messages.warnings.length > 1 && (
+                        <span className="font-medium">{data.messages.warnings?.[0]?.package}:</span> {data.messages.warnings?.[0]?.message}
+                        {(data.messages.warnings?.length || 0) > 1 && (
                           <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">
-                            +{data.messages.warnings.length - 1} more
+                            +{(data.messages.warnings?.length || 0) - 1} more
                           </span>
                         )}
                       </div>
@@ -546,7 +570,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
               {statusFilter !== 'all' && (
                 <div className="px-6 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <div className="text-xs text-gray-600 dark:text-gray-400">
-                    Showing {filteredPackages.length} of {data.packages.length} packages
+                    Showing {filteredPackages.length} of {packages.length} packages
                     <span className="ml-2">
                       filtered by: <span className="font-medium capitalize">{statusFilter}</span>
                     </span>

@@ -5,7 +5,7 @@
 
 import React, { useState } from 'react'
 import { NetworkTable } from '../tables'
-import { extractNetwork } from '../../lib/data-processing/modules'
+import { extractNetwork } from '../../lib/data-processing/modules/network'
 
 interface NetworkTabProps {
   device: any

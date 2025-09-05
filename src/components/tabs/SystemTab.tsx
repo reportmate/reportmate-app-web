@@ -5,7 +5,7 @@
 
 import { formatExactTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { extractSystem } from '../../lib/data-processing/modules'
+import { extractSystem } from '../../lib/data-processing/modules/system'
 
 interface DeviceData {
   id: string;
