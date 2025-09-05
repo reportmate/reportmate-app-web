@@ -142,7 +142,12 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
             hasCimian: !!deviceData?.modules?.installs?.cimian,
             cimianItemsCount: deviceData?.modules?.installs?.cimian?.items?.length || 0
           })
-          setSelfFetchedDevice(deviceData)
+          // CRITICAL FIX: Use deviceData.device (not deviceData) since API returns {success: true, device: {...}}
+          if (deviceData?.success && deviceData?.device) {
+            setSelfFetchedDevice(deviceData.device)  // Use .device property!
+          } else {
+            setSelfFetchedDevice(deviceData)  // Fallback to full response
+          }
         })
         .catch(error => {
           console.error('[INSTALLS TAB] Error fetching device:', error)

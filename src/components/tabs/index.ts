@@ -4,7 +4,7 @@
  */
 
 export { default as InfoTab } from './InfoTab'
-export { default as InstallsTab } from './InstallsTab'
+export { InstallsTab } from './InstallsTab'
 export { default as ProfilesTab } from './ProfilesTab'
 export { default as ApplicationsTab } from './ApplicationsTab'
 export { default as ManagementTab } from './ManagementTab'
