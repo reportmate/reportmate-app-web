@@ -1,0 +1,152 @@
+import { useState, useEffect } from 'react'
+
+interface Device {
+  deviceId: string
+  serialNumber: string
+  name: string
+  model?: string
+  os?: string
+  lastSeen: string
+  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  platform: string
+  totalEvents?: number
+  lastEventTime?: string
+  modules?: {
+    inventory?: {
+      catalog: string
+      usage: string
+      [key: string]: any
+    }
+    system?: {
+      operatingSystem?: {
+        name: string
+        version: string
+        build: string
+        architecture: string
+        displayVersion?: string
+        edition?: string
+        featureUpdate?: string
+      }
+    }
+    hardware?: {
+      processor?: {
+        architecture: string
+        [key: string]: any
+      }
+      [key: string]: any
+    }
+    [key: string]: any
+  }
+  [key: string]: any
+}
+
+interface UseDeviceDataOptions {
+  includeModuleData?: boolean
+  moduleType?: 'inventory' | 'system' | 'applications' | 'hardware' | 'management' | 'network' | 'peripherals' | 'profiles' | 'security' | 'installs'
+}
+
+interface UseDeviceDataReturn {
+  devices: Device[]
+  moduleData: any[]
+  devicesLoading: boolean
+  moduleLoading: boolean
+  error: string | null
+  refetch: () => Promise<void>
+}
+
+/**
+ * Custom hook that provides access to both main device data (with inventory) 
+ * and optional module-specific data for device pages.
+ * 
+ * This ensures all device pages have access to inventory data while also
+ * providing module-specific functionality when needed.
+ */
+export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceDataReturn {
+  const { includeModuleData = false, moduleType } = options
+  
+  const [devices, setDevices] = useState<Device[]>([])
+  const [moduleData, setModuleData] = useState<any[]>([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [moduleLoading, setModuleLoading] = useState(includeModuleData)
+  const [error, setError] = useState<string | null>(null)
+
+  const fetchDevices = async () => {
+    try {
+      const response = await fetch('/api/devices', {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setDevices(data)
+    } catch (err) {
+      console.error('Error fetching devices:', err)
+      setError(err instanceof Error ? err.message : 'Failed to fetch devices')
+    } finally {
+      setDevicesLoading(false)
+    }
+  }
+
+  const fetchModuleData = async () => {
+    if (!includeModuleData || !moduleType) {
+      setModuleLoading(false)
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/modules/${moduleType}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      const data = await response.json()
+      setModuleData(data)
+    } catch (err) {
+      console.error(`Error fetching ${moduleType} module data:`, err)
+      // Don't set error for module data failures as the main devices data is more important
+    } finally {
+      setModuleLoading(false)
+    }
+  }
+
+  const refetch = async () => {
+    setDevicesLoading(true)
+    if (includeModuleData) {
+      setModuleLoading(true)
+    }
+    setError(null)
+    
+    await Promise.all([
+      fetchDevices(),
+      fetchModuleData()
+    ])
+  }
+
+  useEffect(() => {
+    fetchDevices()
+    fetchModuleData()
+  }, [includeModuleData, moduleType])
+
+  return {
+    devices,
+    moduleData,
+    devicesLoading,
+    moduleLoading,
+    error,
+    refetch
+  }
+}
