@@ -103,19 +103,50 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
     hasDevicesWithStatus: devices.filter(d => d.status).length
   })
 
-  // Show loading state with a placeholder chart
+  // Show loading state with a beautiful animated donut
   if (loading && devices.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <div className="text-center">
-          <div className="w-48 h-48 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full animate-pulse flex items-center justify-center">
-            <div className="w-32 h-32 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
+      <div className="space-y-6">
+        {/* Animated Loading Donut */}
+        <div className="flex items-center justify-center">
+          <div className="relative">
+            {/* Outer rotating ring */}
+            <div className="w-48 h-48 rounded-full border-4 border-gray-200 dark:border-gray-700">
+              <div className="w-full h-full rounded-full border-4 border-transparent border-t-blue-500 border-r-blue-400 animate-spin"></div>
+            </div>
+            
+            {/* Inner circle with content */}
+            <div className="absolute inset-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center shadow-sm">
               <div className="text-center">
                 <div className="w-8 h-8 mx-auto mb-2 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                <div className="text-sm text-gray-600 dark:text-gray-400">Loading...</div>
+                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                  Loading
+                </div>
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  Devices
+                </div>
               </div>
             </div>
           </div>
+        </div>
+        
+        {/* Loading skeleton for legend */}
+        <div className="space-y-3">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="flex items-center justify-between p-2">
+              <div className="flex items-center gap-3">
+                <div className="w-4 h-4 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ width: `${80 + (i * 20)}px` }}></div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-3 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        <div className="text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">Loading device status data...</p>
         </div>
       </div>
@@ -126,8 +157,12 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-center">
-          <div className="w-8 h-8 mx-auto mb-4 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin"></div>
-          <p className="text-sm text-gray-600 dark:text-gray-400">Loading status data...</p>
+          <div className="relative">
+            <div className="w-16 h-16 mx-auto mb-4 border-4 border-gray-200 dark:border-gray-700 rounded-full">
+              <div className="w-full h-full rounded-full border-4 border-transparent border-t-emerald-500 border-r-emerald-400 animate-spin"></div>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Updating status data...</p>
         </div>
       </div>
     )
@@ -148,9 +183,6 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
           </h3>
           <p className="text-xs text-gray-600 dark:text-gray-400">
             Devices will appear here when they report in
-          </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-            Debug: {loading ? 'Loading...' : 'Not loading'}
           </p>
         </div>
       </div>

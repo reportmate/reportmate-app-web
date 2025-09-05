@@ -480,10 +480,38 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     removed: 0
   }
 
-  // Process recent installs (contains Cimian data)
-  if (installs.recentInstalls && Array.isArray(installs.recentInstalls)) {
+  // Process recent installs (contains Cimian data) - FALLBACK for empty recentInstalls
+  let packagesToProcess = []
+  
+  if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
+    packagesToProcess = installs.recentInstalls
     console.log('[INSTALLS MODULE] 🔍 PROCESSING RECENT INSTALLS - COUNT:', installs.recentInstalls.length)
-    for (const item of installs.recentInstalls) {
+  } else if (installs.cimian?.pendingPackages && Array.isArray(installs.cimian.pendingPackages) && installs.cimian.pendingPackages.length > 0) {
+    // CRITICAL FIX: If recentInstalls is empty, create package objects from cimian.pendingPackages
+    packagesToProcess = installs.cimian.pendingPackages.map((pkgName: string) => ({
+      name: pkgName,
+      displayName: pkgName,
+      status: 'Pending',
+      type: 'cimian',
+      version: 'Unknown',
+      id: pkgName,
+      lastSeenInSession: installs.lastCheckIn || installs.collected_at || ''
+    }))
+    console.log('[INSTALLS MODULE] 🔄 CRITICAL FIX - FALLBACK TO CIMIAN PENDING PACKAGES:', {
+      pendingPackages: installs.cimian.pendingPackages,
+      processedCount: packagesToProcess.length
+    })
+  } else {
+    console.log('[INSTALLS MODULE] ⚠️ NO PACKAGE DATA FOUND:', {
+      hasRecentInstalls: !!installs.recentInstalls,
+      recentInstallsLength: installs.recentInstalls?.length || 0,
+      hasCimianPending: !!installs.cimian?.pendingPackages,
+      cimianPendingLength: installs.cimian?.pendingPackages?.length || 0
+    })
+  }
+  
+  if (packagesToProcess.length > 0) {
+    for (const item of packagesToProcess) {
       console.log('[INSTALLS MODULE] 🔍 RAW ITEM STRUCTURE:', {
         fullItem: JSON.stringify(item, null, 2),
         name: item.name,
@@ -620,6 +648,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         finalStatus: finalStatus
       })
     }
+  } else {
+    console.log('[INSTALLS MODULE] 📦 NO PACKAGES TO PROCESS - Creating empty install info')
   }
 
   // Add system-level warnings for packages with known issues
