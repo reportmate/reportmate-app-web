@@ -47,7 +47,7 @@ const buildProviders = () => {
         tenantId: process.env.AZURE_AD_TENANT_ID!,
         authorization: {
           params: {
-            scope: "openid profile email User.Read"
+            scope: process.env.AZURE_AD_SCOPE || "openid profile email"
           }
         },
         profile(profile) {

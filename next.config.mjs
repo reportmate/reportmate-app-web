@@ -1,6 +1,6 @@
 /** @type {import("next").NextConfig} */
 export default {
-  // Disable ESLint during builds to focus on fixing the crash issue
+  // Minimal dev configuration
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -8,12 +8,16 @@ export default {
     ignoreBuildErrors: true,
   },
   
-  // Enable standalone output for Docker deployment
+  // Enable standalone output for Docker
   output: 'standalone',
   
-  // Simplified webpack configuration to prevent build hangs
+  // Set explicit output file tracing root - conditional for Docker
+  ...(process.env.DOCKER_BUILD ? {} : {
+    outputFileTracingRoot: "C:\\Users\\rchristiansen\\DevOps\\ReportMate",
+  }),
+  
+  // Simplified webpack configuration
   webpack: (config, { isServer }) => {
-    // Minimal configuration to prevent build issues
     if (isServer) {
       config.externals = [...(config.externals || []), 'canvas', 'jsdom']
     }
