@@ -50,7 +50,10 @@ function ManagementPageContent() {
   useEffect(() => {
     const fetchManagement = async () => {
       try {
-        const response = await fetch('/api/modules/management', {
+        console.log('🚀 Fetching management data using optimized bulk API...')
+        
+        // Use the new bulk management API - single call instead of multiple individual calls
+        const response = await fetch('/api/devices/management', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -59,13 +62,20 @@ function ManagementPageContent() {
         })
         
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
+          throw new Error(`Management API request failed: ${response.status}`)
         }
         
         const data = await response.json()
+        
+        console.log(`✅ Loaded ${data.length} devices with management data in single API call`)
+        console.log('📊 Cache headers:', {
+          dataSource: response.headers.get('X-Data-Source'),
+          fetchedAt: response.headers.get('X-Fetched-At')
+        })
+        
         setManagement(data)
       } catch (err) {
-        console.error('Error fetching management:', err)
+        console.error('❌ Error fetching management:', err)
         setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       } finally {
         setLoading(false)

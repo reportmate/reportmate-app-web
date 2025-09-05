@@ -122,93 +122,34 @@ function InstallsPageContent() {
   useEffect(() => {
     const fetchInstalls = async () => {
       try {
-        // First get the list of devices that have installs data
-        const devicesResponse = await fetch('/api/devices', {
+        console.log('🚀 Fetching installs data using optimized bulk API...')
+        
+        // Use the new bulk installs API - single call instead of 92+ individual calls
+        const installsResponse = await fetch('/api/devices/installs', {
           cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-        })
-        
-        if (!devicesResponse.ok) {
-          throw new Error(`Failed to fetch devices: ${devicesResponse.status}`)
-        }
-        
-        const devicesData = await devicesResponse.json()
-        
-        if (!Array.isArray(devicesData)) {
-          throw new Error('Invalid devices API response format')
-        }
-        
-        // Fetch detailed device data for each device to get proper installs info
-        const installsPromises = devicesData.map(async (device: any) => {
-          try {
-            const deviceResponse = await fetch(`/api/device/${device.serialNumber}`, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-            })
-            
-            if (!deviceResponse.ok) {
-              console.warn(`Failed to fetch device ${device.serialNumber}:`, deviceResponse.status)
-              return null
-            }
-            
-            const deviceData = await deviceResponse.json()
-            
-            if (!deviceData.success || !deviceData.device) {
-              return null
-            }
-            
-            // Process the device's installs data using the same logic as individual device pages
-            const { extractInstalls } = await import('../../../src/lib/data-processing/modules')
-            const installsData = extractInstalls(deviceData.device)
-            
-            // Include devices that have a managed installs system (config) OR packages
-            // This shows devices with Cimian/Munki configured even if no packages currently assigned
-            const hasManagementSystem = installsData.config || installsData.systemName
-            const hasPackages = installsData.packages && installsData.packages.length > 0
-            
-            if (!hasManagementSystem && !hasPackages) {
-              return null // Only exclude if neither management system nor packages exist
-            }
-            
-            // Get device name from inventory module (prioritized) or fallback
-            const deviceName = deviceData.device.modules?.inventory?.deviceName || 
-                              device.name || 
-                              'Unknown Device'
-            
-            // Extract Cimian/Munki version data for version chart
-            const managedInstallsData = {
-              cimian: deviceData.device.modules?.installs?.cimian || null,
-              munki: deviceData.device.modules?.installs?.munki || null
-            }
-            
-            return {
-              id: deviceData.device.deviceId,
-              deviceId: deviceData.device.deviceId,
-              deviceName: deviceName,
-              serialNumber: deviceData.device.serialNumber,
-              lastSeen: deviceData.device.lastSeen,
-              collectedAt: installsData.lastUpdate || deviceData.device.lastSeen,
-              totalPackages: installsData.totalPackages,
-              installed: installsData.installed,
-              pending: installsData.pending,
-              failed: installsData.failed,
-              lastUpdate: installsData.lastUpdate || '',
-              packages: installsData.packages || [],
-              raw: { 
-                ...installsData, 
-                ...managedInstallsData 
-              }
-            } as InstallRecord
-          } catch (error) {
-            console.warn(`Error processing device ${device.serialNumber}:`, error)
-            return null
+          headers: { 
+            'Cache-Control': 'no-cache', 
+            'Pragma': 'no-cache' 
           }
         })
         
-        const results = await Promise.all(installsPromises)
-        const validInstalls = results.filter((install): install is InstallRecord => install !== null)
+        if (!installsResponse.ok) {
+          throw new Error(`Failed to fetch installs data: ${installsResponse.status}`)
+        }
         
-        setInstalls(validInstalls)
+        const installsData = await installsResponse.json()
+        
+        if (!Array.isArray(installsData)) {
+          throw new Error('Invalid installs API response format')
+        }
+        
+        console.log(`✅ Loaded ${installsData.length} devices with installs data in single API call`)
+        console.log('📊 Cache headers:', {
+          dataSource: installsResponse.headers.get('X-Data-Source'),
+          fetchedAt: installsResponse.headers.get('X-Fetched-At')
+        })
+        
+        setInstalls(installsData)
         setError(null)
         
       } catch (error) {
@@ -515,7 +456,22 @@ function InstallsPageContent() {
               }, {});
 
               const sortedCimianVersions = Object.entries(cimianVersions)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([versionA], [versionB]) => {
+                  // Parse semantic versions for proper sorting (latest first)
+                  const parseVersion = (version: string) => {
+                    const parts = version.split('.').map(n => parseInt(n) || 0);
+                    return parts.concat([0, 0, 0]).slice(0, 3); // Ensure 3 parts
+                  };
+                  
+                  const vA = parseVersion(versionA);
+                  const vB = parseVersion(versionB);
+                  
+                  // Compare major, minor, patch in order (latest first)
+                  for (let i = 0; i < 3; i++) {
+                    if (vB[i] !== vA[i]) return vB[i] - vA[i];
+                  }
+                  return 0;
+                })
                 .slice(0, 5); // Show top 5 versions
 
               const totalCimianDevices = Object.values(cimianVersions).reduce((sum, count) => sum + count, 0);
@@ -590,7 +546,22 @@ function InstallsPageContent() {
               }, {});
 
               const sortedMunkiVersions = Object.entries(munkiVersions)
-                .sort(([,a], [,b]) => b - a)
+                .sort(([versionA], [versionB]) => {
+                  // Parse semantic versions for proper sorting (latest first)
+                  const parseVersion = (version: string) => {
+                    const parts = version.split('.').map(n => parseInt(n) || 0);
+                    return parts.concat([0, 0, 0]).slice(0, 3); // Ensure 3 parts
+                  };
+                  
+                  const vA = parseVersion(versionA);
+                  const vB = parseVersion(versionB);
+                  
+                  // Compare major, minor, patch in order (latest first)
+                  for (let i = 0; i < 3; i++) {
+                    if (vB[i] !== vA[i]) return vB[i] - vA[i];
+                  }
+                  return 0;
+                })
                 .slice(0, 5); // Show top 5 versions
 
               const totalMunkiDevices = Object.values(munkiVersions).reduce((sum, count) => sum + count, 0);
