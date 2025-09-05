@@ -25,48 +25,95 @@ const ThemeProviderContext = createContext<ThemeProviderState>(initialState)
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
-  storageKey = 'theme',
+  storageKey = 'reportmate-theme',
   ...props
 }: ThemeProviderProps) {
-  const [theme, setTheme] = useState<Theme>(defaultTheme)
+  const [theme, setTheme] = useState<Theme>(() => {
+    // Initialize with default theme to prevent hydration mismatch
+    return defaultTheme
+  })
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Initialize theme from localStorage or use default
-    const stored = localStorage.getItem(storageKey)
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      setTheme(stored as Theme)
+    setMounted(true)
+    
+    // Initialize theme from localStorage after mounting
+    try {
+      const stored = localStorage.getItem(storageKey)
+      if (stored && ['light', 'dark', 'system'].includes(stored)) {
+        setTheme(stored as Theme)
+      }
+    } catch (error) {
+      console.warn('Failed to read theme from localStorage:', error)
     }
   }, [storageKey])
 
   useEffect(() => {
-    const root = window.document.documentElement
-    root.classList.remove('light', 'dark')
+    if (!mounted) return
 
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'dark'
-        : 'light'
-      root.classList.add(systemTheme)
-      
-      // Listen for system theme changes
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      const handleChange = (e: MediaQueryListEvent) => {
-        root.classList.remove('light', 'dark')
-        root.classList.add(e.matches ? 'dark' : 'light')
+    const root = window.document.documentElement
+    
+    const applyTheme = (themeToApply: Theme) => {
+      root.classList.remove('light', 'dark')
+
+      if (themeToApply === 'system') {
+        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light'
+        root.classList.add(systemTheme)
+        
+        console.log('[ThemeProvider] Applied system theme:', systemTheme)
+        console.log('[ThemeProvider] matchMedia result:', window.matchMedia('(prefers-color-scheme: dark)').matches)
+        console.log('[ThemeProvider] User agent:', navigator.userAgent)
+        
+        return systemTheme
+      } else {
+        root.classList.add(themeToApply)
+        console.log('[ThemeProvider] Applied explicit theme:', themeToApply)
+        return themeToApply
       }
-      
-      mediaQuery.addEventListener('change', handleChange)
-      return () => mediaQuery.removeEventListener('change', handleChange)
     }
 
-    root.classList.add(theme)
-  }, [theme])
+    const appliedTheme = applyTheme(theme)
+
+    // Only set up listener for system theme changes if using system theme
+    if (theme === 'system') {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+      
+      const handleChange = (e: MediaQueryListEvent) => {
+        console.log('[ThemeProvider] System theme changed:', e.matches ? 'dark' : 'light')
+        applyTheme('system')
+      }
+      
+      // Use both addEventListener and addListener for better compatibility
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleChange)
+      } else if (mediaQuery.addListener) {
+        // Fallback for older browsers/Edge
+        mediaQuery.addListener(handleChange)
+      }
+      
+      return () => {
+        if (mediaQuery.removeEventListener) {
+          mediaQuery.removeEventListener('change', handleChange)
+        } else if (mediaQuery.removeListener) {
+          mediaQuery.removeListener(handleChange)
+        }
+      }
+    }
+  }, [theme, mounted])
 
   const value = {
     theme,
     setTheme: (newTheme: Theme) => {
-      localStorage.setItem(storageKey, newTheme)
-      setTheme(newTheme)
+      try {
+        localStorage.setItem(storageKey, newTheme)
+        setTheme(newTheme)
+        console.log('[ThemeProvider] Theme changed to:', newTheme)
+      } catch (error) {
+        console.warn('Failed to save theme to localStorage:', error)
+        setTheme(newTheme)
+      }
     },
   }
 
