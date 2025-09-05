@@ -8,6 +8,8 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { extractSystem } from "../../../src/lib/data-processing/modules"
+import { OSVersionWidget } from "../../../src/lib/modules/widgets/OSVersionWidget"
+import { useDeviceData } from "../../../src/hooks/useDeviceData"
 
 interface SystemDevice {
   id: string
@@ -26,15 +28,135 @@ interface SystemDevice {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
-      {[...Array(10)].map((_, i) => (
-        <div key={i} className="animate-pulse flex space-x-4">
-          <div className="flex-1 space-y-2 py-1">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+    <div className="min-h-screen bg-gray-50 dark:bg-black">
+      {/* Header Skeleton */}
+      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center gap-4 min-w-0 flex-1">
+              <div className="animate-pulse">
+                <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-5 h-5 bg-purple-200 dark:bg-purple-800 rounded animate-pulse"></div>
+                <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 animate-pulse">
+              <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
           </div>
         </div>
-      ))}
+      </header>
+
+      {/* Main Content Skeleton */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          {/* Title Section Skeleton */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div className="animate-pulse">
+                <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+              <div className="animate-pulse">
+                <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Analytics Charts Skeleton */}
+          <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="space-y-6">
+              {/* OS Version Charts Skeleton */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="animate-pulse">
+                  <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+                <div className="animate-pulse">
+                  <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Search Section Skeleton */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="animate-pulse">
+              <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            </div>
+          </div>
+
+          {/* Table Skeleton */}
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                  <th className="px-6 py-3">
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {[...Array(8)].map((_, i) => (
+                  <tr key={i}>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                        <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                        <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="animate-pulse">
+                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -61,33 +183,24 @@ function SystemPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [platformFilter, setPlatformFilter] = useState('all')
 
-  useEffect(() => {
-    const fetchSystems = async () => {
-      try {
-        const response = await fetch('/api/modules/system', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-        
-        const data = await response.json()
-        setSystems(data)
-      } catch (err) {
-        console.error('Error fetching systems:', err)
-        setError(err instanceof Error ? err.message : 'An unexpected error occurred')
-      } finally {
-        setLoading(false)
-      }
-    }
+  // Use the new hook to get both devices data (with inventory) and system module data
+  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading } = useDeviceData({
+    includeModuleData: true,
+    moduleType: 'system'
+  })
 
-    fetchSystems()
-  }, [])
+  useEffect(() => {
+    // Set the systems from the module data when it's available
+    if (systemModuleData && systemModuleData.length > 0) {
+      setSystems(systemModuleData)
+      setLoading(false)
+    }
+  }, [systemModuleData])
+
+  useEffect(() => {
+    // Handle loading state based on module loading
+    setLoading(moduleLoading)
+  }, [moduleLoading])
 
   // Get unique operating systems for filtering
   const operatingSystems = Array.from(new Set(
@@ -100,26 +213,26 @@ function SystemPageContent() {
       if (s.operatingSystem !== platformFilter) return false
     }
     
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      return (
-        s.deviceName?.toLowerCase().includes(query) ||
-        s.operatingSystem?.toLowerCase().includes(query) ||
-        s.osVersion?.toLowerCase().includes(query) ||
-        s.buildNumber?.toLowerCase().includes(query) ||
-        s.serialNumber?.toLowerCase().includes(query)
-      )
-    }
-    
     return true
   })
 
   // Process system info for each device using extractSystem
   const processedSystems = filteredSystems.map(systemDevice => {
+    // Find the corresponding device from the main devices API to get the proper name
+    const deviceFromMainAPI = devices.find(d => 
+      d.deviceId === systemDevice.deviceId || 
+      d.serialNumber === systemDevice.serialNumber
+    )
+    
+    // Debug logging to verify device name mapping
+    if (deviceFromMainAPI && deviceFromMainAPI.name !== systemDevice.deviceName) {
+      console.log(`[SYSTEM PAGE] Device name mapping: "${systemDevice.deviceName}" -> "${deviceFromMainAPI.name}"`)
+    }
+    
     // Create a device object in the format expected by extractSystem
     const deviceData = {
       id: systemDevice.deviceId,
-      name: systemDevice.deviceName,
+      name: deviceFromMainAPI?.name || systemDevice.deviceName,
       modules: systemDevice.raw ? { system: systemDevice.raw } : undefined
     }
     
@@ -127,19 +240,28 @@ function SystemPageContent() {
     
     return {
       ...systemDevice,
+      // Use the device name from the main API if available, fallback to system module data
+      deviceName: deviceFromMainAPI?.name || systemDevice.deviceName,
+      // Include assetTag from inventory data if available
+      assetTag: deviceFromMainAPI?.modules?.inventory?.assetTag,
       systemInfo
     }
   })
 
+  // Apply search filter after processing (so we search the correct device names)
+  const searchFilteredSystems = processedSystems.filter(sys => {
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      return (
+        sys.deviceName?.toLowerCase().includes(query) ||
+        sys.serialNumber?.toLowerCase().includes(query)
+      )
+    }
+    return true
+  })
+
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
-        <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <LoadingSkeleton />
-        </div>
-      </div>
-    )
+    return <LoadingSkeleton />
   }
 
   if (error) {
@@ -191,8 +313,8 @@ function SystemPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-gray-600 dark:text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">System</h1>
               </div>
@@ -220,10 +342,7 @@ function SystemPageContent() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">System Information</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Operating system and system details • {processedSystems.length} systems
-                </p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System Information • {searchFilteredSystems.length} devices</h2>
               </div>
               <div className="flex items-center gap-4">
                 {/* Platform Filter */}
@@ -237,39 +356,53 @@ function SystemPageContent() {
                     <option key={os} value={os}>{os}</option>
                   ))}
                 </select>
-
-                {/* Search */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search systems..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
               </div>
             </div>
           </div>
+
+          {/* Analytics Charts Section */}
+          <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
+            <div className="space-y-6">
+              {/* OS Version Charts - Side by Side */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
+                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
+              </div>
+            </div>
+          </div>
+
+          {/* Search Section */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Search by device name or serial number..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Operating System</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">System Info</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Locale</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Uptime</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                <tr className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-700">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Device</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Operating System</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Version</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Uptime</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Locale</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Last Seen</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {processedSystems.length === 0 ? (
+                {searchFilteredSystems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
@@ -282,7 +415,7 @@ function SystemPageContent() {
                     </td>
                   </tr>
                 ) : (
-                  processedSystems.map((sys) => (
+                  searchFilteredSystems.map((sys) => (
                     <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
@@ -291,7 +424,10 @@ function SystemPageContent() {
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sys.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{sys.serialNumber}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                              {sys.serialNumber}
+                              {sys.assetTag ? ` | ${sys.assetTag}` : ''}
+                            </div>
                           </div>
                         </Link>
                       </td>
@@ -309,7 +445,8 @@ function SystemPageContent() {
                         <div className="text-sm space-y-1">
                           {sys.systemInfo.operatingSystem.build || sys.buildNumber ? (
                             <div className="text-gray-900 dark:text-white">
-                              Build: {sys.systemInfo.operatingSystem.build || sys.buildNumber}
+                              {sys.systemInfo.operatingSystem.build || sys.buildNumber}
+                              {sys.systemInfo.operatingSystem.featureUpdate ? `.${sys.systemInfo.operatingSystem.featureUpdate}` : ''}
                             </div>
                           ) : null}
                           {sys.systemInfo.operatingSystem.edition ? (
@@ -317,11 +454,6 @@ function SystemPageContent() {
                               {sys.systemInfo.operatingSystem.edition}
                             </div>
                           ) : null}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {sys.systemInfo.operatingSystem.locale || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -337,6 +469,11 @@ function SystemPageContent() {
                           ) : (
                             <div className="text-gray-500 dark:text-gray-400">Unknown</div>
                           )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {sys.systemInfo.operatingSystem.locale || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
