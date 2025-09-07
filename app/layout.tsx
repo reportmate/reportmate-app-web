@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
 import { ThemeProvider } from "../src/components/theme-provider";
+import { EdgeThemeFix } from "../src/components/edge-theme-fix";
+import { ThemeDebugPanel } from "../src/components/theme-debug-panel";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 
@@ -33,6 +35,7 @@ export default function RootLayout({
             __html: `
               (function() {
                 console.log('[Theme Init] Starting theme initialization...');
+                console.log('[Theme Init] User agent:', navigator.userAgent);
                 
                 function getStoredTheme() {
                   try {
@@ -46,11 +49,19 @@ export default function RootLayout({
                 }
                 
                 function getSystemTheme() {
-                  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-                    console.log('[Theme Init] System prefers dark mode');
-                    return 'dark';
+                  if (window.matchMedia) {
+                    try {
+                      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                      const matches = mediaQuery.matches;
+                      console.log('[Theme Init] Media query:', mediaQuery);
+                      console.log('[Theme Init] System prefers dark mode:', matches);
+                      return matches ? 'dark' : 'light';
+                    } catch (error) {
+                      console.log('[Theme Init] matchMedia error:', error);
+                      return 'light';
+                    }
                   }
-                  console.log('[Theme Init] System prefers light mode');
+                  console.log('[Theme Init] matchMedia not available');
                   return 'light';
                 }
                 
@@ -75,11 +86,23 @@ export default function RootLayout({
                 
                 // Listen for system theme changes if using system theme
                 if (finalTheme === 'system' && window.matchMedia) {
-                  const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-                  mediaQuery.addEventListener('change', function(e) {
-                    console.log('[Theme Init] System theme changed:', e.matches ? 'dark' : 'light');
-                    setTheme('system');
-                  });
+                  try {
+                    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+                    
+                    const handleChange = function(e) {
+                      console.log('[Theme Init] System theme changed:', e.matches ? 'dark' : 'light');
+                      setTheme('system');
+                    };
+                    
+                    // Edge compatibility - use both methods
+                    if (mediaQuery.addEventListener) {
+                      mediaQuery.addEventListener('change', handleChange);
+                    } else if (mediaQuery.addListener) {
+                      mediaQuery.addListener(handleChange);
+                    }
+                  } catch (error) {
+                    console.log('[Theme Init] Failed to set up media query listener:', error);
+                  }
                 }
               })();
             `
@@ -87,10 +110,14 @@ export default function RootLayout({
         />
         <AuthProvider>
           <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+            <EdgeThemeFix />
             <ErrorBoundary>
               {isDevelopment ? (
                 // Development: No AutoAuth component
-                children
+                <>
+                  {children}
+                  <ThemeDebugPanel />
+                </>
               ) : (
                 // Production: Full authentication with AutoAuth
                 <AutoAuth>
