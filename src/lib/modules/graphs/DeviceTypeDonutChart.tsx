@@ -45,6 +45,13 @@ interface DeviceTypeDonutChartProps {
   devices: Device[]
   loading?: boolean
   className?: string
+  selectedDeviceTypes?: string[]
+  onDeviceTypeToggle?: (deviceType: string) => void
+  // Global filter context for visual feedback
+  globalSelectedPlatforms?: string[]
+  globalSelectedModels?: string[]
+  globalSelectedMemoryRanges?: string[]
+  globalSelectedArchitectures?: string[]
 }
 
 interface TypeData {
@@ -52,9 +59,21 @@ interface TypeData {
   count: number
   percentage: number
   color: string
+  isSelected: boolean
+  isGreyedOut?: boolean
 }
 
-export function DeviceTypeDonutChart({ devices, loading = false, className = '' }: DeviceTypeDonutChartProps) {
+export function DeviceTypeDonutChart({ 
+  devices, 
+  loading = false, 
+  className = '', 
+  selectedDeviceTypes = [],
+  onDeviceTypeToggle,
+  globalSelectedPlatforms = [],
+  globalSelectedModels = [],
+  globalSelectedMemoryRanges = [],
+  globalSelectedArchitectures = []
+}: DeviceTypeDonutChartProps) {
   const typeData = useMemo(() => {
     if (!devices || devices.length === 0) return []
 
@@ -124,30 +143,105 @@ export function DeviceTypeDonutChart({ devices, loading = false, className = '' 
       return 'Desktop'
     }
 
-    // Count device types
-    const typeCounts: { [key: string]: number } = {}
-    
-    devices.forEach((device: Device) => {
-      const type = getDeviceType(device)
-      typeCounts[type] = (typeCounts[type] || 0) + 1
+    // Helper functions for filtering (same as hardware page)
+    const getDeviceModel = (device: Device): string => {
+      return device.model || 
+             device.modules?.hardware?.model ||
+             device.modules?.system?.hardwareInfo?.model ||
+             (device as any).raw?.model ||
+             (device as any).raw?.system?.hardwareInfo?.model ||
+             (device as any).raw?.hardware?.model ||
+             'Unknown Model'
+    }
+
+    const getMemoryRange = (memory: any): string => {
+      if (!memory) return 'Unknown'
+      const memGb = parseFloat(memory)
+      if (isNaN(memGb)) return 'Unknown'
+      if (memGb <= 8) return '≤8 GB'
+      if (memGb <= 16) return '9-16 GB'
+      if (memGb <= 32) return '17-32 GB'
+      if (memGb <= 64) return '33-64 GB'
+      return '>64 GB'
+    }
+
+    const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
+      const model = getDeviceModel(device)
+      if (model.toLowerCase().includes('macbook') || 
+          model.toLowerCase().includes('imac') || 
+          model.toLowerCase().includes('mac mini') ||
+          model.toLowerCase().includes('mac pro') ||
+          model.toLowerCase().includes('mac studio')) {
+        return 'Macintosh'
+      }
+      return 'Windows'
+    }
+
+    // Apply global filters to get synchronized data
+    const filteredDevices = devices.filter(device => {
+      // Platform filter
+      if (globalSelectedPlatforms.length > 0) {
+        const platform = getDevicePlatform(device)
+        if (!globalSelectedPlatforms.includes(platform)) return false
+      }
+
+      // Model filter
+      if (globalSelectedModels.length > 0) {
+        const model = getDeviceModel(device)
+        if (!globalSelectedModels.includes(model)) return false
+      }
+
+      // Memory range filter
+      if (globalSelectedMemoryRanges.length > 0) {
+        const memoryRange = getMemoryRange(device.memory)
+        if (!globalSelectedMemoryRanges.includes(memoryRange)) return false
+      }
+
+      // Architecture filter
+      if (globalSelectedArchitectures.length > 0) {
+        const arch = device.architecture || 'Unknown'
+        if (!globalSelectedArchitectures.includes(arch)) return false
+      }
+
+      return true
     })
 
+    // Count device types from full dataset (to show all possible types)
+    const allTypeCounts: { [key: string]: number } = {}
+    devices.forEach((device: Device) => {
+      const type = getDeviceType(device)
+      allTypeCounts[type] = (allTypeCounts[type] || 0) + 1
+    })
+
+    // Count device types from filtered dataset (for synchronized percentages)
+    const filteredTypeCounts: { [key: string]: number } = {}
+    filteredDevices.forEach((device: Device) => {
+      const type = getDeviceType(device)
+      filteredTypeCounts[type] = (filteredTypeCounts[type] || 0) + 1
+    })
     // Convert to array with percentages
-    const total = devices.length
+    const total = filteredDevices.length
     const typeColors = {
       'Desktop': '#3b82f6',  // Blue
       'Laptop': '#10b981',   // Green
     }
 
-    return Object.entries(typeCounts)
-      .map(([type, count]) => ({
-        type,
-        count,
-        percentage: Math.round((count / total) * 100),
-        color: typeColors[type as keyof typeof typeColors] || '#6b7280'
-      }))
-      .sort((a, b) => b.count - a.count)
-  }, [devices])
+    // Use all device types but show filtered counts and percentages
+    return Object.entries(allTypeCounts)
+      .map(([type, allCount]) => {
+        const filteredCount = filteredTypeCounts[type] || 0
+        
+        return {
+          type,
+          count: filteredCount, // Show filtered count
+          percentage: total > 0 ? Math.round((filteredCount / total) * 100) : 0, // Show filtered percentage
+          color: typeColors[type as keyof typeof typeColors] || '#6b7280',
+          isSelected: selectedDeviceTypes.length === 0 || selectedDeviceTypes.includes(type),
+          isGreyedOut: filteredCount === 0
+        }
+      })
+      .sort((a, b) => b.count - a.count || a.type.localeCompare(b.type))
+  }, [devices, selectedDeviceTypes, globalSelectedPlatforms, globalSelectedModels, globalSelectedMemoryRanges, globalSelectedArchitectures])
 
   if (loading) {
     return (
@@ -188,6 +282,19 @@ export function DeviceTypeDonutChart({ devices, loading = false, className = '' 
 
   // Generate SVG path for donut slice
   const createSlicePath = (centerX: number, centerY: number, outerRadius: number, innerRadius: number, startAngle: number, endAngle: number) => {
+    // Special case for 100% (full circle) - draw two overlapping semicircles
+    if (endAngle - startAngle >= 359.9) {
+      return [
+        'M', centerX - outerRadius, centerY,
+        'A', outerRadius, outerRadius, 0, 0, 1, centerX + outerRadius, centerY,
+        'A', outerRadius, outerRadius, 0, 0, 1, centerX - outerRadius, centerY,
+        'M', centerX - innerRadius, centerY,
+        'A', innerRadius, innerRadius, 0, 0, 0, centerX + innerRadius, centerY,
+        'A', innerRadius, innerRadius, 0, 0, 0, centerX - innerRadius, centerY,
+        'Z'
+      ].join(' ')
+    }
+    
     const startOuter = polarToCartesian(centerX, centerY, outerRadius, endAngle)
     const endOuter = polarToCartesian(centerX, centerY, outerRadius, startAngle)
     const startInner = polarToCartesian(centerX, centerY, innerRadius, endAngle)
@@ -231,7 +338,16 @@ export function DeviceTypeDonutChart({ devices, loading = false, className = '' 
                 fill={slice.color}
                 stroke="white"
                 strokeWidth="2"
-                className="hover:opacity-80 transition-opacity"
+                className={`transition-all duration-200 cursor-pointer ${
+                  slice.isGreyedOut 
+                    ? 'opacity-30' 
+                    : slice.isSelected 
+                      ? 'opacity-100' 
+                      : selectedDeviceTypes.length > 0 
+                        ? 'opacity-40' 
+                        : 'opacity-100'
+                } hover:opacity-80`}
+                onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(slice.type)}
               />
             ))}
           </svg>
@@ -240,16 +356,38 @@ export function DeviceTypeDonutChart({ devices, loading = false, className = '' 
         {/* Legend */}
         <div className="ml-6 space-y-2">
           {typeData.map(item => (
-            <div key={item.type} className="flex items-center">
+            <div 
+              key={item.type} 
+              className="flex items-center cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+              onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(item.type)}
+            >
               <div 
-                className="w-4 h-4 rounded-full mr-3 flex-shrink-0"
+                className={`w-4 h-4 rounded-full mr-3 flex-shrink-0 transition-opacity ${
+                  item.isGreyedOut ? 'opacity-30' : 'opacity-100'
+                }`}
                 style={{ backgroundColor: item.color }}
               ></div>
               <div className="flex-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className={`text-sm font-medium transition-colors ${
+                  item.isGreyedOut
+                    ? 'text-gray-400 dark:text-gray-500'
+                    : item.isSelected 
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : selectedDeviceTypes.length > 0 
+                        ? 'text-gray-400 dark:text-gray-500' 
+                        : 'text-gray-900 dark:text-white'
+                }`}>
                   {item.type}
                 </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400">
+                <div className={`text-xs transition-colors ${
+                  item.isGreyedOut
+                    ? 'text-gray-400 dark:text-gray-500'
+                    : item.isSelected 
+                      ? 'text-blue-500 dark:text-blue-400' 
+                    : selectedDeviceTypes.length > 0 
+                      ? 'text-gray-400 dark:text-gray-500' 
+                      : 'text-gray-500 dark:text-gray-400'
+                }`}>
                   {item.count} devices ({item.percentage}%)
                 </div>
               </div>
