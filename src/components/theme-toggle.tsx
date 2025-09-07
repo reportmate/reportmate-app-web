@@ -1,23 +1,33 @@
 "use client"
 
 import { useTheme } from './theme-provider'
+import { forceThemeSync, isEdgeBrowser } from '../lib/utils'
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
 
+  const handleThemeChange = () => {
+    if (theme === 'light') {
+      setTheme('dark')
+    } else if (theme === 'dark') {
+      setTheme('system')
+    } else {
+      setTheme('light')
+    }
+    
+    // Force theme sync for Edge browsers
+    if (isEdgeBrowser()) {
+      setTimeout(() => {
+        forceThemeSync()
+      }, 100)
+    }
+  }
+
   return (
     <button
-      onClick={() => {
-        if (theme === 'light') {
-          setTheme('dark')
-        } else if (theme === 'dark') {
-          setTheme('system')
-        } else {
-          setTheme('light')
-        }
-      }}
+      onClick={handleThemeChange}
       className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-      title={`Current theme: ${theme}. Click to cycle between light, dark, and system themes.`}
+      title={`Current theme: ${theme}. Click to cycle between light, dark, and system themes.${isEdgeBrowser() ? ' (Edge compatibility enabled)' : ''}`}
     >
       {theme === 'light' && (
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

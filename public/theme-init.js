@@ -13,9 +13,19 @@
   }
   
   function getSystemTheme() {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+    if (window.matchMedia) {
+      try {
+        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        const matches = mediaQuery.matches;
+        console.log('[Theme Debug] Media query:', mediaQuery);
+        console.log('[Theme Debug] System prefers dark:', matches);
+        return matches ? 'dark' : 'light';
+      } catch (error) {
+        console.log('[Theme Debug] matchMedia error:', error);
+        return 'light';
+      }
     }
+    console.log('[Theme Debug] matchMedia not available');
     return 'light';
   }
   
@@ -49,11 +59,23 @@
   
   // Listen for system theme changes if using system theme
   if (finalTheme === 'system' && window.matchMedia) {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', function(e) {
-      const systemTheme = e.matches ? 'dark' : 'light';
-      console.log('[Theme Debug] System theme changed to:', systemTheme);
-      setTheme('system');
-    });
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      const handleChange = function(e) {
+        const systemTheme = e.matches ? 'dark' : 'light';
+        console.log('[Theme Debug] System theme changed to:', systemTheme);
+        setTheme('system');
+      };
+      
+      // Edge compatibility - use both methods
+      if (mediaQuery.addEventListener) {
+        mediaQuery.addEventListener('change', handleChange);
+      } else if (mediaQuery.addListener) {
+        mediaQuery.addListener(handleChange);
+      }
+    } catch (error) {
+      console.log('[Theme Debug] Failed to set up media query listener:', error);
+    }
   }
 })();
