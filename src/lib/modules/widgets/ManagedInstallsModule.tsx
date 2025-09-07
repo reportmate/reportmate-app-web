@@ -40,7 +40,7 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
           })
           
           // Import modular data processing functions
-          const { extractInstalls } = await import('../../data-processing/modules')
+          const { extractInstalls } = await import('../../data-processing/modules/installs')
           const installsData = extractInstalls(data.device)
           
           console.log('ManagedInstalls: Extracted modular data:', {
@@ -297,7 +297,7 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
           console.log('ManagedPackages: Full API response:', data)
           
           // Import device mapper to process raw data into structured format
-          const { extractInstalls } = await import('../../data-processing/modules')
+          const { extractInstalls } = await import('../../data-processing/modules/installs')
           const installsData = extractInstalls(data.device)
           
           if (installsData && installsData.packages) {
@@ -628,7 +628,7 @@ const ManagedInstallsErrorsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) 
           const data = await response.json()
           
           // Import modular data processing functions
-          const { extractInstalls } = await import('../../data-processing/modules')
+          const { extractInstalls } = await import('../../data-processing/modules/installs')
           const installsData = extractInstalls(data.device)
           
           if (installsData && installsData.messages) {
