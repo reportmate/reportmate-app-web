@@ -6,7 +6,7 @@
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { ManagedInstallsTable } from '../tables'
-import { extractInstalls, InstallsInfo } from '../../lib/data-processing/modules'
+import { extractInstalls, type InstallsInfo } from '../../lib/data-processing/modules/installs'
 
 interface InstallsTabProps {
   device: any
@@ -301,6 +301,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
       failed,
       errors,
       packages,
+      lastUpdate: new Date().toISOString(), // Add required lastUpdate field
       config: {
         ...installsData?.config,
         type: 'cimian',

@@ -343,12 +343,13 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
     case 'ok':
       return 'Installed'
 
-    // Pending variants  
+    // Pending variants - CRITICAL FIX: Added "pending update" status from Cimian
     case 'pending':
     case 'pending install':
     case 'pending_install':
     case 'pending update':
     case 'pending_update':
+    case 'pendingupdate':
     case 'available':
     case 'update available':
     case 'update_available':
@@ -357,6 +358,9 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
     case 'queued':
     case 'waiting':
     case 'scheduled':
+    case 'not available':
+    case 'not_available':
+    case 'notavailable':
       return 'Pending'
 
     // Warning variants
@@ -522,32 +526,64 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         allKeys: Object.keys(item)
       })
       
-      // CRITICAL FIX: Override status based on version comparison for Cimian packages
+      // CRITICAL FIX: For Cimian packages, respect the raw status first, then fall back to version comparison
       let finalStatus: StandardInstallStatus
       
-      if (item.type === 'cimian' && item.version && item.installedVersion) {
-        if (item.version === item.installedVersion) {
-          finalStatus = 'Installed'
-          console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FIX - INSTALLED:', {
+      if (item.type === 'cimian') {
+        // First, try to standardize the raw status
+        const standardizedRawStatus = standardizeInstallStatus(item.status)
+        
+        // For Cimian, if the raw status indicates pending/error/warning, trust it
+        if (standardizedRawStatus === 'Pending' || standardizedRawStatus === 'Error' || standardizedRawStatus === 'Warning') {
+          finalStatus = standardizedRawStatus
+          console.log('[INSTALLS MODULE] 🔄 CIMIAN STATUS OVERRIDE - TRUSTING RAW STATUS:', {
             name: item.name,
+            rawStatus: item.status,
+            standardizedStatus: standardizedRawStatus,
             version: item.version,
             installed: item.installedVersion,
-            originalStatus: item.status,
-            newStatus: finalStatus
+            reason: 'Raw status indicates non-installed state'
           })
+        } else if (item.version && item.installedVersion) {
+          // Only use version comparison as fallback for unclear statuses
+          if (item.version === item.installedVersion) {
+            finalStatus = 'Installed'
+            console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FALLBACK - INSTALLED:', {
+              name: item.name,
+              version: item.version,
+              installed: item.installedVersion,
+              originalStatus: item.status,
+              reason: 'Versions match and raw status not definitive'
+            })
+          } else {
+            finalStatus = 'Pending'
+            console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FALLBACK - PENDING UPDATE:', {
+              name: item.name,
+              version: item.version,
+              installed: item.installedVersion,
+              originalStatus: item.status,
+              reason: 'Version mismatch'
+            })
+          }
         } else {
-          finalStatus = 'Pending'
-          console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FIX - PENDING UPDATE:', {
+          // No version info, use standardized status
+          finalStatus = standardizedRawStatus
+          console.log('[INSTALLS MODULE] 🔄 CIMIAN NO VERSION INFO - USING STANDARDIZED:', {
             name: item.name,
-            version: item.version,
-            installed: item.installedVersion,
-            originalStatus: item.status,
-            newStatus: finalStatus
+            rawStatus: item.status,
+            finalStatus: finalStatus
           })
         }
       } else {
         // For non-Cimian packages, use the standardized status
         finalStatus = standardizeInstallStatus(item.status)
+        console.log('[INSTALLS MODULE] 🔍 STATUS STANDARDIZATION:', {
+          name: item.name,
+          rawStatus: item.status,
+          rawStatusType: typeof item.status,
+          standardizedStatus: finalStatus,
+          type: item.type
+        })
       }
       
       console.log('[INSTALLS MODULE] 🔍 FINAL STATUS MAPPING:', {
