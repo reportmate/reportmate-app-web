@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
-import { extractSystem } from "../../../src/lib/data-processing/modules"
+import { extractSystem } from "../../../src/lib/data-processing/modules/system"
 import { OSVersionWidget } from "../../../src/lib/modules/widgets/OSVersionWidget"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 
@@ -71,13 +71,43 @@ function LoadingSkeleton() {
             <div className="space-y-6">
               {/* OS Version Charts Skeleton */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="animate-pulse">
-                  <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                  <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                {/* Windows Chart Skeleton */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 animate-pulse">
+                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg"></div>
+                      <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="max-h-64 space-y-3">
+                      {/* Show 4 bar skeletons to match new height */}
+                      {Array.from({ length: 4 }).map((_, index) => (
+                        <div key={index} className="flex items-center gap-3 p-2 rounded-lg animate-pulse">
+                          <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          <div className="flex-1 flex items-center gap-3">
+                            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6"></div>
+                            <div className="w-12 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="animate-pulse">
-                  <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
-                  <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                
+                {/* macOS Chart Skeleton */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-3 animate-pulse">
+                      <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg"></div>
+                      <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="text-center py-8">
+                      <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mx-auto animate-pulse"></div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
