@@ -53,18 +53,35 @@ export function ThemeProvider({
 
     const root = window.document.documentElement
     
+    const getSystemTheme = () => {
+      // Edge browser compatibility: Force refresh of media query
+      if (window.matchMedia) {
+        try {
+          const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+          // Force re-evaluation for Edge
+          const matches = mediaQuery.matches
+          
+          console.log('[ThemeProvider] Media query matches:', matches)
+          console.log('[ThemeProvider] Media query object:', mediaQuery)
+          console.log('[ThemeProvider] User agent:', navigator.userAgent)
+          
+          return matches ? 'dark' : 'light'
+        } catch (error) {
+          console.warn('[ThemeProvider] matchMedia failed:', error)
+          return 'light'
+        }
+      }
+      return 'light'
+    }
+    
     const applyTheme = (themeToApply: Theme) => {
       root.classList.remove('light', 'dark')
 
       if (themeToApply === 'system') {
-        const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light'
+        const systemTheme = getSystemTheme()
         root.classList.add(systemTheme)
         
         console.log('[ThemeProvider] Applied system theme:', systemTheme)
-        console.log('[ThemeProvider] matchMedia result:', window.matchMedia('(prefers-color-scheme: dark)').matches)
-        console.log('[ThemeProvider] User agent:', navigator.userAgent)
         
         return systemTheme
       } else {
@@ -76,16 +93,46 @@ export function ThemeProvider({
 
     const appliedTheme = applyTheme(theme)
 
+    // Edge-specific workaround: Periodic system theme check
+    let edgeWorkaroundInterval: NodeJS.Timeout | null = null
+    const isEdge = navigator.userAgent.includes('Edg/')
+    
+    if (isEdge) {
+      console.log('[ThemeProvider] Edge detected - setting up enhanced periodic theme check')
+      edgeWorkaroundInterval = setInterval(() => {
+        if (theme === 'system') {
+          const currentSystemTheme = getSystemTheme()
+          const currentAppliedTheme = root.classList.contains('dark') ? 'dark' : 'light'
+          
+          if (currentSystemTheme !== currentAppliedTheme) {
+            console.log('[ThemeProvider] Edge workaround - theme mismatch detected, correcting')
+            applyTheme('system')
+          }
+        } else {
+          // For explicit themes, ensure they're still applied correctly
+          const currentAppliedTheme = root.classList.contains('dark') ? 'dark' : 'light'
+          if (currentAppliedTheme !== theme) {
+            console.log('[ThemeProvider] Edge workaround - explicit theme mismatch detected, correcting')
+            applyTheme(theme)
+          }
+        }
+      }, 1500) // Check every 1.5 seconds for faster responsiveness
+    }
+
     // Only set up listener for system theme changes if using system theme
     if (theme === 'system') {
       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
       
       const handleChange = (e: MediaQueryListEvent) => {
         console.log('[ThemeProvider] System theme changed:', e.matches ? 'dark' : 'light')
-        applyTheme('system')
+        
+        // Force a re-application of system theme for Edge compatibility
+        setTimeout(() => {
+          applyTheme('system')
+        }, 10)
       }
       
-      // Use both addEventListener and addListener for better compatibility
+      // Use multiple compatibility approaches for Edge
       if (mediaQuery.addEventListener) {
         mediaQuery.addEventListener('change', handleChange)
       } else if (mediaQuery.addListener) {
@@ -93,12 +140,33 @@ export function ThemeProvider({
         mediaQuery.addListener(handleChange)
       }
       
+      // Additional Edge compatibility: Force theme re-evaluation on focus
+      const handleFocus = () => {
+        if (theme === 'system') {
+          console.log('[ThemeProvider] Window focus - re-evaluating system theme')
+          applyTheme('system')
+        }
+      }
+      
+      window.addEventListener('focus', handleFocus)
+      
       return () => {
         if (mediaQuery.removeEventListener) {
           mediaQuery.removeEventListener('change', handleChange)
         } else if (mediaQuery.removeListener) {
           mediaQuery.removeListener(handleChange)
         }
+        window.removeEventListener('focus', handleFocus)
+        
+        if (edgeWorkaroundInterval) {
+          clearInterval(edgeWorkaroundInterval)
+        }
+      }
+    }
+    
+    return () => {
+      if (edgeWorkaroundInterval) {
+        clearInterval(edgeWorkaroundInterval)
       }
     }
   }, [theme, mounted])
