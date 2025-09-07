@@ -280,27 +280,104 @@ function InventoryPageContent() {
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
           {/* Header skeleton */}
-          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                  <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-5 h-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+                </div>
+              </div>
             </div>
           </header>
           
           {/* Content skeleton */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="p-6">
-                <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-48 mb-4"></div>
-                <div className="space-y-4">
-                  {[...Array(5)].map((_, i) => (
-                    <div key={i} className="flex items-center space-x-4">
-                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-                      <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
-                    </div>
+              {/* Header section skeleton */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2"></div>
+                  <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-48"></div>
+                </div>
+                <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded w-64"></div>
+              </div>
+              
+              {/* Filter buttons skeleton */}
+              <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-8 bg-gray-300 dark:bg-gray-600 rounded-lg w-20"></div>
                   ))}
                 </div>
+              </div>
+
+              {/* Table skeleton */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-14"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[...Array(8)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="space-y-2">
+                            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+                            <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-28"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-16"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-18"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-8"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
@@ -477,43 +554,37 @@ function InventoryPageContent() {
             <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
               <nav className="flex flex-wrap gap-2">
                 {[
-                  { key: 'all', label: 'All', count: filterCounts.all },
-                  { key: 'assigned', label: 'Assigned', count: filterCounts.assigned },
-                  { key: 'shared', label: 'Shared', count: filterCounts.shared },
-                  { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum },
-                  { key: 'staff', label: 'Staff', count: filterCounts.staff },
-                  { key: 'faculty', label: 'Faculty', count: filterCounts.faculty },
-                  { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk },
+                  { key: 'assigned', label: 'Assigned', count: filterCounts.assigned, type: 'usage', colors: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800' },
+                  { key: 'shared', label: 'Shared', count: filterCounts.shared, type: 'usage', colors: 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800' },
+                  { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum, type: 'catalog', colors: 'bg-teal-100 text-teal-700 border-teal-300 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-600 dark:hover:bg-teal-800' },
+                  { key: 'staff', label: 'Staff', count: filterCounts.staff, type: 'catalog', colors: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800' },
+                  { key: 'faculty', label: 'Faculty', count: filterCounts.faculty, type: 'catalog', colors: 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800' },
+                  { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk, type: 'catalog', colors: 'bg-cyan-100 text-cyan-700 border-cyan-300 hover:bg-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-600 dark:hover:bg-cyan-800' },
                 ].map((filter) => {
-                  const isActive = (filter.key === 'all' && usageFilter === 'all' && catalogFilter === 'all') ||
-                                 (filter.key !== 'all' && (usageFilter === filter.key || catalogFilter === filter.key))
+                  const isActive = (filter.type === 'usage' && usageFilter === filter.key) ||
+                                 (filter.type === 'catalog' && catalogFilter === filter.key)
                   
                   return (
                     <button
                       key={filter.key}
                       onClick={() => {
-                        if (filter.key === 'all') {
-                          setUsageFilter('all')
-                          setCatalogFilter('all')
-                        } else if (['assigned', 'shared'].includes(filter.key)) {
-                          setUsageFilter(filter.key)
-                          setCatalogFilter('all')
+                        if (filter.type === 'usage') {
+                          setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)
                         } else {
-                          setCatalogFilter(filter.key)
-                          setUsageFilter('all')
+                          setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)
                         }
                       }}
                       className={`${
                         isActive
-                          ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                          ? filter.colors
                           : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                       } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                     >
                       <span className="hidden lg:inline">{filter.label}</span>
-                      <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label}</span>
+                      <span className="lg:hidden">{filter.label}</span>
                       <span className={`${
                         isActive 
-                          ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
+                          ? 'bg-white/20 text-current'
                           : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
                       } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
                         {filter.count}
@@ -547,7 +618,7 @@ function InventoryPageContent() {
                       Location
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Last Updated
+                      Status
                     </th>
                   </tr>
                 </thead>
@@ -608,7 +679,7 @@ function InventoryPageContent() {
                         {item.usage ? (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             item.usage.toLowerCase() === 'assigned' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                               : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                           }`}>
                             {item.usage}
@@ -621,11 +692,13 @@ function InventoryPageContent() {
                         {item.catalog ? (
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                             item.catalog.toLowerCase() === 'curriculum' 
-                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
+                              ? 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
                               : item.catalog.toLowerCase() === 'staff'
                               ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
                               : item.catalog.toLowerCase() === 'faculty'
-                              ? 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              : item.catalog.toLowerCase() === 'kiosk'
+                              ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
                               : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                           }`}>
                             {item.catalog}
@@ -641,9 +714,8 @@ function InventoryPageContent() {
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {item.collectedAt ? formatRelativeTime(item.collectedAt) : (
-                            item.lastSeen ? formatRelativeTime(item.lastSeen) : '-'
-                          )}
+                          {/* TODO: Replace with item.status when available from device.modules.inventory.status */}
+                          <span className="text-gray-400 dark:text-gray-500">-</span>
                         </div>
                       </td>
                     </tr>

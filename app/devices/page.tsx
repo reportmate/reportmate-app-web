@@ -41,6 +41,7 @@ function DevicesPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [usageFilter, setUsageFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const searchParams = useSearchParams()
 
   // Initialize search query and usage filter from URL parameters
@@ -54,6 +55,11 @@ function DevicesPageContent() {
       const urlUsage = searchParams.get('usage')
       if (urlUsage && ['assigned', 'shared', 'curriculum', 'staff', 'faculty', 'kiosk'].includes(urlUsage.toLowerCase())) {
         setUsageFilter(urlUsage.toLowerCase())
+      }
+
+      const urlStatus = searchParams.get('status')
+      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
+        setStatusFilter(urlStatus.toLowerCase())
       }
     } catch (e) {
       console.warn('Failed to get search params:', e)
@@ -155,6 +161,18 @@ function DevicesPageContent() {
             return false
           } catch (e) {
             console.warn('Error checking device usage:', device, e)
+            return false
+          }
+        })
+      }
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(device => {
+          try {
+            return device.status === statusFilter
+          } catch (e) {
+            console.warn('Error checking device status:', device, e)
             return false
           }
         })
@@ -412,17 +430,17 @@ function DevicesPageContent() {
                       </svg>
                     </div>
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      No {usageFilter === 'all' ? '' : usageFilter} devices found
+                      No {usageFilter === 'all' ? '' : usageFilter}{statusFilter === 'all' ? '' : ` ${statusFilter}`} devices found
                     </h3>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
                       {searchQuery 
-                        ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' ? ` in ${usageFilter} devices` : ''}.`
-                        : usageFilter !== 'all' 
-                          ? `No devices are marked as "${usageFilter}" in the inventory.`
+                        ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' || statusFilter !== 'all' ? ` with current filters` : ''}.`
+                        : (usageFilter !== 'all' || statusFilter !== 'all')
+                          ? `No devices match the current filter criteria.`
                           : 'Try adjusting your search or filter criteria.'
                       }
                     </p>
-                    {(searchQuery || usageFilter !== 'all') && (
+                    {(searchQuery || usageFilter !== 'all' || statusFilter !== 'all') && (
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
                         {searchQuery && (
                           <button
@@ -437,7 +455,7 @@ function DevicesPageContent() {
                             onClick={() => setUsageFilter('all')}
                             className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
                           >
-                            Show All Devices
+                            Show All Categories
                           </button>
                         )}
                       </div>
@@ -495,13 +513,37 @@ function DevicesPageContent() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                  {/* Status Summary */}
-                  <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                    <div className="flex flex-wrap gap-2 sm:gap-4">
-                      <span>{filteredDevices.filter(d => d.status === 'active').length} Active</span>
-                      <span>{filteredDevices.filter(d => d.status === 'stale').length} Stale</span>
-                      <span>{filteredDevices.filter(d => d.status === 'missing').length} Missing</span>
-                    </div>
+                  {/* Status Filter Buttons */}
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { key: 'active', label: 'Active', count: devices.filter(d => d.status === 'active').length, color: '#10b981' },
+                      { key: 'stale', label: 'Stale', count: devices.filter(d => d.status === 'stale').length, color: '#f59e0b' },
+                      { key: 'missing', label: 'Missing', count: devices.filter(d => d.status === 'missing').length, color: '#6b7280' },
+                    ].map((filter) => {
+                      const isActive = statusFilter === filter.key
+                      
+                      return (
+                        <button
+                          key={filter.key}
+                          onClick={() => setStatusFilter(statusFilter === filter.key ? 'all' : filter.key)}
+                          className={`${
+                            isActive
+                              ? 'text-white shadow-md'
+                              : 'bg-gray-100 text-gray-600 border border-gray-300 hover:shadow-sm dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500'
+                          } px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200`}
+                          style={isActive ? { backgroundColor: filter.color } : {}}
+                        >
+                          {filter.label}
+                          <span className={`${
+                            isActive 
+                              ? 'bg-white/20 text-white'
+                              : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                          } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium`}>
+                            {filter.count}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                   {/* Search Input */}
                   <div className="relative">
@@ -665,12 +707,12 @@ function DevicesPageContent() {
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                             </svg>
-                            <p className="text-lg font-medium mb-1">No {usageFilter === 'all' ? '' : usageFilter} devices found</p>
+                            <p className="text-lg font-medium mb-1">No {usageFilter === 'all' ? '' : usageFilter}{statusFilter === 'all' ? '' : ` ${statusFilter}`} devices found</p>
                             <p className="text-sm">
                               {searchQuery 
-                                ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' ? ` in ${usageFilter} devices` : ''}.`
-                                : usageFilter !== 'all' 
-                                  ? `No devices are marked as "${usageFilter}" in the inventory.`
+                                ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' || statusFilter !== 'all' ? ` with current filters` : ''}.`
+                                : (usageFilter !== 'all' || statusFilter !== 'all')
+                                  ? `No devices match the current filter criteria.`
                                   : 'Try adjusting your search or filter criteria.'
                               }
                             </p>
