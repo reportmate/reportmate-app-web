@@ -16,6 +16,7 @@ import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/Platfo
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { useLiveEvents } from "./hooks"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
+import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
 
 // Import the same hooks and types from the original dashboard
 
@@ -380,7 +381,7 @@ export default function Dashboard() {
       {/* Header */}
       <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
+          <div className="flex items-center h-16 w-full">
             {/* Brand */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
@@ -401,6 +402,20 @@ export default function Dashboard() {
                     Endpoint Monitoring
                   </p>
                 </div>
+              </div>
+            </div>
+            
+            {/* Device Search Field - Aligned with Recent Events table and extends to buttons */}
+            <div className="hidden md:flex flex-1 items-center">
+              {/* Spacer to align search field with Column B (Recent Events table) - 35% width + gap - adjustment */}
+              <div className="flex-1 max-w-[calc(10%+7.7rem)]"></div>
+              
+              {/* Search field that grows to fill available space up to the buttons */}
+              <div className="flex-1 mr-4">
+                <DeviceSearchField 
+                  className="w-full"
+                  placeholder="Find device by name, serial, or asset tag"
+                />
               </div>
             </div>
             

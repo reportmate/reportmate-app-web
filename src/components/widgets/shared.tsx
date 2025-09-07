@@ -57,9 +57,9 @@ export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublab
   return (
     <div>
       <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''} ${showCopyButton ? 'flex items-center' : ''}`}>
+      <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''} flex items-center`}>
         <span>{value || 'Unknown'}</span>
-        {showCopyButton && value && (
+        {showCopyButton && value ? (
           <button
             onClick={handleCopy}
             className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
@@ -75,6 +75,8 @@ export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublab
               </svg>
             )}
           </button>
+        ) : (
+          <div className="w-6 h-6 ml-2 flex-shrink-0"></div>
         )}
       </dd>
       {sublabel && (

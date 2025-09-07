@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, Icons, WidgetColors } from './shared'
+import { formatRelativeTime } from '../../lib/time'
 
 interface Device {
   id: string
@@ -52,11 +53,14 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
     deviceName: device?.name,
     deviceId: device?.id,
     serialNumber: device?.serialNumber,
+    createdAt: device?.createdAt,
+    hasCreatedAt: !!device?.createdAt,
     hasModules: !!device?.modules,
     hasModulesInventory: !!device?.modules?.inventory,
     hasDirectInventory: !!device?.inventory,
     inventoryData: device?.modules?.inventory || device?.inventory,
-    deviceNameFromInventory: (device?.modules?.inventory || device?.inventory)?.deviceName
+    deviceNameFromInventory: (device?.modules?.inventory || device?.inventory)?.deviceName,
+    allDeviceKeys: device ? Object.keys(device) : []
   })
 
   // Use inventory module data if available, fallback to device properties
@@ -64,33 +68,6 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
   
   // Check if we have any assignment details for the right column
   const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location
-  
-  // Format registration date
-  const formatRegistrationDate = (dateString?: string) => {
-    if (!dateString) return undefined
-    try {
-      // Handle invalid timezone format (remove Z if +/-offset is already present)
-      let cleanDateString = dateString
-      if (dateString.includes('+') && dateString.endsWith('Z')) {
-        cleanDateString = dateString.slice(0, -1)
-      } else if (dateString.includes('-') && dateString.endsWith('Z')) {
-        cleanDateString = dateString.slice(0, -1)
-      }
-      
-      const date = new Date(cleanDateString)
-      // Check if the date is valid
-      if (isNaN(date.getTime())) {
-        return undefined
-      }
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
-    } catch {
-      return undefined
-    }
-  }
   
   return (
     <StatBlock 
@@ -128,11 +105,11 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
               showCopyButton
             />
             
-            {/* Registration Date */}
+            {/* Registered */}
             {device.createdAt && (
               <Stat 
-                label="Registration Date" 
-                value={formatRegistrationDate(device.createdAt)} 
+                label="Registered" 
+                value={formatRelativeTime(device.createdAt)} 
               />
             )}
           </div>
