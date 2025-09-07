@@ -380,7 +380,9 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   const colors = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4', '#84CC16', '#F97316']
 
   return (
-    <div className="space-y-3">
+    <div 
+      className="max-h-64 overflow-y-auto space-y-3 no-scrollbar"
+    >
       {versionData.map((item, index) => {
         const percentage = Math.round((item.count / effectiveDevices.length) * 100)
         const barWidth = (item.count / maxCount) * 100

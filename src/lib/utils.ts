@@ -83,6 +83,58 @@ export function initializeTheme(): void {
 }
 
 /**
+ * Force theme synchronization with system preference
+ * Useful for Edge browser issues where theme detection fails
+ */
+export function forceThemeSync(): void {
+  if (typeof window === 'undefined') return
+  
+  try {
+    const stored = localStorage.getItem('reportmate-theme') || localStorage.getItem('theme')
+    
+    if (!stored || stored === 'system') {
+      // Re-evaluate system preference
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      const root = document.documentElement
+      
+      root.classList.remove('light', 'dark')
+      root.classList.add(prefersDark ? 'dark' : 'light')
+      
+      console.log('[Utils] Forced theme sync:', {
+        systemPrefersDark: prefersDark,
+        appliedTheme: prefersDark ? 'dark' : 'light',
+        userAgent: navigator.userAgent
+      })
+    } else {
+      // Apply stored explicit theme
+      const root = document.documentElement
+      root.classList.remove('light', 'dark')
+      root.classList.add(stored)
+      
+      console.log('[Utils] Forced explicit theme sync:', {
+        storedTheme: stored,
+        appliedTheme: stored
+      })
+    }
+  } catch (error) {
+    console.warn('[Utils] Force theme sync failed:', error)
+  }
+}
+
+// Make function globally available for console debugging
+if (typeof window !== 'undefined') {
+  (window as any).forceThemeSync = forceThemeSync
+}
+
+/**
+ * Detect if running on Edge browser
+ */
+export function isEdgeBrowser(): boolean {
+  if (typeof window === 'undefined') return false
+  return navigator.userAgent.includes('Edg/')
+}
+
+/**
  * Utility to combine class names
  */
 export function cn(...classes: (string | undefined | null | false)[]): string {
