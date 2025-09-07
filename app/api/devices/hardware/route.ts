@@ -64,7 +64,7 @@ export async function GET() {
       console.log(`[BULK HARDWARE API] ${timestamp} - Got ${result.rows.length} device records from database`)
 
       // Process the hardware data using the same extraction logic
-      const { extractHardware } = await import('../../../../src/lib/data-processing/modules')
+      const { extractHardware } = await import('../../../../src/lib/data-processing/modules/hardware')
       
       const processedDevices = result.rows
         .map((row: any) => {
@@ -73,15 +73,13 @@ export async function GET() {
             const deviceName = row.device_name || row.computer_name || serialNumber || 'Unknown Device'
             
             // Create device structure for module processing
-            const deviceData = {
-              modules: {
-                hardware: row.hardware_data || {},
-                system: row.system_data || {}
-              }
+            const deviceModules = {
+              hardware: row.hardware_data || {},
+              system: row.system_data || {}
             }
             
             // Extract hardware using the ReportMate module system
-            const hardwareData = extractHardware(deviceData)
+            const hardwareData = extractHardware(deviceModules)
 
             // Extract architecture from various sources
             let architecture = 'Unknown'
