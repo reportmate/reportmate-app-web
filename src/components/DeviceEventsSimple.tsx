@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { normalizeEventKind, severityToBadgeClasses } from '../lib/events/normalize';
 
 interface EventDto {
   id: string;
@@ -23,18 +24,19 @@ interface PayloadObject extends Record<string, unknown> {
 
 // Helper function to get event type styling
 const getEventTypeConfig = (kind?: string) => {
-  switch (kind?.toLowerCase()) {
-    case 'error': 
-      return { bg: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', dot: 'bg-red-500' }
-    case 'warning': 
-      return { bg: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', dot: 'bg-yellow-500' }
-    case 'success': 
-      return { bg: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', dot: 'bg-green-500' }
-    case 'info': 
-      return { bg: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', dot: 'bg-blue-500' }
-    default: 
-      return { bg: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200', dot: 'bg-gray-500' }
+  const severity = normalizeEventKind(kind || '')
+  const badgeClass = severityToBadgeClasses(severity)
+  
+  // Get dot color based on severity
+  let dotColor = 'bg-gray-500'
+  switch (severity) {
+    case 'success': dotColor = 'bg-green-500'; break
+    case 'warning': dotColor = 'bg-yellow-500'; break
+    case 'error': dotColor = 'bg-red-500'; break
+    case 'info': dotColor = 'bg-blue-500'; break
   }
+  
+  return { bg: badgeClass, dot: dotColor }
 }
 
 // Helper function to format timestamp
@@ -419,7 +421,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   {/* Event Type Pill */}
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} flex-shrink-0`}>
-                    {ev.kind || 'unknown'}
+                    {normalizeEventKind(ev.kind || '')}
                   </span>
                   
                   {/* Event Message - Hidden on mobile (sm and below) */}

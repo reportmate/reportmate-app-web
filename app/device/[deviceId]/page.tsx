@@ -777,7 +777,10 @@ export default function DeviceDetailPage() {
     console.log('🔄 Computing installs data:', {
       hasDeviceInfo: !!deviceInfo,
       hasInstallsModule: !!deviceInfo?.modules?.installs,
-      hasProcessedInstalls: !!deviceInfo?.installs
+      hasProcessedInstalls: !!deviceInfo?.installs,
+      deviceInfoKeys: deviceInfo ? Object.keys(deviceInfo) : [],
+      deviceId: deviceInfo?.deviceId,
+      serialNumber: deviceInfo?.serialNumber
     })
     
     if (!deviceInfo?.modules?.installs && !deviceInfo?.installs) {
@@ -847,14 +850,29 @@ export default function DeviceDetailPage() {
   }, [deviceId, router])
   
   useEffect(() => {
+    console.log('[DEVICE PAGE] 🚀 FETCH DEVICE DATA USEEFFECT TRIGGERED:', {
+      deviceId,
+      initializing,
+      isResolving,
+      identifierType: identifyDeviceIdentifierType(deviceId)
+    });
+    
     // Don't fetch device data if we're still initializing or resolving the identifier
     if (initializing || isResolving) {
+      console.log('[DEVICE PAGE] ⏸️ Skipping fetch - still initializing or resolving');
       return
     }
     
     // Only fetch if this is a serial number, asset tag, or device name (resolved identifiers will redirect)
     const identifierType = identifyDeviceIdentifierType(deviceId)
+    console.log('[DEVICE PAGE] 🔍 Device ID type check:', {
+      deviceId,
+      identifierType,
+      shouldFetch: identifierType === 'serialNumber' || identifierType === 'assetTag' || identifierType === 'deviceName'
+    });
+    
     if (identifierType !== 'serialNumber' && identifierType !== 'assetTag' && identifierType !== 'deviceName') {
+      console.log('[DEVICE PAGE] ⏸️ Skipping fetch - identifier type not supported for direct fetch');
       return // Let the resolution effect handle this
     }
     
@@ -888,10 +906,30 @@ export default function DeviceDetailPage() {
         
         if (deviceData.success && deviceData.device) {
           // Use the proper modular device mapper
-          const processedDevice = mapDeviceData(deviceData.device);
+          console.log('[DEVICE PAGE] About to call mapDeviceData with:', {
+            hasDevice: !!deviceData.device,
+            deviceKeys: deviceData.device ? Object.keys(deviceData.device) : [],
+            hasModules: !!deviceData.device?.modules,
+            moduleKeys: deviceData.device?.modules ? Object.keys(deviceData.device.modules) : []
+          });
           
-          // Set the processed device data
-          setDeviceInfo(processedDevice);
+          try {
+            const processedDevice = mapDeviceData(deviceData.device);
+            console.log('[DEVICE PAGE] mapDeviceData returned:', {
+              hasProcessedDevice: !!processedDevice,
+              processedDeviceKeys: processedDevice ? Object.keys(processedDevice) : [],
+              hasInstalls: !!processedDevice?.installs,
+              hasModules: !!processedDevice?.modules
+            });
+            
+            // Set the processed device data
+            setDeviceInfo(processedDevice);
+            console.log('[DEVICE PAGE] setDeviceInfo called successfully');
+          } catch (mapError) {
+            console.error('[DEVICE PAGE] mapDeviceData failed:', mapError);
+            setTimeout(() => setError(`Failed to process device data: ${mapError}`), 100)
+            return
+          }
         } else {
           console.error('Invalid device data structure:', deviceData)
           setTimeout(() => setError('Invalid device data received'), 100)
@@ -1119,7 +1157,7 @@ export default function DeviceDetailPage() {
                   {/* Asset tag and serial - below device name on mobile, inline on desktop */}
                   <div className="flex items-center gap-2 mt-1 sm:mt-0">
                     {(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 min-w-[80px] justify-center">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
                         {deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}
                       </span>
                     )}
@@ -1132,11 +1170,90 @@ export default function DeviceDetailPage() {
                 </div>
               </div>
               
-              {/* Last seen and copy link button - hidden on mobile */}
+              {/* Last seen and action buttons - hidden on mobile */}
               <div className="hidden sm:flex items-center gap-4 pr-4">
                 <div className="text-2sm text-gray-600 dark:text-gray-400">
                   Last seen {formatRelativeTime(deviceInfo.lastSeen)}
                 </div>
+                
+                {/* Remote access button */}
+                {(() => {
+                  // Get active network interface IP address
+                  const getActiveIPAddress = () => {
+                    // Check for active network interface first
+                    if (deviceInfo.modules?.network?.interfaces) {
+                      const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
+                        iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
+                      )
+                      if (activeInterface) {
+                        // Find IPv4 address (not IPv6)
+                        const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
+                          /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                        )
+                        if (ipv4) return ipv4
+                      }
+                    }
+                    
+                    // Fallback to processed network data
+                    return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
+                  }
+                  
+                  // Get OS platform for protocol selection
+                  const getRemoteProtocol = () => {
+                    // Try multiple paths for OS information
+                    const os = deviceInfo.os || 
+                              deviceInfo.system?.operatingSystem?.name || 
+                              deviceInfo.modules?.system?.operatingSystem?.name || 
+                              deviceInfo.modules?.system?.operatingSystem?.productName || ''
+                    
+                    const osLower = os.toLowerCase()
+                    
+                    if (osLower.includes('windows')) {
+                      return 'rdp'
+                    } else if (osLower.includes('mac') || osLower.includes('darwin') || osLower.includes('macos')) {
+                      return 'vnc'
+                    }
+                    
+                    // No fallback - return null for unknown platforms
+                    return null
+                  }
+                  
+                  const ipAddress = getActiveIPAddress()
+                  const protocol = getRemoteProtocol()
+                  
+                  // Only show if we have both IP address and known platform
+                  if (!ipAddress || !protocol) return null
+                  
+                  return (
+                    <button
+                      onClick={() => {
+                        const remoteUrl = `${protocol}://${ipAddress}`
+                        window.location.href = remoteUrl
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900 dark:hover:text-purple-300"
+                      title={`Connect via ${protocol.toUpperCase()} to ${ipAddress}`}
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M10 10h4"/>
+                        <path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/>
+                        <path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/>
+                        <path d="M 22 16 L 2 16"/>
+                        <path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/>
+                        <path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/>
+                      </svg>
+                      <span>Remote</span>
+                    </button>
+                  )
+                })()}
                 
                 {/* Copy shareable link button */}
                 <button
@@ -1144,7 +1261,7 @@ export default function DeviceDetailPage() {
                   className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
                     copySuccess 
                       ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-yellow-100 hover:text-yellow-700 dark:hover:bg-yellow-900 dark:hover:text-yellow-300'
                   }`}
                   title={`Copy shareable link using ${(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) ? 'asset tag' : 'serial number'}`}
                 >
