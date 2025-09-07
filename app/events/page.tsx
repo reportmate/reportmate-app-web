@@ -630,7 +630,7 @@ function EventsPageContent() {
         {/* Events Table */}
         <>
           {/* Desktop Table View (lg and up) */}
-          <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700 overflow-hidden">
               {/* Table Header with Search */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div>
@@ -920,10 +920,12 @@ function EventsPageContent() {
                   </tbody>
                 </table>
               </div>
+              {/* Bottom border for desktop table */}
+              <div className="border-b border-gray-200 dark:border-gray-700"></div>
             </div>
 
             {/* Tablet Table View (md to lg) - Horizontally scrollable */}
-            <div className="hidden md:block lg:hidden bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+            <div className="hidden md:block lg:hidden bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700">
               {/* Table Header with Search */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <div>
@@ -1174,6 +1176,8 @@ function EventsPageContent() {
                   </tbody>
                 </table>
               </div>
+              {/* Bottom border for tablet table */}
+              <div className="border-b border-gray-200 dark:border-gray-700"></div>
             </div>
 
             {/* Mobile Card View (sm and below) */}
@@ -1327,7 +1331,7 @@ function EventsPageContent() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-xl">
+              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-l border-r border-b border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-xl shadow-sm">
                 <div className="flex-1 flex justify-between sm:hidden">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
