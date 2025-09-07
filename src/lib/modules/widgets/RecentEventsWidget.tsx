@@ -7,6 +7,7 @@ import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
+import { normalizeEventKind, severityToBadgeClasses } from '../../events/normalize'
 
 interface RecentEventsTableProps {
   events: FleetEvent[]
@@ -358,7 +359,8 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {bundledEvents.map((bundledEvent: BundledEvent) => {
-                      const statusConfig = getStatusConfig(bundledEvent.kind)
+                      const severity = normalizeEventKind(bundledEvent.kind)
+                      const badgeClass = severityToBadgeClasses(severity)
                       return (
                         <tr 
                           key={bundledEvent.id} 
@@ -366,8 +368,8 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                         >
                           <td className="w-20 px-3 py-2.5">
                             <div className="flex items-center gap-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                                {bundledEvent.kind === 'system' ? 'info' : bundledEvent.kind}
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${badgeClass}`}>
+                                {severity}
                               </span>
                             </div>
                           </td>
