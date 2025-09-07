@@ -7,7 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
-import { extractNetwork } from "../../../src/lib/data-processing/modules"
+import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
 
 interface NetworkDevice {
   id: string
