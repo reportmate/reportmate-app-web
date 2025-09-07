@@ -41,6 +41,59 @@ function HardwarePageContent() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
+  
+  // Chart filter states
+  const [selectedModels, setSelectedModels] = useState<string[]>([])
+  const [selectedMemoryRanges, setSelectedMemoryRanges] = useState<string[]>([])
+  const [selectedArchitectures, setSelectedArchitectures] = useState<string[]>([])
+  const [selectedDeviceTypes, setSelectedDeviceTypes] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  
+  // Handler functions for chart interactions
+  const handleModelToggle = (model: string) => {
+    setSelectedModels(prev => 
+      prev.includes(model) 
+        ? prev.filter(m => m !== model)
+        : [...prev, model]
+    )
+  }
+
+  const handleMemoryRangeToggle = (memoryRange: string) => {
+    setSelectedMemoryRanges(prev => 
+      prev.includes(memoryRange) 
+        ? prev.filter(m => m !== memoryRange)
+        : [...prev, memoryRange]
+    )
+  }
+
+  const handleArchitectureToggle = (architecture: string) => {
+    setSelectedArchitectures(prev => 
+      prev.includes(architecture) 
+        ? prev.filter(a => a !== architecture)
+        : [...prev, architecture]
+    )
+  }
+
+  const handleDeviceTypeToggle = (deviceType: string) => {
+    setSelectedDeviceTypes(prev => 
+      prev.includes(deviceType) 
+        ? prev.filter(d => d !== deviceType)
+        : [...prev, deviceType]
+    )
+  }
+
+  const handlePlatformToggle = (platform: string) => {
+    setSelectedPlatforms(prev => {
+      if (prev.includes(platform)) {
+        // If this platform is currently selected, remove it
+        return prev.filter(p => p !== platform)
+      } else {
+        // If this platform is not selected, make it the only selected platform (mutually exclusive)
+        return [platform]
+      }
+    })
+  }
+  
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -289,8 +342,91 @@ function HardwarePageContent() {
     })
   )).sort()
 
+  // Helper function to get memory range for a device
+  const getMemoryRange = (memory: any): string => {
+    let memoryGB = 0
+    
+    if (typeof memory === 'object' && memory !== null) {
+      const memObj = memory as any
+      if (memObj.totalPhysical) {
+        memoryGB = typeof memObj.totalPhysical === 'number' 
+          ? memObj.totalPhysical / (1024 * 1024 * 1024)
+          : parseFloat(memObj.totalPhysical) || 0
+      }
+    } else if (typeof memory === 'number') {
+      memoryGB = memory / (1024 * 1024 * 1024)
+    } else if (typeof memory === 'string') {
+      const match = memory.match(/(\d+(?:\.\d+)?)\s*GB/i)
+      if (match) {
+        memoryGB = parseFloat(match[1])
+      }
+    }
+    
+    if (memoryGB <= 4) return '≤4 GB'
+    if (memoryGB <= 8) return '4-8 GB'
+    if (memoryGB <= 16) return '8-16 GB'
+    if (memoryGB <= 32) return '16-32 GB'
+    if (memoryGB <= 64) return '32-64 GB'
+    return '>64 GB'
+  }
+
+  // Helper function to get device model
+  const getDeviceModel = (h: any): string => {
+    const deviceFromMainAPI = devices.find(d => 
+      d.deviceId === h.deviceId || 
+      d.serialNumber === h.serialNumber
+    )
+    
+    return deviceFromMainAPI?.model || 
+           deviceFromMainAPI?.modules?.hardware?.model ||
+           deviceFromMainAPI?.modules?.system?.hardwareInfo?.model ||
+           h.raw?.model ||
+           h.raw?.system?.hardwareInfo?.model ||
+           h.raw?.hardware?.model ||
+           'Unknown Model'
+  }
+
+  // Helper function to determine device type
+  const getDeviceType = (h: any): string => {
+    const model = getDeviceModel(h)
+    if (model.toLowerCase().includes('macbook') || model.toLowerCase().includes('imac') || model.toLowerCase().includes('mac')) {
+      return 'Mac'
+    }
+    if (model.toLowerCase().includes('surface')) {
+      return 'Surface'
+    }
+    if (model.toLowerCase().includes('thinkpad') || model.toLowerCase().includes('laptop')) {
+      return 'Laptop'
+    }
+    if (model.toLowerCase().includes('desktop') || model.toLowerCase().includes('optiplex')) {
+      return 'Desktop'
+    }
+    return 'Other'
+  }
+
+  // Helper function to determine platform from device model
+  const getDevicePlatform = (h: any): 'Windows' | 'Macintosh' | 'Other' => {
+    const model = getDeviceModel(h)
+    
+    // Debug logging to see what models we have
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Platform detection for device:', h.serialNumber || h.deviceId, 'Model:', model)
+    }
+    
+    if (model.toLowerCase().includes('macbook') || 
+        model.toLowerCase().includes('imac') || 
+        model.toLowerCase().includes('mac mini') ||
+        model.toLowerCase().includes('mac pro') ||
+        model.toLowerCase().includes('mac studio')) {
+      return 'Macintosh'
+    }
+    // Most other devices are Windows
+    return 'Windows'
+  }
+
   // Filter hardware
   const filteredHardware = processedHardware.filter(h => {
+    // Existing processor filter
     if (processorFilter !== 'all') {
       let processorStr = ''
       if (typeof h.processor === 'string') {
@@ -302,7 +438,34 @@ function HardwarePageContent() {
       const family = processorStr.includes(processorFilter.toLowerCase())
       if (!family) return false
     }
-    
+
+    // Chart filters
+    if (selectedModels.length > 0) {
+      const deviceModel = getDeviceModel(h)
+      if (!selectedModels.includes(deviceModel)) return false
+    }
+
+    if (selectedMemoryRanges.length > 0) {
+      const memoryRange = getMemoryRange(h.memory)
+      if (!selectedMemoryRanges.includes(memoryRange)) return false
+    }
+
+    if (selectedArchitectures.length > 0) {
+      const arch = h.architecture || 'Unknown'
+      if (!selectedArchitectures.includes(arch)) return false
+    }
+
+    if (selectedDeviceTypes.length > 0) {
+      const deviceType = getDeviceType(h)
+      if (!selectedDeviceTypes.includes(deviceType)) return false
+    }
+
+    if (selectedPlatforms.length > 0) {
+      const platform = getDevicePlatform(h)
+      if (!selectedPlatforms.includes(platform)) return false
+    }
+
+    // Existing search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       
@@ -332,6 +495,11 @@ function HardwarePageContent() {
     }
     
     return true
+  }).sort((a, b) => {
+    // Sort alphabetically by device name (Device column)
+    const deviceNameA = (a.deviceName || a.serialNumber || '').toLowerCase()
+    const deviceNameB = (b.deviceName || b.serialNumber || '').toLowerCase()
+    return deviceNameA.localeCompare(deviceNameB)
   })
 
   const formatMemory = (memory: string | number | object | any) => {
@@ -361,8 +529,29 @@ function HardwarePageContent() {
     return memory || 'Unknown'
   }
 
-  const formatStorage = (storage: any[]) => {
-    if (!storage || storage.length === 0) return 'No drives'
+  const formatStorage = (storage: any) => {
+    // Handle non-array storage data
+    if (!storage) return 'No drives'
+    
+    // If storage is not an array, try to convert or handle it
+    if (!Array.isArray(storage)) {
+      // If it's a string or number, return it as-is
+      if (typeof storage === 'string') return storage
+      if (typeof storage === 'number') {
+        return storage >= 1000000000000 ? `${(storage / 1099511627776).toFixed(1)} TB` : `${Math.round(storage / 1073741824)} GB`
+      }
+      // If it's an object, try to extract meaningful data
+      if (typeof storage === 'object') {
+        const size = storage.size || storage.capacity || storage.total || 0
+        if (size > 0) {
+          return size >= 1000000000000 ? `${(size / 1099511627776).toFixed(1)} TB` : `${Math.round(size / 1073741824)} GB`
+        }
+      }
+      return 'Unknown storage'
+    }
+    
+    // Handle array storage data
+    if (storage.length === 0) return 'No drives'
     const totalSize = storage.reduce((sum, drive) => {
       const size = drive.size || drive.capacity || 0
       return sum + (typeof size === 'number' ? size : 0)
@@ -472,21 +661,50 @@ function HardwarePageContent() {
             devices={processedHardware} 
             loading={loading}
             className=""
+            selectedPlatforms={selectedPlatforms}
+            onPlatformToggle={handlePlatformToggle}
+            selectedModels={selectedModels}
+            onModelToggle={handleModelToggle}
+            // Global filter context for visual feedback
+            globalSelectedMemoryRanges={selectedMemoryRanges}
+            globalSelectedArchitectures={selectedArchitectures}
+            globalSelectedDeviceTypes={selectedDeviceTypes}
           />
           <MemoryBreakdownChart 
             devices={processedHardware} 
             loading={loading}
             className=""
+            selectedMemoryRanges={selectedMemoryRanges}
+            onMemoryRangeToggle={handleMemoryRangeToggle}
+            // Global filter context for visual feedback
+            globalSelectedPlatforms={selectedPlatforms}
+            globalSelectedModels={selectedModels}
+            globalSelectedArchitectures={selectedArchitectures}
+            globalSelectedDeviceTypes={selectedDeviceTypes}
           />
           <ArchitectureDonutChart 
             devices={processedHardware} 
             loading={loading}
             className=""
+            selectedArchitectures={selectedArchitectures}
+            onArchitectureToggle={handleArchitectureToggle}
+            // Global filter context for visual feedback
+            globalSelectedPlatforms={selectedPlatforms}
+            globalSelectedModels={selectedModels}
+            globalSelectedMemoryRanges={selectedMemoryRanges}
+            globalSelectedDeviceTypes={selectedDeviceTypes}
           />
           <DeviceTypeDonutChart 
             devices={processedHardware} 
             loading={loading}
             className=""
+            selectedDeviceTypes={selectedDeviceTypes}
+            onDeviceTypeToggle={handleDeviceTypeToggle}
+            // Global filter context for visual feedback
+            globalSelectedPlatforms={selectedPlatforms}
+            globalSelectedModels={selectedModels}
+            globalSelectedMemoryRanges={selectedMemoryRanges}
+            globalSelectedArchitectures={selectedArchitectures}
           />
         </div>
       </div>
@@ -564,13 +782,13 @@ function HardwarePageContent() {
                         >
                           {hw.deviceName || hw.serialNumber || 'Unknown Device'}
                         </Link>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                        <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
                           {hw.serialNumber}
                           {hw.assetTag ? ` | ${hw.assetTag}` : ''}
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
+                        <div className="text-xs text-gray-900 dark:text-white">
                           {(() => {
                             // Try to get model from device data
                             const deviceFromMainAPI = devices.find(d => 
@@ -596,7 +814,7 @@ function HardwarePageContent() {
                                    'Unknown Model'
                           })()}
                         </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
                           {(() => {
                             // Try to get manufacturer from device data
                             const deviceFromMainAPI = devices.find(d => 
@@ -615,20 +833,20 @@ function HardwarePageContent() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
+                        <div className="text-xs text-gray-900 dark:text-white">
                           {typeof hw.processor === 'object' && hw.processor ? 
                             (hw.processor as any).name || (hw.processor as any).model || 'Unknown Processor' : 
                             hw.processor || 'Unknown Processor'
                           }
                         </div>
                         {hw.processorCores && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             {hw.processorCores} cores
                             {hw.processorSpeed && ` • ${hw.processorSpeed}`}
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 text-xs text-gray-900 dark:text-white">
                         {(() => {
                           // Handle graphics as array
                           if (Array.isArray(hw.graphics) && hw.graphics.length > 0) {
@@ -638,7 +856,7 @@ function HardwarePageContent() {
                               <div>
                                 <div>{displayName}</div>
                                 {hw.graphics.length > 1 && (
-                                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
                                     +{hw.graphics.length - 1} more
                                   </div>
                                 )}
@@ -670,18 +888,18 @@ function HardwarePageContent() {
                           return 'Unknown'
                         })()}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 text-xs text-gray-900 dark:text-white">
                         {formatMemory(hw.memory)}
                         {hw.memoryModules?.length > 0 && (
-                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
                             {hw.memoryModules.length} modules
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 text-xs text-gray-900 dark:text-white">
                         {formatStorage(hw.storage)}
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <td className="px-6 py-4 text-xs text-gray-900 dark:text-white">
                         {(() => {
                           // Debug log architecture for specific devices
                           if (process.env.NODE_ENV === 'development' && hw.serialNumber === '0F33V9G25083HJ') {
