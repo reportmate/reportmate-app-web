@@ -46,15 +46,7 @@ export async function resolveDeviceIdentifier(identifier: string): Promise<Devic
   const identifierType = identifyDeviceIdentifierType(identifier)
   console.log(`[DEVICE RESOLVER] Resolving ${identifierType}: ${identifier}`)
   
-  // If it's already a serial number, return it directly
-  if (identifierType === 'serialNumber') {
-    return {
-      found: true,
-      serialNumber: identifier,
-      originalIdentifier: identifier,
-      identifierType: 'serialNumber'
-    }
-  }
+  // Always validate through the API - don't assume identifiers are valid
   
   try {
     // Use the dedicated resolution API
@@ -109,23 +101,13 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
   const identifierType = identifyDeviceIdentifierType(identifier)
   console.log(`[DEVICE RESOLVER SERVER] Resolving ${identifierType}: ${identifier}`)
   
-  // If it's already a serial number, return it directly
-  if (identifierType === 'serialNumber') {
-    return {
-      found: true,
-      serialNumber: identifier,
-      originalIdentifier: identifier,
-      identifierType: 'serialNumber'
-    }
-  }
-  
   try {
     // Always use the local Next.js API which has proper fallback logic
     const baseUrl = process.env.NODE_ENV === 'production'   
       ? `https://${process.env.VERCEL_URL || 'localhost'}`
       : 'http://localhost:3000'  // Use the actual dev server port
     
-    // For UUID or Asset Tag, we need to query the local devices API (which handles fallbacks)
+    // Always query the devices API to search for the identifier - don't assume it's already a serial number
     const response = await fetch(`${baseUrl}/api/devices?limit=1000`, {
       cache: 'no-store',
       headers: {
@@ -154,100 +136,75 @@ export async function resolveDeviceIdentifierServer(identifier: string, apiBaseU
       }
     }
     
-    // Search for the device by the appropriate identifier
-    const device = data.find((d: any) => {
-      if (identifierType === 'uuid') {
-        // Check if the UUID matches the deviceId field
-        return d.deviceId === identifier || d.id === identifier
-      } else if (identifierType === 'assetTag') {
-        // Check if asset tag matches at the top level first
-        return d.assetTag === identifier
-      }
-      return false
-    })
+    console.log(`[DEVICE RESOLVER SERVER] Searching ${data.length} devices for identifier: ${identifier}`)
     
+    // First, try exact match on serial number (most common case)
+    let device = data.find((d: any) => d.serialNumber === identifier)
+    if (device) {
+      console.log(`[DEVICE RESOLVER SERVER] ✅ Found exact serial number match: ${identifier}`)
+      return {
+        found: true,
+        serialNumber: identifier,
+        originalIdentifier: identifier,
+        identifierType: 'serialNumber'
+      }
+    }
+    
+    // Then try UUID matches
+    device = data.find((d: any) => d.deviceId === identifier || d.id === identifier)
     if (device && device.serialNumber) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved ${identifierType} ${identifier} → serial number: ${device.serialNumber}`)
+      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved UUID ${identifier} → serial number: ${device.serialNumber}`)
       return {
         found: true,
         serialNumber: device.serialNumber,
         originalIdentifier: identifier,
-        identifierType
+        identifierType: 'uuid'
       }
     }
     
-    // If not found by simple lookup, we need to check individual device records for asset tags and device names
-    if (identifierType === 'assetTag' || identifierType === 'uuid' || identifierType === 'deviceName') {
-      console.log(`[DEVICE RESOLVER SERVER] Performing detailed search for ${identifierType}: ${identifier}`)
-      
-      // Check each device's detailed data for matching identifiers
-      for (const device of data) {
-        if (!device.serialNumber) continue
-        
-        try {
-          const deviceResponse = await fetch(`${baseUrl}/api/device/${device.serialNumber}`, {
-            cache: 'no-store',
-            headers: {
-              'Cache-Control': 'no-cache',
-              'Pragma': 'no-cache'
-            }
-          })
-          
-          if (deviceResponse.ok) {
-            const deviceData = await deviceResponse.json()
-            
-            if (identifierType === 'uuid') {
-              // Check various UUID fields in the response
-              if (deviceData.metadata?.deviceId === identifier ||
-                  deviceData.inventory?.uuid === identifier ||
-                  deviceData.inventory?.deviceId === identifier ||
-                  deviceData.deviceId === identifier) {
-                console.log(`[DEVICE RESOLVER SERVER] ✅ Found UUID ${identifier} in device ${device.serialNumber}`)
-                return {
-                  found: true,
-                  serialNumber: device.serialNumber,
-                  originalIdentifier: identifier,
-                  identifierType
-                }
-              }
-            } else if (identifierType === 'assetTag') {
-              // Check asset tag in various locations
-              if (deviceData.inventory?.assetTag === identifier ||
-                  deviceData.assetTag === identifier) {
-                console.log(`[DEVICE RESOLVER SERVER] ✅ Found Asset Tag ${identifier} in device ${device.serialNumber}`)
-                return {
-                  found: true,
-                  serialNumber: device.serialNumber,
-                  originalIdentifier: identifier,
-                  identifierType
-                }
-              }
-            } else if (identifierType === 'deviceName') {
-              // Check multiple possible device name fields
-              const deviceName = deviceData.inventory?.deviceName || deviceData.inventory?.device_name || deviceData.name
-              const computerName = deviceData.inventory?.computerName || deviceData.inventory?.computer_name
-              
-              if (deviceName === identifier || computerName === identifier ||
-                  deviceName?.toLowerCase() === identifier.toLowerCase() ||
-                  computerName?.toLowerCase() === identifier.toLowerCase()) {
-                console.log(`[DEVICE RESOLVER SERVER] ✅ Found Device Name ${identifier} in device ${device.serialNumber}`)
-                return {
-                  found: true,
-                  serialNumber: device.serialNumber,
-                  originalIdentifier: identifier,
-                  identifierType
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.warn(`[DEVICE RESOLVER SERVER] Failed to check device ${device.serialNumber}:`, error)
-          continue
-        }
+    // Then try asset tag at top level
+    device = data.find((d: any) => d.assetTag === identifier)
+    if (device && device.serialNumber) {
+      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Asset Tag ${identifier} → serial number: ${device.serialNumber}`)
+      return {
+        found: true,
+        serialNumber: device.serialNumber,
+        originalIdentifier: identifier,
+        identifierType: 'assetTag'
       }
     }
     
-    console.log(`[DEVICE RESOLVER SERVER] ❌ No device found for ${identifierType}: ${identifier}`)
+    // Check for asset tag in modules.inventory
+    device = data.find((d: any) => d.modules?.inventory?.assetTag === identifier)
+    if (device && device.serialNumber) {
+      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Asset Tag (inventory) ${identifier} → serial number: ${device.serialNumber}`)
+      return {
+        found: true,
+        serialNumber: device.serialNumber,
+        originalIdentifier: identifier,
+        identifierType: 'assetTag'
+      }
+    }
+    
+    // Check device names
+    device = data.find((d: any) => 
+      d.name === identifier || 
+      d.modules?.inventory?.deviceName === identifier ||
+      d.modules?.inventory?.device_name === identifier ||
+      d.modules?.inventory?.computerName === identifier ||
+      d.modules?.inventory?.computer_name === identifier
+    )
+    if (device && device.serialNumber) {
+      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Device Name ${identifier} → serial number: ${device.serialNumber}`)
+      return {
+        found: true,
+        serialNumber: device.serialNumber,
+        originalIdentifier: identifier,
+        identifierType: 'deviceName'
+      }
+    }
+    
+    console.log(`[DEVICE RESOLVER SERVER] ❌ No device found for identifier: ${identifier}`)
     return {
       found: false,
       originalIdentifier: identifier,
