@@ -180,6 +180,62 @@ export async function GET(
       }
       */
       
+      // Try local sample file fallback for development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[DEVICE API] Trying local sample file fallback...')
+        try {
+          const sampleFilePath = path.join(process.cwd(), '../../sample-device.json')
+          if (fs.existsSync(sampleFilePath)) {
+            const sampleData = JSON.parse(fs.readFileSync(sampleFilePath, 'utf8'))
+            console.log('[DEVICE API] ✅ Using sample device data for development')
+            
+            // Check if this device ID matches the sample device
+            if (sampleData.device && 
+                (sampleData.device.serialNumber === deviceId || 
+                 sampleData.device.deviceId === deviceId ||
+                 deviceId === 'MJ0KP6EX')) {
+              console.log('[DEVICE API] 📋 Device ID matches sample data, using it')
+              
+              // Continue with normal processing using sample data
+              const data = sampleData.device
+              const device = data
+              let modules = data.modules || {}
+              
+              // Apply PowerShell object conversion
+              const cleanedModules = convertPowerShellObjects(modules, 'modules', data) as Record<string, unknown>
+              
+              const responseData = {
+                success: true,
+                device: {
+                  deviceId: device.deviceId,
+                  serialNumber: device.serialNumber,
+                  lastSeen: device.lastSeen || new Date().toISOString(),
+                  clientVersion: device.clientVersion || '1.0.0',
+                  modules: cleanedModules
+                }
+              }
+              
+              console.log('[DEVICE API] 📋 Sample device response prepared:', {
+                deviceId: responseData.device.deviceId,
+                serialNumber: responseData.device.serialNumber,
+                moduleCount: Object.keys(responseData.device.modules).length,
+                moduleNames: Object.keys(responseData.device.modules)
+              })
+              
+              return NextResponse.json(responseData, {
+                headers: {
+                  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                  'Pragma': 'no-cache',
+                  'Expires': '0'
+                }
+              })
+            }
+          }
+        } catch (sampleError) {
+          console.error('[DEVICE API] Sample file fallback failed:', sampleError)
+        }
+      }
+      
       // No fallback data - return error if Azure Functions API fails
       console.log('[DEVICE API] Azure Functions API failed, no fallback available')
       
@@ -243,17 +299,18 @@ export async function GET(
       const cleanedModules = convertPowerShellObjects(modules, 'modules', data) as Record<string, unknown>
       console.log('[DEVICE API] PowerShell conversion complete')
       
-      const responseData = {
-        success: true,
-        device: {
-          deviceId: device.deviceId,
-          serialNumber: device.serialNumber,
-          // Let frontend calculate status based on lastSeen timestamp
-          lastSeen: device.lastSeen || device.collectedAt,
-          clientVersion: device.clientVersion || '1.0.0',
-          modules: cleanedModules
+        const responseData = {
+          success: true,
+          device: {
+            deviceId: device.deviceId,
+            serialNumber: device.serialNumber,
+            // Let frontend calculate status based on lastSeen timestamp
+            lastSeen: device.lastSeen || device.collectedAt,
+            createdAt: device.createdAt, // Include registration date
+            clientVersion: device.clientVersion || '1.0.0',
+            modules: cleanedModules
+          }
         }
-      }
       
       console.log('[DEVICE API] Clean device response prepared:', {
         deviceId: responseData.device.deviceId,
@@ -350,6 +407,7 @@ export async function GET(
           serialNumber: metadata.serialNumber,   // Human-readable ID (unique)
           // Let frontend calculate status based on lastSeen timestamp
           lastSeen: metadata.collectedAt,
+          createdAt: metadata.createdAt, // Include registration date
           clientVersion: metadata.clientVersion,
           
           // ALL data comes from modules - frontend must use device.modules.{moduleName} for everything
@@ -424,6 +482,7 @@ export async function GET(
           deviceId: data.metadata?.deviceId || data.deviceId,
           serialNumber: data.metadata?.serialNumber || data.serialNumber,
           collectedAt: data.metadata?.collectedAt || data.collectedAt,
+          createdAt: data.metadata?.createdAt || data.createdAt,
           clientVersion: data.metadata?.clientVersion || data.clientVersion || '1.0.0'
         }
         
@@ -452,6 +511,7 @@ export async function GET(
             serialNumber: deviceMetadata.serialNumber,   // Human-readable ID (unique) 
             // Let frontend calculate status based on lastSeen timestamp
             lastSeen: deviceMetadata.collectedAt,
+            createdAt: deviceMetadata.createdAt, // Include registration date
             clientVersion: deviceMetadata.clientVersion,
             
             // ALL data comes from modules - frontend must use device.modules.{moduleName} for everything
