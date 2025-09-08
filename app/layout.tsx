@@ -4,7 +4,6 @@ import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
 import { ThemeProvider } from "../src/components/theme-provider";
 import { EdgeThemeFix } from "../src/components/edge-theme-fix";
-import { ThemeDebugPanel } from "../src/components/theme-debug-panel";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 
@@ -114,10 +113,7 @@ export default function RootLayout({
             <ErrorBoundary>
               {isDevelopment ? (
                 // Development: No AutoAuth component
-                <>
-                  {children}
-                  <ThemeDebugPanel />
-                </>
+                children
               ) : (
                 // Production: Full authentication with AutoAuth
                 <AutoAuth>

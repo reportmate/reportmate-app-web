@@ -269,7 +269,7 @@ export function MemoryBreakdownChart({
   if (!memoryData || memoryData.length === 0) {
     return (
       <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Memory Distribution</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Memory</h3>
         <div className="text-center text-gray-500 dark:text-gray-400 py-8">
           <p>No memory data available</p>
         </div>
@@ -282,70 +282,48 @@ export function MemoryBreakdownChart({
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Memory Distribution</h3>
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Memory</h3>
+        <span className="text-sm text-gray-500 dark:text-gray-400">{totalDevices} devices</span>
+      </div>
       
-      <div className="space-y-4">
+      <div className="space-y-3">
         {memoryData.map(item => (
-          <div key={item.range} className="flex items-center">
-            <div 
-              className="flex items-center cursor-pointer rounded-lg p-2 transition-colors w-full hover:bg-gray-50 dark:hover:bg-gray-700/50"
-              onClick={() => onMemoryRangeToggle && onMemoryRangeToggle(item.range)}
-            >
-              {/* Label */}
-              <div className={`w-20 text-sm font-medium transition-colors ${
+          <div 
+            key={item.range}
+            className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            onClick={() => onMemoryRangeToggle && onMemoryRangeToggle(item.range)}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <span className={`text-sm font-medium transition-colors ${
                 item.isGreyedOut 
                   ? 'text-gray-400 dark:text-gray-500' 
                   : 'text-gray-900 dark:text-white'
-              }`}>
-                {item.range}
+              }`}>{item.range}</span>
+              <div className="flex items-center gap-2">
+                <span className={`text-sm transition-colors ${
+                  item.isGreyedOut 
+                    ? 'text-gray-400 dark:text-gray-500' 
+                    : 'text-gray-600 dark:text-gray-400'
+                }`}>{item.count}</span>
+                <span className={`text-xs transition-colors ${
+                  item.isGreyedOut 
+                    ? 'text-gray-400 dark:text-gray-500' 
+                    : 'text-gray-500 dark:text-gray-500'
+                }`}>({item.percentage.toFixed(1)}%)</span>
               </div>
-              
-              {/* Bar */}
-              <div className="flex-1 ml-4">
-                <div className="flex items-center">
-                  <div className="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-6 relative overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ease-out ${
-                        item.isGreyedOut 
-                          ? 'opacity-30' 
-                          : item.isSelected 
-                            ? 'opacity-100' 
-                            : selectedMemoryRanges.length > 0 
-                              ? 'opacity-40' 
-                              : 'opacity-100'
-                      }`}
-                      style={{ 
-                        width: `${maxCount > 0 ? (item.count / maxCount) * 100 : 0}%`,
-                        backgroundColor: item.color
-                      }}
-                    ></div>
-                    
-                    {/* Count label inside bar if there's space */}
-                    {item.count > 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className={`text-xs font-medium mix-blend-difference transition-colors ${
-                          item.isGreyedOut ? 'text-gray-400' : 'text-white'
-                        }`}>
-                          {item.count}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Percentage */}
-                  <div className={`ml-3 text-sm w-12 text-right transition-colors ${
-                    item.isGreyedOut
-                      ? 'text-gray-400 dark:text-gray-500'
-                      : item.isSelected 
-                        ? 'text-blue-600 dark:text-blue-400 font-medium' 
-                      : selectedMemoryRanges.length > 0 
-                        ? 'text-gray-400 dark:text-gray-500' 
-                        : 'text-gray-500 dark:text-gray-400'
-                  }`}>
-                    {item.percentage}%
-                  </div>
-                </div>
-              </div>
+            </div>
+            <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-opacity duration-200 ${
+              item.isGreyedOut ? 'opacity-30' : ''
+            }`}>
+              <div
+                className="h-2 rounded-full transition-all duration-300"
+                style={{
+                  width: `${item.percentage}%`,
+                  backgroundColor: item.color,
+                  opacity: item.isGreyedOut ? 0.3 : 1
+                }}
+              />
             </div>
           </div>
         ))}

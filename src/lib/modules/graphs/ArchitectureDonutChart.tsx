@@ -247,15 +247,17 @@ export function ArchitectureDonutChart({
     // Convert to array with percentages
     const total = filteredDevices.length
     const archColors = {
-      'x64': '#3b82f6',
-      'ARM64': '#10b981',
-      'x86': '#f59e0b',
-      'IA64': '#8b5cf6',
-      'Unknown': '#6b7280'
+      'x64': '#f59e0b',      // Amber
+      'ARM64': '#ef4444',    // Red  
+      'x86': '#8b5cf6',      // Purple
+      'IA64': '#06b6d4',     // Cyan
+      'Unknown': '#6b7280'   // Gray
     }
 
     // Use all architectures but show filtered counts and percentages
-    return Object.entries(allArchCounts).map(([architecture, allCount]) => {
+    return Object.entries(allArchCounts)
+      .filter(([architecture]) => architecture !== 'Unknown') // Don't show unknown architectures
+      .map(([architecture, allCount]) => {
       const filteredCount = filteredArchCounts[architecture] || 0
       
       return {
@@ -351,79 +353,73 @@ export function ArchitectureDonutChart({
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Architecture Distribution</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Architecture</h3>
       
-      <div className="flex items-center justify-between">
-        {/* Pie Chart */}
-        <div className="flex-shrink-0">
-          <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
-            {pieSlices.map((slice, index) => (
-              <path
-                key={slice.architecture}
-                d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
-                fill={slice.color}
-                stroke="white"
-                strokeWidth="2"
-                className={`transition-all duration-200 cursor-pointer ${
-                  slice.isGreyedOut 
-                    ? 'opacity-30' 
-                    : slice.isSelected 
-                      ? 'opacity-100' 
-                      : selectedArchitectures.length > 0 
-                        ? 'opacity-40' 
-                        : 'opacity-100'
-                } hover:opacity-80`}
-                onClick={() => onArchitectureToggle && onArchitectureToggle(slice.architecture)}
-              />
-            ))}
-          </svg>
-        </div>
-
-        {/* Legend */}
-        <div className="ml-6 space-y-2">
-          {archData.map(item => (
+      {/* Legend Above Chart */}
+      <div className="space-y-1 mb-3">
+        {archData.map(item => (
+          <div 
+            key={item.architecture} 
+            className="flex items-center cursor-pointer rounded-lg p-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            onClick={() => onArchitectureToggle && onArchitectureToggle(item.architecture)}
+          >
             <div 
-              key={item.architecture} 
-              className="flex items-center cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-              onClick={() => onArchitectureToggle && onArchitectureToggle(item.architecture)}
-            >
-              <div 
-                className={`w-3 h-3 rounded-full mr-3 transition-opacity ${
-                  item.isGreyedOut ? 'opacity-30' : 'opacity-100'
-                }`}
-                style={{ backgroundColor: item.color }}
-              ></div>
-              <div className="text-sm">
-                <span className={`font-medium transition-colors ${
-                  item.isGreyedOut
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : item.isSelected 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : selectedArchitectures.length > 0 
-                        ? 'text-gray-400 dark:text-gray-500' 
-                        : 'text-gray-900 dark:text-white'
-                }`}>
-                  {item.architecture}
-                </span>
-                <span className={`ml-2 transition-colors ${
-                  item.isGreyedOut
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : item.isSelected 
-                      ? 'text-blue-500 dark:text-blue-400' 
+              className={`w-3 h-3 rounded-full mr-2 transition-opacity ${
+                item.isGreyedOut ? 'opacity-30' : 'opacity-100'
+              }`}
+              style={{ backgroundColor: item.color }}
+            ></div>
+            <div className="text-sm min-w-0 flex-1">
+              <span className={`font-medium transition-colors whitespace-nowrap ${
+                item.isGreyedOut
+                  ? 'text-gray-400 dark:text-gray-500'
+                  : item.isSelected 
+                    ? 'text-blue-600 dark:text-blue-400' 
                     : selectedArchitectures.length > 0 
                       ? 'text-gray-400 dark:text-gray-500' 
-                      : 'text-gray-500 dark:text-gray-400'
-                }`}>
-                  {item.count} ({item.percentage}%)
-                </span>
-              </div>
+                      : 'text-gray-900 dark:text-white'
+              }`}>
+                {item.architecture}
+              </span>
+              <span className={`ml-2 transition-colors whitespace-nowrap ${
+                item.isGreyedOut
+                  ? 'text-gray-400 dark:text-gray-500'
+                  : item.isSelected 
+                    ? 'text-blue-500 dark:text-blue-400' 
+                  : selectedArchitectures.length > 0 
+                    ? 'text-gray-400 dark:text-gray-500' 
+                    : 'text-gray-500 dark:text-gray-400'
+              }`}>
+                {item.count} ({item.percentage}%)
+              </span>
             </div>
-          ))}
-        </div>
+          </div>
+        ))}
       </div>
-      
-      <div className="mt-4 text-sm text-gray-500 dark:text-gray-400 text-center">
-        Total devices: {total}
+
+      {/* Donut Chart */}
+      <div className="flex justify-center">
+        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
+          {pieSlices.map((slice, index) => (
+            <path
+              key={slice.architecture}
+              d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
+              fill={slice.color}
+              stroke="white"
+              strokeWidth="2"
+              className={`transition-all duration-200 cursor-pointer ${
+                slice.isGreyedOut 
+                  ? 'opacity-30' 
+                  : slice.isSelected 
+                    ? 'opacity-100' 
+                    : selectedArchitectures.length > 0 
+                      ? 'opacity-40' 
+                      : 'opacity-100'
+              } hover:opacity-80`}
+              onClick={() => onArchitectureToggle && onArchitectureToggle(slice.architecture)}
+            />
+          ))}
+        </svg>
       </div>
     </div>
   )
