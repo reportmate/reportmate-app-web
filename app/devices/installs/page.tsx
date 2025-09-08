@@ -8,9 +8,75 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 
-function LoadingSkeleton() {
+interface FetchProgress {
+  stage: 'discovering' | 'fetching' | 'aggregating' | 'complete' | 'error'
+  sessionId: string
+  deviceCount: number
+  processedDevices: number
+  currentDevice?: string | null
+  totalInstalls: number
+  startTime: number
+  data?: any[]
+  error?: string
+}
+
+function LoadingSkeleton({ progress }: { progress?: FetchProgress }) {
+  const getProgressPercentage = () => {
+    if (!progress || progress.deviceCount === 0) return 10;
+    if (progress.stage === 'discovering') return 15;
+    if (progress.stage === 'fetching') {
+      return 15 + (progress.processedDevices / progress.deviceCount) * 70; // 15% to 85%
+    }
+    if (progress.stage === 'aggregating') return 90;
+    if (progress.stage === 'complete') return 100;
+    return 10;
+  };
+
+  const getStatusText = () => {
+    if (!progress) return 'Initializing...';
+    switch (progress.stage) {
+      case 'discovering':
+        return `Found ${progress.deviceCount} devices`;
+      case 'fetching':
+        return ''; 
+      case 'aggregating':
+        return `Organizing ${progress.totalInstalls.toLocaleString()} install records`;
+      case 'complete':
+        return 'Ready!';
+      case 'error':
+        return progress.error || 'An error occurred';
+      default:
+        return 'Fetching install data from all devices...';
+    }
+  };
+
+  const progressPercentage = getProgressPercentage();
+
   return (
     <div className="space-y-6">
+      {/* Progress Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">Loading Installs Report</h3>
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+            {getStatusText()}
+          </p>
+          <div className="mt-4 w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+            <div 
+              className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+              style={{ width: `${progressPercentage}%` }}
+            ></div>
+          </div>
+          {progress && progress.stage === 'fetching' && progress.deviceCount > 0 && (
+            <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              {progress.processedDevices} of {progress.deviceCount} devices processed
+              {progress.totalInstalls > 0 && ` • ${progress.totalInstalls.toLocaleString()} installs found`}
+            </p>
+          )}
+        </div>
+      </div>
+
       {/* Dashboard Style Widgets Skeleton */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Errors/Warnings Stack */}
@@ -98,12 +164,21 @@ interface InstallRecord {
   lastUpdate: string
   packages: any[]
   raw?: any
+  installs?: {
+    cimian?: {
+      version?: string
+    }
+    munki?: {
+      version?: string
+    }
+  }
 }
 
 function InstallsPageContent() {
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [fetchProgress, setFetchProgress] = useState<FetchProgress | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const searchParams = useSearchParams()
@@ -120,48 +195,60 @@ function InstallsPageContent() {
   }, [searchParams])
 
   useEffect(() => {
-    const fetchInstalls = async () => {
+    const fetchInstallsWithProgress = async () => {
       try {
-        console.log('🚀 Fetching installs data using optimized bulk API...')
-        
-        // Use the new bulk installs API - single call instead of 92+ individual calls
-        const installsResponse = await fetch('/api/devices/installs', {
-          cache: 'no-store',
-          headers: { 
-            'Cache-Control': 'no-cache', 
-            'Pragma': 'no-cache' 
-          }
-        })
-        
-        if (!installsResponse.ok) {
-          throw new Error(`Failed to fetch installs data: ${installsResponse.status}`)
-        }
-        
-        const installsData = await installsResponse.json()
-        
-        if (!Array.isArray(installsData)) {
-          throw new Error('Invalid installs API response format')
-        }
-        
-        console.log(`✅ Loaded ${installsData.length} devices with installs data in single API call`)
-        console.log('📊 Cache headers:', {
-          dataSource: installsResponse.headers.get('X-Data-Source'),
-          fetchedAt: installsResponse.headers.get('X-Fetched-At')
-        })
-        
-        setInstalls(installsData)
+        console.log('🚀 Starting installs fetch with real-time progress...')
+        setLoading(true)
         setError(null)
+        setFetchProgress(null)
+        
+        const sessionId = Date.now().toString()
+        const eventSource = new EventSource(`/api/devices/installs/progress?sessionId=${sessionId}`)
+        
+        eventSource.onmessage = (event) => {
+          try {
+            const progressData: FetchProgress = JSON.parse(event.data)
+            console.log('📊 Progress update:', progressData)
+            
+            setFetchProgress(progressData)
+            
+            if (progressData.stage === 'complete' && progressData.data) {
+              console.log(`✅ Installs fetch completed! Loaded ${progressData.data.length} devices`)
+              console.log('🔍 Sample device data for debugging:', progressData.data[0])
+              setInstalls(progressData.data)
+              setLoading(false)
+              eventSource.close()
+            } else if (progressData.stage === 'error') {
+              console.error('❌ Progress API error:', progressData.error)
+              setError(progressData.error || 'Failed to fetch installs')
+              setLoading(false)
+              eventSource.close()
+            }
+          } catch (parseError) {
+            console.error('❌ Failed to parse progress data:', parseError)
+          }
+        }
+        
+        eventSource.onerror = (event) => {
+          console.error('❌ EventSource error:', event)
+          setError('Lost connection to progress updates')
+          setLoading(false)
+          eventSource.close()
+        }
+        
+        // Cleanup on component unmount
+        return () => {
+          eventSource.close()
+        }
         
       } catch (error) {
-        console.error('❌ Failed to fetch installs:', error)
-        setError(error instanceof Error ? error.message : 'Unknown error')
-        setInstalls([])
-      } finally {
+        console.error('❌ Failed to start progress fetch:', error)
+        setError(error instanceof Error ? error.message : 'Failed to start fetch')
         setLoading(false)
       }
     }
 
-    fetchInstalls()
+    fetchInstallsWithProgress()
   }, [])
 
   // Filter installs based on status and search
@@ -284,7 +371,7 @@ function InstallsPageContent() {
                   <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                   </svg>
-                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Installs</h1>
+                  <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Installs Report</h1>
                 </div>
               </div>
               <div className="flex items-center gap-4 flex-shrink-0">
@@ -300,7 +387,7 @@ function InstallsPageContent() {
         </header>
         
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-8">
-          <LoadingSkeleton />
+          <LoadingSkeleton progress={fetchProgress || undefined} />
         </div>
       </div>
     )
@@ -318,7 +405,7 @@ function InstallsPageContent() {
               Dashboard
             </Link>
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Installs</h1>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Installs Report</h1>
           </div>
         </header>
         
@@ -358,7 +445,7 @@ function InstallsPageContent() {
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Installs</h1>
+                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Installs Report</h1>
               </div>
             </div>
             
@@ -448,9 +535,10 @@ function InstallsPageContent() {
             {(() => {
               // Extract Cimian version data from installs
               const cimianVersions = installs.reduce((acc: Record<string, number>, install) => {
-                if (install.raw?.cimian?.version) {
-                  const version = install.raw.cimian.version;
-                  acc[version] = (acc[version] || 0) + 1;
+                // Check both possible locations for Cimian version data
+                const cimianVersion = install.installs?.cimian?.version || install.raw?.cimian?.version;
+                if (cimianVersion) {
+                  acc[cimianVersion] = (acc[cimianVersion] || 0) + 1;
                 }
                 return acc;
               }, {});
@@ -538,9 +626,10 @@ function InstallsPageContent() {
             {(() => {
               // Extract Munki version data from installs
               const munkiVersions = installs.reduce((acc: Record<string, number>, install) => {
-                if (install.raw?.munki?.version) {
-                  const version = install.raw.munki.version;
-                  acc[version] = (acc[version] || 0) + 1;
+                // Check both possible locations for Munki version data
+                const munkiVersion = install.installs?.munki?.version || install.raw?.munki?.version;
+                if (munkiVersion) {
+                  acc[munkiVersion] = (acc[munkiVersion] || 0) + 1;
                 }
                 return acc;
               }, {});
