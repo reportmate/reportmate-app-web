@@ -21,6 +21,9 @@ export interface ProcessedDeviceInfo {
   status: DeviceStatus
   createdAt?: string
   
+  // Client information
+  clientVersion?: string
+  
   // Modular data (source of truth)
   modules?: any
   
@@ -130,6 +133,9 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     lastSeen: validLastSeen,
     status: deviceStatus,
     createdAt: rawDevice.createdAt,
+    
+    // Client information
+    clientVersion: rawDevice.clientVersion,
     
     // Pass through modules (source of truth)
     modules: rawDevice.modules,
