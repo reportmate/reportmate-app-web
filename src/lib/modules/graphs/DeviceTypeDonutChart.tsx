@@ -325,75 +325,73 @@ export function DeviceTypeDonutChart({
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Device Type Distribution</h3>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Type</h3>
       
-      <div className="flex items-center justify-between">
-        {/* Donut Chart */}
-        <div className="flex-shrink-0">
-          <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
-            {pieSlices.map((slice, index) => (
-              <path
-                key={slice.type}
-                d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
-                fill={slice.color}
-                stroke="white"
-                strokeWidth="2"
-                className={`transition-all duration-200 cursor-pointer ${
-                  slice.isGreyedOut 
-                    ? 'opacity-30' 
-                    : slice.isSelected 
-                      ? 'opacity-100' 
-                      : selectedDeviceTypes.length > 0 
-                        ? 'opacity-40' 
-                        : 'opacity-100'
-                } hover:opacity-80`}
-                onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(slice.type)}
-              />
-            ))}
-          </svg>
-        </div>
-
-        {/* Legend */}
-        <div className="ml-6 space-y-2">
-          {typeData.map(item => (
+      {/* Legend Above Chart */}
+      <div className="space-y-1 mb-3">
+        {typeData.map(item => (
+          <div 
+            key={item.type} 
+            className="flex items-center cursor-pointer rounded-lg p-1 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(item.type)}
+          >
             <div 
-              key={item.type} 
-              className="flex items-center cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-              onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(item.type)}
-            >
-              <div 
-                className={`w-4 h-4 rounded-full mr-3 flex-shrink-0 transition-opacity ${
-                  item.isGreyedOut ? 'opacity-30' : 'opacity-100'
-                }`}
-                style={{ backgroundColor: item.color }}
-              ></div>
-              <div className="flex-1">
-                <div className={`text-sm font-medium transition-colors ${
-                  item.isGreyedOut
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : item.isSelected 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : selectedDeviceTypes.length > 0 
-                        ? 'text-gray-400 dark:text-gray-500' 
-                        : 'text-gray-900 dark:text-white'
-                }`}>
-                  {item.type}
-                </div>
-                <div className={`text-xs transition-colors ${
-                  item.isGreyedOut
-                    ? 'text-gray-400 dark:text-gray-500'
-                    : item.isSelected 
-                      ? 'text-blue-500 dark:text-blue-400' 
+              className={`w-3 h-3 rounded-full mr-2 transition-opacity ${
+                item.isGreyedOut ? 'opacity-30' : 'opacity-100'
+              }`}
+              style={{ backgroundColor: item.color }}
+            ></div>
+            <div className="text-sm min-w-0 flex-1">
+              <span className={`font-medium transition-colors whitespace-nowrap ${
+                item.isGreyedOut
+                  ? 'text-gray-400 dark:text-gray-500'
+                  : item.isSelected 
+                    ? 'text-blue-600 dark:text-blue-400' 
                     : selectedDeviceTypes.length > 0 
                       ? 'text-gray-400 dark:text-gray-500' 
-                      : 'text-gray-500 dark:text-gray-400'
-                }`}>
-                  {item.count} devices ({item.percentage}%)
-                </div>
-              </div>
+                      : 'text-gray-900 dark:text-white'
+              }`}>
+                {item.type}
+              </span>
+              <span className={`ml-2 transition-colors whitespace-nowrap ${
+                item.isGreyedOut
+                  ? 'text-gray-400 dark:text-gray-500'
+                  : item.isSelected 
+                    ? 'text-blue-500 dark:text-blue-400' 
+                  : selectedDeviceTypes.length > 0 
+                    ? 'text-gray-400 dark:text-gray-500' 
+                    : 'text-gray-500 dark:text-gray-400'
+              }`}>
+                {item.count} ({item.percentage}%)
+              </span>
             </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Donut Chart */}
+      <div className="flex justify-center">
+        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
+          {pieSlices.map((slice, index) => (
+            <path
+              key={slice.type}
+              d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
+              fill={slice.color}
+              stroke="white"
+              strokeWidth="2"
+              className={`transition-all duration-200 cursor-pointer ${
+                slice.isGreyedOut 
+                  ? 'opacity-30' 
+                  : slice.isSelected 
+                    ? 'opacity-100' 
+                    : selectedDeviceTypes.length > 0 
+                      ? 'opacity-40' 
+                      : 'opacity-100'
+              } hover:opacity-80`}
+              onClick={() => onDeviceTypeToggle && onDeviceTypeToggle(slice.type)}
+            />
           ))}
-        </div>
+        </svg>
       </div>
     </div>
   )

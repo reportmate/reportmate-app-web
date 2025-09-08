@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 // Cache for bulk hardware data
 let hardwareCache: any[] = []
 let cacheTimestamp: number = 0
-const CACHE_DURATION = 60 * 1000 // 60 seconds (hardware changes less frequently)
+const CACHE_DURATION = 30 * 1000 // 30 seconds (shorter for debugging)
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -14,10 +14,11 @@ export async function GET() {
     const timestamp = new Date().toISOString()
     console.log(`[BULK HARDWARE API] ${timestamp} - Fetching bulk hardware data`)
 
-    // Check cache first
+    // Check cache first - but add debugging
     const now = Date.now()
     if (hardwareCache.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
       console.log(`[BULK HARDWARE API] ${timestamp} - Serving from cache: ${hardwareCache.length} devices`)
+      console.log(`[BULK HARDWARE API] ${timestamp} - Cache sample:`, hardwareCache[0] ? Object.keys(hardwareCache[0]) : 'no items')
       return NextResponse.json(hardwareCache, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -28,7 +29,7 @@ export async function GET() {
       })
     }
 
-    console.log(`[BULK HARDWARE API] ${timestamp} - Fetching fresh data`)
+    console.log(`[BULK HARDWARE API] ${timestamp} - Fetching fresh data, cache age: ${now - cacheTimestamp}ms, cache size: ${hardwareCache.length}`)
 
     // Get database connection
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -106,10 +107,12 @@ export async function GET() {
               architecture: architecture,
               processor: hardwareData.processor || 'Unknown',
               processorSpeed: hardwareData.processorSpeed || 'Unknown',
+              processorCores: hardwareData.cores || 0,
               cores: hardwareData.cores || 0,
               memory: hardwareData.memory || 'Unknown',
-              memoryGB: row.hardware_data?.memory?.totalGB || 0,
               storage: hardwareData.storage || 'Unknown',
+              graphics: hardwareData.graphics || 'Unknown',
+              memoryGB: row.hardware_data?.memory?.totalGB || 0,
               storageGB: row.hardware_data?.storage?.totalGB || 0,
               
               // Full hardware data for detailed views
@@ -117,6 +120,12 @@ export async function GET() {
               raw: {
                 hardware: row.hardware_data,
                 system: row.system_data
+              },
+              
+              // Include full modules structure for chart processing
+              modules: {
+                hardware: row.hardware_data || {},
+                system: row.system_data || {}
               }
             }
           } catch (error) {

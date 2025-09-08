@@ -1,6 +1,6 @@
 /**
- * Hardware Model Chart Component
- * Shows distribution of hardware models across devices
+ * Processor Distribution Bar Chart Component
+ * Shows distribution of processor types across devices
  */
 
 import React, { useMemo } from 'react'
@@ -33,23 +33,23 @@ interface Device {
   }
 }
 
-interface HardwareModelChartProps {
+interface ProcessorDistributionChartProps {
   devices: Device[]
   loading?: boolean
   className?: string
-  selectedModels?: string[]
-  onModelToggle?: (model: string) => void
+  selectedProcessors?: string[]
+  onProcessorToggle?: (processor: string) => void
   // Global filter context for visual feedback
   globalSelectedPlatforms?: string[]
-  globalSelectedProcessors?: string[]
+  globalSelectedModels?: string[]
   globalSelectedArchitectures?: string[]
   globalSelectedDeviceTypes?: string[]
   globalSelectedMemoryRanges?: string[]
   globalSelectedStorageRanges?: string[]
 }
 
-interface HardwareData {
-  name: string
+interface ProcessorData {
+  processor: string
   count: number
   percentage: number
   color: string
@@ -57,24 +57,86 @@ interface HardwareData {
   isGreyedOut?: boolean
 }
 
-export function HardwareTypeChart({ 
+export function ProcessorDistributionChart({ 
   devices, 
   loading = false, 
   className = '',
-  selectedModels = [],
-  onModelToggle,
+  selectedProcessors = [],
+  onProcessorToggle,
   globalSelectedPlatforms = [],
-  globalSelectedProcessors = [],
+  globalSelectedModels = [],
   globalSelectedArchitectures = [],
   globalSelectedDeviceTypes = [],
   globalSelectedMemoryRanges = [],
   globalSelectedStorageRanges = []
-}: HardwareModelChartProps) {
-  const hardwareData = useMemo(() => {
+}: ProcessorDistributionChartProps) {
+  const processorData = useMemo(() => {
     if (!devices || devices.length === 0) return []
 
-    // Helper function to get model name
-    const getModelName = (device: Device): string => {
+    // Helper function to get processor name
+    const getProcessorName = (device: Device): string => {
+      // Try different processor field locations
+      const processor = device.processor || 
+                       device.modules?.hardware?.processor ||
+                       (device as any).raw?.processor ||
+                       'Unknown Processor'
+
+      if (typeof processor === 'string') {
+        return processor
+      }
+
+      if (typeof processor === 'object' && processor !== null) {
+        return processor.name || processor.model || processor.brand || 'Unknown Processor'
+      }
+
+      return 'Unknown Processor'
+    }
+
+    // Helper function to simplify processor name for grouping
+    const simplifyProcessorName = (processorName: string): string => {
+      const name = processorName.toLowerCase()
+      
+      // Intel processors
+      if (name.includes('intel')) {
+        if (name.includes('core i9')) return 'Intel Core i9'
+        if (name.includes('core i7')) return 'Intel Core i7'
+        if (name.includes('core i5')) return 'Intel Core i5'
+        if (name.includes('core i3')) return 'Intel Core i3'
+        if (name.includes('xeon')) return 'Intel Xeon'
+        if (name.includes('pentium')) return 'Intel Pentium'
+        if (name.includes('celeron')) return 'Intel Celeron'
+        return 'Intel Other'
+      }
+      
+      // AMD processors
+      if (name.includes('amd')) {
+        if (name.includes('ryzen 9')) return 'AMD Ryzen 9'
+        if (name.includes('ryzen 7')) return 'AMD Ryzen 7'
+        if (name.includes('ryzen 5')) return 'AMD Ryzen 5'
+        if (name.includes('ryzen 3')) return 'AMD Ryzen 3'
+        if (name.includes('epyc')) return 'AMD EPYC'
+        if (name.includes('threadripper')) return 'AMD Threadripper'
+        return 'AMD Other'
+      }
+      
+      // Apple processors
+      if (name.includes('apple') || name.includes('m1') || name.includes('m2') || name.includes('m3')) {
+        if (name.includes('m3')) return 'Apple M3'
+        if (name.includes('m2')) return 'Apple M2'
+        if (name.includes('m1')) return 'Apple M1'
+        return 'Apple Silicon'
+      }
+      
+      // Qualcomm processors
+      if (name.includes('qualcomm') || name.includes('snapdragon')) {
+        return 'Qualcomm Snapdragon'
+      }
+      
+      return processorName // Return original if no pattern matches
+    }
+
+    // Helper functions for filtering (same pattern as other charts)
+    const getDeviceModel = (device: Device): string => {
       return device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
@@ -84,9 +146,8 @@ export function HardwareTypeChart({
              'Unknown Model'
     }
 
-    // Helper function to determine device type
     const getDeviceType = (device: Device): string => {
-      const model = getModelName(device)
+      const model = getDeviceModel(device)
       const modelLower = model.toLowerCase()
       
       // Desktop indicators
@@ -119,31 +180,11 @@ export function HardwareTypeChart({
         return 'Laptop'
       }
       
-      // Default to Desktop for unknown
+      // Default to Desktop for unknown (most enterprise devices are desktops)
       return 'Desktop'
     }
 
-    // Helper function to get processor name
-    const getProcessorName = (device: Device): string => {
-      const processor = device.processor || 
-                       device.modules?.hardware?.processor ||
-                       (device as any).raw?.processor ||
-                       'Unknown Processor'
-
-      if (typeof processor === 'string') {
-        return processor
-      }
-
-      if (typeof processor === 'object' && processor !== null) {
-        return processor.name || processor.model || processor.brand || 'Unknown Processor'
-      }
-
-      return 'Unknown Processor'
-    }
-
-    // Helper function to get memory range
-    const getMemoryRange = (device: Device): string => {
-      const memory = (device as any).memory
+    const getMemoryRange = (memory: any): string => {
       if (!memory) return 'Unknown'
       const memGb = parseFloat(memory)
       if (isNaN(memGb)) return 'Unknown'
@@ -154,18 +195,30 @@ export function HardwareTypeChart({
       return '>64 GB'
     }
 
-    // Helper function to get architecture
-    const getArchitecture = (device: Device): string => {
-      return device.architecture || 
-             device.modules?.hardware?.processor?.architecture ||
-             device.modules?.system?.operatingSystem?.architecture ||
-             (device as any).raw?.architecture ||
-             'x64'
+    const getStorageRange = (device: Device): string => {
+      // Calculate total storage
+      const storage = device.modules?.hardware?.storage || (device as any).storage
+      if (!Array.isArray(storage)) return 'Unknown'
+      
+      const totalBytes = storage.reduce((sum, drive) => {
+        const size = drive.size || drive.capacity || drive.totalSize || 0
+        return sum + (typeof size === 'number' ? size : 0)
+      }, 0)
+      
+      const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))
+      
+      if (storageGB === 0) return 'Unknown'
+      if (storageGB <= 128) return '≤128 GB'
+      if (storageGB <= 256) return '129-256 GB'
+      if (storageGB <= 512) return '257-512 GB'
+      if (storageGB <= 1024) return '513 GB-1 TB'
+      if (storageGB <= 2048) return '1-2 TB'
+      if (storageGB <= 4096) return '2-4 TB'
+      return '>4 TB'
     }
 
-    // Helper function to get platform
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
-      const model = getModelName(device)
+      const model = getDeviceModel(device)
       if (model.toLowerCase().includes('macbook') || 
           model.toLowerCase().includes('imac') || 
           model.toLowerCase().includes('mac mini') ||
@@ -176,6 +229,14 @@ export function HardwareTypeChart({
       return 'Windows'
     }
 
+    const getArchitecture = (device: Device): string => {
+      return device.architecture || 
+             (device.modules?.hardware?.processor as any)?.architecture ||
+             device.modules?.system?.operatingSystem?.architecture ||
+             (device as any).raw?.architecture ||
+             'x64'
+    }
+
     // Apply global filters to get the relevant device subset
     const filteredDevices = devices.filter(device => {
       // Platform filter
@@ -184,10 +245,10 @@ export function HardwareTypeChart({
         if (!globalSelectedPlatforms.includes(platform)) return false
       }
 
-      // Processor filter
-      if (globalSelectedProcessors.length > 0) {
-        const processor = getProcessorName(device)
-        if (!globalSelectedProcessors.includes(processor)) return false
+      // Model filter
+      if (globalSelectedModels.length > 0) {
+        const model = getDeviceModel(device)
+        if (!globalSelectedModels.includes(model)) return false
       }
 
       // Architecture filter
@@ -204,36 +265,35 @@ export function HardwareTypeChart({
 
       // Memory range filter
       if (globalSelectedMemoryRanges.length > 0) {
-        const memoryRange = getMemoryRange(device)
+        const memoryRange = getMemoryRange((device as any).memory)
         if (!globalSelectedMemoryRanges.includes(memoryRange)) return false
       }
 
       // Storage range filter
       if (globalSelectedStorageRanges.length > 0) {
-        // This would need storage calculation logic here
-        // Skipping for now to avoid complexity
+        const storageRange = getStorageRange(device)
+        if (!globalSelectedStorageRanges.includes(storageRange)) return false
       }
 
       return true
     })
 
-    // Count by model
-    const counts: { [key: string]: number } = {}
+    // Count devices by processor type
+    const processorCounts: { [key: string]: number } = {}
     
     filteredDevices.forEach(device => {
-      const model = getModelName(device)
-      counts[model] = (counts[model] || 0) + 1
+      const processorName = getProcessorName(device)
+      const simplifiedName = simplifyProcessorName(processorName)
+      if (simplifiedName !== 'Unknown Processor') { // Don't show unknown processors
+        processorCounts[simplifiedName] = (processorCounts[simplifiedName] || 0) + 1
+      }
     })
 
-    // Get top models
-    const sortedModels = Object.entries(counts)
-      .filter(([model]) => model !== 'Unknown Model') // Don't show unknown models
+    // Sort by count and get colors
+    const sortedProcessors = Object.entries(processorCounts)
       .sort(([, a], [, b]) => b - a)
-      .slice(0, 10) // Show top 10 models
+      .slice(0, 10) // Show top 10 processors
 
-    const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
-
-    // Color palette
     const colors = [
       '#3b82f6', // blue-500
       '#06b6d4', // cyan-500
@@ -244,43 +304,38 @@ export function HardwareTypeChart({
       '#ef4444', // red-500
       '#8b5cf6', // violet-500
       '#ec4899', // pink-500
-      '#14b8a6'  // teal-500
+      '#6b7280'  // gray-500
     ]
 
-    return sortedModels.map(([model, count], index) => {
+    const total = Object.values(processorCounts).reduce((sum, count) => sum + count, 0)
+    
+    return sortedProcessors.map(([processor, count], index) => {
       const percentage = total > 0 ? (count / total) * 100 : 0
-      const isSelected = selectedModels.includes(model)
-      const isGreyedOut = selectedModels.length > 0 && !isSelected
+      const isSelected = selectedProcessors.includes(processor)
       
       return {
-        name: model,
+        processor,
         count,
         percentage,
         color: colors[index % colors.length],
         isSelected,
-        isGreyedOut
+        isGreyedOut: count === 0
       }
     })
-  }, [devices, selectedModels, globalSelectedPlatforms, globalSelectedProcessors, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges])
+  }, [devices, globalSelectedPlatforms, globalSelectedModels, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges, selectedProcessors])
 
   const total = useMemo(() => {
-    return hardwareData.reduce((sum, item) => sum + item.count, 0)
-  }, [hardwareData])
+    return processorData.reduce((sum: number, item) => sum + item.count, 0)
+  }, [processorData])
 
   if (loading) {
     return (
       <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-1/2 mb-3"></div>
-          <div className="space-y-2">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-4"></div>
+          <div className="space-y-3">
             {[...Array(5)].map((_, i) => (
-              <div key={i}>
-                <div className="flex justify-between mb-2">
-                  <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-1/6"></div>
-                </div>
-                <div className="h-2 bg-gray-200 dark:bg-gray-600 rounded"></div>
-              </div>
+              <div key={i} className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
             ))}
           </div>
         </div>
@@ -291,23 +346,23 @@ export function HardwareTypeChart({
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Models</h3>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Processor</h3>
         <span className="text-sm text-gray-500 dark:text-gray-400">{total} devices</span>
       </div>
       
       <div className="space-y-2">
-        {hardwareData.map(item => (
+        {processorData.map((item) => (
           <div 
-            key={item.name}
+            key={item.processor}
             className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-            onClick={() => onModelToggle && onModelToggle(item.name)}
+            onClick={() => onProcessorToggle?.(item.processor)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${
                 item.isGreyedOut 
                   ? 'text-gray-400 dark:text-gray-500' 
                   : 'text-gray-900 dark:text-white'
-              }`}>{item.name}</span>
+              }`}>{item.processor}</span>
               <div className="flex items-center gap-2">
                 <span className={`text-sm transition-colors ${
                   item.isGreyedOut 
@@ -321,11 +376,9 @@ export function HardwareTypeChart({
                 }`}>({item.percentage.toFixed(1)}%)</span>
               </div>
             </div>
-            <div 
-              className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-opacity duration-200 ${
-                item.isGreyedOut ? 'opacity-30' : ''
-              }`}
-            >
+            <div className={`w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 transition-opacity duration-200 ${
+              item.isGreyedOut ? 'opacity-30' : ''
+            }`}>
               <div
                 className="h-2 rounded-full transition-all duration-300"
                 style={{
@@ -337,9 +390,17 @@ export function HardwareTypeChart({
             </div>
           </div>
         ))}
+        
+        {processorData.length === 0 && (
+          <div className="text-center py-8">
+            <div className="text-gray-400 dark:text-gray-600 text-sm">
+              No processor data available
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-export default HardwareTypeChart
+export default ProcessorDistributionChart

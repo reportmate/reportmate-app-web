@@ -1172,8 +1172,19 @@ export default function DeviceDetailPage() {
               
               {/* Last seen and action buttons - hidden on mobile */}
               <div className="hidden sm:flex items-center gap-4 pr-4">
-                <div className="text-2sm text-gray-600 dark:text-gray-400">
-                  Last seen {formatRelativeTime(deviceInfo.lastSeen)}
+                <div className="flex items-center gap-2 text-2sm text-gray-600 dark:text-gray-400">
+                  {/* Subtle version indicator dot */}
+                  {deviceInfo.clientVersion && (
+                    <div className="group relative">
+                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 cursor-help" />
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                        ReportMate v{deviceInfo.clientVersion}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                      </div>
+                    </div>
+                  )}
+                  <span>Last seen {formatRelativeTime(deviceInfo.lastSeen)}</span>
                 </div>
                 
                 {/* Remote access button */}
