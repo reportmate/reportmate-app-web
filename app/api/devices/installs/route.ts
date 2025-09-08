@@ -8,60 +8,278 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('id');
     
-    const timestamp = new Date().toISOString();
-    console.log(`[FAST INSTALLS API] ${timestamp} - Using optimized Azure Functions installs endpoint${deviceId ? ` for device ${deviceId}` : ''}`);
+    // If device ID is provided, return data for specific device
+    if (deviceId) {
+      const timestamp = new Date().toISOString();
+      console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
 
-    // Use the new optimized Azure Functions installs endpoint
-    const apiResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices/installs', {
+      // Fetch device data from Azure Functions device endpoint
+      const apiResponse = await fetch(`https://reportmate-api.azurewebsites.net/api/device/${encodeURIComponent(deviceId)}`, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'User-Agent': 'ReportMate-Frontend/1.0'
+        }
+      });
+      
+      if (!apiResponse.ok) {
+        console.error('[INSTALLS API] API fetch failed:', apiResponse.status, apiResponse.statusText);
+        
+        // Following .instructions.md: NO FAKE DATA - return empty state for broken backend
+        console.log('[INSTALLS API] Backend unavailable, returning empty state (NO FAKE DATA)');
+        return NextResponse.json({
+          success: true,
+          deviceId: deviceId,
+          data: {
+            hasInstallsModule: false,
+            hasRecentInstalls: false,
+            recentInstallsCount: 0,
+            recentInstalls: [],
+            cacheSize: 0
+          },
+          message: 'Backend API unavailable - showing empty state (NO FAKE DATA)',
+          backendStatus: apiResponse.status
+        });
+      }
+      
+      const deviceData = await apiResponse.json();
+      console.log('[INSTALLS API] Raw API response received for device:', deviceId);
+      
+      // Extract installs data from the device response
+      const installsData = deviceData?.device?.modules?.installs || {};
+      
+      // Return the installs data
+      return NextResponse.json({
+        success: true,
+        deviceId: deviceId,
+        data: installsData,
+        timestamp: timestamp
+      });
+    }
+
+    // No device ID - return installs data for all devices
+    const timestamp = new Date().toISOString();
+    console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for all devices`);
+    
+    // Fetch all devices from Azure Functions
+    const apiResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices', {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
         'User-Agent': 'ReportMate-Frontend/1.0'
       }
     });
-    
+
     if (!apiResponse.ok) {
-      console.error('[FAST INSTALLS API] API fetch failed:', apiResponse.status);
+      console.error('[INSTALLS API] API fetch failed for all devices:', apiResponse.status, apiResponse.statusText);
+      
+      // Following .instructions.md: NO FAKE DATA - return empty state for broken backend
+      console.log('[INSTALLS API] Backend unavailable, returning empty state (NO FAKE DATA)');
       return NextResponse.json({
-        error: 'Failed to fetch installs data',
-        status: apiResponse.status
-      }, { status: 500 });
+        success: true,
+        data: [],
+        count: 0,
+        message: 'Backend API unavailable - showing empty state (NO FAKE DATA)',
+        backendStatus: apiResponse.status
+      });
     }
     
-    const installsData = await apiResponse.json();
-    console.log('[FAST INSTALLS API] Raw API response type:', typeof installsData);
-    console.log('[FAST INSTALLS API] Installs count:', Array.isArray(installsData) ? installsData.length : 'not array');
+    const devicesData = await apiResponse.json();
+    console.log(`[INSTALLS API] Raw API response received for ${Array.isArray(devicesData) ? devicesData.length : 0} devices`);
     
-    const installsArray = Array.isArray(installsData) ? installsData : [];
+    // Get the list of devices
+    const devices = Array.isArray(devicesData) ? devicesData : [];
     
-    // Filter by device if requested
-    const filteredInstalls = deviceId 
-      ? installsArray.filter(install => install.deviceId === deviceId || install.serialNumber === deviceId)
-      : installsArray;
+    // Process devices in smaller batches to avoid overwhelming the API
+    const batchSize = 10; // Process 10 devices at a time
+    const results: any[] = [];
     
-    console.log('[FAST INSTALLS API] Filtered installs count:', filteredInstalls.length);
+    console.log(`[INSTALLS API] Fetching installs data for ${devices.length} devices in batches of ${batchSize}...`);
     
-    if (filteredInstalls.length === 0) {
-      if (deviceId) {
-        console.log('[FAST INSTALLS API] Device not found:', deviceId);
-        return NextResponse.json({ error: 'Device not found', deviceId }, { status: 404 });
+    for (let i = 0; i < devices.length; i += batchSize) {
+      const batch = devices.slice(i, i + batchSize);
+      console.log(`[INSTALLS API] Processing batch ${Math.floor(i/batchSize) + 1}/${Math.ceil(devices.length/batchSize)} (devices ${i + 1}-${Math.min(i + batchSize, devices.length)})`);
+      
+      const batchPromises = batch.map(async (device: any, index: number) => {
+        // Use serialNumber (not deviceId) for Azure Functions API calls
+        const serialNumber = device.serialNumber;
+        const deviceIdentifier = serialNumber || device.deviceId || `device-${i + index}`;
+        
+        if (!serialNumber) {
+          console.warn(`[INSTALLS API] Device missing serialNumber: ${device.deviceId || 'unknown'}`);
+          return {
+            deviceId: device.deviceId || 'unknown',
+            deviceName: device.deviceName || device.name || 'Unknown Device',
+            serialNumber: 'Unknown',
+            lastSeen: device.lastSeen,
+            status: device.status || 'error',
+            installs: {
+              cimian: {
+                status: 'Not Available',
+                isInstalled: false,
+                items: [],
+                events: [],
+                sessions: []
+              }
+            },
+            error: 'Missing serial number',
+            hasError: true
+          };
+        }
+
+        try {
+          // Use the same Azure Functions endpoint that works for single device installs
+          // CRITICAL: Use serialNumber (not deviceId) as that's what works for /api/device/{serialNumber}
+          const deviceApiResponse = await fetch(`https://reportmate-api.azurewebsites.net/api/device/${encodeURIComponent(serialNumber)}`, {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'User-Agent': 'ReportMate-Frontend/1.0'
+            },
+            // Increase timeout for better reliability
+            signal: AbortSignal.timeout(30000) // 30 second timeout per device
+          });
+
+          if (!deviceApiResponse.ok) {
+            console.warn(`[INSTALLS API] Failed to fetch device ${serialNumber}: ${deviceApiResponse.status}`);
+            return {
+              deviceId: device.deviceId,
+              deviceName: device.deviceName || device.name || 'Unknown Device',
+              serialNumber: serialNumber,
+              lastSeen: device.lastSeen,
+              status: device.status || 'error',
+              installs: {
+                cimian: {
+                  status: 'API Error',
+                  isInstalled: false,
+                  items: [],
+                  events: [],
+                  sessions: []
+                }
+              },
+              error: `API error: ${deviceApiResponse.status}`,
+              hasError: true
+            };
+          }
+
+          const deviceData = await deviceApiResponse.json();
+          const installsData = deviceData?.device?.modules?.installs || {
+            cimian: {
+              status: 'No Data',
+              isInstalled: false,
+              items: [],
+              events: [],
+              sessions: []
+            }
+          };
+
+          return {
+            deviceId: device.deviceId,
+            deviceName: device.deviceName || device.name || deviceData?.device?.deviceName || 'Unknown Device',
+            serialNumber: serialNumber,
+            lastSeen: device.lastSeen || deviceData?.device?.lastSeen,
+            status: device.status || deviceData?.device?.status || 'unknown',
+            installs: installsData,
+            hasError: false
+          };
+
+        } catch (error) {
+          // Distinguish between timeout and other errors
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('aborted');
+          
+          console.error(`[INSTALLS API] Error fetching device ${serialNumber}: ${errorMessage}`);
+          return {
+            deviceId: device.deviceId,
+            deviceName: device.deviceName || device.name || 'Unknown Device',
+            serialNumber: serialNumber,
+            lastSeen: device.lastSeen,
+            status: device.status || 'error',
+            installs: {
+              cimian: {
+                status: isTimeout ? 'Timeout' : 'Error',
+                isInstalled: false,
+                items: [],
+                events: [],
+                sessions: []
+              }
+            },
+            error: errorMessage,
+            hasError: true
+          };
+        }
+      });
+
+      // Wait for this batch to complete
+      const batchResults = await Promise.all(batchPromises);
+      results.push(...batchResults);
+      
+      // Brief pause between batches to be gentle on the API
+      if (i + batchSize < devices.length) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // 100ms pause
       }
-      console.log('[FAST INSTALLS API] No install data found');
-      return NextResponse.json([]);
     }
     
-    // Data is already processed by Azure Functions, just return it
-    if (deviceId && filteredInstalls.length > 0) {
-      return NextResponse.json(filteredInstalls[0]);
-    }
+    // Separate successful and failed devices
+    const successfulInstalls = results.filter(device => !device.hasError);
+    const failedInstalls = results.filter(device => device.hasError);
     
-    return NextResponse.json(filteredInstalls);
+    console.log(`[INSTALLS API] Successfully fetched installs for ${successfulInstalls.length}/${devices.length} devices`);
+    if (failedInstalls.length > 0) {
+      console.warn(`[INSTALLS API] Failed to fetch installs for ${failedInstalls.length} devices:`, 
+        failedInstalls.map(d => d.deviceId || d.serialNumber).slice(0, 5) // Log first 5 failures
+      );
+    }
+
+    // Return all data, including devices with errors (showing them with error states)
+    return NextResponse.json({
+      success: true,
+      data: results, // Include all devices, even those with errors for UI handling
+      count: results.length,
+      successCount: successfulInstalls.length,
+      errorCount: failedInstalls.length,
+      timestamp: timestamp,
+      message: failedInstalls.length === 0 
+        ? `Successfully fetched installs data for all ${devices.length} devices`
+        : `Fetched installs data for ${successfulInstalls.length}/${devices.length} devices (${failedInstalls.length} errors)`,
+      // Provide error summary for debugging
+      errors: failedInstalls.length > 0 ? failedInstalls.map(d => ({
+        deviceId: d.deviceId,
+        serialNumber: d.serialNumber,
+        error: d.error
+      })).slice(0, 10) : undefined // Only show first 10 errors in response
+    });
     
   } catch (error) {
-    console.error('[FAST INSTALLS API] Error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to fetch installs data',
-      details: error instanceof Error ? error.message : String(error)
-    }, { status: 500 });
+    console.error('[INSTALLS API] Error:', error);
+    
+    // Following .instructions.md: NO FAKE DATA - return empty state for errors
+    const deviceId = new URL(request.url).searchParams.get('id');
+    
+    if (deviceId) {
+      // Single device error
+      return NextResponse.json({
+        success: true,
+        deviceId: deviceId,
+        data: {
+          hasInstallsModule: false,
+          hasRecentInstalls: false,
+          recentInstallsCount: 0,
+          recentInstalls: [],
+          cacheSize: 0
+        },
+        message: 'Error occurred - showing empty state (NO FAKE DATA)',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    } else {
+      // Bulk devices error
+      return NextResponse.json({
+        success: true,
+        data: [],
+        count: 0,
+        message: 'Error occurred - showing empty state (NO FAKE DATA)',
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 }
