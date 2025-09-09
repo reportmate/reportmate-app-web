@@ -87,28 +87,53 @@ export async function GET() {
       console.warn(`[DEVICES API CACHED] ${timestamp} - Inventory API failed: ${inventoryResponse.status}`)
     }
     
-    // Get system module data from local database
-    let systemData = []
+    // Get ALL modules' latest timestamps for proper status calculation
+    let allModulesData = []
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Pool } = require('pg')
       const pool = new Pool({ connectionString: process.env.DATABASE_URL })
       
-      const result = await pool.query(`
-        SELECT DISTINCT ON (d.serial_number)
-          d.serial_number, s.data, s.collected_at, s.updated_at
-        FROM system s
-        JOIN devices d ON s.device_id = d.id
-        WHERE d.serial_number IS NOT NULL
-        ORDER BY d.serial_number, s.updated_at DESC
-      `)
+      // Query all module tables to get latest collectedAt timestamps per device
+      const moduleTableQueries = [
+        'SELECT device_id, collected_at, \'system\' as module_name FROM system WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'inventory\' as module_name FROM inventory WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'hardware\' as module_name FROM hardware WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'installs\' as module_name FROM installs WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'applications\' as module_name FROM applications WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'management\' as module_name FROM management WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'network\' as module_name FROM network WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'security\' as module_name FROM security WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'profiles\' as module_name FROM profiles WHERE collected_at IS NOT NULL',
+        'SELECT device_id, collected_at, \'printers\' as module_name FROM printers WHERE collected_at IS NOT NULL'
+      ]
       
-      systemData = result.rows
-      console.log(`[DEVICES API CACHED] ${timestamp} - Got ${systemData.length} system records from database`)
+      const unionQuery = `
+        WITH all_modules AS (
+          ${moduleTableQueries.join(' UNION ALL ')}
+        ),
+        latest_per_device AS (
+          SELECT 
+            device_id,
+            MAX(collected_at) as latest_collected_at
+          FROM all_modules 
+          GROUP BY device_id
+        )
+        SELECT 
+          d.serial_number,
+          l.latest_collected_at
+        FROM latest_per_device l
+        JOIN devices d ON l.device_id = d.id
+        WHERE d.serial_number IS NOT NULL
+      `
+      
+      const result = await pool.query(unionQuery)
+      allModulesData = result.rows
+      console.log(`[DEVICES API CACHED] ${timestamp} - Got latest module timestamps for ${allModulesData.length} devices`)
       
       await pool.end()
     } catch (dbError) {
-      console.warn(`[DEVICES API CACHED] ${timestamp} - Database query failed:`, dbError)
+      console.warn(`[DEVICES API CACHED] ${timestamp} - Module timestamps query failed:`, dbError)
     }
     
     // Build inventory lookup map for fast device name resolution (same as inventory page)
@@ -122,15 +147,15 @@ export async function GET() {
       console.log(`[DEVICES API CACHED] ${timestamp} - Built inventory map for ${inventoryMap.size} devices`)
     }
     
-    // Build system data lookup map for OS information
-    const systemMap = new Map<string, any>()
-    if (Array.isArray(systemData)) {
-      systemData.forEach((item: any) => {
-        if (item.serial_number && item.data) {
-          systemMap.set(item.serial_number, item.data)
+    // Build module timestamps map for latest activity per device
+    const moduleTimestampsMap = new Map<string, Date>()
+    if (Array.isArray(allModulesData)) {
+      allModulesData.forEach((item: any) => {
+        if (item.serial_number && item.latest_collected_at) {
+          moduleTimestampsMap.set(item.serial_number, new Date(item.latest_collected_at))
         }
       })
-      console.log(`[DEVICES API CACHED] ${timestamp} - Built system map for ${systemMap.size} devices`)
+      console.log(`[DEVICES API CACHED] ${timestamp} - Built module timestamps map for ${moduleTimestampsMap.size} devices`)
     }
     
     console.log(`[DEVICES API CACHED] ${timestamp} - Raw Azure Functions response:`, {
@@ -157,10 +182,17 @@ export async function GET() {
       .map((device: any) => {
         const serialNumber = device.serialNumber || device.serial_number
         
-        // Fast status calculation
-        const calculateStatus = (lastSeen: string | null) => {
-          if (!lastSeen) return 'missing'
-          const hours = (Date.now() - new Date(lastSeen).getTime()) / (1000 * 60 * 60)
+        // Status calculation using module timestamps (matches Azure Functions logic)
+        const calculateStatus = (lastSeen: string | null, serialNumber: string) => {
+          // Check for most recent module timestamp first (like Azure Functions)
+          const latestModuleTimestamp = moduleTimestampsMap.get(serialNumber)
+          
+          // Use latest module timestamp if available, otherwise fall back to lastSeen
+          const timestampToUse = latestModuleTimestamp || (lastSeen ? new Date(lastSeen) : null)
+          
+          if (!timestampToUse || isNaN(timestampToUse.getTime())) return 'missing'
+          
+          const hours = (Date.now() - timestampToUse.getTime()) / (1000 * 60 * 60)
           return hours < 24 ? 'active' : hours < 168 ? 'stale' : 'missing'
         }
 
@@ -168,9 +200,6 @@ export async function GET() {
         
         // Get inventory info for this device (same as inventory page)
         const inventoryInfo = inventoryMap.get(serialNumber) || {}
-        
-        // Get system module data from database (includes OS info for charts)
-        const systemModuleData = systemMap.get(serialNumber) || {}
         
         // Build proper device name using EXACT SAME logic as inventory page
         const deviceName = inventoryInfo.deviceName || inventoryInfo.computerName || serialNumber || 'Unknown Device'
@@ -180,8 +209,22 @@ export async function GET() {
           console.log(`[DEVICES API DEBUG] Processing device ${serialNumber}:`)
           console.log(`[DEVICES API DEBUG] - Device keys: ${Object.keys(device).join(', ')}`)
           console.log(`[DEVICES API DEBUG] - Has inventory: ${inventoryInfo !== undefined}`)
-          console.log(`[DEVICES API DEBUG] - Has systemModuleData: ${Object.keys(systemModuleData).length > 0}`)
+          console.log(`[DEVICES API DEBUG] - Latest module timestamp: ${moduleTimestampsMap.get(serialNumber)}`)
           console.log(`[DEVICES API DEBUG] - Final deviceName: "${deviceName}"`)
+        }
+        
+        // Build simplified modules structure (we only have inventory data now)
+        const modules = {
+          inventory: {
+            catalog: inventoryInfo?.catalog || 'Unknown',
+            usage: inventoryInfo?.usage || 'Unknown',
+            ...inventoryInfo // Include all other inventory fields
+          },
+          system: {
+            // System module data is no longer directly available for efficiency
+            // but status calculation uses all module timestamps
+            operatingSystem: undefined
+          }
         }
         
         return {
@@ -190,29 +233,12 @@ export async function GET() {
           name: deviceName,
           lastSeen: lastSeenValue,
           createdAt: device.createdAt,
-          status: calculateStatus(lastSeenValue),
+          status: calculateStatus(lastSeenValue, serialNumber),
           clientVersion: device.clientVersion || '1.0.0',
           assetTag: inventoryInfo?.assetTag,
           location: inventoryInfo?.location,
-          os: systemModuleData?.operatingSystem?.name || inventoryInfo?.operatingSystem || device.os,
-          modules: {
-            inventory: {
-              catalog: inventoryInfo?.catalog || 'Unknown',
-              usage: inventoryInfo?.usage || 'Unknown',
-              ...inventoryInfo // Include all other inventory fields
-            },
-            system: {
-              operatingSystem: systemModuleData?.operatingSystem ? {
-                name: systemModuleData.operatingSystem.name,
-                version: systemModuleData.operatingSystem.version,
-                build: systemModuleData.operatingSystem.build,
-                architecture: systemModuleData.operatingSystem.architecture,
-                displayVersion: systemModuleData.operatingSystem.displayVersion,
-                edition: systemModuleData.operatingSystem.edition,
-                featureUpdate: systemModuleData.operatingSystem.featureUpdate
-              } : undefined
-            }
-          },
+          os: inventoryInfo?.operatingSystem || device.os,
+          modules,
           totalEvents: device.totalEvents || 0,
           lastEventTime: lastSeenValue
         }
