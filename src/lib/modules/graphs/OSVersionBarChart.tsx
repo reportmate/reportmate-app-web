@@ -48,6 +48,20 @@ interface OSVersionBarChartProps {
 
 // Helper function to process OS versions
 const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
+  console.log(`[OSVersionBarChart ${osType}] Processing ${devices.length} devices`)
+  
+  // Debug: log sample device structures
+  if (devices.length > 0) {
+    console.log(`[OSVersionBarChart ${osType}] Sample device structure:`, {
+      deviceId: devices[0].deviceId,
+      hasModules: !!devices[0].modules,
+      hasSystemModule: !!devices[0].modules?.system,
+      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
+      legacyOs: devices[0].os,
+      modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : []
+    })
+  }
+  
   if (devices.length === 0) {
     return []
   }
