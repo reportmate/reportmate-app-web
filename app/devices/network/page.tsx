@@ -8,12 +8,14 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
+import { Copy } from "lucide-react"
 
 interface NetworkDevice {
   id: string
   deviceId: string
   deviceName: string
   serialNumber: string
+  assetTag?: string
   lastSeen: string
   collectedAt: string
   operatingSystem: string
@@ -29,6 +31,7 @@ function NetworkPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless'>('all')
   const searchParams = useSearchParams()
 
   useEffect(() => {
@@ -39,8 +42,8 @@ function NetworkPageContent() {
   useEffect(() => {
     const fetchNetworkDevices = async () => {
       try {
-        // Use the same API as the system page to get device data with modules
-        const response = await fetch('/api/modules/system', {
+        // Use the network API to get device data with network modules
+        const response = await fetch('/api/modules/network', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         })
@@ -88,6 +91,21 @@ function NetworkPageContent() {
   })
 
   const filteredNetworkDevices = processedNetworkDevices.filter(n => {
+    // Connection type filter
+    if (connectionFilter !== 'all') {
+      const connectionType = n.networkInfo.connectionType?.toLowerCase() || ''
+      if (connectionFilter === 'wired') {
+        if (!(connectionType.includes('ethernet') || connectionType.includes('wired'))) {
+          return false
+        }
+      } else if (connectionFilter === 'wireless') {
+        if (!(connectionType.includes('wireless') || connectionType.includes('wifi'))) {
+          return false
+        }
+      }
+    }
+
+    // Search query filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
@@ -97,6 +115,7 @@ function NetworkPageContent() {
         n.networkInfo.ssid?.toLowerCase().includes(query) ||
         n.networkInfo.connectionType?.toLowerCase().includes(query) ||
         n.serialNumber?.toLowerCase().includes(query) ||
+        n.assetTag?.toLowerCase().includes(query) ||
         n.networkInfo.interfaces?.some((iface: any) => 
           iface.name?.toLowerCase().includes(query) ||
           iface.ipAddress?.toLowerCase().includes(query) ||
@@ -106,6 +125,21 @@ function NetworkPageContent() {
     }
     return true
   })
+
+  // Helper function to copy text to clipboard
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch (err) {
+      // Fallback for older browsers
+      const textArea = document.createElement('textarea')
+      textArea.value = text
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+    }
+  }
 
   // Helper function to get IPv4 address
   const getIPv4Address = (ipAddress: string | undefined): string | undefined => {
@@ -143,17 +177,86 @@ function NetworkPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
-        <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6">
-            <div className="space-y-4">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="flex space-x-4">
-                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/3"></div>
-                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-1/4"></div>
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <header className="bg-white dark:bg-gray-900 border-b animate-pulse">
+          <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
+            <div className="h-5 w-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
+            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+            <div className="h-5 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
+          </div>
+        </header>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-6 w-48 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
+                  <div className="h-4 w-64 bg-gray-300 dark:bg-gray-600 rounded"></div>
                 </div>
-              ))}
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                    <div className="h-8 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                  </div>
+                  <div className="h-8 w-48 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(6)].map((_, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-3">
+                        <div className="flex flex-col justify-center h-12 space-y-1">
+                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-3 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2 h-12">
+                          <div className="h-2 w-2 bg-gray-300 dark:bg-gray-600 rounded-full flex-shrink-0"></div>
+                          <div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2 h-12">
+                          <div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center gap-2 h-12">
+                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center h-12">
+                          <div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center h-12">
+                          <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -229,7 +332,7 @@ function NetworkPageContent() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -239,33 +342,60 @@ function NetworkPageContent() {
                   Network interfaces and connectivity • {filteredNetworkDevices.length} devices
                 </p>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              <div className="flex items-center gap-4">
+                {/* Connection Type Filters */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setConnectionFilter(connectionFilter === 'wired' ? 'all' : 'wired')}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      connectionFilter === 'wired'
+                        ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200'
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Wired
+                  </button>
+                  <button
+                    onClick={() => setConnectionFilter(connectionFilter === 'wireless' ? 'all' : 'wireless')}
+                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                      connectionFilter === 'wireless'
+                        ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200'
+                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    Wireless
+                  </button>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Search network"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                />
+
+                {/* Search Input */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search devices, IPs, MACs, asset tags..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-96 md:w-[32rem] pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  />
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Device</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Connection</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IP Address</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">MAC Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Network Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Interfaces</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Network</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Protocol/Band</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -286,22 +416,27 @@ function NetworkPageContent() {
                     
                     return (
                       <tr key={networkDevice.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4">
-                          <Link
-                            href={`/device/${encodeURIComponent(networkDevice.deviceId)}`}
-                            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-                          >
-                            {networkDevice.deviceName || 'Unknown Device'}
-                          </Link>
-                          <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                            {networkDevice.serialNumber}
+                        <td className="px-6 py-3">
+                          <div className="flex flex-col justify-center h-12">
+                            <Link
+                              href={`/device/${encodeURIComponent(networkDevice.deviceId)}#network`}
+                              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm leading-tight truncate"
+                            >
+                              {networkDevice.deviceName || 'Unknown Device'}
+                            </Link>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight truncate">
+                              {networkDevice.serialNumber}
+                              {networkDevice.assetTag && (
+                                <span> | {networkDevice.assetTag}</span>
+                              )}
+                            </div>
                           </div>
                         </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2 h-12">
                             {networkDevice.networkInfo.connectionType ? (
                               <>
-                                <div className={`w-2 h-2 rounded-full ${
+                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                   networkDevice.networkInfo.connectionType.toLowerCase().includes('wireless') || 
                                   networkDevice.networkInfo.connectionType.toLowerCase().includes('wifi') 
                                     ? 'bg-blue-400' 
@@ -310,7 +445,7 @@ function NetworkPageContent() {
                                     ? 'bg-green-400'
                                     : 'bg-gray-400'
                                 }`} />
-                                <span className="text-sm text-gray-900 dark:text-white">
+                                <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
                                   {networkDevice.networkInfo.connectionType}
                                 </span>
                               </>
@@ -319,40 +454,93 @@ function NetworkPageContent() {
                             )}
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
-                          {ipv4Address || networkDevice.networkInfo.ipAddress || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-mono">
-                          {networkDevice.networkInfo.macAddress || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                          {networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName || 'N/A'}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="text-sm">
-                            {networkDevice.networkInfo.interfaces && Array.isArray(networkDevice.networkInfo.interfaces) ? (
-                              <div className="space-y-1">
-                                {networkDevice.networkInfo.interfaces.slice(0, 2).map((iface: any, idx: number) => (
-                                  <div key={idx} className="flex items-center gap-2">
-                                    <div className={`w-1.5 h-1.5 rounded-full ${
-                                      iface.isActive || iface.status === 'Active' || iface.status === 'Connected' 
-                                        ? 'bg-green-400' 
-                                        : 'bg-gray-400'
-                                    }`} />
-                                    <span className="text-gray-900 dark:text-white text-xs">
-                                      {iface.name || 'Unknown'} ({getInterfaceType(iface)})
-                                    </span>
-                                  </div>
-                                ))}
-                                {networkDevice.networkInfo.interfaces.length > 2 && (
-                                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                                    +{networkDevice.networkInfo.interfaces.length - 2} more
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-gray-500 dark:text-gray-400">No interfaces</span>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2 h-12">
+                            <span className="text-sm text-gray-900 dark:text-white font-mono whitespace-nowrap">
+                              {ipv4Address || networkDevice.networkInfo.ipAddress || 'N/A'}
+                            </span>
+                            {(ipv4Address || networkDevice.networkInfo.ipAddress) && (
+                              <button
+                                onClick={() => copyToClipboard(ipv4Address || networkDevice.networkInfo.ipAddress)}
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                title="Copy IP address"
+                              >
+                                <Copy size={14} />
+                              </button>
                             )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center gap-2 h-12">
+                            <span className="text-sm text-gray-900 dark:text-white font-mono whitespace-nowrap">
+                              {networkDevice.networkInfo.macAddress || 'N/A'}
+                            </span>
+                            {networkDevice.networkInfo.macAddress && (
+                              <button
+                                onClick={() => copyToClipboard(networkDevice.networkInfo.macAddress)}
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                title="Copy MAC address"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center h-12">
+                            <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                              {(networkDevice.networkInfo.connectionType && 
+                                (networkDevice.networkInfo.connectionType.toLowerCase().includes('ethernet') || 
+                                 networkDevice.networkInfo.connectionType.toLowerCase().includes('wired'))) 
+                                ? '' 
+                                : (networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName || 'N/A')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center h-12">
+                            <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                              {(() => {
+                                // Try to get protocol/band from various sources
+                                let protocolBand = null;
+                                
+                                // First try direct fields
+                                if (networkDevice.networkInfo.protocol) {
+                                  protocolBand = networkDevice.networkInfo.protocol;
+                                } else if (networkDevice.networkInfo.band) {
+                                  protocolBand = networkDevice.networkInfo.band;
+                                } else if (networkDevice.networkInfo.wirelessStandard) {
+                                  protocolBand = networkDevice.networkInfo.wirelessStandard;
+                                } else if (networkDevice.networkInfo.frequency) {
+                                  protocolBand = networkDevice.networkInfo.frequency;
+                                }
+                                
+                                // If not found, try to get from active interface
+                                if (!protocolBand && networkDevice.networkInfo.interfaces && Array.isArray(networkDevice.networkInfo.interfaces)) {
+                                  const activeInterface = networkDevice.networkInfo.interfaces.find((iface: any) => 
+                                    iface.isActive || iface.status === 'Active' || iface.status === 'Connected'
+                                  );
+                                  
+                                  if (activeInterface) {
+                                    if (activeInterface.wirelessProtocol && activeInterface.wirelessBand) {
+                                      protocolBand = `${activeInterface.wirelessProtocol} - ${activeInterface.wirelessBand}`;
+                                    } else if (activeInterface.wirelessProtocol) {
+                                      protocolBand = activeInterface.wirelessProtocol;
+                                    } else if (activeInterface.wirelessBand) {
+                                      protocolBand = activeInterface.wirelessBand;
+                                    }
+                                  }
+                                }
+                                
+                                // Clean up the display format
+                                if (protocolBand) {
+                                  // Replace patterns like " (2.4 GHz (6))" with " - 2.4 GHz (6)"
+                                  protocolBand = protocolBand.replace(/\s+\(([^)]+)\)$/, ' - $1');
+                                }
+                                
+                                return protocolBand && protocolBand !== 'N/A' ? protocolBand : '';
+                              })()}
+                            </span>
                           </div>
                         </td>
                       </tr>

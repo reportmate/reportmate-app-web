@@ -1,145 +1,55 @@
 import { NextResponse } from 'next/server'
 
-// Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[NETWORK API] ${timestamp} - Fetching network data`)
-
-    const apiBaseUrl = process.env.API_BASE_URL
+    console.log(`[NETWORK API] ${timestamp} - Fetching network data from Azure Functions`)
     
-    if (!apiBaseUrl) {
-      console.error(`[NETWORK API] ${timestamp} - API_BASE_URL environment variable not configured`)
-      return NextResponse.json({
-        error: 'API configuration error',
-        details: 'API_BASE_URL environment variable not configured'
-      }, { status: 500 })
-    }
+    // Fetch from Azure Functions API - use dedicated network endpoint
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://reportmate-api.azurewebsites.net'
     
-    let response
-    let useLocalFallback = false
-    
-    try {
-      response = await fetch(`${apiBaseUrl}/api/network`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        }
-      })
-      
-      if (!response.ok) {
-        console.error(`[NETWORK API] ${timestamp} - Azure Functions API error:`, response.status, response.statusText)
-        useLocalFallback = true
-      }
-    } catch (fetchError) {
-      console.error(`[NETWORK API] ${timestamp} - Failed to reach Azure Functions API:`, fetchError)
-      useLocalFallback = true
-    }
-    
-    if (useLocalFallback) {
-      console.log(`[NETWORK API] ${timestamp} - Azure Functions /api/network not found - extracting from events`)
-      
-      try {
-        // Try to get network data from events
-        const eventsResponse = await fetch(`${apiBaseUrl}/api/events`, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'User-Agent': 'ReportMate-Frontend/1.0'
-          }
-        })
-        
-        if (eventsResponse.ok) {
-          const eventsData = await eventsResponse.json()
-          
-          if (eventsData.success && Array.isArray(eventsData.events)) {
-            console.log(`[NETWORK API] ${timestamp} - Extracting network data from ${eventsData.events.length} events`)
-            
-            // Find network module events
-            const networkEvents = eventsData.events.filter((event: any) => 
-              event.payload && 
-              typeof event.payload === 'object' && 
-              event.payload.module_id === 'network'
-            )
-            
-            const networkData = networkEvents.map((event: any) => ({
-              id: event.device,
-              deviceId: event.device,
-              deviceName: event.device,
-              serialNumber: event.device,
-              lastSeen: event.ts,
-              collectedAt: event.payload.timestamp,
-              dataSize: event.payload.data_size_kb,
-              collectionType: event.payload.collection_type,
-              eventId: event.id,
-              message: event.message
-            }))
-            
-            console.log(`[NETWORK API] ${timestamp} - Found ${networkData.length} network events`)
-            
-            return NextResponse.json(networkData, {
-              headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache', 
-                'Expires': '0',
-                'X-Fetched-At': timestamp,
-                'X-Data-Source': 'azure-functions-events'
-              }
-            })
-          }
-        }
-        
-        console.error(`[NETWORK API] ${timestamp} - Events fallback also failed`)
-      } catch (eventsError) {
-        console.error(`[NETWORK API] ${timestamp} - Events fallback error:`, eventsError)
-      }
-      
-      // If events fallback also fails, return 503
-      return NextResponse.json(
-        { error: 'Service temporarily unavailable - cloud infrastructure error' },
-        { status: 503 }
-      )
-    }
-    
-    // Continue with Azure Functions API response processing if we have a valid response
-    if (response) {
-      const data = await response.json()
-      console.log(`[NETWORK API] ${timestamp} - Successfully received data from Azure Functions API`)
-      
-      return NextResponse.json(data, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Fetched-At': timestamp,
-          'X-Data-Source': 'azure-functions'
-        }
-      })
-    }
-    
-    // This should not be reached since we handle the fallback above
-    return NextResponse.json({
-      error: 'Unexpected error in API routing'
-    }, { status: 500 })
-
-  } catch (error) {
-    console.error('[NETWORK API] Error fetching network:', error)
-    return NextResponse.json({
-      error: 'Failed to fetch network data',
-      details: error instanceof Error ? error.message : String(error)
-    }, { 
-      status: 500,
+    const response = await fetch(`${apiBaseUrl}/api/network`, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
+        'Cache-Control': 'no-cache',
       }
     })
+    
+    if (!response.ok) {
+      throw new Error(`Azure Functions API error: ${response.status}`)
+    }
+    
+    const networkData = await response.json()
+    console.log(`[NETWORK API] ${timestamp} - Azure Functions returned ${Array.isArray(networkData) ? networkData.length : 0} network records`)
+    
+    // If we got an array, it's already in the correct format from Azure Functions
+    if (Array.isArray(networkData)) {
+      return NextResponse.json(networkData, {
+        headers: { 
+          'X-Fetched-At': timestamp, 
+          'X-Data-Source': 'azure-functions-network',
+          'X-Records-Count': String(networkData.length)
+        }
+      })
+    }
+    
+    // If we got an empty result or unexpected format, return empty array
+    console.log(`[NETWORK API] ${timestamp} - No network data available`)
+    return NextResponse.json([], {
+      headers: { 
+        'X-Fetched-At': timestamp, 
+        'X-Data-Source': 'azure-functions-network-empty',
+        'X-Records-Count': '0'
+      }
+    })
+    
+  } catch (error) {
+    console.error('[NETWORK API] Error:', error)
+    return NextResponse.json({ 
+      error: 'Failed to fetch network data',
+      details: error instanceof Error ? error.message : String(error)
+    }, { status: 500 })
   }
 }
