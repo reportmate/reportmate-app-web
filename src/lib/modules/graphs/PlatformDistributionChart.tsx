@@ -61,6 +61,18 @@ interface PlatformStats {
 
 // Helper function to detect platform from device
 const detectPlatform = (device: Device): 'Windows' | 'macOS' | 'Linux' | 'Unknown' => {
+  // Debug logging for first few devices
+  if (Math.random() < 0.1) { // Log 10% of devices to avoid spam
+    console.log('[PlatformDistributionChart] detectPlatform debug:', {
+      deviceName: device.name,
+      systemOS: device.modules?.system?.operatingSystem?.name,
+      legacyOS: device.os,
+      hasModules: !!device.modules,
+      hasSystem: !!device.modules?.system,
+      hasOperatingSystem: !!device.modules?.system?.operatingSystem
+    })
+  }
+  
   // Check system module OS info first (most reliable)
   const systemOS = device.modules?.system?.operatingSystem?.name?.toLowerCase()
   if (systemOS) {
@@ -123,6 +135,20 @@ const getUsage = (device: Device): string => {
 
 // Process platform distribution data
 const processPlatformData = (devices: Device[], filters?: any): PlatformStats[] => {
+  console.log('[PlatformDistributionChart] processPlatformData: Processing', devices.length, 'devices')
+  
+  // Debug: log sample device structure
+  if (devices.length > 0) {
+    console.log('[PlatformDistributionChart] Sample device structure:', {
+      deviceId: devices[0].deviceId,
+      hasModules: !!devices[0].modules,
+      hasSystemModule: !!devices[0].modules?.system,
+      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
+      legacyOs: devices[0].os,
+      modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : []
+    })
+  }
+  
   let filteredDevices = devices
 
   // Apply filters
