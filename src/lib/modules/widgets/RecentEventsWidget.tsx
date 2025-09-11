@@ -141,10 +141,10 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
       case 'polling':
         return { 
           text: 'Polling', 
-          color: 'text-green-600 dark:text-green-400', 
-          dot: 'bg-green-500',
+          color: 'text-blue-600 dark:text-blue-400', 
+          dot: 'bg-blue-500',
           show: true,
-          tooltip: 'HTTP polling /api/events every 5 seconds'
+          tooltip: 'HTTP polling /api/events every 10 seconds'
         }
       case 'connecting':
       case 'reconnecting':

@@ -17,6 +17,9 @@ import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkelet
 import { useLiveEvents } from "./hooks"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
+import { useComponentTracker, memoryManager } from "../../src/lib/memory-utils"
+import { PerformanceMonitor } from "../../src/components/PerformanceMonitor"
+import { SignalRStatus } from "../../src/components/SignalRStatus"
 
 // Import the same hooks and types from the original dashboard
 
@@ -70,11 +73,23 @@ interface Device {
 // Reuse the live events hook from the original dashboard
 
 export default function Dashboard() {
+  const componentId = useComponentTracker('Dashboard')
   const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
+
+  // Log memory status every 5 minutes in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const interval = setInterval(() => {
+        memoryManager.logMemoryStatus('Dashboard')
+      }, 300000) // 5 minutes
+      
+      return () => clearInterval(interval)
+    }
+  }, [])
 
   // Fetch devices data (same as original dashboard)
   useEffect(() => {
@@ -342,11 +357,11 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally running once on mount
   }, [])
 
-  // Update relative times every 30 seconds
+  // Update relative times every 60 seconds (increased from 30 to reduce processing)
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeUpdateCounter(prev => prev + 1)
-    }, 30000)
+    }, 60000)
     return () => clearInterval(interval)
   }, [])
 
@@ -358,6 +373,20 @@ export default function Dashboard() {
       status: d.status, 
       serialNumber: d.serialNumber 
     })))
+    
+    // Debug OS data specifically
+    if (devices.length > 0) {
+      console.log('[DASHBOARD] Sample device OS data:', {
+        deviceId: devices[0].deviceId,
+        serialNumber: devices[0].serialNumber,
+        legacyOs: devices[0].os,
+        hasModules: !!devices[0].modules,
+        hasSystemModule: !!devices[0].modules?.system,
+        hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
+        modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : [],
+        systemModuleData: devices[0].modules?.system
+      })
+    }
   }, [devices, devicesLoading])
 
   // Show skeleton while data is loading
@@ -365,16 +394,19 @@ export default function Dashboard() {
     return <DashboardSkeleton />
   }
 
-  // Debug log for render
-  console.log('[DASHBOARD] Rendering with:', {
-    devicesCount: devices.length,
-    devicesLoading,
-    firstDevice: devices[0] ? {
-      name: devices[0].name,
-      status: devices[0].status,
-      serialNumber: devices[0].serialNumber
-    } : null
-  })
+    // DEBUG: Add unique timestamp to force re-render 
+    console.log('[DASHBOARD] Component render at:', new Date().toISOString())
+    
+    // Debug log for render
+    console.log('[DASHBOARD] Rendering with:', {
+      devicesCount: devices.length,
+      devicesLoading,
+      firstDevice: devices[0] ? {
+        name: devices[0].name,
+        status: devices[0].status,
+        serialNumber: devices[0].serialNumber
+      } : null
+    })
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -415,6 +447,7 @@ export default function Dashboard() {
                 <DeviceSearchField 
                   className="w-full"
                   placeholder="Find device by name, serial, or asset tag"
+                  preloadedDevices={devices}
                 />
               </div>
             </div>
@@ -494,6 +527,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      
+      <PerformanceMonitor />
     </div>
   )
 }
