@@ -79,8 +79,8 @@ export function MemoryBreakdownChart({
 
     // Helper function to get memory size in GB
     const getMemoryGB = (device: Device): number => {
-      // Debug logging
-      if (process.env.NODE_ENV === 'development') {
+      // Only enable debug logging in development AND when specifically needed
+      if (process.env.NODE_ENV === 'development' && process.env.DEBUG_MEMORY_CHART === 'true') {
         console.log('Memory debug for device:', device.serialNumber || device.deviceName || device.name, {
           // Check all possible memory locations based on HardwareTab.tsx
           directMemory: device.memory,
