@@ -145,6 +145,7 @@ export async function GET(request: Request) {
                       sessions: []
                     }
                   },
+                  raw: {},
                   error: 'Missing serial number',
                   hasError: true
                 };
@@ -176,6 +177,7 @@ export async function GET(request: Request) {
                         sessions: []
                       }
                     },
+                    raw: {},
                     error: `API Error: ${deviceApiResponse.status}`,
                     hasError: true
                   };
@@ -196,6 +198,8 @@ export async function GET(request: Request) {
                   lastSeen: device.lastSeen,
                   status: device.status || 'active',
                   installs: installsData,
+                  // Add direct access to raw data for version extraction
+                  raw: deviceData?.device?.modules || {},
                   hasError: false
                 };
 
@@ -216,6 +220,7 @@ export async function GET(request: Request) {
                       sessions: []
                     }
                   },
+                  raw: {},
                   error: error instanceof Error ? error.message : 'Unknown error',
                   hasError: true
                 };

@@ -78,7 +78,19 @@ Timestamp: ${new Date().toISOString()}`
     )
   }
 
-  const displayVersion = versionInfo?.version || '20250807220630-8992f2c'
+  const displayVersion = versionInfo?.version || '20250911054209-16416de'
+
+  // Format version for display: 20250911054209-16416de -> 2025.09.11.054209-16416de
+  const formatVersionForDisplay = (version: string): string => {
+    const match = version.match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})-(.+)$/)
+    if (match) {
+      const [, year, month, day, hour, minute, second, hash] = match
+      return `${year}.${month}.${day}.${hour}${minute}${second}-${hash}`
+    }
+    return version // Return original if it doesn't match the expected format
+  }
+
+  const formattedDisplayVersion = formatVersionForDisplay(displayVersion)
 
   return (
     <div 
@@ -90,7 +102,7 @@ Timestamp: ${new Date().toISOString()}`
     >
       <div className="flex items-center gap-1">
         <div className={`w-2 h-2 rounded-full ${copied ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-        <span>{copied ? 'Copied!' : `v${displayVersion}`}</span>
+        <span>{copied ? 'Copied!' : `v${formattedDisplayVersion}`}</span>
       </div>
       
       {showTooltip && versionInfo && (
@@ -101,16 +113,18 @@ Timestamp: ${new Date().toISOString()}`
               <span className="text-blue-600 dark:text-blue-400 text-xs">Click to copy</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Version:</span>
-              <span className="text-gray-900 dark:text-white font-mono">{versionInfo.version}</span>
+              <span className="text-gray-600 dark:text-gray-400">Tag:</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.version}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Build ID:</span>
-              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.buildId.slice(0, 8)}...</span>
+              <span className="text-gray-600 dark:text-gray-400">Commit:</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.buildId.slice(0, 8)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600 dark:text-gray-400">Image:</span>
-              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.imageTag.split(':')[1] || versionInfo.imageTag}</span>
+              <span className="text-gray-600 dark:text-gray-400">Registry:</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">
+                {versionInfo.imageTag.includes('/') ? versionInfo.imageTag.split('/')[0] : 'local'}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Node:</span>

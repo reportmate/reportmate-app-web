@@ -23,14 +23,12 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function GET() {
+  const timestamp = new Date().toISOString()
+  
   try {
-    const timestamp = new Date().toISOString()
-    console.log(`[DEVICES API CACHED] ${timestamp} - Cached devices endpoint`)
-
     // Check cache first
     const now = Date.now()
     if (devicesCache.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
-      console.log(`[DEVICES API CACHED] ${timestamp} - Serving from cache: ${devicesCache.length} devices`)
       return NextResponse.json(devicesCache, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -50,9 +48,9 @@ export async function GET() {
       }, { status: 500 })
     }
     
-    console.log(`[DEVICES API CACHED] ${timestamp} - Fetching fresh data from Azure Functions`)
+    // Fetch devices and inventory data concurrently
   
-    // Fetch both devices and inventory data to get complete device information (same as inventory page)
+    // Fetch devices and inventory data from Azure Functions
     const [devicesResponse, inventoryResponse] = await Promise.all([
       fetch(`${apiBaseUrl}/api/devices`, {
         cache: 'no-store',
@@ -82,9 +80,36 @@ export async function GET() {
     let inventoryData = []
     if (inventoryResponse.ok) {
       inventoryData = await inventoryResponse.json()
-      console.log(`[DEVICES API CACHED] ${timestamp} - Got ${inventoryData.length} inventory items`)
     } else {
-      console.warn(`[DEVICES API CACHED] ${timestamp} - Inventory API failed: ${inventoryResponse.status}`)
+      console.warn(`[DEVICES API] Inventory API failed: ${inventoryResponse.status}`)
+    }
+
+    // Get system data from database for OS information
+    let systemData: any[] = []
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { Pool } = require('pg')
+      const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+      
+      // Query system table for OS information with device serial numbers
+      const systemQuery = `
+        SELECT 
+          device_id as system_device_id,
+          data,
+          collected_at
+        FROM system
+        WHERE collected_at IS NOT NULL 
+          AND data IS NOT NULL
+          AND device_id IS NOT NULL
+        ORDER BY collected_at DESC
+      `
+      
+      const systemResult = await pool.query(systemQuery)
+      systemData = systemResult.rows || []
+      
+      await pool.end()
+    } catch (systemError) {
+      console.warn(`[DEVICES API] System database query failed:`, systemError)
     }
     
     // Get ALL modules' latest timestamps for proper status calculation
@@ -129,11 +154,10 @@ export async function GET() {
       
       const result = await pool.query(unionQuery)
       allModulesData = result.rows
-      console.log(`[DEVICES API CACHED] ${timestamp} - Got latest module timestamps for ${allModulesData.length} devices`)
       
       await pool.end()
     } catch (dbError) {
-      console.warn(`[DEVICES API CACHED] ${timestamp} - Module timestamps query failed:`, dbError)
+      console.warn(`[DEVICES API] Module timestamps query failed:`, dbError)
     }
     
     // Build inventory lookup map for fast device name resolution (same as inventory page)
@@ -144,7 +168,37 @@ export async function GET() {
           inventoryMap.set(item.serialNumber, item)
         }
       })
-      console.log(`[DEVICES API CACHED] ${timestamp} - Built inventory map for ${inventoryMap.size} devices`)
+    }
+
+    // Build system map for OS information using database data
+    const systemMap = new Map<string, any>()
+    if (Array.isArray(systemData)) {
+      systemData.forEach((item: any) => {
+        if (item.system_device_id && item.data) {
+          // Parse the data JSON field from database to extract operatingSystem
+          let systemInfo = null
+          let operatingSystem = null
+          try {
+            systemInfo = typeof item.data === 'string' 
+              ? JSON.parse(item.data) 
+              : item.data
+            
+            // Extract operatingSystem from the system data
+            operatingSystem = systemInfo?.operatingSystem
+          } catch (parseError) {
+            console.warn(`[DEVICES API] Failed to parse system data for ${item.system_device_id}:`, parseError)
+          }
+          
+          if (operatingSystem) {
+            // Use device_id from system table as the serial number
+            systemMap.set(item.system_device_id, {
+              operatingSystem,
+              collected_at: item.collected_at,
+              device_id: item.system_device_id
+            })
+          }
+        }
+      })
     }
     
     // Build module timestamps map for latest activity per device
@@ -155,20 +209,11 @@ export async function GET() {
           moduleTimestampsMap.set(item.serial_number, new Date(item.latest_collected_at))
         }
       })
-      console.log(`[DEVICES API CACHED] ${timestamp} - Built module timestamps map for ${moduleTimestampsMap.size} devices`)
     }
-    
-    console.log(`[DEVICES API CACHED] ${timestamp} - Raw Azure Functions response:`, {
-      isArray: Array.isArray(devicesData),
-      deviceCount: Array.isArray(devicesData) ? devicesData.length : (devicesData.devices?.length || 0),
-      keys: Object.keys(devicesData || {}),
-      firstDeviceKeys: Array.isArray(devicesData) && devicesData[0] ? Object.keys(devicesData[0]) : (devicesData.devices?.[0] ? Object.keys(devicesData.devices[0]) : [])
-    })
     
     // Extract devices array from Azure Functions response structure
     // Azure Functions returns array directly, not wrapped in devices property
     const devicesArray = Array.isArray(devicesData) ? devicesData : (devicesData.devices || devicesData || [])
-    console.log(`[DEVICES API CACHED] ${timestamp} - Got ${devicesArray.length} devices from optimized endpoint`)
     
     // Enhanced transformation using inventory data (same logic as inventory page)
     const transformedDevices = (Array.isArray(devicesArray) ? devicesArray : [])
@@ -204,16 +249,10 @@ export async function GET() {
         // Build proper device name using EXACT SAME logic as inventory page
         const deviceName = inventoryInfo.deviceName || inventoryInfo.computerName || serialNumber || 'Unknown Device'
         
-        // Debug logging for specific device
-        if (serialNumber === '8LD0BZ2') {
-          console.log(`[DEVICES API DEBUG] Processing device ${serialNumber}:`)
-          console.log(`[DEVICES API DEBUG] - Device keys: ${Object.keys(device).join(', ')}`)
-          console.log(`[DEVICES API DEBUG] - Has inventory: ${inventoryInfo !== undefined}`)
-          console.log(`[DEVICES API DEBUG] - Latest module timestamp: ${moduleTimestampsMap.get(serialNumber)}`)
-          console.log(`[DEVICES API DEBUG] - Final deviceName: "${deviceName}"`)
-        }
+        // Get system info for this device
+        const systemInfo = systemMap.get(serialNumber) || {}
         
-        // Build simplified modules structure (we only have inventory data now)
+        // Build modules structure with system and inventory data
         const modules = {
           inventory: {
             catalog: inventoryInfo?.catalog || 'Unknown',
@@ -221,34 +260,37 @@ export async function GET() {
             ...inventoryInfo // Include all other inventory fields
           },
           system: {
-            // System module data is no longer directly available for efficiency
-            // but status calculation uses all module timestamps
-            operatingSystem: undefined
+            // Include system module data if available from database
+            operatingSystem: systemInfo?.operatingSystem,
+            ...systemInfo // Include all other system fields (collected_at, device_id)
           }
         }
         
-        return {
+        // Create clean device object to avoid property duplication
+        const cleanDevice = {
           deviceId: device.deviceId || device.id || serialNumber,
           serialNumber: serialNumber,
-          name: deviceName,
+          name: deviceName, // Use name for consistency with component interface
           lastSeen: lastSeenValue,
           createdAt: device.createdAt,
           status: calculateStatus(lastSeenValue, serialNumber),
           clientVersion: device.clientVersion || '1.0.0',
           assetTag: inventoryInfo?.assetTag,
           location: inventoryInfo?.location,
-          os: inventoryInfo?.operatingSystem || device.os,
+          os: systemInfo?.operatingSystem?.name || inventoryInfo?.operatingSystem || device.os,
           modules,
           totalEvents: device.totalEvents || 0,
-          lastEventTime: lastSeenValue
+          lastEventTime: lastSeenValue,
+          hasData: true // Explicitly set since these devices have data
         }
+        
+        return cleanDevice
       })
     
     // Update cache
     devicesCache = transformedDevices
     cacheTimestamp = now
     
-    console.log(`[DEVICES API CACHED] ${timestamp} - Cached ${transformedDevices.length} devices for future requests`)
     return NextResponse.json(transformedDevices, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -259,11 +301,10 @@ export async function GET() {
     })
       
   } catch (error) {
-    console.error('[DEVICES API CACHED] Error:', error)
+    console.error('[DEVICES API] Error:', error)
     
     // If we have cached data, return it even if fresh fetch fails
     if (devicesCache.length > 0) {
-      console.log(`[DEVICES API CACHED] Falling back to stale cache: ${devicesCache.length} devices`)
       return NextResponse.json(devicesCache, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
