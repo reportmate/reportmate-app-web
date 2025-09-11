@@ -53,8 +53,8 @@ export default function LiveInstallsPage() {
   useEffect(() => {
     fetchLiveData()
     
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchLiveData, 30000)
+    // Auto-refresh every 60 seconds (increased from 30 to reduce server load)
+    const interval = setInterval(fetchLiveData, 60000)
     return () => clearInterval(interval)
   }, [])
 
