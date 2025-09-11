@@ -5,46 +5,40 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
-import Image from "next/image"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
-import { DevicesPageSkeleton } from "../../src/components/skeleton/DevicesPageSkeleton"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 
-interface Device {
-  deviceId: string      // Internal UUID (unique)
-  serialNumber: string  // Human-readable unique identifier
-  name: string
-  assetTag?: string     // Asset tag from inventory
-  os?: string
+interface InventoryItem {
+  id: string
+  deviceId: string
+  deviceName: string
+  serialNumber: string
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error'
-  uptime?: string
+  collectedAt: string
+  assetTag?: string
   location?: string
-  ipAddress?: string
-  totalEvents: number
-  lastEventTime: string
-  modules?: {
-    inventory?: {
-      assetTag?: string
-      deviceName?: string
-      location?: string
-      usage?: string  // 'Assigned' or 'Shared'
-      catalog?: string  // 'Curriculum', 'Staff', 'Faculty', 'Kiosk'
-    }
-  }
+  usage?: string
+  catalog?: string
+  computerName?: string
+  domain?: string
+  organizationalUnit?: string
+  manufacturer?: string
+  model?: string
+  uuid?: string
+  raw?: any
 }
 
 function DevicesPageContent() {
-  const [devices, setDevices] = useState<Device[]>([])
+  const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [usageFilter, setUsageFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [catalogFilter, setCatalogFilter] = useState<string>('all')
   const searchParams = useSearchParams()
 
-  // Initialize search query and usage filter from URL parameters
+  // Initialize search query and filters from URL parameters
   useEffect(() => {
     try {
       const urlSearch = searchParams.get('search')
@@ -53,13 +47,13 @@ function DevicesPageContent() {
       }
       
       const urlUsage = searchParams.get('usage')
-      if (urlUsage && ['assigned', 'shared', 'curriculum', 'staff', 'faculty', 'kiosk'].includes(urlUsage.toLowerCase())) {
+      if (urlUsage && ['assigned', 'shared'].includes(urlUsage.toLowerCase())) {
         setUsageFilter(urlUsage.toLowerCase())
       }
 
-      const urlStatus = searchParams.get('status')
-      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
-        setStatusFilter(urlStatus.toLowerCase())
+      const urlCatalog = searchParams.get('catalog')
+      if (urlCatalog && ['curriculum', 'staff', 'faculty', 'kiosk'].includes(urlCatalog.toLowerCase())) {
+        setCatalogFilter(urlCatalog.toLowerCase())
       }
     } catch (e) {
       console.warn('Failed to get search params:', e)
@@ -67,9 +61,9 @@ function DevicesPageContent() {
   }, [searchParams])
 
   useEffect(() => {
-    const fetchDevices = async () => {
+    const fetchInventory = async () => {
       try {
-        // Use Next.js API route
+        // Use devices API endpoint which has proper status calculation logic
         const apiUrl = '/api/devices'
         const timestamp = new Date().toISOString()
         console.log(`${timestamp} - Fetching devices from Next.js API route:`, apiUrl)
@@ -83,7 +77,6 @@ function DevicesPageContent() {
         })
         
         console.log(`${timestamp} - API Response Status:`, response.status)
-        console.log(`${timestamp} - API Response Headers:`, Object.fromEntries(response.headers.entries()))
         
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status} ${response.statusText}`)
@@ -94,28 +87,52 @@ function DevicesPageContent() {
           type: typeof data, 
           isArray: Array.isArray(data), 
           length: Array.isArray(data) ? data.length : 'N/A',
-          fetchedAt: response.headers.get('X-Fetched-At'),
-          keys: Array.isArray(data) ? [] : Object.keys(data || {})
+          fullResponse: data
         })
         
-        // The API returns a direct array of devices
-        let devicesArray: Device[]
+        // The devices API returns a direct array of device items with proper status calculation
+        let inventoryArray: InventoryItem[]
         
         if (Array.isArray(data)) {
-          devicesArray = data
-          console.log('✅ Successfully received devices array:', devicesArray.length, 'devices')
+          // Transform device data to match inventory structure
+          inventoryArray = data.map(device => ({
+            id: device.deviceId,
+            deviceId: device.deviceId,
+            deviceName: device.name,
+            serialNumber: device.serialNumber,
+            lastSeen: device.lastSeen,
+            collectedAt: device.lastSeen, // Use lastSeen as collectedAt
+            assetTag: device.modules?.inventory?.assetTag || device.assetTag,
+            location: device.modules?.inventory?.location || device.location,
+            usage: device.modules?.inventory?.usage,
+            catalog: device.modules?.inventory?.catalog,
+            computerName: device.modules?.inventory?.computerName || device.name,
+            domain: device.modules?.inventory?.domain,
+            organizationalUnit: device.modules?.inventory?.organizationalUnit,
+            manufacturer: device.modules?.inventory?.manufacturer,
+            model: device.modules?.inventory?.model,
+            uuid: device.modules?.inventory?.uuid || device.deviceId,
+            raw: { 
+              ...device, 
+              // Include the calculated status from the API
+              status: device.status 
+            }
+          }))
+          console.log('✅ Successfully received devices array:', inventoryArray.length, 'items')
+          console.log('📋 First device item sample:', inventoryArray[0])
         } else {
           console.error('❌ Invalid API response format:', data)
           throw new Error('API returned invalid data format')
         }
         
-        if (devicesArray.length === 0) {
+        if (inventoryArray.length === 0) {
           console.warn('⚠️ No devices found in API response')
-          setDevices([])
+          setInventory([])
           setError(null)
         } else {
-          console.log('✅ Successfully loaded', devicesArray.length, 'devices from API')
-          setDevices(devicesArray)
+          console.log('✅ Successfully loaded', inventoryArray.length, 'device items from API')
+          console.log('📋 Setting inventory state with:', inventoryArray)
+          setInventory(inventoryArray)
           setError(null)
         }
         
@@ -123,56 +140,54 @@ function DevicesPageContent() {
         console.error('❌ Failed to fetch devices:', error)
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
         setError(errorMessage)
-        setDevices([]) // Set empty array on error
+        setInventory([]) // Set empty array on error
       } finally {
-        // ALWAYS clear loading state
         setLoading(false)
         console.log('✅ Loading state cleared')
       }
     }
 
-    fetchDevices()
+    fetchInventory()
   }, [])
 
-  // Filter devices based on search query and usage filter with error handling
-  const filteredDevices = (() => {
+  // Filter inventory based on search query and filters
+  const filteredInventory = (() => {
     try {
-      if (!Array.isArray(devices)) {
-        console.warn('Devices is not an array:', devices)
+      console.log('🔍 Filter function called with inventory:', {
+        isArray: Array.isArray(inventory),
+        length: inventory?.length,
+        firstItem: inventory?.[0],
+        inventoryState: inventory
+      })
+      
+      if (!Array.isArray(inventory)) {
+        console.warn('Inventory is not an array:', inventory)
         return []
       }
       
-      let filtered = devices
+      let filtered = inventory
       
       // Apply usage filter first
       if (usageFilter !== 'all') {
-        filtered = filtered.filter(device => {
+        filtered = filtered.filter(item => {
           try {
-            // Check usage field for 'assigned' and 'shared'
-            if (usageFilter === 'assigned' || usageFilter === 'shared') {
-              const usage = device.modules?.inventory?.usage?.toLowerCase()
-              return usage === usageFilter
-            }
-            // Check catalog field for 'curriculum', 'staff', 'faculty', 'kiosk'
-            else if (['curriculum', 'staff', 'faculty', 'kiosk'].includes(usageFilter)) {
-              const catalog = device.modules?.inventory?.catalog?.toLowerCase()
-              return catalog === usageFilter
-            }
-            return false
+            const usage = item.usage?.toLowerCase()
+            return usage === usageFilter
           } catch (e) {
-            console.warn('Error checking device usage:', device, e)
+            console.warn('Error checking item usage:', item, e)
             return false
           }
         })
       }
 
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        filtered = filtered.filter(device => {
+      // Apply catalog filter
+      if (catalogFilter !== 'all') {
+        filtered = filtered.filter(item => {
           try {
-            return device.status === statusFilter
+            const catalog = item.catalog?.toLowerCase()
+            return catalog === catalogFilter
           } catch (e) {
-            console.warn('Error checking device status:', device, e)
+            console.warn('Error checking item catalog:', item, e)
             return false
           }
         })
@@ -181,116 +196,198 @@ function DevicesPageContent() {
       // Then apply search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
-        filtered = filtered.filter(device => {
+        filtered = filtered.filter(item => {
           try {
             return (
-              device?.name?.toLowerCase().includes(query) ||
-              device?.assetTag?.toLowerCase().includes(query) ||
-              device?.os?.toLowerCase().includes(query) ||
-              device?.serialNumber?.toLowerCase().includes(query) ||
-              device?.ipAddress?.toLowerCase().includes(query) ||
-              device?.deviceId?.toLowerCase().includes(query) ||
-              device?.modules?.inventory?.deviceName?.toLowerCase().includes(query) ||
-              device?.modules?.inventory?.location?.toLowerCase().includes(query)
+              item?.deviceName?.toLowerCase().includes(query) ||
+              item?.assetTag?.toLowerCase().includes(query) ||
+              item?.serialNumber?.toLowerCase().includes(query) ||
+              item?.computerName?.toLowerCase().includes(query) ||
+              item?.location?.toLowerCase().includes(query) ||
+              item?.manufacturer?.toLowerCase().includes(query) ||
+              item?.model?.toLowerCase().includes(query) ||
+              item?.uuid?.toLowerCase().includes(query) ||
+              item?.domain?.toLowerCase().includes(query) ||
+              item?.organizationalUnit?.toLowerCase().includes(query)
             )
           } catch (e) {
-            console.warn('Error filtering device:', device, e)
+            console.warn('Error filtering item:', item, e)
             return false
           }
         })
       }
       
-      return filtered
+      // Remove duplicates based on serialNumber
+      const uniqueFiltered = filtered.reduce((unique: InventoryItem[], item: InventoryItem) => {
+        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      
+      console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items`)
+      console.log('🔍 Sample filtered item:', uniqueFiltered[0])
+      
+      return uniqueFiltered
     } catch (e) {
-      console.error('Error in filteredDevices:', e)
+      console.error('Error in filteredInventory:', e)
       return []
     }
   })()
 
-  // Get usage filter counts
-  const getUsageFilterCounts = () => {
+  // Get filter counts from unique inventory (remove duplicates first)
+  const getFilterCounts = () => {
     try {
-      if (!Array.isArray(devices)) return { 
+      if (!Array.isArray(inventory)) return { 
         all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 
       }
       
+      // Remove duplicates first based on serialNumber
+      const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
+        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      
       return {
-        all: devices.length,
-        assigned: devices.filter(device => 
-          device.modules?.inventory?.usage?.toLowerCase() === 'assigned'
+        all: uniqueInventory.length,
+        assigned: uniqueInventory.filter(item => 
+          item.usage?.toLowerCase() === 'assigned'
         ).length,
-        shared: devices.filter(device => 
-          device.modules?.inventory?.usage?.toLowerCase() === 'shared'
+        shared: uniqueInventory.filter(item => 
+          item.usage?.toLowerCase() === 'shared'
         ).length,
-        curriculum: devices.filter(device => 
-          device.modules?.inventory?.catalog?.toLowerCase() === 'curriculum'
+        curriculum: uniqueInventory.filter(item => 
+          item.catalog?.toLowerCase() === 'curriculum'
         ).length,
-        staff: devices.filter(device => 
-          device.modules?.inventory?.catalog?.toLowerCase() === 'staff'
+        staff: uniqueInventory.filter(item => 
+          item.catalog?.toLowerCase() === 'staff'
         ).length,
-        faculty: devices.filter(device => 
-          device.modules?.inventory?.catalog?.toLowerCase() === 'faculty'
+        faculty: uniqueInventory.filter(item => 
+          item.catalog?.toLowerCase() === 'faculty'
         ).length,
-        kiosk: devices.filter(device => 
-          device.modules?.inventory?.catalog?.toLowerCase() === 'kiosk'
+        kiosk: uniqueInventory.filter(item => 
+          item.catalog?.toLowerCase() === 'kiosk'
         ).length,
       }
     } catch (e) {
-      console.error('Error calculating usage filter counts:', e)
+      console.error('Error calculating filter counts:', e)
       return { all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
     }
   }
 
-  const usageFilterCounts = getUsageFilterCounts()
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
-      case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
-      case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
-      case 'stale': return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
-      case 'missing': return 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900'
-      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800' // Treat any unknown status as stale
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'active':
-        return (
-          <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-        )
-      case 'warning':
-        return (
-          <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        )
-      case 'error':
-        return (
-          <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-          </svg>
-        )
-      case 'missing':
-        return (
-          <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-          </svg>
-        )
-      default:
-        return (
-          <svg className="w-5 h-5 text-gray-600 dark:text-gray-400" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-          </svg>
-        )
-    }
-  }
+  const filterCounts = getFilterCounts()
 
   if (loading) {
-    return <DevicesPageSkeleton />
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="animate-pulse">
+          {/* Header skeleton */}
+          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16">
+                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                  <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="w-5 h-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+                </div>
+              </div>
+            </div>
+          </header>
+          
+          {/* Content skeleton */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              {/* Header section skeleton */}
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div>
+                  <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2"></div>
+                  <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-48"></div>
+                </div>
+                <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded w-64"></div>
+              </div>
+              
+              {/* Filter buttons skeleton */}
+              <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
+                <div className="flex flex-wrap gap-2">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="h-8 bg-gray-300 dark:bg-gray-600 rounded-lg w-20"></div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Table skeleton */}
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-14"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3">
+                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {[...Array(8)].map((_, i) => (
+                      <tr key={i}>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="space-y-2">
+                            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+                            <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                          </div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-28"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-16"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-18"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                        </td>
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-8"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (error) {
@@ -334,7 +431,6 @@ function DevicesPageContent() {
                 onClick={() => {
                   setError(null)
                   setLoading(true)
-                  // Trigger a re-fetch by forcing component re-render
                   window.location.reload()
                 }}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -380,7 +476,7 @@ function DevicesPageContent() {
                 </div>
               </div>
             </div>
-            
+
             {/* Right side - Navigation */}
             <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
               {/* Navigation */}
@@ -398,10 +494,8 @@ function DevicesPageContent() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-
-
-        {devices.length === 0 ? (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
+        {inventory.length === 0 ? (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 py-16">
             <div className="text-center">
               <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
@@ -418,351 +512,239 @@ function DevicesPageContent() {
             </div>
           </div>
         ) : (
-          <>
-            {/* Mobile and Tablet View - Cards */}
-            <div className="md:hidden">
-              {filteredDevices.length === 0 ? (
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                      <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                      No {usageFilter === 'all' ? '' : usageFilter}{statusFilter === 'all' ? '' : ` ${statusFilter}`} devices found
-                    </h3>
-                    <p className="text-gray-600 dark:text-gray-400 mb-6">
-                      {searchQuery 
-                        ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' || statusFilter !== 'all' ? ` with current filters` : ''}.`
-                        : (usageFilter !== 'all' || statusFilter !== 'all')
-                          ? `No devices match the current filter criteria.`
-                          : 'Try adjusting your search or filter criteria.'
-                      }
-                    </p>
-                    {(searchQuery || usageFilter !== 'all' || statusFilter !== 'all') && (
-                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
-                        {searchQuery && (
-                          <button
-                            onClick={() => setSearchQuery('')}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                          >
-                            Clear Search
-                          </button>
-                        )}
-                        {usageFilter !== 'all' && (
-                          <button
-                            onClick={() => setUsageFilter('all')}
-                            className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                          >
-                            Show All Categories
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                {filteredDevices.map((device) => (
-                  <Link
-                    key={device.deviceId}
-                    href={`/device/${encodeURIComponent(device.serialNumber)}`}
-                    className="block"
-                  >
-                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <div className="flex items-center gap-2 flex-shrink-0">
-                            {getStatusIcon(device.status)}
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusColor(device.status)}`}>
-                              {device.status}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0 ml-2">
-                          {formatRelativeTime(device.lastSeen)}
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3">
-                        <div className="font-medium text-gray-900 dark:text-white text-sm mb-1">
-                          {device.name || device.serialNumber}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-                          <div>Asset: {device.modules?.inventory?.assetTag || 'No asset tag'}</div>
-                          <div className="font-mono">{device.serialNumber}</div>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Endpoints Fleet: {filterCounts.all} devices
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Manage and monitor all devices in fleet
+                </p>
               </div>
-              )}
+              <div className="flex items-center gap-4">
+                {/* Search Input */}
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search devices..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="block w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    >
+                      <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Filter Row */}
+            <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
+              <nav className="flex flex-wrap gap-2">
+                {[
+                  { key: 'assigned', label: 'Assigned', count: filterCounts.assigned, type: 'usage', colors: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800' },
+                  { key: 'shared', label: 'Shared', count: filterCounts.shared, type: 'usage', colors: 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800' },
+                  { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum, type: 'catalog', colors: 'bg-teal-100 text-teal-700 border-teal-300 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-600 dark:hover:bg-teal-800' },
+                  { key: 'staff', label: 'Staff', count: filterCounts.staff, type: 'catalog', colors: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800' },
+                  { key: 'faculty', label: 'Faculty', count: filterCounts.faculty, type: 'catalog', colors: 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800' },
+                  { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk, type: 'catalog', colors: 'bg-cyan-100 text-cyan-700 border-cyan-300 hover:bg-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-600 dark:hover:bg-cyan-800' },
+                ].map((filter) => {
+                  const isActive = (filter.type === 'usage' && usageFilter === filter.key) ||
+                                 (filter.type === 'catalog' && catalogFilter === filter.key)
+                  
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => {
+                        if (filter.type === 'usage') {
+                          setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)
+                        } else {
+                          setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)
+                        }
+                      }}
+                      className={`${
+                        isActive
+                          ? filter.colors
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                    >
+                      <span className="hidden lg:inline">{filter.label}</span>
+                      <span className="lg:hidden">{filter.label}</span>
+                      <span className={`${
+                        isActive 
+                          ? 'bg-white/20 text-current'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                        {filter.count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </nav>
             </div>
 
-            {/* Desktop View - Table */}
-            <div className="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                    Endpoints Fleet
-                  </h2>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    Manage and monitor all devices in fleet
-                  </p>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                  {/* Status Filter Buttons */}
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { key: 'active', label: 'Active', count: devices.filter(d => d.status === 'active').length, color: '#10b981' },
-                      { key: 'stale', label: 'Stale', count: devices.filter(d => d.status === 'stale').length, color: '#f59e0b' },
-                      { key: 'missing', label: 'Missing', count: devices.filter(d => d.status === 'missing').length, color: '#6b7280' },
-                    ].map((filter) => {
-                      const isActive = statusFilter === filter.key
-                      
-                      return (
-                        <button
-                          key={filter.key}
-                          onClick={() => setStatusFilter(statusFilter === filter.key ? 'all' : filter.key)}
-                          className={`${
-                            isActive
-                              ? 'text-white shadow-md'
-                              : 'bg-gray-100 text-gray-600 border border-gray-300 hover:shadow-sm dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500'
-                          } px-3 py-1.5 rounded-lg text-sm font-medium flex items-center gap-2 transition-all duration-200`}
-                          style={isActive ? { backgroundColor: filter.color } : {}}
-                        >
-                          {filter.label}
-                          <span className={`${
-                            isActive 
-                              ? 'bg-white/20 text-white'
-                              : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                          } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium`}>
-                            {filter.count}
-                          </span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  {/* Search Input */}
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search devices..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="block w-full sm:w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg leading-5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    />
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                      >
-                        <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full table-fixed">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
-                    {/* Filter Row */}
-                    <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={5} className="px-4 lg:px-6 py-3">
-                        {/* Desktop filter tabs */}
-                        <nav className="hidden sm:flex flex-wrap gap-2">
-                          {[
-                            { key: 'all', label: 'All Devices', count: usageFilterCounts.all },
-                            { key: 'assigned', label: 'Assigned', count: usageFilterCounts.assigned },
-                            { key: 'shared', label: 'Shared', count: usageFilterCounts.shared },
-                            { key: 'curriculum', label: 'Curriculum', count: usageFilterCounts.curriculum },
-                            { key: 'staff', label: 'Staff', count: usageFilterCounts.staff },
-                            { key: 'faculty', label: 'Faculty', count: usageFilterCounts.faculty },
-                            { key: 'kiosk', label: 'Kiosk', count: usageFilterCounts.kiosk },
-                          ].map((filter) => {
-                            const isActive = usageFilter === filter.key
-                            
-                            return (
-                              <button
-                                key={filter.key}
-                                onClick={() => setUsageFilter(filter.key)}
-                                className={`${
-                                  isActive
-                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                                } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                              >
-                                {filter.key === 'assigned' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                  </svg>
-                                )}
-                                {filter.key === 'shared' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                  </svg>
-                                )}
-                                {filter.key === 'curriculum' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l9-5-9-5-9 5 9 5z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" />
-                                  </svg>
-                                )}
-                                {filter.key === 'staff' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <rect x="2" y="7" width="20" height="12" rx="2" ry="2" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 13h8" />
-                                  </svg>
-                                )}
-                                {filter.key === 'faculty' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                  </svg>
-                                )}
-                                {filter.key === 'kiosk' && (
-                                  <svg className="w-4 h-4 -mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 21l8 0" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 17l0 4" />
-                                  </svg>
-                                )}
-                                <span className="hidden lg:inline">{filter.label}</span>
-                                <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
-                                <span className={`${
-                                  isActive 
-                                    ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                                } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                                  {filter.count}
-                                </span>
-                              </button>
-                            )
-                          })}
-                        </nav>
-                        {/* Mobile filter dropdown */}
-                        <div className="sm:hidden">
-                          <div className="relative">
-                            <select
-                              value={usageFilter}
-                              onChange={(e) => setUsageFilter(e.target.value)}
-                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                            >
-                              {[
-                                { key: 'all', label: 'All Devices', count: usageFilterCounts.all },
-                                { key: 'assigned', label: 'Assigned Devices', count: usageFilterCounts.assigned },
-                                { key: 'shared', label: 'Shared Devices', count: usageFilterCounts.shared },
-                                { key: 'curriculum', label: 'Curriculum Devices', count: usageFilterCounts.curriculum },
-                                { key: 'staff', label: 'Staff Devices', count: usageFilterCounts.staff },
-                                { key: 'faculty', label: 'Faculty Devices', count: usageFilterCounts.faculty },
-                                { key: 'kiosk', label: 'Kiosk Devices', count: usageFilterCounts.kiosk },
-                              ].map((filter) => (
-                                <option key={filter.key} value={filter.key}>
-                                  {filter.label} ({filter.count})
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700">
+                  <tr>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Device Name
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Asset Tag
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Serial Number
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Usage
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Catalog
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredInventory.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <div className="flex flex-col items-center justify-center">
+                          <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          <p className="text-lg font-medium mb-1">No inventory items found</p>
+                          <p className="text-sm">
+                            {searchQuery 
+                              ? `No items match your search "${searchQuery}".`
+                              : 'Try adjusting your search or filter criteria.'
+                            }
+                          </p>
                         </div>
                       </td>
                     </tr>
-                    {/* Header Row */}
-                    <tr>
-                      <th className="w-32 px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th className="w-48 px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device
-                      </th>
-                      <th className="w-32 px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Asset Tag
-                      </th>
-                      <th className="w-40 px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Serial Number
-                      </th>
-                      <th className="w-32 px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Last Seen
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredDevices.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center justify-center">
-                            <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                            </svg>
-                            <p className="text-lg font-medium mb-1">No {usageFilter === 'all' ? '' : usageFilter}{statusFilter === 'all' ? '' : ` ${statusFilter}`} devices found</p>
-                            <p className="text-sm">
-                              {searchQuery 
-                                ? `No devices match your search "${searchQuery}"${usageFilter !== 'all' || statusFilter !== 'all' ? ` with current filters` : ''}.`
-                                : (usageFilter !== 'all' || statusFilter !== 'all')
-                                  ? `No devices match the current filter criteria.`
-                                  : 'Try adjusting your search or filter criteria.'
-                              }
-                            </p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : (
-                      filteredDevices.map((device) => (
-                      <Link
-                        key={device.deviceId}
-                        href={`/device/${encodeURIComponent(device.serialNumber)}`}
-                        className="table-row hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-                      >
-                        <td className="w-32 px-4 lg:px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {getStatusIcon(device.status)}
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusColor(device.status)}`}>
-                              {device.status}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="w-48 px-4 lg:px-6 py-4">
+                  ) : (
+                    filteredInventory.map((item) => (
+                    <tr key={`${item.serialNumber}-${item.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                      <td className="px-4 lg:px-6 py-4">
+                        <Link
+                          href={`/device/${encodeURIComponent(item.serialNumber)}`}
+                          className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
+                        >
                           <div className="min-w-0">
                             <div className="font-medium text-gray-900 dark:text-white truncate">
-                              {device.name || device.serialNumber}
+                              {item.deviceName || item.computerName || item.serialNumber || 'Unknown Device'}
+                            </div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                              {(() => {
+                                const manufacturer = item.manufacturer && item.manufacturer !== 'Unknown' ? item.manufacturer : null;
+                                const model = item.model && item.model !== 'Unknown' ? item.model : null;
+                                if (manufacturer && model) return `${manufacturer} ${model}`;
+                                if (manufacturer) return manufacturer;
+                                if (model) return model;
+                                return '';
+                              })()}
                             </div>
                           </div>
-                        </td>
-                        <td className="w-32 px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white truncate">
-                            {device.modules?.inventory?.assetTag || '-'}
-                          </div>
-                        </td>
-                        <td className="w-40 px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white font-mono truncate">
-                            {device.serialNumber}
-                          </div>
-                        </td>
-                        <td className="w-32 px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {formatRelativeTime(device.lastSeen)}
-                          </div>
-                        </td>
-                      </Link>
-                    )))}
-                  </tbody>
-                </table>
-              </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white font-mono">
+                          {item.assetTag || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white font-mono">
+                          {item.serialNumber}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        {item.usage ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.usage.toLowerCase() === 'assigned' 
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                          }`}>
+                            {item.usage}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        {item.catalog ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            item.catalog.toLowerCase() === 'curriculum' 
+                              ? 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
+                              : item.catalog.toLowerCase() === 'staff'
+                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
+                              : item.catalog.toLowerCase() === 'faculty'
+                              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              : item.catalog.toLowerCase() === 'kiosk'
+                              ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                          }`}>
+                            {item.catalog}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {item.location || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4">
+                        {(() => {
+                          // Use the status from the API instead of calculating locally
+                          const status = item.raw?.status || 'missing'
+                          const getStatusColor = (status: string) => {
+                            switch (status.toLowerCase()) {
+                              case 'active':
+                                return 'text-green-700 dark:text-green-400'
+                              case 'stale':
+                                return 'text-yellow-700 dark:text-yellow-400'
+                              case 'missing':
+                              default:
+                                return 'text-gray-700 dark:text-gray-400'
+                            }
+                          }
+                          
+                          return (
+                            <span 
+                              className={`text-sm font-medium ${getStatusColor(status)}`}
+                              title={`Last seen: ${formatRelativeTime(item.lastSeen)}`}
+                            >
+                              {status.charAt(0).toUpperCase() + status.slice(1)}
+                            </span>
+                          )
+                        })()}
+                      </td>
+                    </tr>
+                  )))}
+                </tbody>
+              </table>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
@@ -771,7 +753,17 @@ function DevicesPageContent() {
 
 export default function DevicesPage() {
   return (
-    <Suspense fallback={<DevicesPageSkeleton />}>
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="animate-pulse">
+          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
+              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+            </div>
+          </header>
+        </div>
+      </div>
+    }>
       <DevicesPageContent />
     </Suspense>
   )
