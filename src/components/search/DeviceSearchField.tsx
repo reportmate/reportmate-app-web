@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 
 interface Device {
@@ -14,11 +14,13 @@ interface Device {
 interface DeviceSearchFieldProps {
   className?: string
   placeholder?: string
+  preloadedDevices?: Device[]  // Optional pre-loaded devices for instant search
 }
 
 export function DeviceSearchField({ 
   className = "", 
-  placeholder = "Find device by name, serial, or asset tag"
+  placeholder = "Find device by name, serial, or asset tag",
+  preloadedDevices = []
 }: DeviceSearchFieldProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
@@ -42,35 +44,31 @@ export function DeviceSearchField({
     return () => document.removeEventListener('keydown', handleGlobalKeydown)
   }, [])
 
-  // Debounced search function
-  useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (searchQuery.trim().length >= 2) {
-        searchDevices(searchQuery.trim())
-      } else {
-        setSuggestions([])
-        setShowSuggestions(false)
-      }
-    }, 300)
-
-    return () => clearTimeout(timeoutId)
-  }, [searchQuery])
-
-  const searchDevices = async (query: string) => {
+  const searchDevices = useCallback(async (query: string) => {
     setIsLoading(true)
     try {
-      const response = await fetch('/api/devices', {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      })
+      let devices: Device[] = []
+      
+      // Use preloaded devices if available for instant search
+      if (preloadedDevices && preloadedDevices.length > 0) {
+        devices = preloadedDevices
+      } else {
+        // Fallback to API call if no preloaded devices
+        const response = await fetch('/api/devices', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
 
-      if (response.ok) {
-        const data = await response.json()
-        const devices = Array.isArray(data) ? data : (data.devices || [])
-        
+        if (response.ok) {
+          const data = await response.json()
+          devices = Array.isArray(data) ? data : (data.devices || [])
+        }
+      }
+      
+      if (devices.length > 0) {
         // Filter devices based on search query
         const filteredDevices = devices.filter((device: Device) => {
           const queryLower = query.toLowerCase()
@@ -92,7 +90,24 @@ export function DeviceSearchField({
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [preloadedDevices])
+
+  // Debounced search function - faster debounce for preloaded devices
+  useEffect(() => {
+    const debounceTime = preloadedDevices && preloadedDevices.length > 0 ? 150 : 300
+    const minSearchLength = preloadedDevices && preloadedDevices.length > 0 ? 1 : 2
+    
+    const timeoutId = setTimeout(() => {
+      if (searchQuery.trim().length >= minSearchLength) {
+        searchDevices(searchQuery.trim())
+      } else {
+        setSuggestions([])
+        setShowSuggestions(false)
+      }
+    }, debounceTime)
+
+    return () => clearTimeout(timeoutId)
+  }, [searchQuery, preloadedDevices, searchDevices])
 
   const navigateToDevice = async (identifier: string) => {
     try {
