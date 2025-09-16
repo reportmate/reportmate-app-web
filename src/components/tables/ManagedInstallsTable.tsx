@@ -1,6 +1,26 @@
 import React, { useState } from 'react';
 import { formatRelativeTime } from '../../lib/time';
-import { InstallsInfo, getErrorCodeInfo, categorizeError, getErrorDescription, getRecommendedAction, ErrorCategory, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
+import { InstallsInfo, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
+
+// Helper function to format item size from bytes to human readable format
+const formatItemSize = (sizeBytes?: string): string => {
+  if (!sizeBytes || sizeBytes === '0') return '';
+  
+  const bytes = parseInt(sizeBytes, 10);
+  if (isNaN(bytes) || bytes === 0) return '';
+  
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  let size = bytes;
+  let unitIndex = 0;
+  
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+  
+  const formatted = unitIndex === 0 ? size.toString() : size.toFixed(1);
+  return `${formatted} ${units[unitIndex]}`;
+};
 
 interface ManagedInstallsTableProps {
   data: InstallsInfo;
@@ -82,28 +102,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
       case 'removed':
         return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  };
-
-  // Get category color for error badges
-  const getCategoryColor = (category: ErrorCategory) => {
-    switch (category) {
-      case ErrorCategory.ARCHITECTURE:
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      case ErrorCategory.MSI_INSTALLER:
-        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case ErrorCategory.EXE_INSTALLER:
-        return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200';
-      case ErrorCategory.CHOCOLATEY:
-        return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
-      case ErrorCategory.POWERSHELL:
-        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200';
-      case ErrorCategory.TIMEOUT:
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case ErrorCategory.DEPENDENCY:
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
     }
@@ -219,105 +217,22 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     <div className="border-t border-red-200 dark:border-red-800 p-4 bg-red-25 dark:bg-red-900/10">
                       <div className="space-y-4">
                         {data.messages.errors.map((error: ErrorMessage) => {
-                          const category = categorizeError(error);
-                          const codeInfo = getErrorCodeInfo(error.code);
-                          const description = getErrorDescription(error);
-                          const recommendedAction = getRecommendedAction(error);
-                          
                           return (
                             <div key={error.id || `error-${Date.now()}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-semibold text-red-800 dark:text-red-200">
-                                        {error.package || 'System'}
-                                      </span>
-                                      {/* Error Category Badge */}
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
-                                        {category.replace('_', ' ')}
-                                      </span>
-                                      {/* Error Code Badge */}
-                                      {error.code && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                          Code: {error.code}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {error.timestamp && (
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {new Date(error.timestamp).toLocaleString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Enhanced Error Description */}
-                                  <div className="mb-2">
-                                    <p className="text-sm font-medium text-red-800 dark:text-red-200 mb-1">
-                                      {description}
-                                    </p>
-                                    <p className="text-sm text-red-700 dark:text-red-300">
-                                      {error.message}
-                                    </p>
-                                  </div>
-                                  
-                                  {/* Enhanced Context Information */}
-                                  {error.context && (
-                                    <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                                      {error.context.runType && (
-                                        <div><span className="font-medium">Run Type:</span> {error.context.runType}</div>
-                                      )}
-                                      {error.context.exitCode && (
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium">Exit Code:</span> {error.context.exitCode}
-                                          {error.context.exitMeaning && (
-                                            <span className="text-red-600 dark:text-red-400">({error.context.exitMeaning})</span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {error.context.systemArch && error.context.supportedArch && (
-                                        <div>
-                                          <span className="font-medium">Architecture:</span> System: {error.context.systemArch}, 
-                                          Package supports: {Array.isArray(error.context.supportedArch) ? error.context.supportedArch.join(', ') : error.context.supportedArch}
-                                        </div>
-                                      )}
-                                      {error.context.installerPath && (
-                                        <div><span className="font-medium">Installer:</span> {error.context.installerPath}</div>
-                                      )}
-                                      {error.context.commandUsed && (
-                                        <div><span className="font-medium">Command:</span> {error.context.commandUsed}</div>
-                                      )}
-                                      {error.context.timeoutDuration && (
-                                        <div><span className="font-medium">Timeout:</span> {error.context.timeoutDuration}s</div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Recommended Action */}
-                                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                                    <div className="flex items-start gap-2">
-                                      <div className="w-4 h-4 text-blue-600 dark:text-blue-400 mt-0.5">
-                                        <svg fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="text-xs font-medium text-blue-800 dark:text-blue-200 mb-1">Recommended Action</p>
-                                        <p className="text-xs text-blue-700 dark:text-blue-300">{recommendedAction}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {error.details && (
-                                    <div className="mt-3">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Technical Details:</p>
-                                      <pre className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-2 rounded border overflow-x-auto max-h-32">
-                                        {error.details}
-                                      </pre>
-                                    </div>
-                                  )}
-                                </div>
+                              <div className="flex items-start justify-between mb-3">
+                                <span className="text-sm font-semibold text-red-800 dark:text-red-200">
+                                  {error.package || 'System'}
+                                </span>
+                                {error.timestamp && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {new Date(error.timestamp).toLocaleString()}
+                                  </span>
+                                )}
                               </div>
+                              
+                              <p className="text-sm text-red-700 dark:text-red-300">
+                                {error.message}
+                              </p>
                             </div>
                           );
                         })}
@@ -376,99 +291,22 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     <div className="border-t border-yellow-200 dark:border-yellow-800 p-4 bg-yellow-25 dark:bg-yellow-900/10">
                       <div className="space-y-4">
                         {data.messages.warnings.map((warning: WarningMessage) => {
-                          const category = categorizeError(warning);
-                          const codeInfo = getErrorCodeInfo(warning.code);
-                          const description = getErrorDescription(warning);
-                          const recommendedAction = getRecommendedAction(warning);
-                          
                           return (
                             <div key={warning.id || `warning-${Date.now()}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex-1">
-                                  <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
-                                        {warning.package || 'System'}
-                                      </span>
-                                      {/* Warning Category Badge */}
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getCategoryColor(category)}`}>
-                                        {category.replace('_', ' ')}
-                                      </span>
-                                      {/* Warning Code Badge */}
-                                      {warning.code && (
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                          Code: {warning.code}
-                                        </span>
-                                      )}
-                                    </div>
-                                    {warning.timestamp && (
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {new Date(warning.timestamp).toLocaleString()}
-                                      </span>
-                                    )}
-                                  </div>
-                                  
-                                  {/* Enhanced Warning Description */}
-                                  <div className="mb-2">
-                                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200 mb-1">
-                                      {description}
-                                    </p>
-                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                      {warning.message}
-                                    </p>
-                                  </div>
-                                  
-                                  {/* Enhanced Context Information */}
-                                  {warning.context && (
-                                    <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                                      {warning.context.runType && (
-                                        <div><span className="font-medium">Run Type:</span> {warning.context.runType}</div>
-                                      )}
-                                      {warning.context.exitCode && (
-                                        <div className="flex items-center gap-2">
-                                          <span className="font-medium">Exit Code:</span> {warning.context.exitCode}
-                                          {warning.context.exitMeaning && (
-                                            <span className="text-yellow-600 dark:text-yellow-400">({warning.context.exitMeaning})</span>
-                                          )}
-                                        </div>
-                                      )}
-                                      {warning.context.systemArch && warning.context.supportedArch && (
-                                        <div>
-                                          <span className="font-medium">Architecture:</span> System: {warning.context.systemArch}, 
-                                          Package supports: {Array.isArray(warning.context.supportedArch) ? warning.context.supportedArch.join(', ') : warning.context.supportedArch}
-                                        </div>
-                                      )}
-                                      {warning.context.installerPath && (
-                                        <div><span className="font-medium">Installer:</span> {warning.context.installerPath}</div>
-                                      )}
-                                    </div>
-                                  )}
-                                  
-                                  {/* Recommended Action */}
-                                  <div className="mt-3 p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
-                                    <div className="flex items-start gap-2">
-                                      <div className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5">
-                                        <svg fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                        </svg>
-                                      </div>
-                                      <div className="flex-1">
-                                        <p className="text-xs font-medium text-orange-800 dark:text-orange-200 mb-1">Recommended Action</p>
-                                        <p className="text-xs text-orange-700 dark:text-orange-300">{recommendedAction}</p>
-                                      </div>
-                                    </div>
-                                  </div>
-                                  
-                                  {warning.details && (
-                                    <div className="mt-3">
-                                      <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Technical Details:</p>
-                                      <pre className="text-xs text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 p-2 rounded border overflow-x-auto max-h-32">
-                                        {warning.details}
-                                      </pre>
-                                    </div>
-                                  )}
-                                </div>
+                              <div className="flex items-start justify-between mb-3">
+                                <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
+                                  {warning.package || 'System'}
+                                </span>
+                                {warning.timestamp && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    {new Date(warning.timestamp).toLocaleString()}
+                                  </span>
+                                )}
                               </div>
+                              
+                              <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                {warning.message}
+                              </p>
                             </div>
                           );
                         })}
@@ -583,14 +421,15 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Update</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item Size</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date Processed</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {!hasPackages ? (
                     // Empty state when managed system is configured but no packages
                     <tr>
-                      <td colSpan={4} className="px-6 py-16">
+                      <td colSpan={5} className="px-6 py-16">
                         <div className="text-center">
                           <div className="w-12 h-12 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center">
                             <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -636,7 +475,10 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatRelativeTime(pkg.lastUpdate)}
+                          {formatItemSize(pkg.itemSize) || ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          {pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}
                         </td>
                       </tr>
                     ))
