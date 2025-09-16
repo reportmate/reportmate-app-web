@@ -6,6 +6,7 @@
 import { formatExactTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { extractSystem } from '../../lib/data-processing/modules/system'
+import { ScheduledTasksTable } from '../tables/ScheduledTasksTable'
 
 interface DeviceData {
   id: string;
@@ -44,7 +45,7 @@ interface SystemTabProps {
 export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
   // Process system data using the centralized data processing function
   const systemTabData = extractSystem(device)
-  const { services, environment, updates, runningServices, operatingSystem } = systemTabData
+  const { services, environment, updates, scheduledTasks, runningServices, operatingSystem } = systemTabData
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
@@ -256,7 +257,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
       )}
       
       {/* System Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{services.length}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Total Services</div>
@@ -273,7 +274,16 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
           <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{environment.length}</div>
           <div className="text-sm text-gray-600 dark:text-gray-400">Environment Variables</div>
         </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{scheduledTasks.length}</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Scheduled Tasks</div>
+        </div>
       </div>
+
+      {/* Scheduled Tasks Table */}
+      {scheduledTasks.length > 0 && (
+        <ScheduledTasksTable scheduledTasks={scheduledTasks} />
+      )}
 
       {/* Services Table */}
       {services.length > 0 && (
