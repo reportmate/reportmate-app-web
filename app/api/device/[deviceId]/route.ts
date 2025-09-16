@@ -164,6 +164,14 @@ export async function GET(
       console.error('[DEVICE API] ❌ Azure Functions API error:', response.status, response.statusText)
       console.error('[DEVICE API] ❌ Response headers:', Object.fromEntries(response.headers.entries()))
       
+      // Log response body for debugging
+      try {
+        const errorBody = await response.text()
+        console.error('[DEVICE API] ❌ Error response body:', errorBody)
+      } catch (bodyError) {
+        console.error('[DEVICE API] ❌ Could not read error response body:', bodyError)
+      }
+      
       // TEMPORARILY DISABLED - DATABASE FALLBACK CAUSING WEBPACK ISSUES
       console.log('[DEVICE API] Database fallback temporarily disabled due to webpack module loading issues')
       /*
@@ -266,7 +274,8 @@ export async function GET(
 
     const data = await response.json()
     console.log('[DEVICE API] ✅ Successfully fetched device data from Azure Functions')
-    console.log('[DEVICE API] 📊 Response structure:', {
+    console.log('[DEVICE API] � DEBUG: Raw response data:', JSON.stringify(data, null, 2).substring(0, 2000))
+    console.log('[DEVICE API] �📊 Response structure:', {
       hasMetadata: 'metadata' in data,
       metadataKeys: data.metadata ? Object.keys(data.metadata) : [],
       responseKeys: Object.keys(data),
@@ -274,7 +283,8 @@ export async function GET(
       hasSuccess: 'success' in data,
       successValue: data.success,
       hasDevice: 'device' in data,
-      deviceKeys: data.device ? Object.keys(data.device) : []
+      deviceKeys: data.device ? Object.keys(data.device) : [],
+      hasModules: data.device && data.device.modules ? Object.keys(data.device.modules) : []
     })
     
     // DEBUG: Log the raw response to understand the structure
