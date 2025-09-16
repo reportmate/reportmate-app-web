@@ -13,6 +13,7 @@
   "dependencies": {
     "@azure/msal-browser": "^4.21.1",
     "@azure/msal-node": "^3.7.3",
+    "@heroicons/react": "^2.2.0",
     "@microsoft/signalr": "^8.0.17",
     "@prisma/client": "^5.22.0",
     "@swc/helpers": "^0.5.17",
