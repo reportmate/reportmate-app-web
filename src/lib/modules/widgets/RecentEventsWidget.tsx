@@ -7,7 +7,6 @@ import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
-import { normalizeEventKind, severityToBadgeClasses } from '../../events/normalize'
 
 interface RecentEventsTableProps {
   events: FleetEvent[]
@@ -16,6 +15,53 @@ interface RecentEventsTableProps {
   mounted: boolean
   deviceNameMap: Record<string, string>
   isLoading?: boolean
+}
+
+// Helper function to detect module type from event
+const getEventModuleId = (event: BundledEvent): string | null => {
+  // Check if the event payload contains module_id
+  if (event.payload && typeof event.payload === 'object') {
+    const moduleId = (event.payload as any).module_id
+    if (moduleId && typeof moduleId === 'string') {
+      return moduleId
+    }
+  }
+  
+  // Fallback: try to detect module from message content
+  const message = event.message?.toLowerCase() || ''
+  
+  // Common module patterns in messages
+  if (message.includes('install') || message.includes('package') || message.includes('cimian')) {
+    return 'installs'
+  }
+  if (message.includes('hardware') || message.includes('cpu') || message.includes('memory') || message.includes('disk')) {
+    return 'hardware'
+  }
+  if (message.includes('network') || message.includes('wifi') || message.includes('ethernet') || message.includes('ip')) {
+    return 'network'
+  }
+  if (message.includes('profile') || message.includes('policy') || message.includes('configuration')) {
+    return 'profiles'
+  }
+  if (message.includes('security') || message.includes('antivirus') || message.includes('firewall') || message.includes('tpm')) {
+    return 'security'
+  }
+  if (message.includes('system') || message.includes('os') || message.includes('operating system')) {
+    return 'system'
+  }
+  if (message.includes('application') || message.includes('software') || message.includes('app')) {
+    return 'applications'
+  }
+  if (message.includes('management') || message.includes('mdm') || message.includes('enrollment')) {
+    return 'management'
+  }
+  
+  return null
+}
+
+// Helper function to check if event is from a specific module (backward compatibility)
+const isInstallsEvent = (event: BundledEvent) => {
+  return getEventModuleId(event) === 'installs'
 }
 
 // Helper function to get device display name
@@ -66,19 +112,57 @@ const getDeviceName = (event: FleetEvent, deviceNameMap: Record<string, string>)
   return deviceId || 'Unknown Device'
 }
 
-// Helper function to get event status configuration
-const getStatusConfig = (kind: string) => {
+// Helper function to get event status icon
+const getStatusIcon = (kind: string) => {
   switch (kind.toLowerCase()) {
-    case 'error': 
-      return { bg: 'bg-red-400', text: 'text-red-600 dark:text-red-200', badge: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200' }
-    case 'warning': 
-      return { bg: 'bg-yellow-500', text: 'text-yellow-700 dark:text-yellow-300', badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' }
-    case 'success': 
-      return { bg: 'bg-green-500', text: 'text-green-700 dark:text-green-300', badge: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' }
-    case 'info': 
-      return { bg: 'bg-blue-500', text: 'text-blue-700 dark:text-blue-300', badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' }
-    default: 
-      return { bg: 'bg-gray-500', text: 'text-gray-700 dark:text-gray-300', badge: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200' }
+    case 'success':
+      return (
+        <div className="w-6 h-6 bg-green-400 rounded-full flex items-center justify-center" title="Success">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'warning':
+      return (
+        <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center" title="Warning">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-4a1 1 0 011 1v2a1 1 0 11-2 0v-2a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'error':
+      return (
+        <div className="w-6 h-6 bg-red-400 rounded-full flex items-center justify-center" title="Error">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'info':
+      return (
+        <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center" title="Info">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'system':
+      return (
+        <div className="w-6 h-6 bg-purple-400 rounded-full flex items-center justify-center" title="System">
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+      )
+    default:
+      return (
+        <div className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center" title="Unknown">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
   }
 }
 
@@ -359,23 +443,22 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {bundledEvents.map((bundledEvent: BundledEvent) => {
-                      const severity = normalizeEventKind(bundledEvent.kind)
-                      const badgeClass = severityToBadgeClasses(severity)
                       return (
                         <tr 
                           key={bundledEvent.id} 
                           className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                         >
                           <td className="w-20 px-3 py-2.5">
-                            <div className="flex items-center gap-1">
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium capitalize ${badgeClass}`}>
-                                {severity}
-                              </span>
+                            <div className="flex items-center justify-center">
+                              {getStatusIcon(bundledEvent.kind)}
                             </div>
                           </td>
                           <td className="w-56 px-3 py-2.5">
                             <Link
-                              href={`/device/${encodeURIComponent(bundledEvent.device)}`}
+                              href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
+                                const moduleId = getEventModuleId(bundledEvent)
+                                return moduleId ? `#${moduleId}` : ''
+                              })()}`}
                               className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                             >
                               {getDeviceName(bundledEvent, deviceNameMap)}
