@@ -13,7 +13,7 @@ export { extractEvents, type EventsInfo, type EventItem } from './events'
 export { extractHardware, type HardwareInfo } from './hardware'
 
 // Installs module
-export { extractInstalls, type InstallsInfo, type PackageInfo, type StandardInstallStatus } from './installs'
+export { extractInstalls, type InstallsInfo, type InstallPackage, type StandardInstallStatus } from './installs'
 
 // Inventory module
 export { extractInventory, type InventoryInfo } from './inventory'

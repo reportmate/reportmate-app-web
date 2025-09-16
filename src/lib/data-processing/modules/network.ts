@@ -20,6 +20,12 @@ export interface NetworkInfo {
   interfaceName?: string
   vpnName?: string
   vpnActive?: boolean
+  // Enhanced DNS and NETBIOS for active connection
+  activeDnsServers?: string[]
+  activeNetbiosName?: string
+  activeNetbiosType?: string
+  // Computer's DNS address/FQDN
+  dnsAddress?: string
 }
 
 export interface NetworkInterface {
@@ -87,6 +93,53 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
   // Extract DNS information
   if (network.dns) {
     networkInfo.dns = network.dns
+    
+    // Extract DNS servers for active connection (prefer IPv4, limit to 2-3 for display)
+    if (network.dns.servers && Array.isArray(network.dns.servers)) {
+      const servers = network.dns.servers
+      // Prioritize IPv4 servers for active connection display
+      const ipv4Servers = servers.filter((server: string) => 
+        /^(\d{1,3}\.){3}\d{1,3}$/.test(server)
+      )
+      const ipv6Servers = servers.filter((server: string) => 
+        /^[0-9a-fA-F:]+$/.test(server) && server.includes(':')
+      )
+      
+      // Take 1-2 IPv4 servers and 1 IPv6 server for widget display
+      const displayServers = [
+        ...ipv4Servers.slice(0, 2),
+        ...ipv6Servers.slice(0, 1)
+      ]
+      networkInfo.activeDnsServers = displayServers.slice(0, 3)
+    }
+  }
+
+  // Extract NETBIOS information for active connection
+  if (network.netbios && network.netbios.localNames && Array.isArray(network.netbios.localNames)) {
+    const activeInterface = networkInfo.interfaceName
+    
+    // Find NETBIOS name for the active interface, prefer "File Server Service" type
+    const activeNetbiosEntry = network.netbios.localNames.find((entry: any) => {
+      // Match by interface name or use first entry if no interface match
+      if (activeInterface && entry.interface) {
+        // Handle case where interfaceName might be just a number but interface is full name
+        const interfaceMatch = entry.interface.includes(activeInterface) || 
+                               activeInterface.includes(entry.interface) ||
+                               entry.interface === activeInterface
+        return interfaceMatch && entry.type === 'File Server Service'
+      }
+      return false
+    })
+    
+    // Fallback to first File Server Service entry if no interface match
+    const fallbackEntry = activeNetbiosEntry || network.netbios.localNames.find((entry: any) => 
+      entry.type === 'File Server Service'
+    )
+    
+    if (fallbackEntry) {
+      networkInfo.activeNetbiosName = fallbackEntry.name
+      networkInfo.activeNetbiosType = fallbackEntry.type
+    }
   }
 
   // Extract all network interfaces
@@ -214,6 +267,16 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     }
     
     // If still no hostname, leave it undefined (will show as N/A in UI)
+  }
+
+  // Build computer's DNS address/FQDN
+  if (networkInfo.hostname) {
+    const domain = network.domain || network.dns?.domain || network.dns?.dhcpDomain
+    if (domain && domain.trim() !== '') {
+      networkInfo.dnsAddress = `${networkInfo.hostname}.${domain}`
+    } else {
+      networkInfo.dnsAddress = networkInfo.hostname
+    }
   }
 
   console.log('[NETWORK MODULE] Network info extracted:', {
