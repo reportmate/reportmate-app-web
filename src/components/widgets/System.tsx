@@ -105,21 +105,8 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
         <div className="h-0"></div>
 
         {/* Second Section - Localization Info */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            
-            <Stat 
-              label="Uptime" 
-              value={uptimeString || 'Unknown'} 
-            />
-
-            <Stat 
-              label="Locale" 
-              value={operatingSystem?.locale || 'Unknown'} 
-            />
-          </div>
-          
-          <div className="space-y-4">
+        <div className="grid grid-cols-5 gap-6">
+          <div className="col-span-3 space-y-4">
             <Stat 
               label="Keyboard Layout" 
               value={operatingSystem?.activeKeyboardLayout || 'Unknown'} 
@@ -128,6 +115,18 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
             <Stat 
               label="Time Zone" 
               value={operatingSystem?.timeZone || 'Unknown'} 
+            />
+          </div>
+          
+          <div className="col-span-2 space-y-4">
+            <Stat 
+              label="Uptime" 
+              value={uptimeString || 'Unknown'} 
+            />
+
+            <Stat 
+              label="Locale" 
+              value={operatingSystem?.locale || 'Unknown'} 
             />
           </div>
         </div>

@@ -17,6 +17,7 @@ interface ProcessorInfo {
 interface Device {
   id: string
   name: string
+  deviceId?: string
   model?: string
   manufacturer?: string
   processor?: string | ProcessorInfo
@@ -74,6 +75,16 @@ interface Device {
         cycleCount?: number
       }
     }
+    inventory?: {
+      deviceName?: string
+      usage?: string
+      catalog?: string
+      department?: string
+      location?: string
+      assetTag?: string
+      serialNumber?: string
+      uuid?: string
+    }
   }
   // Legacy hardware properties (fallback)
   hardware?: any
@@ -121,6 +132,9 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   // Get hardware data from modules first, then fallback to device properties
   const hardwareModule = device.modules?.hardware
   const legacyHardware = device.modules?.hardware || {}
+  
+  // Get inventory data for Hardware UUID
+  const inventory = device.modules?.inventory || {}
   
   console.log('[HardwareWidget] Debug data access:', {
     deviceId: device.id,
@@ -202,18 +216,18 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
       icon={Icons.hardware}
       iconColor={WidgetColors.orange}
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Primary Hardware Info */}
-        <div className="space-y-4">
+        <div className="space-y-5">
           <Stat 
             label="Model" 
             value={hardwareInfo.model} 
           />
           
-          <Stat 
+          {/* <Stat 
             label="Architecture" 
             value={hardwareInfo.architecture} 
-          />
+          /> */}
           
           <Stat 
             label="Processor" 
@@ -226,16 +240,34 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
             value={hardwareInfo.graphics}
           />
           
-          <Stat 
-            label="Memory" 
-            value={hardwareInfo.memory}
-          />
-
-          <Stat 
-            label="Storage" 
-            value={hardwareInfo.storage}
-          />
+          {/* Memory and Storage - 30/70 split */}
+          <div className="grid grid-cols-10 gap-4">
+            <div className="col-span-3">
+              <Stat 
+                label="Memory" 
+                value={hardwareInfo.memory}
+              />
+            </div>
+            <div className="col-span-7">
+              <Stat 
+                label="Storage" 
+                value={hardwareInfo.storage}
+              />
+            </div>
+          </div>
         </div>
+        
+        {/* Hardware UUID - Single row at bottom */}
+        {(inventory.uuid || device.deviceId) && (
+          <div>
+            <Stat 
+              label="Hardware UUID" 
+              value={inventory.uuid || device.deviceId} 
+              isMono 
+              showCopyButton
+            />
+          </div>
+        )}
       </div>
     </StatBlock>
   )
