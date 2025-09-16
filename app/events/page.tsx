@@ -237,7 +237,7 @@ function EventsPageContent() {
           const filteredEvents = data.events.filter((event: Event) => 
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           )
-          console.log('[EVENTS PAGE] Filtered events count:', filteredEvents.length)
+          // Filtered events processed
           setEvents(filteredEvents)
         } else {
           console.error('[EVENTS PAGE] Invalid events data received:', data)
@@ -340,7 +340,7 @@ function EventsPageContent() {
         // For bundled events, fetch payloads from all constituent events
         const bundledEvent = filteredEvents.find(e => e.id === eventId)
         if (bundledEvent && bundledEvent.isBundle && bundledEvent.eventIds) {
-          console.log(`[EVENTS PAGE] Fetching payloads for ${bundledEvent.eventIds.length} bundled events`)
+          // Fetching payloads for bundled events
           
           // Fetch payloads for all bundled events in parallel
           const payloadPromises = bundledEvent.eventIds.map(async (realEventId: string) => {

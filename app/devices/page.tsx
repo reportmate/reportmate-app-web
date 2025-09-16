@@ -235,12 +235,10 @@ function DevicesPageContent() {
     }
   })()
 
-  // Get filter counts from unique inventory (remove duplicates first)
-  const getFilterCounts = () => {
+  // Calculate base counts (without filters) for reference
+  const getBaseCounts = () => {
     try {
-      if (!Array.isArray(inventory)) return { 
-        all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 
-      }
+      if (!Array.isArray(inventory)) return { all: 0 }
       
       // Remove duplicates first based on serialNumber
       const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
@@ -251,23 +249,73 @@ function DevicesPageContent() {
       }, [])
       
       return {
-        all: uniqueInventory.length,
-        assigned: uniqueInventory.filter(item => 
+        all: uniqueInventory.length
+      }
+    } catch (e) {
+      console.error('Error calculating base counts:', e)
+      return { all: 0 }
+    }
+  }
+
+  // Get filter counts from search-filtered inventory (dynamic based on current search)
+  const getFilterCounts = () => {
+    try {
+      if (!Array.isArray(inventory)) return { 
+        all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 
+      }
+      
+      // Start with unique inventory (remove duplicates based on serialNumber)
+      const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
+        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
+          unique.push(item)
+        }
+        return unique
+      }, [])
+      
+      // Apply search filter to the unique inventory
+      let searchFiltered = uniqueInventory
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase()
+        searchFiltered = uniqueInventory.filter(item => {
+          try {
+            return (
+              item?.deviceName?.toLowerCase().includes(query) ||
+              item?.assetTag?.toLowerCase().includes(query) ||
+              item?.serialNumber?.toLowerCase().includes(query) ||
+              item?.computerName?.toLowerCase().includes(query) ||
+              item?.location?.toLowerCase().includes(query) ||
+              item?.manufacturer?.toLowerCase().includes(query) ||
+              item?.model?.toLowerCase().includes(query) ||
+              item?.uuid?.toLowerCase().includes(query) ||
+              item?.domain?.toLowerCase().includes(query) ||
+              item?.organizationalUnit?.toLowerCase().includes(query)
+            )
+          } catch (e) {
+            console.warn('Error filtering item:', item, e)
+            return false
+          }
+        })
+      }
+      
+      // Calculate counts from search-filtered results
+      return {
+        all: searchFiltered.length,
+        assigned: searchFiltered.filter(item => 
           item.usage?.toLowerCase() === 'assigned'
         ).length,
-        shared: uniqueInventory.filter(item => 
+        shared: searchFiltered.filter(item => 
           item.usage?.toLowerCase() === 'shared'
         ).length,
-        curriculum: uniqueInventory.filter(item => 
+        curriculum: searchFiltered.filter(item => 
           item.catalog?.toLowerCase() === 'curriculum'
         ).length,
-        staff: uniqueInventory.filter(item => 
+        staff: searchFiltered.filter(item => 
           item.catalog?.toLowerCase() === 'staff'
         ).length,
-        faculty: uniqueInventory.filter(item => 
+        faculty: searchFiltered.filter(item => 
           item.catalog?.toLowerCase() === 'faculty'
         ).length,
-        kiosk: uniqueInventory.filter(item => 
+        kiosk: searchFiltered.filter(item => 
           item.catalog?.toLowerCase() === 'kiosk'
         ).length,
       }
@@ -277,7 +325,9 @@ function DevicesPageContent() {
     }
   }
 
+  const baseCounts = getBaseCounts()
   const filterCounts = getFilterCounts()
+  const isFiltered = searchQuery.trim() || usageFilter !== 'all' || catalogFilter !== 'all'
 
   if (loading) {
     return (
@@ -516,10 +566,18 @@ function DevicesPageContent() {
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                  Endpoints Fleet: {filterCounts.all} devices
+                  Endpoints Fleet: {filteredInventory.length} {isFiltered ? `of ${baseCounts.all}` : ''} devices
+                  {isFiltered && (
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
+                      (filtered)
+                    </span>
+                  )}
                 </h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Manage and monitor all devices in fleet
+                  {isFiltered 
+                    ? `Showing filtered results from ${baseCounts.all} total devices`
+                    : 'Manage and monitor all devices in fleet'
+                  }
                 </p>
               </div>
               <div className="flex items-center gap-4">

@@ -162,7 +162,7 @@ function HardwarePageContent() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log('🚀 Fetching hardware data using optimized bulk API...')
+        // Fetching hardware data using optimized bulk API
         
         // Use the new bulk hardware API - single call instead of multiple individual calls
         const hardwareResponse = await fetch('/api/devices/hardware', {
@@ -170,8 +170,8 @@ function HardwarePageContent() {
           headers: { 'Cache-Control': 'no-cache' }
         })
         
-        console.log('📡 Hardware API response status:', hardwareResponse.status)
-        console.log('📡 Hardware API response headers:', Object.fromEntries(hardwareResponse.headers.entries()))
+        // Hardware API response received
+        // Hardware API response headers processed
         
         if (!hardwareResponse.ok) {
           throw new Error(`Hardware API request failed: ${hardwareResponse.status}`)
@@ -179,19 +179,10 @@ function HardwarePageContent() {
         
         const hardwareData = await hardwareResponse.json()
         
-        console.log('📊 Raw hardware response:', {
-          isArray: Array.isArray(hardwareData),
-          length: Array.isArray(hardwareData) ? hardwareData.length : 'not array',
-          type: typeof hardwareData,
-          keys: Array.isArray(hardwareData) ? 'array' : Object.keys(hardwareData || {}),
-          sampleItem: Array.isArray(hardwareData) && hardwareData.length > 0 ? hardwareData[0] : 'no items'
-        })
+        // Raw hardware response processed
         
-        console.log(`✅ Loaded ${Array.isArray(hardwareData) ? hardwareData.length : 'non-array'} devices with hardware data in single API call`)
-        console.log('📊 Cache headers:', {
-          dataSource: hardwareResponse.headers.get('X-Data-Source'),
-          fetchedAt: hardwareResponse.headers.get('X-Fetched-At')
-        })
+        // Loaded devices with hardware data in single API call
+        // Cache headers processed - dataSource and fetchedAt available
         
         // Still fetch devices for additional name mapping (this is already cached)
         const devicesResponse = await fetch('/api/devices', {
@@ -199,30 +190,25 @@ function HardwarePageContent() {
           headers: { 'Cache-Control': 'no-cache' }
         })
         
-        console.log('📡 Devices API response status:', devicesResponse.status)
+        // Devices API response received
         
         let devicesData = []
         if (devicesResponse.ok) {
           devicesData = await devicesResponse.json()
-          console.log('📊 Raw devices response:', {
-            isArray: Array.isArray(devicesData),
-            length: Array.isArray(devicesData) ? devicesData.length : 'not array',
-            type: typeof devicesData,
-            sampleItem: Array.isArray(devicesData) && devicesData.length > 0 ? devicesData[0] : 'no items'
-          })
+          // Raw devices response processed
         }
         
         if (Array.isArray(hardwareData)) {
-          console.log('✅ Setting hardware data:', hardwareData.length, 'devices')
+          // Setting hardware data
           setHardware(hardwareData)
           setError(null)
         } else {
-          console.error('❌ Hardware data is not an array:', typeof hardwareData, hardwareData)
+          console.error('Hardware data is not an array:', typeof hardwareData, hardwareData)
           throw new Error('Invalid hardware API response format')
         }
         
         if (Array.isArray(devicesData)) {
-          console.log('✅ Setting devices data:', devicesData.length, 'devices')
+          // Setting devices data
           setDevices(devicesData)
         } else {
           console.warn('Invalid devices API response format')
@@ -230,7 +216,7 @@ function HardwarePageContent() {
         }
         
       } catch (error) {
-        console.error('❌ Failed to fetch data:', error)
+        console.error('Failed to fetch data:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
         setHardware([])
         setDevices([])
@@ -364,8 +350,8 @@ function HardwarePageContent() {
     const allHardwareSerials = hardware.map(h => h.serialNumber || h.deviceId);
     const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
     
-    console.log('[DEVICE NOT FOUND] 0F33V9G25083HJ not in hardware array.');
-    console.log('[HARDWARE SERIALS] Total hardware devices:', allHardwareSerials.length);
+    // Device 0F33V9G25083HJ not in hardware array
+    // Total hardware devices checked
     console.log('[HARDWARE SERIALS] Sample serials:', allHardwareSerials.slice(0, 20));
     
     // Check for partial matches in hardware
@@ -377,21 +363,12 @@ function HardwarePageContent() {
     }
   }
   if (targetDeviceInMainAPI) {
-    console.log('[MAIN API] 0F33V9G25083HJ found in devices API:', {
-      deviceId: targetDeviceInMainAPI.deviceId,
-      serialNumber: targetDeviceInMainAPI.serialNumber,
-      name: targetDeviceInMainAPI.name,
-      hasHardwareModule: !!targetDeviceInMainAPI.modules?.hardware,
-      hardwareModuleKeys: targetDeviceInMainAPI.modules?.hardware ? Object.keys(targetDeviceInMainAPI.modules.hardware) : 'none',
-      processorInfo: targetDeviceInMainAPI.modules?.hardware?.processor || 'no processor info',
-      graphicsInfo: targetDeviceInMainAPI.modules?.hardware?.graphics || 'no graphics info'
-    })
+    // Device 0F33V9G25083HJ found in devices API
   } else {
     const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
     
-    console.log('[MAIN API] 0F33V9G25083HJ not found in devices API either.');
-    console.log('[DEVICE SERIALS] Total devices:', allDeviceSerials.length);
-    console.log('[DEVICE SERIALS] Sample serials:', allDeviceSerials.slice(0, 20));
+    // Device 0F33V9G25083HJ not found in devices API
+    // Total devices and sample serials checked
     
     // Check for partial matches in main API
     const partialDeviceMatches = allDeviceSerials.filter(serial => 
