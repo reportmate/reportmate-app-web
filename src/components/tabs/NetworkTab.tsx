@@ -363,6 +363,94 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
         </div>
       )}
 
+      {/* NetBIOS Information - Only show if NetBIOS data is available */}
+      {networkData.activeNetbiosName && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-4 mb-4">
+            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">NetBIOS Information</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Network Basic Input/Output System details</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Computer Name</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
+                <CopyableValue 
+                  value={networkData.activeNetbiosName} 
+                  className="justify-center"
+                />
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">Service Type</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                {networkData.activeNetbiosType || 'N/A'}
+              </div>
+            </div>
+            {/* Show total count of NetBIOS entries if available */}
+            {(() => {
+              const netbiosData = device?.modules?.network?.netbios
+              const localNamesCount = netbiosData?.localNames?.length || 0
+              return localNamesCount > 0 && (
+                <div className="text-center">
+                  <div className="text-sm text-gray-500 dark:text-gray-500">Total Entries</div>
+                  <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                    {localNamesCount}
+                  </div>
+                </div>
+              )
+            })()}
+          </div>
+          
+          {/* Show detailed NetBIOS entries if available */}
+          {(() => {
+            const netbiosData = device?.modules?.network?.netbios
+            const localNames = netbiosData?.localNames
+            
+            if (localNames && localNames.length > 0) {
+              return (
+                <div className="mt-6">
+                  <h4 className="text-sm font-medium text-gray-900 dark:text-white mb-3">NetBIOS Local Names</h4>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                      <thead className="bg-gray-50 dark:bg-gray-900">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interface</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                        {localNames.map((entry: any, index: number) => (
+                          <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                            <td className="px-4 py-2 font-mono text-gray-900 dark:text-white">{entry.name}</td>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white">{entry.type}</td>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white">
+                              <span className="inline-flex px-2 py-1 text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 rounded-full">
+                                {entry.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-2 text-gray-900 dark:text-white">{entry.interface}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            }
+            return null
+          })()}
+        </div>
+      )}
+
       {/* VPN Connection Card - Only show if VPN is active */}
       {networkData.vpnActive && networkData.vpnName && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
