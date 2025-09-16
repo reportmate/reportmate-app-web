@@ -20,6 +20,8 @@ import { DeviceSearchField } from "../../src/components/search/DeviceSearchField
 import { useComponentTracker, memoryManager } from "../../src/lib/memory-utils"
 import { PerformanceMonitor } from "../../src/components/PerformanceMonitor"
 import { SignalRStatus } from "../../src/components/SignalRStatus"
+import { MemoryWarning } from "../../src/components/MemoryWarning"
+import { optimizeDevicesArray, optimizeEventForMemory, checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
 
 // Import the same hooks and types from the original dashboard
 
@@ -80,6 +82,19 @@ export default function Dashboard() {
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
 
+  // Memory monitoring and cleanup
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const memoryCheck = checkMemoryUsage()
+      if (memoryCheck.warning && memoryCheck.usage > 200) {
+        console.warn(`[DASHBOARD] Critical memory usage: ${memoryCheck.usage}MB - triggering cleanup`)
+        triggerMemoryCleanup()
+      }
+    }, 60000) // Check every minute
+    
+    return () => clearInterval(interval)
+  }, [])
+
   // Log memory status every 5 minutes in development
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
@@ -96,18 +111,21 @@ export default function Dashboard() {
     let timeoutId: NodeJS.Timeout
 
     const fetchDevices = async () => {
-      console.log('[DASHBOARD] 🚀 Starting fetchDevices...')
-      console.log('[DASHBOARD] Current state - devices.length:', devices.length, 'devicesLoading:', devicesLoading)
+      // Reduced debug logging to prevent memory issues (CRITICAL FIX)
+      if (process.env.NODE_ENV === 'development') {
+        // Fetching devices from API
+      }
       
       // Set a timeout to prevent waiting forever
       timeoutId = setTimeout(() => {
-        console.log('[DASHBOARD] ⏰ Timeout reached - setting loading to false')
+        if (process.env.NODE_ENV === 'development') {
+          // Fetch timeout reached after 15 seconds
+        }
         setDevicesLoading(false)
         setDevices([])
       }, 15000) // 15 second timeout
 
       try {
-        console.log('[DASHBOARD] Fetching from /api/devices...')
         // Use production API 
         const response = await fetch('/api/devices', {
           cache: 'no-store',
@@ -116,13 +134,15 @@ export default function Dashboard() {
             'Pragma': 'no-cache'
           }
         })
-        console.log('[DASHBOARD] Response status:', response.status, response.statusText)
-        console.log('[DASHBOARD] Response ok:', response.ok)
+        
+        // Minimal response logging (CRITICAL MEMORY FIX)
+        if (!response.ok) {
+          console.error('[DASHBOARD] API Error:', response.status)
+          throw new Error(`HTTP ${response.status}`)
+        }
         
         if (response.ok) {
-          console.log('[DASHBOARD] Response OK, parsing JSON...')
           const text = await response.text()
-          console.log('[DASHBOARD] Raw response text length:', text.length)
           
           if (!text.trim()) {
             console.error('[DASHBOARD] Empty response body!')
@@ -134,31 +154,27 @@ export default function Dashboard() {
             data = JSON.parse(text)
           } catch (jsonError) {
             console.error('[DASHBOARD] JSON Parse Error:', jsonError)
-            console.error('[DASHBOARD] Raw response:', text.substring(0, 500))
             throw new Error('Invalid JSON response from API')
           }
           
-          console.log('[DASHBOARD] Received device data:', data)
-          console.log('[DASHBOARD] Is array?', Array.isArray(data))
-          console.log('[DASHBOARD] Data length:', Array.isArray(data) ? data.length : 'N/A')
+          // Minimal data logging (CRITICAL MEMORY FIX)
+          if (process.env.NODE_ENV === 'development' && Array.isArray(data)) {
+            // Received device data from API
+          }
           
           // Handle both response formats: {success: true, devices: [...]} or direct array
           if (Array.isArray(data)) {
-            console.log('[DASHBOARD] Processing array format...')
-            // Process devices to extract inventory data while preserving ALL modules
-            const processedDevices = data.map((device: Device) => {
+            // MEMORY OPTIMIZATION: Use optimized processing
+            const optimizedDevices = optimizeDevicesArray(data)
+            
+            // Process remaining devices for backwards compatibility
+            const processedDevices = optimizedDevices.map((device: Device) => {
               const inventory = device.modules?.inventory || {}
-              const modules = device.modules
-              
-              console.log('[DASHBOARD] Device modules available:', Object.keys(device.modules || {}))
-              console.log('[DASHBOARD] System module present:', !!modules?.system)
-              if (modules?.system) {
-                console.log('[DASHBOARD] System module OS data:', !!modules.system.operatingSystem)
-              }
+              // Removed excessive debug logging to prevent memory issues
               
               return {
                 ...device,
-                // Preserve all modules (including system) by copying as-is
+                // Modules are already optimized
                 modules: { ...device.modules },
                 // Extract inventory fields for backwards compatibility
                 assetTag: inventory.assetTag,
@@ -171,15 +187,8 @@ export default function Dashboard() {
               new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
             )
             
-            console.log('[DASHBOARD] Setting devices:', sortedDevices.length, 'devices')
-            console.log('[DASHBOARD] First device:', sortedDevices[0])
-            console.log('[DASHBOARD] Devices being set:', sortedDevices.map(d => ({ 
-              name: d.name, 
-              status: d.status, 
-              serialNumber: d.serialNumber,
-              deviceId: d.deviceId,
-              hasStatus: !!d.status
-            })))
+            // Setting device state
+            // Removed detailed device array logging to prevent memory issues
             
             try {
               setDevices(sortedDevices)
@@ -190,16 +199,8 @@ export default function Dashboard() {
                 clearTimeout(timeoutId)
               }
               
-              console.log('[DASHBOARD] Successfully called setDevices and setDevicesLoading(false)')
-              console.log('[DASHBOARD] Final devices state will be:', {
-                count: sortedDevices.length,
-                loading: false,
-                firstDeviceStatus: sortedDevices[0]?.status,
-                statusCounts: sortedDevices.reduce((acc, d) => {
-                  acc[d.status] = (acc[d.status] || 0) + 1
-                  return acc
-                }, {} as Record<string, number>)
-              })
+              // State update completed successfully
+              // Removed final devices state log to save memory
             } catch (error) {
               console.error('[DASHBOARD] Error setting devices:', error)
             }
@@ -229,18 +230,12 @@ export default function Dashboard() {
                 }
               }
               
-              console.log('[DASHBOARD] Device name mapping for:', device.serialNumber, ':', {
-                serialNumber: device.serialNumber,
-                deviceId: device.deviceId,
-                assetTag: device.assetTag,
-                inventoryDeviceName: device.modules?.inventory?.deviceName,
-                mappedName: deviceName
-              })
+              // Device name mapped for device
             })
-            console.log('[DASHBOARD] Final device name map:', nameMap)
+            // Removed device mapping debug log to save memory
             setDeviceNameMap(nameMap)
           } else if (data.success && data.devices) {
-            console.log('[DASHBOARD] Processing wrapped format...')
+            // Removed wrapped format debug log to save memory
             // Process devices to extract inventory data while preserving ALL modules
             const processedDevices = data.devices.map((device: Device) => {
               const inventory = device.modules?.inventory || {}
@@ -285,33 +280,23 @@ export default function Dashboard() {
                 }
               }
               
-              console.log('[DASHBOARD] Device name mapping for:', device.serialNumber, ':', {
-                serialNumber: device.serialNumber,
-                deviceId: device.deviceId,
-                assetTag: device.assetTag,
-                inventoryDeviceName: device.modules?.inventory?.deviceName,
-                mappedName: deviceName
-              })
+              // Device name mapped for device
             })
-            console.log('[DASHBOARD] Final device name map (wrapped format):', nameMap)
+            // Removed wrapped format device mapping debug log to save memory
             setDeviceNameMap(nameMap)
           } else {
-            console.log('[DASHBOARD] Unrecognized data format:', data)
+            // Unrecognized data format from API
             setDevicesLoading(false)
           }
         } else {
-          console.error('[DASHBOARD] ❌ Response not OK:', response.status, response.statusText)
-          console.log('[DASHBOARD] Setting devicesLoading(false) due to failed response')
+          console.error('[DASHBOARD] Response not OK:', response.status, response.statusText)
+          // Failed API response
           setDevicesLoading(false)
         }
       } catch (error) {
-        console.error('[DASHBOARD] ❌ Error in fetchDevices:', error)
-        console.error('[DASHBOARD] Error details:', {
-          message: error instanceof Error ? error.message : String(error),
-          stack: error instanceof Error ? error.stack : undefined,
-          name: error instanceof Error ? error.name : 'Unknown'
-        })
-        console.log('[DASHBOARD] Setting devicesLoading(false) due to error')
+        console.error('[DASHBOARD] Error in fetchDevices:', error)
+        // Error details removed to save memory
+        // Setting device loading to false due to error
         
         // Clear the timeout
         if (timeoutId) {
@@ -324,7 +309,7 @@ export default function Dashboard() {
       }
     }
 
-    console.log('[DASHBOARD] useEffect triggered, calling fetchDevices()...')
+    // Removed useEffect trigger log to save memory
     fetchDevices()
 
     // Cleanup function
@@ -340,11 +325,11 @@ export default function Dashboard() {
         const response = await fetch('/api/devices')
         if (response.ok) {
           const data = await response.json()
-          console.log('[DASHBOARD] Direct API: Got devices:', data.length, 'devices')
+          // Got devices from direct API call
           if (data && data.length > 0) {
             setDevices(data)
             setDevicesLoading(false)
-            console.log('[DASHBOARD] Direct API: Successfully set devices state')
+            // Successfully set devices state
           }
         }
       } catch (error) {
@@ -365,29 +350,14 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
-  // Debug: Log devices state changes
+  // Debug: Log devices state changes (DISABLED - causes memory issues)
   useEffect(() => {
-    console.log('[DASHBOARD] Devices state changed:', devices.length, 'devices loaded:', !devicesLoading)
-    console.log('[DASHBOARD] Current devices:', devices.map(d => ({ 
-      name: d.name, 
-      status: d.status, 
-      serialNumber: d.serialNumber 
-    })))
-    
-    // Debug OS data specifically
-    if (devices.length > 0) {
-      console.log('[DASHBOARD] Sample device OS data:', {
-        deviceId: devices[0].deviceId,
-        serialNumber: devices[0].serialNumber,
-        legacyOs: devices[0].os,
-        hasModules: !!devices[0].modules,
-        hasSystemModule: !!devices[0].modules?.system,
-        hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
-        modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : [],
-        systemModuleData: devices[0].modules?.system
-      })
+    // Only log basic info in development and limit frequency
+    if (process.env.NODE_ENV === 'development' && devices.length > 0) {
+      // Devices loaded successfully
+      // Removed detailed device mapping to prevent memory issues
     }
-  }, [devices, devicesLoading])
+  }, [devices.length, devicesLoading]) // Use devices.length instead of full array
 
   // Show skeleton while data is loading
   if (devicesLoading) {
@@ -395,18 +365,9 @@ export default function Dashboard() {
   }
 
     // DEBUG: Add unique timestamp to force re-render 
-    console.log('[DASHBOARD] Component render at:', new Date().toISOString())
+    // Removed render timestamp log to save memory
     
-    // Debug log for render
-    console.log('[DASHBOARD] Rendering with:', {
-      devicesCount: devices.length,
-      devicesLoading,
-      firstDevice: devices[0] ? {
-        name: devices[0].name,
-        status: devices[0].status,
-        serialNumber: devices[0].serialNumber
-      } : null
-    })
+    // Dashboard rendering with current device state
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -529,6 +490,7 @@ export default function Dashboard() {
       </div>
       
       <PerformanceMonitor />
+      <MemoryWarning />
     </div>
   )
 }

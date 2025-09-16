@@ -177,7 +177,7 @@ export function useLiveEvents() {
     // Function to fetch events from local API
     async function fetchLocalEvents() {
       try {
-        const response = await fetch('/api/events')
+        const response = await fetch('/api/events?limit=50')
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.events) {
@@ -186,7 +186,7 @@ export function useLiveEvents() {
               if (prev.length === 0) {
                 console.log("Loading initial events:", data.events.length)
                 setLastUpdateTime(new Date())
-                return data.events.slice(-50).map(sanitizeEventForDisplay) // Reduced from 100 to 50 events
+                return data.events.slice(-50).map(sanitizeEventForDisplay) // Show last 50 events
               }
               
               // Otherwise, merge new events, avoiding duplicates
@@ -196,7 +196,7 @@ export function useLiveEvents() {
                 .map(sanitizeEventForDisplay)
               if (newEvents.length > 0) {
                 setLastUpdateTime(new Date())
-                return [...prev, ...newEvents].slice(-50) // Reduced from 100 to 50 events
+                return [...prev, ...newEvents].slice(-50) // Keep last 50 events
               }
               return prev
             })
