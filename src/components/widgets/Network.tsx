@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
+import { extractNetwork } from '../../lib/data-processing/modules/network'
 
 // Based on actual API response structure from your sample data
 interface NetworkInfo {
@@ -95,40 +96,39 @@ interface NetworkWidgetProps {
 }
 
 export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
-  // Access network data from modular structure or fallback to device level
-  const networkModule = device.modules?.network as NetworkInfo | undefined
-  const network = networkModule
+  // Use the enhanced extractNetwork function to get processed network data
+  const network = extractNetwork(device)
   
-  // Get activeConnection data using the same structure as NetworkTab
-  const activeConnectionData = (network as any)?.activeConnection || {
-    connectionType: (network as any)?.connectionType || 'Unknown',
-    interfaceName: (network as any)?.primaryInterface || (network as any)?.interfaceName,
-    friendlyName: (network as any)?.friendlyName,
-    ipAddress: (network as any)?.ipAddress || device.ipAddress,
-    gateway: (network as any)?.gateway,
-    macAddress: (network as any)?.activeConnection?.macAddress || (network as any)?.macAddress || device.macAddress,
-    isVpnActive: (network as any)?.isVpnActive || false,
-    vpnName: (network as any)?.vpnName || '',
-    activeWifiSsid: (network as any)?.activeConnection?.activeWifiSsid,
-    wifiSignalStrength: (network as any)?.activeConnection?.wifiSignalStrength || (network as any)?.signalStrength
+  // Get activeConnection data using the processed network data
+  const activeConnectionData = {
+    connectionType: network.connectionType || 'Unknown',
+    interfaceName: network.interfaceName,
+    ipAddress: network.ipAddress || device.ipAddress,
+    gateway: network.gateway,
+    macAddress: network.macAddress || device.macAddress,
+    isVpnActive: network.vpnActive || false,
+    vpnName: network.vpnName || '',
+    activeWifiSsid: network.ssid,
+    wifiSignalStrength: network.signalStrength,
+    // Enhanced data for active connection
+    activeDnsServers: network.activeDnsServers || [],
+    activeNetbiosName: network.activeNetbiosName,
+    activeNetbiosType: network.activeNetbiosType,
+    dnsAddress: network.dnsAddress
   }
-  
-  // Get DNS servers - handle both array and string formats
-  const dnsServers = (network as any)?.dns?.servers || (network as any)?.dns || []
   
   // Debug logging
   console.log('[NetworkWidget] Device data:', {
     deviceId: device.id,
     hasModules: !!device.modules,
     hasNetworkModule: !!device.modules?.network,
-    hasDirectNetwork: false,
-    networkKeys: network ? Object.keys(network) : [],
+    networkData: network,
     activeConnectionData: activeConnectionData,
-    dnsServers: dnsServers,
-    networkSample: network ? JSON.stringify(network)?.substring(0, 300) || 'null' : 'null'
+    activeDnsCount: activeConnectionData.activeDnsServers?.length || 0,
+    activeNetbios: activeConnectionData.activeNetbiosName
   })
   
-  const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown' || network
+  const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown'
 
   if (!hasNetworkInfo) {
     return (
@@ -150,35 +150,46 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
       icon={Icons.network}
       iconColor={WidgetColors.teal}
     >
-      <div className="space-y-4">
+      <div className="space-y-5">
         {/* Active Connection - Priority Display */}
         {activeConnectionData.connectionType !== 'Unknown' ? (
           <>            
-            {/* Connection Type */}
-            <Stat 
-              label="Connection Type" 
-              value={activeConnectionData.connectionType} 
-            />
-
-            {/* WiFi SSID */}
-            {activeConnectionData.activeWifiSsid && (
+            {/* Connection Type and WiFi SSID - Side by side */}
+            <div className="grid grid-cols-2 gap-4">
               <Stat 
-                label="WiFi Network" 
-                value={activeConnectionData.activeWifiSsid} 
+                label="Connection Type" 
+                value={activeConnectionData.connectionType} 
               />
-            )}
+              {activeConnectionData.activeWifiSsid && activeConnectionData.connectionType === 'Wireless' ? (
+                <Stat 
+                  label="WiFi Network" 
+                  value={activeConnectionData.activeWifiSsid} 
+                />
+              ) : (
+                <div></div>
+              )}
+            </div>
 
-            {/* IP Address */}
-            {activeConnectionData.ipAddress && (
-              <Stat 
-                label="IP Address" 
-                value={activeConnectionData.ipAddress} 
-                isMono 
-                showCopyButton
-              />
-            )}
+            {/* IP Address and NetBios - Side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              {activeConnectionData.ipAddress && (
+                <Stat 
+                  label="IP Address" 
+                  value={activeConnectionData.ipAddress} 
+                  isMono 
+                  showCopyButton
+                />
+              )}
+              {activeConnectionData.activeNetbiosName && (
+                <Stat 
+                  label="NetBios" 
+                  value={activeConnectionData.activeNetbiosName} 
+                  showCopyButton={false}
+                />
+              )}
+            </div>
 
-            {/* MAC Address */}
+            {/* MAC Address - Full width */}
             {activeConnectionData.macAddress && (
               <Stat 
                 label="MAC Address" 
@@ -188,20 +199,22 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
               />
             )}
 
-            {/* VPN Status */}
+            {/* DNS Address - Full width for long addresses */}
+            {activeConnectionData.dnsAddress && (
+              <Stat 
+                label="DNS Address" 
+                value={activeConnectionData.dnsAddress} 
+                isMono 
+                showCopyButton
+              />
+            )}
+
+            {/* VPN Status - Full width if active */}
             {activeConnectionData.isVpnActive && (
               <StatusBadge
                 label="VPN Active"
                 status={activeConnectionData.vpnName || 'Connected'}
                 type="success"
-              />
-            )}
-
-            {/* WiFi Signal Strength */}
-            {activeConnectionData.wifiSignalStrength && activeConnectionData.connectionType === 'Wireless' && (
-              <Stat 
-                label="Signal Strength" 
-                value={`${activeConnectionData.wifiSignalStrength}%`} 
               />
             )}
 
