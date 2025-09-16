@@ -48,21 +48,6 @@ interface InventoryWidgetProps {
 }
 
 export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
-  // Debug logging to see exactly what data we're getting
-  console.log('📋 InventoryWidget DEBUG:', {
-    deviceName: device?.name,
-    deviceId: device?.id,
-    serialNumber: device?.serialNumber,
-    createdAt: device?.createdAt,
-    hasCreatedAt: !!device?.createdAt,
-    hasModules: !!device?.modules,
-    hasModulesInventory: !!device?.modules?.inventory,
-    hasDirectInventory: !!device?.inventory,
-    inventoryData: device?.modules?.inventory || device?.inventory,
-    deviceNameFromInventory: (device?.modules?.inventory || device?.inventory)?.deviceName,
-    allDeviceKeys: device ? Object.keys(device) : []
-  })
-
   // Use inventory module data if available, fallback to device properties
   const inventory = device.modules?.inventory || {}
   
@@ -139,18 +124,6 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             </div>
           )}
         </div>
-        
-        {/* Hardware UUID - Single column on bottom */}
-        {(inventory.uuid || device.deviceId) && (
-          <div>
-            <Stat 
-              label="Hardware UUID" 
-              value={inventory.uuid || device.deviceId} 
-              isMono 
-              showCopyButton
-            />
-          </div>
-        )}
       </div>
     </StatBlock>
   )
