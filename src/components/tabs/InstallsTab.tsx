@@ -52,24 +52,35 @@ const formatCompactRelativeTime = (timestamp: string): string => {
   }
 }
 
-// Helper function to format duration from HH:MM:SS to readable format (e.g., "20m 34s" or "1h 5m")
-const formatDuration = (duration: string): string => {
-  if (!duration || duration === 'Unknown' || duration === 'null' || duration === 'undefined') {
+// Helper function to format duration from seconds to readable format (e.g., "2m 34s" or "1h 5m")
+const formatDuration = (durationSeconds: number | string): string => {
+  // Handle different input types
+  let seconds: number
+  
+  if (typeof durationSeconds === 'string') {
+    if (!durationSeconds || durationSeconds === 'Unknown' || durationSeconds === 'null' || durationSeconds === 'undefined') {
+      return 'Unknown'
+    }
+    seconds = parseInt(durationSeconds, 10)
+    if (isNaN(seconds)) {
+      return 'Unknown'
+    }
+  } else if (typeof durationSeconds === 'number') {
+    seconds = durationSeconds
+  } else {
     return 'Unknown'
   }
 
-  // Parse HH:MM:SS format
-  const parts = duration.split(':')
-  if (parts.length !== 3) {
-    console.log('🕐 Duration format unexpected:', duration)
-    return duration // Return as-is if not in expected format
+  if (seconds <= 0) {
+    return 'Unknown'
   }
 
-  const hours = parseInt(parts[0], 10)
-  const minutes = parseInt(parts[1], 10)
-  const seconds = parseInt(parts[2], 10)
+  // Convert seconds to hours, minutes, seconds
+  const hours = Math.floor(seconds / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+  const remainingSeconds = seconds % 60
 
-  console.log(`🕐 Formatting duration: ${duration} -> ${hours}h ${minutes}m ${seconds}s`)
+  console.log(`🕐 Formatting duration: ${durationSeconds} seconds -> ${hours}h ${minutes}m ${remainingSeconds}s`)
 
   // Build formatted string
   const parts_formatted: string[] = []
@@ -80,9 +91,9 @@ const formatDuration = (duration: string): string => {
   if (minutes > 0) {
     parts_formatted.push(`${minutes}m`)
   }
-  if (seconds > 0 || (hours === 0 && minutes === 0)) {
+  if (remainingSeconds > 0 || (hours === 0 && minutes === 0)) {
     // Always show seconds if it's the only unit, or if there are seconds to show
-    parts_formatted.push(`${seconds}s`)
+    parts_formatted.push(`${remainingSeconds}s`)
   }
 
   const formatted = parts_formatted.join(' ')
@@ -245,7 +256,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
     const failed = packages.filter(p => p.status === 'failed').length
     const errors = packages.filter(p => p.status === 'error').length
     
-    // Get duration from latest COMPLETED session instead of calculating from events
+    // Get duration from latest COMPLETED session using duration_seconds instead of duration
     let duration = 'Unknown'
     console.log('🔥🔥🔥 DURATION EXTRACTION STARTING - CIMIAN SESSIONS 🔥🔥🔥')
     console.log('🔥 Sessions data exists:', !!(cimianData.sessions))
@@ -254,39 +265,40 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
     
     if (cimianData.sessions && Array.isArray(cimianData.sessions) && cimianData.sessions.length > 0) {
       console.log('🔍 DEBUGGING ALL SESSIONS:', cimianData.sessions.slice(0, 5).map((s: any) => ({
-        sessionId: s.sessionId,
+        sessionId: s.session_id,
         duration: s.duration,
+        duration_seconds: s.duration_seconds,
         status: s.status,
         hasCompletedStatus: s.status === 'completed',
-        hasDuration: !!s.duration,
-        durationNotZero: s.duration !== '00:00:00'
+        hasDurationSeconds: !!s.duration_seconds,
+        durationSecondsNotZero: s.duration_seconds > 0
       })))
       
-      // Find the most recent completed session (not running)
-      const completedSession = cimianData.sessions.find((session: any) => 
-        session.status === 'completed' && session.duration && session.duration !== '00:00:00'
+      // Find the most recent session with duration_seconds > 0 (prefer completed sessions)
+      const completedSessionWithDuration = cimianData.sessions.find((session: any) => 
+        session.status === 'completed' && session.duration_seconds && session.duration_seconds > 0
       )
       
-      if (completedSession) {
-        duration = completedSession.duration
-        console.log('🕐 Using completed session duration:', duration, 'from session:', completedSession.sessionId)
-        console.log('🔥🔥🔥 DURATION FOUND AND SET TO:', duration, '🔥🔥🔥')
+      if (completedSessionWithDuration) {
+        duration = completedSessionWithDuration.duration_seconds
+        console.log('🕐 Using completed session duration_seconds:', duration, 'from session:', completedSessionWithDuration.session_id)
+        console.log('🔥🔥🔥 DURATION FOUND AND SET TO:', duration, 'seconds 🔥🔥🔥')
       } else {
-        // Try to find any session with a non-zero duration
+        // Try to find any session with duration_seconds > 0
         const sessionWithDuration = cimianData.sessions.find((session: any) => 
-          session.duration && session.duration !== '00:00:00'
+          session.duration_seconds && session.duration_seconds > 0
         )
         
         if (sessionWithDuration) {
-          duration = sessionWithDuration.duration
-          console.log('🕐 Using session with duration:', duration, 'from session:', sessionWithDuration.sessionId, 'status:', sessionWithDuration.status)
-          console.log('🔥🔥🔥 FALLBACK DURATION FOUND AND SET TO:', duration, '🔥🔥🔥')
+          duration = sessionWithDuration.duration_seconds
+          console.log('🕐 Using session with duration_seconds:', duration, 'from session:', sessionWithDuration.session_id, 'status:', sessionWithDuration.status)
+          console.log('🔥🔥🔥 FALLBACK DURATION FOUND AND SET TO:', duration, 'seconds 🔥🔥🔥')
         } else {
-          // Fallback to first session if no sessions with duration found
+          // Fallback to first session if no sessions with duration_seconds found
           const latestSession = cimianData.sessions[0]
-          duration = latestSession.duration || 'Unknown'
-          console.log('⚠️ Using latest session duration (may be running):', duration, 'from session:', latestSession.sessionId)
-          console.log('🔥🔥🔥 LAST RESORT DURATION SET TO:', duration, '🔥🔥🔥')
+          duration = latestSession.duration_seconds || 'Unknown'
+          console.log('⚠️ Using latest session duration_seconds (may be zero):', duration, 'from session:', latestSession.session_id)
+          console.log('🔥🔥🔥 LAST RESORT DURATION SET TO:', duration, 'seconds 🔥🔥🔥')
         }
       }
     } else {
