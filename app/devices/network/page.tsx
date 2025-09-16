@@ -114,6 +114,8 @@ function NetworkPageContent() {
         n.networkInfo.macAddress?.toLowerCase().includes(query) ||
         n.networkInfo.ssid?.toLowerCase().includes(query) ||
         n.networkInfo.connectionType?.toLowerCase().includes(query) ||
+        n.networkInfo.dnsAddress?.toLowerCase().includes(query) ||
+        n.networkInfo.hostname?.toLowerCase().includes(query) ||
         n.serialNumber?.toLowerCase().includes(query) ||
         n.assetTag?.toLowerCase().includes(query) ||
         n.networkInfo.interfaces?.some((iface: any) => 
@@ -186,8 +188,8 @@ function NetworkPageContent() {
           </div>
         </header>
         
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden animate-pulse">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
+          <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden animate-pulse">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
@@ -204,53 +206,53 @@ function NetworkPageContent() {
               </div>
             </div>
 
-            <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
+            <div className="overflow-y-auto overflow-x-hidden h-[calc(100vh-280px)]">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-4 py-3 w-52"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-56"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-36"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-44"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-40"><div className="h-4 w-18 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3"><div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {[...Array(6)].map((_, i) => (
+                  {[...Array(8)].map((_, i) => (
                     <tr key={i}>
-                      <td className="px-6 py-3">
+                      <td className="px-4 py-3 w-52">
                         <div className="flex flex-col justify-center h-12 space-y-1">
-                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                          <div className="h-3 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-36 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-3 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 w-56">
                         <div className="flex items-center gap-2 h-12">
-                          <div className="h-2 w-2 bg-gray-300 dark:bg-gray-600 rounded-full flex-shrink-0"></div>
-                          <div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center gap-2 h-12">
-                          <div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-40 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
                           <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 w-36">
                         <div className="flex items-center gap-2 h-12">
-                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
                           <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center h-12">
-                          <div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                      <td className="px-6 py-3 w-44">
+                        <div className="flex items-center gap-2 h-12">
+                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
+                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3">
+                      <td className="px-6 py-3 w-40">
                         <div className="flex items-center h-12">
                           <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="flex items-center h-12">
+                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
                         </div>
                       </td>
                     </tr>
@@ -332,8 +334,8 @@ function NetworkPageContent() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
+        <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -376,7 +378,7 @@ function NetworkPageContent() {
                   </div>
                   <input
                     type="text"
-                    placeholder="Search devices, IPs, MACs, asset tags..."
+                    placeholder="Search devices, IPs, MACs, DNS, asset tags..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="block w-96 md:w-[32rem] pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
@@ -386,15 +388,15 @@ function NetworkPageContent() {
             </div>
           </div>
 
-          <div className="overflow-x-auto max-h-[calc(100vh-300px)]">
+          <div className="overflow-y-auto overflow-x-hidden h-[calc(100vh-280px)]">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Connection</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">IP Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">MAC Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Network</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-52">Device</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56">DNS Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36">IP Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44">MAC Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40">Network</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Protocol/Band</th>
                 </tr>
               </thead>
@@ -416,15 +418,15 @@ function NetworkPageContent() {
                     
                     return (
                       <tr key={networkDevice.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-3">
+                        <td className="px-4 py-3 w-52">
                           <div className="flex flex-col justify-center h-12">
                             <Link
                               href={`/device/${encodeURIComponent(networkDevice.deviceId)}#network`}
-                              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm leading-tight truncate"
+                              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm leading-tight truncate max-w-48"
                             >
                               {networkDevice.deviceName || 'Unknown Device'}
                             </Link>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight truncate">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight truncate max-w-48">
                               {networkDevice.serialNumber}
                               {networkDevice.assetTag && (
                                 <span> | {networkDevice.assetTag}</span>
@@ -434,23 +436,17 @@ function NetworkPageContent() {
                         </td>
                         <td className="px-6 py-3">
                           <div className="flex items-center gap-2 h-12">
-                            {networkDevice.networkInfo.connectionType ? (
-                              <>
-                                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                                  networkDevice.networkInfo.connectionType.toLowerCase().includes('wireless') || 
-                                  networkDevice.networkInfo.connectionType.toLowerCase().includes('wifi') 
-                                    ? 'bg-blue-400' 
-                                    : networkDevice.networkInfo.connectionType.toLowerCase().includes('ethernet') || 
-                                      networkDevice.networkInfo.connectionType.toLowerCase().includes('wired')
-                                    ? 'bg-green-400'
-                                    : 'bg-gray-400'
-                                }`} />
-                                <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                                  {networkDevice.networkInfo.connectionType}
-                                </span>
-                              </>
-                            ) : (
-                              <span className="text-sm text-gray-500 dark:text-gray-400">Unknown</span>
+                            <span className="text-sm text-gray-900 dark:text-white font-mono whitespace-nowrap">
+                              {networkDevice.networkInfo.dnsAddress || networkDevice.networkInfo.hostname || 'N/A'}
+                            </span>
+                            {(networkDevice.networkInfo.dnsAddress || networkDevice.networkInfo.hostname) && (
+                              <button
+                                onClick={() => copyToClipboard(networkDevice.networkInfo.dnsAddress || networkDevice.networkInfo.hostname)}
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                title="Copy DNS address"
+                              >
+                                <Copy size={14} />
+                              </button>
                             )}
                           </div>
                         </td>

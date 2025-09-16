@@ -514,10 +514,188 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
         )}
       </div>
 
-      {/* Loading State */}
+      {/* Enhanced Loading Skeleton */}
       {isLoading && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="text-blue-800 dark:text-blue-200">Loading network data...</div>
+        <div className="space-y-6 animate-pulse">
+          {/* Header Skeleton */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+              <div>
+                <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                <div className="h-5 w-72 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            </div>
+            <div className="text-right mr-8">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+              <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+
+          {/* Active Connection Overview Skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, index) => (
+                <div key={index} className="text-center">
+                  <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mx-auto mb-2"></div>
+                  <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Network Interfaces Table Skeleton */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    {['Interface', 'Type', 'Protocol', 'Band', 'Status', 'IP Address', 'MAC Address', 'Link Speed', 'MTU'].map((header, index) => (
+                      <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(3)].map((_, rowIndex) => (
+                    <tr key={rowIndex}>
+                      <td className="px-6 py-4">
+                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-10 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* VPN Connection Card Skeleton - Conditionally shown */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+              <div>
+                <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="text-center">
+                  <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mx-auto mb-2"></div>
+                  <div className="h-6 w-28 bg-gray-200 dark:bg-gray-700 rounded mx-auto"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Network Configuration and WiFi Networks Skeleton - Side by Side */}
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+            {/* Network Configuration Details Skeleton - 25% width (1 column) */}
+            <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+              <div className="space-y-6">
+                <div>
+                  <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="space-y-2">
+                    {[...Array(2)].map((_, index) => (
+                      <div key={index} className="flex justify-between">
+                        <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                  <div className="space-y-2">
+                    {[...Array(3)].map((_, index) => (
+                      <div key={index} className="flex justify-between">
+                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* WiFi Networks Skeleton - 75% width (3 columns) */}
+            <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      {['SSID', 'Security', 'Status', 'Channel'].map((header, index) => (
+                        <th key={index} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {[...Array(4)].map((_, rowIndex) => (
+                      <tr key={rowIndex}>
+                        <td className="px-6 py-4">
+                          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Loading Status Message */}
+          <div className="bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800 rounded-lg p-4">
+            <div className="flex items-center">
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-teal-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              <span className="text-teal-800 dark:text-teal-200 font-medium">Loading network configuration and interfaces...</span>
+            </div>
+          </div>
         </div>
       )}
 
