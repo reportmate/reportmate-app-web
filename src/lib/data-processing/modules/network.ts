@@ -116,6 +116,12 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
   // Extract NETBIOS information for active connection
   if (network.netbios && network.netbios.localNames && Array.isArray(network.netbios.localNames)) {
+    console.log('[NETWORK MODULE] Processing NetBIOS data:', {
+      localNamesCount: network.netbios.localNames.length,
+      activeInterface: networkInfo.interfaceName,
+      localNames: network.netbios.localNames.map((n: any) => ({ name: n.name, type: n.type, interface: n.interface }))
+    })
+
     const activeInterface = networkInfo.interfaceName
     
     // Find NETBIOS name for the active interface, prefer "File Server Service" type
@@ -126,7 +132,16 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         const interfaceMatch = entry.interface.includes(activeInterface) || 
                                activeInterface.includes(entry.interface) ||
                                entry.interface === activeInterface
-        return interfaceMatch && entry.type === 'File Server Service'
+        const isFileServer = entry.type === 'File Server Service'
+        console.log('[NETWORK MODULE] Checking NetBIOS entry:', {
+          name: entry.name,
+          type: entry.type,
+          interface: entry.interface,
+          interfaceMatch,
+          isFileServer,
+          matches: interfaceMatch && isFileServer
+        })
+        return interfaceMatch && isFileServer
       }
       return false
     })
@@ -136,10 +151,27 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       entry.type === 'File Server Service'
     )
     
-    if (fallbackEntry) {
-      networkInfo.activeNetbiosName = fallbackEntry.name
-      networkInfo.activeNetbiosType = fallbackEntry.type
+    // Additional fallback: any NetBIOS entry (Workstation Service is also useful)
+    const anyNetbiosEntry = fallbackEntry || network.netbios.localNames[0]
+    
+    if (anyNetbiosEntry) {
+      networkInfo.activeNetbiosName = anyNetbiosEntry.name
+      networkInfo.activeNetbiosType = anyNetbiosEntry.type
+      console.log('[NETWORK MODULE] Selected NetBIOS entry:', {
+        name: anyNetbiosEntry.name,
+        type: anyNetbiosEntry.type,
+        interface: anyNetbiosEntry.interface,
+        source: activeNetbiosEntry ? 'interface-match' : fallbackEntry ? 'fallback-fileserver' : 'any-entry'
+      })
+    } else {
+      console.log('[NETWORK MODULE] No suitable NetBIOS entry found')
     }
+  } else {
+    console.log('[NETWORK MODULE] No NetBIOS data available:', {
+      hasNetbios: !!network.netbios,
+      hasLocalNames: !!(network.netbios && network.netbios.localNames),
+      isArray: network.netbios && network.netbios.localNames ? Array.isArray(network.netbios.localNames) : false
+    })
   }
 
   // Extract all network interfaces
