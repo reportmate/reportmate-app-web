@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react'
-import { NetworkTable } from '../tables'
+import { NetworkTable } from '../tables/NetworkTable'
 import { extractNetwork } from '../../lib/data-processing/modules/network'
 
 interface NetworkTabProps {
@@ -183,22 +183,29 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
             </div>
           </div>
           <div className="text-center">
-            <div className="text-sm text-gray-500 dark:text-gray-500">DNS Servers</div>
+            <div className="text-sm text-gray-500 dark:text-gray-500">DNS Address</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white font-mono">
               <CopyableValue 
-                value={Array.isArray(networkData.dns) 
-                  ? networkData.dns.join(', ') 
-                  : typeof networkData.dns === 'object' && networkData.dns?.servers 
-                    ? networkData.dns.servers.join(', ')
-                    : typeof networkData.dns === 'string' 
-                      ? networkData.dns 
-                      : undefined
-                } 
+                value={networkData.dnsAddress} 
                 className="justify-center" 
                 placeholder="N/A"
               />
             </div>
           </div>
+          
+          {/* Computer Name (NETBIOS) for Active Connection */}
+          {networkData.activeNetbiosName && (
+            <div className="text-center">
+              <div className="text-sm text-gray-500 dark:text-gray-500">NetBios</div>
+              <div className="text-lg font-semibold text-gray-900 dark:text-white">
+                <CopyableValue 
+                  value={networkData.activeNetbiosName} 
+                  className="justify-center"
+                  showCopy={false}
+                />
+              </div>
+            </div>
+          )}
           {/* Find active interface with wireless protocol */}
           {(() => {
             const activeInterface = networkData.interfaces?.find((iface: any) => 
@@ -210,21 +217,6 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                 <div className="text-sm text-gray-500 dark:text-gray-500">Protocol</div>
                 <div className="text-lg font-semibold text-gray-900 dark:text-white">
                   {activeInterface.wirelessProtocol}
-                </div>
-              </div>
-            );
-          })()}
-          {/* Find active interface with wireless band */}
-          {(() => {
-            const activeInterface = networkData.interfaces?.find((iface: any) => 
-              (iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected') && 
-              iface.wirelessBand
-            );
-            return activeInterface?.wirelessBand && (
-              <div className="text-center">
-                <div className="text-sm text-gray-500 dark:text-gray-500">Band</div>
-                <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {activeInterface.wirelessBand}
                 </div>
               </div>
             );

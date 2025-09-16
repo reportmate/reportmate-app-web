@@ -4,6 +4,7 @@
  */
 
 import React from 'react'
+import { StorageVisualization } from '../storage'
 
 interface HardwareData {
   model?: unknown;
@@ -355,82 +356,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
       </div>
 
-      {/* Storage Devices - Only show devices with valid capacity or free space data */}
+      {/* Storage Visualization - Enhanced with hierarchical drill-down */}
       {storageDevices && storageDevices.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Storage Devices</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Physical and logical storage devices
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capacity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Free Space</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Usage %</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Health</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {storageDevices.map((drive: any, index: number) => {
-                  const usagePercent = drive.capacity > 0 ? Math.round(((drive.capacity - drive.freeSpace) / drive.capacity) * 100) : 0
-                  return (
-                    <tr key={index}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        {drive.name || `Drive ${index + 1}`}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          drive.type === 'SSD' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          drive.type === 'HDD' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                          {drive.type || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        {formatBytes(drive.capacity || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        {formatBytes(drive.freeSpace || 0)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
-                            <div 
-                              className={`h-2 rounded-full ${
-                                usagePercent >= 90 ? 'bg-red-500' :
-                                usagePercent >= 75 ? 'bg-yellow-500' :
-                                'bg-green-500'
-                              }`}
-                              style={{ width: `${Math.min(usagePercent, 100)}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs">{usagePercent}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          drive.health === 'Good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                          drive.health === 'Warning' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                          drive.health === 'Critical' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                          'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                          {drive.health || 'Unknown'}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <StorageVisualization storageDevices={storageDevices} />
       )}
 
       {/* Battery Information - Only show for laptops (devices with battery data) */}
