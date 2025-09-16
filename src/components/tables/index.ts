@@ -4,3 +4,4 @@ export { ApplicationsTable } from './ApplicationsTable';
 export { NetworkTable } from './NetworkTable';
 export { SecurityCard } from './SecurityCard';
 export { SecurityEventsTable } from './SecurityEventsTable';
+export { ScheduledTasksTable } from './ScheduledTasksTable';
