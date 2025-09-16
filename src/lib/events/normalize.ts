@@ -3,10 +3,17 @@ export type EventSeverity = 'success' | 'warning' | 'error' | 'info'
 export function normalizeEventKind(kind: string): EventSeverity {
   const k = (kind || '').toLowerCase()
 
+  // Check for exact matches first (for ReportMate client events)
+  if (k === 'success') return 'success'
+  if (k === 'warning') return 'warning'
+  if (k === 'error') return 'error'
+  
+  // Check for install-specific patterns
   if (k === 'install_success' || k === 'package_install_success') return 'success'
   if (k === 'install_warning' || k === 'package_install_warning') return 'warning'
   if (k === 'install_error' || k === 'package_install_error') return 'error'
 
+  // Check for suffix/prefix patterns
   if (k.endsWith('_error')) return 'error'
   if (k.endsWith('_warning') || k.startsWith('warn_')) return 'warning'
   if (k.endsWith('_success') || k.startsWith('success_')) return 'success'
