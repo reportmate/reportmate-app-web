@@ -25,6 +25,20 @@ export interface WindowsUpdate {
   requiresRestart?: boolean
 }
 
+export interface ScheduledTask {
+  name: string
+  path: string
+  enabled: boolean
+  action: string
+  hidden: boolean
+  state: string
+  lastRunTime?: string
+  nextRunTime?: string
+  lastRunCode: string
+  lastRunMessage: string
+  status: string
+}
+
 export interface OperatingSystemInfo {
   name?: string
   version?: string
@@ -42,6 +56,7 @@ export interface SystemInfo {
   services: SystemService[]
   environment: EnvironmentVariable[]
   updates: WindowsUpdate[]
+  scheduledTasks: ScheduledTask[]
   runningServices: number
   operatingSystem: OperatingSystemInfo
   bootTime?: string
@@ -59,6 +74,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
     services: [],
     environment: [],
     updates: [],
+    scheduledTasks: [],
     runningServices: 0,
     operatingSystem: {}
   }
@@ -127,6 +143,30 @@ export function extractSystem(deviceModules: any): SystemInfo {
     }))
   }
 
+  // Extract scheduled tasks - check both system.scheduledTasks and separate scheduledTasks module
+  let rawScheduledTasks = null
+  if (modules?.system?.scheduledTasks) {
+    rawScheduledTasks = modules.system.scheduledTasks
+  } else if (modules?.scheduledTasks?.scheduledTasks) {
+    rawScheduledTasks = modules.scheduledTasks.scheduledTasks
+  }
+
+  if (rawScheduledTasks && Array.isArray(rawScheduledTasks)) {
+    systemInfo.scheduledTasks = rawScheduledTasks.map((task: any) => ({
+      name: task.name || '',
+      path: task.path || '',
+      enabled: task.enabled || false,
+      action: task.action || '',
+      hidden: task.hidden || false,
+      state: task.state || '',
+      lastRunTime: task.lastRunTime || task.last_run_time || '',
+      nextRunTime: task.nextRunTime || task.next_run_time || '',
+      lastRunCode: task.lastRunCode || task.last_run_code || '',
+      lastRunMessage: task.lastRunMessage || task.last_run_message || '',
+      status: task.status || task.state || 'Unknown'
+    }))
+  }
+
   // Extract operating system info
   if (modules?.system?.operatingSystem) {
     const os = modules.system.operatingSystem
@@ -156,6 +196,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
     runningServices: systemInfo.runningServices,
     environmentCount: systemInfo.environment.length,
     updatesCount: systemInfo.updates.length,
+    scheduledTasksCount: systemInfo.scheduledTasks.length,
     hasOperatingSystem: !!Object.keys(systemInfo.operatingSystem).length
   })
 
