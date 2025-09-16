@@ -113,30 +113,42 @@ async function getDeviceNames(): Promise<Map<string, string>> {
   return deviceNamesCache // Return existing cache even if fetch failed
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const limitParam = searchParams.get('limit')
+    const limit = limitParam ? parseInt(limitParam, 10) : 100
+    
+    // Validate limit parameter
+    const validLimit = Math.min(Math.max(limit, 1), 500) // Between 1 and 500 events
+    
     const timestamp = new Date().toISOString()
-    console.log(`[EVENTS API CACHED] ${timestamp} - Cached events endpoint`)
+    console.log(`[EVENTS API CACHED] ${timestamp} - Cached events endpoint (limit: ${validLimit})`)
 
-    // Check cache first
+    // Check cache first - but only if requesting same or fewer events than cached
     const now = Date.now()
-    if (eventsCache.length > 0 && (now - eventsCacheTimestamp) < EVENTS_CACHE_DURATION) {
-      console.log(`[EVENTS API CACHED] ${timestamp} - Serving from cache: ${eventsCache.length} events`)
+    if (eventsCache.length > 0 && 
+        (now - eventsCacheTimestamp) < EVENTS_CACHE_DURATION && 
+        validLimit <= eventsCache.length) {
+      console.log(`[EVENTS API CACHED] ${timestamp} - Serving from cache: ${validLimit}/${eventsCache.length} events`)
+      const limitedEvents = eventsCache.slice(0, validLimit)
       return NextResponse.json({
         success: true,
-        events: eventsCache,
-        count: eventsCache.length
+        events: limitedEvents,
+        count: limitedEvents.length,
+        totalCached: eventsCache.length
       }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Pragma': 'no-cache',
           'X-Fetched-At': new Date(eventsCacheTimestamp).toISOString(),
-          'X-Data-Source': 'in-memory-cache'
+          'X-Data-Source': 'in-memory-cache',
+          'X-Event-Limit': validLimit.toString()
         }
       })
     }
 
-    console.log(`[EVENTS API CACHED] ${timestamp} - Fetching fresh data from Azure Functions`)
+    console.log(`[EVENTS API CACHED] ${timestamp} - Fetching fresh data from Azure Functions (limit: ${validLimit})`)
     console.log('[EVENTS API] Fetching events from Azure Functions API');
     console.log('[EVENTS API] Using API base URL:', AZURE_FUNCTIONS_BASE_URL);
 
@@ -145,13 +157,13 @@ export async function GET() {
 
     // Try Azure Functions API with very short timeout
     try {
-      console.log('[EVENTS API] Attempting to fetch from:', `${AZURE_FUNCTIONS_BASE_URL}/api/events`);
+      console.log('[EVENTS API] Attempting to fetch from:', `${AZURE_FUNCTIONS_BASE_URL}/api/events?limit=${validLimit}`);
       
       // Use longer timeout (15 seconds) for Azure Functions
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events`, {
+      const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events?limit=${validLimit}`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -222,7 +234,8 @@ export async function GET() {
               'Cache-Control': 'no-store, no-cache, must-revalidate',
               'Pragma': 'no-cache',
               'X-Fetched-At': timestamp,
-              'X-Data-Source': 'azure-functions'
+              'X-Data-Source': 'azure-functions',
+              'X-Event-Limit': validLimit.toString()
             }
           });
         }
