@@ -330,22 +330,31 @@ function EventsPageContent() {
       return // Already loaded or loading
     }
 
-    setLoadingPayloads(prev => new Set(prev).add(eventId))
+    // Ensure eventId is a string
+    const eventIdStr = String(eventId)
+    setLoadingPayloads(prev => new Set(prev).add(eventIdStr))
     
     try {
-      console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventId}`)
+      console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventIdStr}`)
       
       // For bundled events, we need to handle them differently
-      if (eventId.startsWith('bundle-')) {
+      if (eventIdStr.startsWith('bundle-')) {
         // For bundled events, fetch payloads from all constituent events
-        const bundledEvent = filteredEvents.find(e => e.id === eventId)
+        const bundledEvent = filteredEvents.find(e => e.id === eventIdStr)
         if (bundledEvent && bundledEvent.isBundle && bundledEvent.eventIds) {
           // Fetching payloads for bundled events
           
-          // Fetch payloads for all bundled events in parallel
+          // Fetch payloads for all bundled events in parallel with timeout
           const payloadPromises = bundledEvent.eventIds.map(async (realEventId: string) => {
             try {
-              const response = await fetch(`/api/events/${realEventId}/payload`)
+              // Create timeout promise
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+              })
+              
+              const fetchPromise = fetch(`/api/events/${realEventId}/payload`)
+              const response = await Promise.race([fetchPromise, timeoutPromise]) as Response
+              
               if (!response.ok) {
                 console.error(`[EVENTS PAGE] Failed to fetch payload for event ${realEventId}: ${response.status}`)
                 return { eventId: realEventId, error: `Failed to fetch (${response.status})` }
@@ -354,7 +363,8 @@ function EventsPageContent() {
               return { eventId: realEventId, payload: data.payload || 'No payload data' }
             } catch (error) {
               console.error(`[EVENTS PAGE] Error fetching payload for event ${realEventId}:`, error)
-              return { eventId: realEventId, error: error instanceof Error ? error.message : 'Unknown error' }
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              return { eventId: realEventId, error: errorMessage }
             }
           })
           
@@ -369,55 +379,74 @@ function EventsPageContent() {
           }
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: bundleInfo
+            [eventIdStr]: bundleInfo
           }))
           return
         }
       }
       
-      // For regular events, fetch from API
-      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
+      // For regular events, fetch from API with timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+      })
+      
+      const fetchPromise = fetch(`/api/events/${encodeURIComponent(eventIdStr)}/payload`)
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response
       
       if (response.ok) {
         const data = await response.json()
-        console.log(`[EVENTS PAGE] Successfully fetched full payload for ${eventId}`)
+        console.log(`[EVENTS PAGE] Successfully fetched full payload for ${eventIdStr}`)
         
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: data.payload
+          [eventIdStr]: data.payload
         }))
       } else {
-        console.error(`[EVENTS PAGE] Failed to fetch payload for ${eventId}:`, response.status)
+        console.error(`[EVENTS PAGE] Failed to fetch payload for ${eventIdStr}:`, response.status)
+        const errorMessage = `Unable to load payload (HTTP ${response.status})`
         // Fallback to showing bundle info for bundled events
-        const bundledEvent = filteredEvents.find(e => e.id === eventId)
+        const bundledEvent = filteredEvents.find(e => e.id === eventIdStr)
         if (bundledEvent) {
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: bundledEvent.isBundle ? { 
+            [eventIdStr]: bundledEvent.isBundle ? { 
               message: bundledEvent.message,
               eventIds: bundledEvent.eventIds,
-              isBundle: true 
-            } : 'Unable to load payload'
+              isBundle: true,
+              error: errorMessage 
+            } : errorMessage
+          }))
+        } else {
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventIdStr]: errorMessage
           }))
         }
       }
     } catch (error) {
-      console.error(`[EVENTS PAGE] Error fetching payload for ${eventId}:`, error)
-      const bundledEvent = filteredEvents.find(e => e.id === eventId)
+      console.error(`[EVENTS PAGE] Error fetching payload for ${eventIdStr}:`, error)
+      const errorMessage = error instanceof Error ? error.message : 'Error loading payload'
+      const bundledEvent = filteredEvents.find(e => e.id === eventIdStr)
       if (bundledEvent) {
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: bundledEvent.isBundle ? { 
+          [eventIdStr]: bundledEvent.isBundle ? { 
             message: bundledEvent.message,
             eventIds: bundledEvent.eventIds,
-            isBundle: true 
-          } : 'Error loading payload'
+            isBundle: true,
+            error: errorMessage 
+          } : errorMessage
+        }))
+      } else {
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventIdStr]: errorMessage
         }))
       }
     } finally {
       setLoadingPayloads(prev => {
         const newSet = new Set(prev)
-        newSet.delete(eventId)
+        newSet.delete(eventIdStr)
         return newSet
       })
     }
@@ -751,6 +780,9 @@ function EventsPageContent() {
                       <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
+                      <th className="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        ID
+                      </th>
                       <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
@@ -768,7 +800,7 @@ function EventsPageContent() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {currentEvents.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -797,8 +829,13 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
+                              <span className="text-sm text-gray-900 dark:text-gray-100 font-mono">
+                                #{event.id}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
                               <Link
-                                href={`/device/${encodeURIComponent(event.device)}`}
+                                href={`/device/${encodeURIComponent(event.device)}#events`}
                                 className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                 title={deviceNameMap[event.device] || event.device}
                               >
@@ -855,13 +892,18 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-6 py-4">
                                   <div className="space-y-3">
                                     <div className="flex items-center justify-between">
-                                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                        {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
-                                      </h4>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                                        </h4>
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                                          #{event.id}
+                                        </span>
+                                      </div>
                                       <button
                                         onClick={() => {
                                           const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
@@ -1047,6 +1089,9 @@ function EventsPageContent() {
                         Type
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                        ID
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         Device
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
@@ -1063,7 +1108,7 @@ function EventsPageContent() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {currentEvents.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1092,8 +1137,13 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="text-sm text-gray-900 dark:text-gray-100 font-mono">
+                                #{event.id}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
                               <Link
-                                href={`/device/${encodeURIComponent(event.device)}`}
+                                href={`/device/${encodeURIComponent(event.device)}#events`}
                                 className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
                                 title={deviceNameMap[event.device] || event.device}
                               >
@@ -1139,13 +1189,18 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-4 py-3">
                                   <div className="space-y-2">
                                     <div className="flex items-center justify-between">
-                                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                        Raw Payload
-                                      </h4>
+                                      <div className="flex items-center gap-2">
+                                        <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                                          Raw Payload
+                                        </h4>
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                                          #{event.id}
+                                        </span>
+                                      </div>
                                       <button
                                         onClick={() => {
                                           const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
@@ -1240,12 +1295,15 @@ function EventsPageContent() {
                   <div key={event.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
                           {statusConfig.icon}
                         </div>
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
                           {event.kind}
+                        </span>
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                          #{event.id}
                         </span>
                       </div>
                     </div>
@@ -1254,7 +1312,7 @@ function EventsPageContent() {
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</div>
                       <Link
-                        href={`/device/${encodeURIComponent(event.device)}`}
+                        href={`/device/${encodeURIComponent(event.device)}#events`}
                         className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm"
                       >
                         {deviceNameMap[event.device] || event.device}
@@ -1300,9 +1358,14 @@ function EventsPageContent() {
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                            Raw Payload
-                          </h4>
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                              Raw Payload
+                            </h4>
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                              #{event.id}
+                            </span>
+                          </div>
                           <button
                             onClick={() => {
                               const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
