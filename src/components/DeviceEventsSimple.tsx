@@ -111,23 +111,32 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       return // Already loaded or loading
     }
 
-    setLoadingPayloads(prev => new Set(prev).add(eventId))
+    // Ensure eventId is a string
+    const eventIdStr = String(eventId)
+    setLoadingPayloads(prev => new Set(prev).add(eventIdStr))
     
     try {
-      console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventId}`)
+      console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventIdStr}`)
       
       // For bundled events, we need to handle them differently
-      if (eventId.startsWith('bundle-')) {
+      if (eventIdStr.startsWith('bundle-')) {
         // For bundled events, fetch payloads from all constituent events
-        const bundledEvent = events.find(e => e.id === eventId)
+        const bundledEvent = events.find(e => e.id === eventIdStr)
         if (bundledEvent && (bundledEvent as any).raw?.bundledEvents) {
           const bundledEventIds = (bundledEvent as any).raw.bundledEvents
           console.log(`[DEVICE EVENTS SIMPLE] Fetching payloads for ${bundledEventIds.length} bundled events`)
           
-          // Fetch payloads for all bundled events in parallel
+          // Fetch payloads for all bundled events in parallel with timeout
           const payloadPromises = bundledEventIds.map(async (realEventId: string) => {
             try {
-              const response = await fetch(`/api/events/${realEventId}/payload`)
+              // Create timeout promise
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+              })
+              
+              const fetchPromise = fetch(`/api/events/${realEventId}/payload`)
+              const response = await Promise.race([fetchPromise, timeoutPromise]) as Response
+              
               if (!response.ok) {
                 console.error(`[DEVICE EVENTS SIMPLE] Failed to fetch payload for event ${realEventId}: ${response.status}`)
                 return { eventId: realEventId, error: `Failed to fetch (${response.status})` }
@@ -136,7 +145,8 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
               return { eventId: realEventId, payload: data.payload || 'No payload data' }
             } catch (error) {
               console.error(`[DEVICE EVENTS SIMPLE] Error fetching payload for event ${realEventId}:`, error)
-              return { eventId: realEventId, error: error instanceof Error ? error.message : 'Unknown error' }
+              const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+              return { eventId: realEventId, error: errorMessage }
             }
           })
           
@@ -150,56 +160,75 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           }
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: bundleInfo
+            [eventIdStr]: bundleInfo
           }))
           return
         }
       }
       
-      // For regular events, fetch from API
-      const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
+      // For regular events, fetch from API with timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Request timeout after 30 seconds')), 30000)
+      })
+      
+      const fetchPromise = fetch(`/api/events/${encodeURIComponent(eventIdStr)}/payload`)
+      const response = await Promise.race([fetchPromise, timeoutPromise]) as Response
       
       if (response.ok) {
         const data = await response.json()
-        console.log(`[DEVICE EVENTS SIMPLE] Successfully fetched full payload for ${eventId}`)
+        console.log(`[DEVICE EVENTS SIMPLE] Successfully fetched full payload for ${eventIdStr}`)
         
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: data.payload
+          [eventIdStr]: data.payload
         }))
       } else {
-        console.error(`[DEVICE EVENTS SIMPLE] Failed to fetch payload for ${eventId}:`, response.status)
+        console.error(`[DEVICE EVENTS SIMPLE] Failed to fetch payload for ${eventIdStr}:`, response.status)
+        const errorMessage = `Unable to load payload (HTTP ${response.status})`
         // Fallback to the existing payload from events list
-        const event = events.find(e => e.id === eventId)
+        const event = events.find(e => e.id === eventIdStr)
         if (event) {
           setFullPayloads(prev => ({
             ...prev,
-            [eventId]: (event as any).isBundle ? { 
+            [eventIdStr]: (event as any).isBundle ? { 
               message: event.message,
               eventIds: (event as any).raw?.bundledEvents,
-              isBundle: true 
-            } : event.raw
+              isBundle: true,
+              error: errorMessage 
+            } : errorMessage
+          }))
+        } else {
+          setFullPayloads(prev => ({
+            ...prev,
+            [eventIdStr]: errorMessage
           }))
         }
       }
     } catch (error) {
-      console.error(`[DEVICE EVENTS SIMPLE] Error fetching payload for ${eventId}:`, error)
+      console.error(`[DEVICE EVENTS SIMPLE] Error fetching payload for ${eventIdStr}:`, error)
+      const errorMessage = error instanceof Error ? error.message : 'Error loading payload'
       // Fallback to the existing payload from events list
-      const event = events.find(e => e.id === eventId)
+      const event = events.find(e => e.id === eventIdStr)
       if (event) {
         setFullPayloads(prev => ({
           ...prev,
-          [eventId]: (event as any).isBundle ? { 
+          [eventIdStr]: (event as any).isBundle ? { 
             message: event.message,
             eventIds: (event as any).raw?.bundledEvents,
-            isBundle: true 
-          } : event.raw
+            isBundle: true,
+            error: errorMessage 
+          } : errorMessage
+        }))
+      } else {
+        setFullPayloads(prev => ({
+          ...prev,
+          [eventIdStr]: errorMessage
         }))
       }
     } finally {
       setLoadingPayloads(prev => {
         const newSet = new Set(prev)
-        newSet.delete(eventId)
+        newSet.delete(eventIdStr)
         return newSet
       })
     }
@@ -424,6 +453,11 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     {normalizeEventKind(ev.kind || '')}
                   </span>
                   
+                  {/* Event ID Badge */}
+                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
+                    #{ev.id}
+                  </span>
+                  
                   {/* Event Message - Hidden on mobile (sm and below) */}
                   <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
                     {getEventMessage(ev)}
@@ -462,9 +496,14 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                      {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
-                    </h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-medium text-gray-900 dark:text-white">
+                        {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                      </h4>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                        #{ev.id}
+                      </span>
+                    </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => {
