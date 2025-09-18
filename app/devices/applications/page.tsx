@@ -299,17 +299,64 @@ function ApplicationsPageContent() {
       let progressInterval: NodeJS.Timeout | undefined
       
       try {
+        // First, get the actual device count dynamically
+        setFetchProgress(prev => ({
+          ...prev,
+          stage: 'discovering',
+          deviceCount: 0,
+          processedDevices: 0
+        }))
+
+        // Get actual device count from API
+        const apiBaseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+          ? `http://localhost:${window.location.port}` 
+          : 'https://reportmate-api.azurewebsites.net'
+        
+        const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'User-Agent': 'ReportMate-Frontend/1.0'
+          }
+        })
+        
+        let actualDeviceCount = 0
+        if (devicesResponse.ok) {
+          const devicesData = await devicesResponse.json()
+          actualDeviceCount = Array.isArray(devicesData) ? devicesData.length : 0
+        }
+        
+        console.log(`[APPLICATIONS] Discovered ${actualDeviceCount} devices`)
+        
+        // If no devices locally, fall back to production API for testing
+        if (actualDeviceCount === 0 && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+          console.log('[APPLICATIONS] No devices locally, trying production API...')
+          const prodResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'User-Agent': 'ReportMate-Frontend/1.0'
+            }
+          })
+          
+          if (prodResponse.ok) {
+            const prodData = await prodResponse.json()
+            actualDeviceCount = Array.isArray(prodData) ? prodData.length : 0
+            console.log('[APPLICATIONS] Production API returned', actualDeviceCount, 'devices')
+          }
+        }
+
         setFetchProgress(prev => ({
           ...prev,
           stage: 'fetching',
-          deviceCount: 92, // Known device count
+          deviceCount: actualDeviceCount, // Use dynamic device count
           processedDevices: 0
         }))
 
         // Start progress simulation
         progressInterval = setInterval(() => {
           setFetchProgress(prev => {
-            if (prev.stage === 'fetching' && prev.processedDevices < prev.deviceCount) {
+            if (prev.stage === 'fetching' && prev.processedDevices < prev.deviceCount && prev.deviceCount > 0) {
               // Simulate progress at varying speeds (some devices faster than others)
               const increment = Math.random() > 0.7 ? 2 : 1
               const newProcessed = Math.min(prev.processedDevices + increment, prev.deviceCount - 5) // Leave room for final jump

@@ -143,16 +143,163 @@ function InstallsPageContent() {
       try {
         console.log('[PROGRESS] Starting fetch...')
         
-        // Set initial loading state with reasonable estimates
-        const estimatedDeviceCount = 138 // Based on your actual count
+        // First, get the actual device count dynamically
+        setLoadingProgress({
+          current: 0,
+          total: 0,
+          currentBatch: 0,
+          totalBatches: 0,
+          status: 'Fetching device count...'
+        })
+        
+        // Get actual device count from API
+        const apiBaseUrl = typeof window !== 'undefined' && window.location.hostname === 'localhost' 
+          ? `http://localhost:${window.location.port}` 
+          : 'https://reportmate-api.azurewebsites.net'
+        
+        const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'User-Agent': 'ReportMate-Frontend/1.0'
+          }
+        })
+        
+        if (!devicesResponse.ok) {
+          throw new Error('Failed to fetch device count')
+        }
+        
+        const devicesData = await devicesResponse.json()
+        const actualDeviceCount = Array.isArray(devicesData) ? devicesData.length : 0
+        
+        console.log('[PROGRESS] Device count response:', { 
+          isArray: Array.isArray(devicesData), 
+          count: actualDeviceCount,
+          firstFew: Array.isArray(devicesData) ? devicesData.slice(0, 3) : devicesData 
+        })
+        
+        // If no devices locally, fall back to production API for testing
+        if (actualDeviceCount === 0 && typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+          console.log('[PROGRESS] No devices locally, trying production API...')
+          const prodResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices', {
+            cache: 'no-store',
+            headers: {
+              'Cache-Control': 'no-cache',
+              'User-Agent': 'ReportMate-Frontend/1.0'
+            }
+          })
+          
+          if (prodResponse.ok) {
+            const prodData = await prodResponse.json()
+            const prodDeviceCount = Array.isArray(prodData) ? prodData.length : 0
+            console.log('[PROGRESS] Production API returned', prodDeviceCount, 'devices')
+            
+            if (prodDeviceCount > 0) {
+              // Use production device count but still call local API for consistency
+              const batchSize = 10
+              const actualBatches = Math.ceil(prodDeviceCount / batchSize)
+              
+              console.log(`[PROGRESS] Using production count: ${prodDeviceCount} devices, ${actualBatches} batches`)
+              
+              setLoadingProgress({
+                current: 0,
+                total: prodDeviceCount,
+                currentBatch: 0,
+                totalBatches: actualBatches,
+                status: 'Connecting to API...'
+              })
+              
+              // Continue with the rest using production count
+              let currentProgress = 0
+              let currentBatch = 0
+              
+              progressInterval = setInterval(() => {
+                currentProgress = Math.min(currentProgress + 12, prodDeviceCount - 5)
+                currentBatch = Math.min(Math.floor(currentProgress / batchSize) + 1, actualBatches)
+                
+                setLoadingProgress(prev => {
+                  if (!prev) return null
+                  return {
+                    current: currentProgress,
+                    total: prodDeviceCount,
+                    currentBatch: currentBatch,
+                    totalBatches: actualBatches,
+                    status: `Processing batch ${currentBatch}/${actualBatches}...`
+                  }
+                })
+              }, 1200)
+              
+              // Make the API call (still use local for consistency)
+              console.log('[PROGRESS] Making local API call...')
+              const response = await fetch('/api/devices/installs')
+              if (!response.ok) throw new Error('Failed to fetch installs')
+              
+              const data = await response.json()
+              
+              // Clear interval and show final results
+              if (progressInterval) {
+                clearInterval(progressInterval)
+                progressInterval = null
+              }
+              
+              // Get final device count from API response
+              const finalDeviceCount = (data.data || []).length
+              const finalBatches = Math.ceil(finalDeviceCount / batchSize)
+              
+              console.log('[PROGRESS] API completed, final device count:', finalDeviceCount, 'batches:', finalBatches)
+              
+              // Show completion with real numbers
+              setLoadingProgress({
+                current: finalDeviceCount || prodDeviceCount,
+                total: prodDeviceCount,
+                currentBatch: finalBatches || actualBatches,
+                totalBatches: actualBatches,
+                status: 'Processing complete!'
+              })
+              
+              if (data.success && data.data) {
+                // Process the API response data structure
+                const processedInstalls = data.data.map((device: any) => {
+                  const packages: Array<{name: string, version: string, status: string, last_update?: string}> = []
+                  
+                  if (device.installs?.cimian?.items) {
+                    device.installs.cimian.items.forEach((item: any) => {
+                      packages.push({
+                        name: item.itemName || 'Unknown Package',
+                        version: item.latestVersion || item.currentVersion || '1.0.0',
+                        status: item.currentStatus || 'Unknown',
+                        last_update: item.lastUpdate
+                      })
+                    })
+                  }
+                  
+                  return {
+                    ...device,
+                    packages
+                  }
+                })
+                
+                setInstalls(processedInstalls)
+                console.log('[PROGRESS] Final installs data processed:', processedInstalls.length, 'devices')
+              }
+              
+              setLoading(false)
+              setLoadingProgress(null)
+              return
+            }
+          }
+        }
+        
         const batchSize = 10
-        const estimatedBatches = Math.ceil(estimatedDeviceCount / batchSize)
+        const actualBatches = Math.ceil(actualDeviceCount / batchSize)
+        
+        console.log(`[PROGRESS] Discovered ${actualDeviceCount} devices, ${actualBatches} batches`)
         
         setLoadingProgress({
           current: 0,
-          total: estimatedDeviceCount,
+          total: actualDeviceCount,
           currentBatch: 0,
-          totalBatches: estimatedBatches,
+          totalBatches: actualBatches,
           status: 'Connecting to API...'
         })
         
@@ -161,17 +308,17 @@ function InstallsPageContent() {
         let currentBatch = 0
         
         progressInterval = setInterval(() => {
-          currentProgress = Math.min(currentProgress + 12, estimatedDeviceCount - 5) // Progress in chunks
-          currentBatch = Math.min(Math.floor(currentProgress / batchSize) + 1, estimatedBatches)
+          currentProgress = Math.min(currentProgress + 12, actualDeviceCount - 5) // Progress in chunks
+          currentBatch = Math.min(Math.floor(currentProgress / batchSize) + 1, actualBatches)
           
           setLoadingProgress(prev => {
             if (!prev) return null
             return {
               current: currentProgress,
-              total: estimatedDeviceCount,
+              total: actualDeviceCount,
               currentBatch: currentBatch,
-              totalBatches: estimatedBatches,
-              status: `Processing batch ${currentBatch}/${estimatedBatches}...`
+              totalBatches: actualBatches,
+              status: `Processing batch ${currentBatch}/${actualBatches}...`
             }
           })
         }, 1200) // Update every 1.2 seconds to match typical API timing
@@ -189,18 +336,18 @@ function InstallsPageContent() {
           progressInterval = null
         }
         
-        // Get actual device count from API response
-        const actualDeviceCount = (data.data || []).length
-        const actualBatches = Math.ceil(actualDeviceCount / batchSize)
+        // Get final device count from API response
+        const finalDeviceCount = (data.data || []).length
+        const finalBatches = Math.ceil(finalDeviceCount / batchSize)
         
-        console.log('[PROGRESS] API completed, actual device count:', actualDeviceCount, 'batches:', actualBatches)
+        console.log('[PROGRESS] API completed, final device count:', finalDeviceCount, 'batches:', finalBatches)
         
         // Show completion with real numbers
         setLoadingProgress({
-          current: actualDeviceCount,
-          total: actualDeviceCount,
-          currentBatch: actualBatches,
-          totalBatches: actualBatches,
+          current: finalDeviceCount,
+          total: finalDeviceCount,
+          currentBatch: finalBatches,
+          totalBatches: finalBatches,
           status: 'Processing complete!'
         })
         
@@ -1030,14 +1177,8 @@ function InstallsPageContent() {
                                 </div>
                               </div>
                               
-                              <div className="text-center">
-                                <p className="text-xs text-gray-600 dark:text-gray-400">
-                                  {loadingProgress.status}
-                                </p>
-                              </div>
-                              
                               {/* Visual batch indicators */}
-                              <div className="flex justify-center gap-1 mt-2">
+                              <div className="flex justify-center gap-1 mt-4">
                                 {Array.from({ length: loadingProgress.totalBatches }).map((_, index) => (
                                   <div
                                     key={index}
