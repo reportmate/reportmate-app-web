@@ -17,6 +17,7 @@ interface FilterOptions {
   catalogs: string[]
   rooms: string[]
   fleets: string[]
+  platforms: string[]
   devicesWithData: number
 }
 
@@ -34,6 +35,22 @@ interface InstallRecord {
   catalog?: string
   room?: string
   fleet?: string
+  platform?: string
+  raw?: any
+}
+
+// Helper function to get device platform
+function getDevicePlatform(install: InstallRecord): string {
+  if (install.platform) return install.platform
+  
+  if (install.raw?.system?.operatingSystem?.platform === 'Windows NT') {
+    return 'Windows'
+  } else if (install.raw?.system?.operatingSystem?.platform === 'Darwin') {
+    return 'Macintosh'
+  }
+  
+  // Fallback based on other indicators
+  return install.raw?.system?.operatingSystem?.name?.includes('Windows') ? 'Windows' : 'Unknown'
 }
 
 function InstallsPageContent() {
@@ -49,6 +66,7 @@ function InstallsPageContent() {
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     managedInstalls: [],
@@ -59,6 +77,7 @@ function InstallsPageContent() {
     catalogs: [],
     rooms: [],
     fleets: [],
+    platforms: [],
     devicesWithData: 0
   })
 
@@ -103,12 +122,21 @@ function InstallsPageContent() {
     )
   }
 
+  const togglePlatform = (platform: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platform) 
+        ? prev.filter(p => p !== platform)
+        : [...prev, platform]
+    )
+  }
+
   const clearAllFilters = () => {
     setSelectedInstalls([])
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedRooms([])
     setSelectedFleets([])
+    setSelectedPlatforms([])
   }
 
   // Fetch filter options
@@ -138,6 +166,7 @@ function InstallsPageContent() {
             catalogs: fallbackData.catalogs || [],
             rooms: fallbackData.rooms || [],
             fleets: fallbackData.fleets || [],
+            platforms: ['Windows', 'Macintosh'],
             devicesWithData: fallbackData.devicesWithData || 0
           })
         }
@@ -171,6 +200,7 @@ function InstallsPageContent() {
       selectedCatalogs.forEach(catalog => params.append('catalogs', catalog))
       selectedRooms.forEach(room => params.append('rooms', room))
       selectedFleets.forEach(fleet => params.append('fleets', fleet))
+      selectedPlatforms.forEach(platform => params.append('platforms', platform))
 
       const response = await fetch(`/api/devices/installs?${params}`)
       
@@ -256,7 +286,7 @@ function InstallsPageContent() {
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 Installs Report {filteredInstalls.length > 0 && `(${filteredInstalls.length})`}
-                {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && installs.length > 0 && (
+                {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && installs.length > 0 && (
                   <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
                     (filtered)
                   </span>
@@ -304,7 +334,7 @@ function InstallsPageContent() {
                   <button
                     onClick={() => {
                       const csvContent = [
-                        ['Device Name', 'Serial Number', 'Install', 'Version', 'Status', 'Source', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
+                        ['Device Name', 'Serial Number', 'Install', 'Version', 'Status', 'Source', 'Platform', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
                         ...filteredInstalls.map(install => [
                           install.deviceName,
                           install.serialNumber,
@@ -312,6 +342,7 @@ function InstallsPageContent() {
                           install.version || '',
                           install.status || '',
                           install.source || '',
+                          getDevicePlatform(install),
                           install.usage || '',
                           install.catalog || '',
                           install.room || '',
@@ -349,13 +380,184 @@ function InstallsPageContent() {
             </div>
           )}
 
+          {/* Overview Cards - Always Visible */}
+          {installs.length > 0 && (
+            <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              
+              {/* Status Overview Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                
+                {/* Total Installs */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-lg">
+                      <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Installs</p>
+                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{installs.length}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Success Count */}
+                <div className="bg-green-50 dark:bg-green-900 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-green-100 dark:bg-green-800 rounded-lg">
+                      <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-green-600 dark:text-green-400">Installed</p>
+                      <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                        {installs.filter(i => i.status === 'installed' || i.status === 'success').length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning Count */}
+                <div className="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-yellow-100 dark:bg-yellow-800 rounded-lg">
+                      <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">Warnings</p>
+                      <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
+                        {installs.filter(i => i.status === 'warning' || i.status === 'pending').length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Error Count */}
+                <div className="bg-red-50 dark:bg-red-900 rounded-lg p-4">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-red-100 dark:bg-red-800 rounded-lg">
+                      <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div className="ml-4">
+                      <p className="text-sm font-medium text-red-600 dark:text-red-400">Errors</p>
+                      <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                        {installs.filter(i => i.status === 'error' || i.status === 'failed').length}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Version Distribution Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                
+                {/* Cimian/Munki Version Distribution */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    📦 Cimian/Munki Version Distribution
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      installs
+                        .filter(install => install.source === 'cimian' || install.source === 'munki')
+                        .reduce((acc: Record<string, number>, install) => {
+                          const version = install.version || 'Unknown'
+                          acc[version] = (acc[version] || 0) + 1
+                          return acc
+                        }, {})
+                    )
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 8)
+                    .map(([version, count]) => {
+                      const percentage = Math.round((count / installs.filter(i => i.source === 'cimian' || i.source === 'munki').length) * 100)
+                      return (
+                        <div key={version} className="flex items-center">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                                {version}
+                              </span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">
+                                {count} ({percentage}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div 
+                                className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {installs.filter(i => i.source === 'cimian' || i.source === 'munki').length === 0 && (
+                      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                        No Cimian/Munki installations found
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Platform Distribution */}
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                    💻 Platform Distribution
+                  </h3>
+                  <div className="space-y-3">
+                    {Object.entries(
+                      installs.reduce((acc: Record<string, number>, install) => {
+                        const platform = getDevicePlatform(install)
+                        acc[platform] = (acc[platform] || 0) + 1
+                        return acc
+                      }, {})
+                    )
+                    .sort(([,a], [,b]) => b - a)
+                    .map(([platform, count]) => {
+                      const percentage = Math.round((count / installs.length) * 100)
+                      return (
+                        <div key={platform} className="flex items-center">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                {platform === 'Macintosh' ? '🍎' : platform === 'Windows' ? '🪟' : '❓'} {platform}
+                              </span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">
+                                {count} ({percentage}%)
+                              </span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-300 ${
+                                  platform === 'Macintosh' ? 'bg-blue-500' : 
+                                  platform === 'Windows' ? 'bg-indigo-500' : 'bg-gray-500'
+                                }`}
+                                style={{ width: `${percentage}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Filter Clouds Section */}
           {!filtersLoading && (
             <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
               <div className="space-y-4">
                 
                 {/* Inventory Filter Sections - Top */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   
                   {/* Usage Filter */}
                   <div>
@@ -433,6 +635,33 @@ function InstallsPageContent() {
                       {(!filterOptions.fleets || filterOptions.fleets.length === 0) && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
                           No fleet data available
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Platform Filter */}
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Platform {selectedPlatforms.length > 0 && `(${selectedPlatforms.length} selected)`}
+                    </h3>
+                    <div className="flex flex-wrap gap-1">
+                      {(filterOptions.platforms || []).map(platform => (
+                        <button
+                          key={platform}
+                          onClick={() => togglePlatform(platform)}
+                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                            selectedPlatforms.includes(platform)
+                              ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-600'
+                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                          }`}
+                        >
+                          {platform === 'Macintosh' ? '🍎' : '🪟'} {platform}
+                        </button>
+                      ))}
+                      {(!filterOptions.platforms || filterOptions.platforms.length === 0) && (
+                        <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
+                          No platform data available
                         </span>
                       )}
                     </div>
@@ -549,7 +778,7 @@ function InstallsPageContent() {
                     Generate Report
                   </button>
                   
-                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && (
+                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && (
                     <button
                       onClick={clearAllFilters}
                       className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors"
@@ -582,6 +811,7 @@ function InstallsPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Source</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Platform</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inventory</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Seen</th>
                   </tr>
@@ -614,6 +844,11 @@ function InstallsPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">{install.source || '-'}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {getDevicePlatform(install) === 'Macintosh' ? '🍎' : '🪟'} {getDevicePlatform(install)}
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
