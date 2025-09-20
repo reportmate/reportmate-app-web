@@ -122,9 +122,17 @@ export default async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.nextUrl.hostname
   
+  // Force correct base URL for callbacks in production
+  const getCorrectUrl = (originalUrl: string): string => {
+    if (process.env.NODE_ENV === 'production') {
+      return originalUrl.replace(/(https?:\/\/)[^\/]+/, 'https://reportmate.ecuad.ca')
+    }
+    return originalUrl
+  }
+  
   // Log all requests for debugging
   console.log('[MIDDLEWARE] Request:', {
-    url: request.url,
+    url: getCorrectUrl(request.url),
     hostname: hostname,
     pathname: pathname,
     nodeEnv: process.env.NODE_ENV
@@ -152,7 +160,7 @@ export default async function middleware(request: NextRequest) {
       const resolvedSerial = await resolveDeviceInMiddleware(deviceIdentifier, request)
       if (resolvedSerial && resolvedSerial !== deviceIdentifier) {
         console.log(`[MIDDLEWARE] Redirecting /device/${deviceIdentifier} → /device/${resolvedSerial}`)
-        const newUrl = new URL(request.url)
+        const newUrl = new URL(getCorrectUrl(request.url))
         newUrl.pathname = `/device/${encodeURIComponent(resolvedSerial)}`
         // Preserve any hash fragments
         if (request.nextUrl.hash) {
@@ -187,16 +195,18 @@ export default async function middleware(request: NextRequest) {
     }
     
     console.log('[MIDDLEWARE] No valid session - redirecting to sign in')
-    const callbackUrl = encodeURIComponent(request.url)
+    const correctUrl = getCorrectUrl(request.url)
+    const callbackUrl = encodeURIComponent(correctUrl)
     return NextResponse.redirect(
-      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, request.url)
+      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, 'https://reportmate.ecuad.ca')
     )
   } catch (error) {
     console.error('[MIDDLEWARE] Error checking session:', error)
     // If there's an error checking the session, redirect to sign in
-    const callbackUrl = encodeURIComponent(request.url)
+    const correctUrl = getCorrectUrl(request.url)
+    const callbackUrl = encodeURIComponent(correctUrl)
     return NextResponse.redirect(
-      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, request.url)
+      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, 'https://reportmate.ecuad.ca')
     )
   }
 }

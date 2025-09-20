@@ -1,68 +1,70 @@
 import NextAuth from "next-auth"
-import { NextRequest, NextResponse } from "next/server"
-import { authOptions } from "@/lib/auth"
+import AzureADProvider from "next-auth/providers/azure-ad"
+import type { NextAuthOptions } from "next-auth"
 
-// Development mode: bypass authentication completely
-const isDevelopment = process.env.NODE_ENV === 'development'
+console.log('[NEXTAUTH ROUTE] Loading NextAuth route handler')
 
-let GET: any, POST: any
-
-if (isDevelopment) {
-  const mockSession = {
-    user: {
-      id: "dev-user",
-      name: "Development User", 
-      email: "dev@localhost",
-      provider: "development"
-    },
-    expires: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-  }
-
-  // Mock handler for development
-  const devHandler = async (req: NextRequest) => {
-    const url = new URL(req.url)
-    const action = url.pathname.split('/').pop()
-    const callbackUrl = url.searchParams.get('callbackUrl')
-    
-    console.log('[DEV AUTH] Mock authentication handler:', action, 'callback:', callbackUrl)
-    
-    // Handle different NextAuth endpoints
-    switch (action) {
-      case 'session':
-        return NextResponse.json(mockSession)
-      case 'signin':
-        // If there's a callback URL, redirect directly to it instead of showing signin page
-        if (callbackUrl) {
-          console.log('[DEV AUTH] Redirecting to callback URL:', callbackUrl)
-          return NextResponse.redirect(new URL(callbackUrl, req.url))
+// Build authOptions at module level but defer provider creation
+const authOptions: NextAuthOptions = {
+  providers: [
+    AzureADProvider({
+      clientId: process.env.AZURE_AD_CLIENT_ID!,
+      clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+      tenantId: process.env.AZURE_AD_TENANT_ID!,
+      authorization: {
+        params: {
+          scope: "openid profile email",
+          redirect_uri: "https://reportmate.ecuad.ca/api/auth/callback/azure-ad"
         }
-        return NextResponse.json({ url: '/' })
-      case 'signout':
-        return NextResponse.json({ url: '/' })
-      case 'providers':
-        return NextResponse.json({})
-      case 'csrf':
-        return NextResponse.json({ csrfToken: 'dev-csrf-token' })
-      case 'azure-ad':
-        // For Azure AD signin, redirect directly to callback or home
-        if (callbackUrl) {
-          console.log('[DEV AUTH] Azure AD signin - redirecting to:', callbackUrl)
-          return NextResponse.redirect(new URL(callbackUrl, req.url))
+      },
+      profile(profile) {
+        return {
+          id: profile.sub,
+          name: profile.name,
+          email: profile.email || profile.preferred_username,
+          image: profile.picture,
         }
-        return NextResponse.redirect(new URL('/', req.url))
-      default:
-        return NextResponse.json(mockSession)
+      }
+    })
+  ],
+  pages: {
+    signIn: '/auth/signin',
+    error: '/auth/error'
+  },
+  session: {
+    strategy: 'jwt' as const,
+    maxAge: 24 * 60 * 60, // 24 hours
+  },
+  useSecureCookies: true,
+  callbacks: {
+    async redirect({ url, baseUrl }) {
+      const correctBaseUrl = 'https://reportmate.ecuad.ca'
+      console.log(`[NEXTAUTH] Redirect - URL: ${url}, baseUrl: ${baseUrl}, forcing: ${correctBaseUrl}`)
+      
+      if (url.startsWith("/")) {
+        return `${correctBaseUrl}${url}`
+      }
+      
+      if (url.includes('0.0.0.0:3000') || url.includes('localhost:3000')) {
+        return url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
+      }
+      
+      try {
+        const urlObj = new URL(url)
+        if (urlObj.origin !== correctBaseUrl) {
+          urlObj.hostname = 'reportmate.ecuad.ca'
+          urlObj.protocol = 'https:'
+          urlObj.port = ''
+          return urlObj.toString()
+        }
+        return url
+      } catch (e) {
+        return correctBaseUrl
+      }
     }
   }
-
-  GET = devHandler
-  POST = devHandler
-} else {
-  // Production: use proper NextAuth
-  console.log('NextAuth configured for production with Azure AD')
-  const handler = NextAuth(authOptions)
-  GET = handler
-  POST = handler
 }
 
-export { GET, POST }
+const handler = NextAuth(authOptions)
+
+export { handler as GET, handler as POST }

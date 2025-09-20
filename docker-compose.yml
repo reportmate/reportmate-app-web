@@ -18,7 +18,7 @@ services:
       - DATABASE_URL=${DATABASE_URL:-postgresql://reportmate:${DB_PASSWORD:-reportmate123}@postgres:5432/reportmate}
       - NEXT_PUBLIC_WPS_URL=${NEXT_PUBLIC_WPS_URL:-wss://reportmate-signalr.webpubsub.azure.com/client/hubs/fleet}
       - NEXT_PUBLIC_ENABLE_SIGNALR=${NEXT_PUBLIC_ENABLE_SIGNALR:-true}
-      - API_BASE_URL=${API_BASE_URL:-https://reportmate-api.azurewebsites.net}
+      - API_BASE_URL=${API_BASE_URL:-https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io}
       - WPS_CONNECTION_STRING=${WPS_CONNECTION_STRING:-}
     depends_on:
       - postgres

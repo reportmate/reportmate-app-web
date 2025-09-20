@@ -11,6 +11,11 @@ export default {
   // Enable standalone output for Docker
   output: 'standalone',
   
+  // Set hostname for custom domain support
+  env: {
+    HOSTNAME: '0.0.0.0',
+  },
+  
   // Set explicit output file tracing root - conditional for Docker
   ...(process.env.DOCKER_BUILD ? {} : {
     outputFileTracingRoot: "C:\\Users\\rchristiansen\\DevOps\\ReportMate",
