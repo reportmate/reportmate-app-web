@@ -9,7 +9,7 @@ export async function GET() {
     console.log(`[NETWORK API] ${timestamp} - Fetching network data from Azure Functions`)
     
     // Fetch from Azure Functions API - use dedicated network endpoint
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://reportmate-api.azurewebsites.net'
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
     
     const response = await fetch(`${apiBaseUrl}/api/network`, {
       headers: {

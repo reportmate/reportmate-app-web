@@ -63,7 +63,7 @@ export async function GET(request: Request) {
           console.log(`[INSTALLS PROGRESS API] ${timestamp} - Starting installs fetch with progress updates`);
           
           // Fetch all devices first
-          const apiResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices', {
+          const apiResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/devices', {
             cache: 'no-store',
             headers: {
               'Cache-Control': 'no-cache',
@@ -152,7 +152,7 @@ export async function GET(request: Request) {
               }
 
               try {
-                const deviceApiResponse = await fetch(`https://reportmate-api.azurewebsites.net/api/device/${encodeURIComponent(serialNumber)}`, {
+                const deviceApiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(serialNumber)}`, {
                   cache: 'no-store',
                   headers: {
                     'Cache-Control': 'no-cache',

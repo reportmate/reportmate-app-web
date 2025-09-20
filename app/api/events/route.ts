@@ -37,7 +37,7 @@ interface NormalizedEvent {
   payload: Record<string, unknown>
 }
 
-const AZURE_FUNCTIONS_BASE_URL = process.env.AZURE_FUNCTIONS_BASE_URL || 'https://reportmate-api.azurewebsites.net';
+const AZURE_FUNCTIONS_BASE_URL = process.env.AZURE_FUNCTIONS_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io';
 
 // Function to get device names for events enrichment
 async function getDeviceNames(): Promise<Map<string, string>> {

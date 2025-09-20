@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
 
       // Fetch device data from Azure Functions device endpoint
-      const apiResponse = await fetch(`https://reportmate-api.azurewebsites.net/api/device/${encodeURIComponent(deviceId)}`, {
+      const apiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -62,7 +62,7 @@ export async function GET(request: Request) {
     console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for all devices`);
     
     // Fetch all devices from Azure Functions
-    const apiResponse = await fetch('https://reportmate-api.azurewebsites.net/api/devices', {
+    const apiResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/devices', {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
@@ -131,7 +131,7 @@ export async function GET(request: Request) {
         try {
           // Use the same Azure Functions endpoint that works for single device installs
           // CRITICAL: Use serialNumber (not deviceId) as that's what works for /api/device/{serialNumber}
-          const deviceApiResponse = await fetch(`https://reportmate-api.azurewebsites.net/api/device/${encodeURIComponent(serialNumber)}`, {
+          const deviceApiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(serialNumber)}`, {
             cache: 'no-store',
             headers: {
               'Cache-Control': 'no-cache',

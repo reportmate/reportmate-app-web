@@ -18,8 +18,8 @@ interface AuthConfig {
   allowedDomains?: string[]
 }
 
-// Get auth configuration from environment or defaults
-const getAuthConfig = (): AuthConfig => ({
+// Get auth configuration from environment or defaults (server-side only)
+export const getAuthConfig = (): AuthConfig => ({
   providers: (process.env.AUTH_PROVIDERS || 'azure-ad').split(','),
   defaultProvider: process.env.DEFAULT_AUTH_PROVIDER || AUTH_PROVIDERS.AZURE_AD,
   requireEmailVerification: process.env.REQUIRE_EMAIL_VERIFICATION === 'true',
@@ -35,19 +35,38 @@ const isAllowedDomain = (email: string, allowedDomains: string[]): boolean => {
 
 // Build providers array based on configuration
 const buildProviders = () => {
+  console.log('[AUTH] Building providers...')
   const config = getAuthConfig()
   const providers = []
 
+  console.log('[AUTH] Config:', config)
+  console.log('[AUTH] Azure AD Client ID:', process.env.AZURE_AD_CLIENT_ID ? 'SET' : 'MISSING')
+  console.log('[AUTH] Azure AD Client Secret:', process.env.AZURE_AD_CLIENT_SECRET ? 'SET' : 'MISSING') 
+  console.log('[AUTH] Azure AD Tenant ID:', process.env.AZURE_AD_TENANT_ID ? 'SET' : 'MISSING')
+  console.log('[AUTH] NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
+  console.log('[AUTH] NODE_ENV:', process.env.NODE_ENV)
+
   // Azure AD / Entra ID Provider
   if (config.providers.includes(AUTH_PROVIDERS.AZURE_AD)) {
+    const clientId = process.env.AZURE_AD_CLIENT_ID
+    const clientSecret = process.env.AZURE_AD_CLIENT_SECRET
+    const tenantId = process.env.AZURE_AD_TENANT_ID
+
+    if (!clientId || !clientSecret || !tenantId) {
+      console.error('[AUTH] Missing required Azure AD environment variables')
+      throw new Error('Missing required Azure AD environment variables')
+    }
+
+    console.log('[AUTH] Adding Azure AD provider')
     providers.push(
       AzureADProvider({
-        clientId: process.env.AZURE_AD_CLIENT_ID!,
-        clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
-        tenantId: process.env.AZURE_AD_TENANT_ID!,
+        clientId: clientId,
+        clientSecret: clientSecret, 
+        tenantId: tenantId,
         authorization: {
           params: {
-            scope: process.env.AZURE_AD_SCOPE || "openid profile email"
+            scope: process.env.AZURE_AD_SCOPE || "openid profile email User.Read",
+            redirect_uri: `${process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL}/api/auth/callback/azure-ad`
           }
         },
         profile(profile) {
@@ -117,6 +136,8 @@ const buildProviders = () => {
   return providers
 }
 
+console.log('[AUTH] Creating authOptions...')
+
 export const authOptions: NextAuthOptions = {
   providers: buildProviders(),
   
@@ -130,8 +151,23 @@ export const authOptions: NextAuthOptions = {
     maxAge: 24 * 60 * 60, // 24 hours
   },
 
+  // Force the correct base URL for all auth operations
+  useSecureCookies: process.env.NODE_ENV === 'production',
+
   callbacks: {
     async signIn({ user, account, profile }) {
+      console.log('[AUTH] Sign in callback:', { 
+        userEmail: user?.email,
+        provider: account?.provider,
+        error: account?.error,
+        accountType: account?.type 
+      })
+      
+      if (account?.error) {
+        console.error('[AUTH] OAuth account error:', account.error)
+        return false
+      }
+
       const config = getAuthConfig()
       
       // Check allowed domains if configured
@@ -147,6 +183,7 @@ export const authOptions: NextAuthOptions = {
         return (profile as any)?.email_verified === true
       }
 
+      console.log('[AUTH] Sign in successful for:', user.email)
       return true
     },
 
@@ -180,50 +217,56 @@ export const authOptions: NextAuthOptions = {
     },
 
     async redirect({ url, baseUrl }) {
-      // Allows relative callback URLs
-      if (url.startsWith("/")) return `${baseUrl}${url}`
-      // Allows callback URLs on the same origin
-      else if (new URL(url).origin === baseUrl) return url
-      return baseUrl
+      // Get the correct base URL from environment variables
+      const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || baseUrl
+      
+      console.log(`[NextAuth Redirect] Detected baseUrl: ${baseUrl}, URL param: ${url}`)
+      console.log(`[NextAuth Redirect] Using configured baseUrl: ${correctBaseUrl}`)
+      
+      // Always use the configured base URL
+      if (url.startsWith("/")) {
+        const redirectUrl = `${correctBaseUrl}${url}`
+        console.log(`[NextAuth Redirect] Relative URL redirect: ${redirectUrl}`)
+        return redirectUrl
+      }
+      
+      // Replace any incorrect base URL with the correct one
+      if (url.includes('0.0.0.0:3000') || url.includes('localhost:3000')) {
+        const correctedUrl = url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
+        console.log(`[NextAuth Redirect] Corrected URL from ${url} to ${correctedUrl}`)
+        return correctedUrl
+      }
+      
+      // For absolute URLs, ensure they use the correct origin
+      try {
+        const urlObj = new URL(url)
+        const correctBaseUrlObj = new URL(correctBaseUrl)
+        if (urlObj.origin !== correctBaseUrlObj.origin) {
+          urlObj.hostname = correctBaseUrlObj.hostname
+          urlObj.protocol = correctBaseUrlObj.protocol
+          urlObj.port = correctBaseUrlObj.port || ''
+          const correctedUrl = urlObj.toString()
+          console.log(`[NextAuth Redirect] Origin corrected from ${url} to ${correctedUrl}`)
+          return correctedUrl
+        }
+        return url
+      } catch (e) {
+        console.log(`[NextAuth Redirect] Invalid URL ${url}, redirecting to ${correctBaseUrl}`)
+        return correctBaseUrl
+      }
     }
   },
 
   events: {
     async signIn({ user, account, profile }) {
-      console.log(`User signed in: ${user.email} via ${account?.provider}`)
+      console.log(`[AUTH] User signed in: ${user.email} via ${account?.provider}`)
     },
     
     async signOut({ session }) {
-      console.log(`User signed out: ${session?.user?.email}`)
+      console.log(`[AUTH] User signed out: ${session?.user?.email}`)
     }
   },
 
-  debug: process.env.NODE_ENV === 'development'
+  debug: true, // Enable debug logging in all environments
 }
 
-// Helper function to get available providers for UI
-export const getAvailableProviders = () => {
-  const config = getAuthConfig()
-  return config.providers.map(provider => ({
-    id: provider,
-    name: getProviderDisplayName(provider),
-    enabled: true
-  }))
-}
-
-// Helper function to get provider display names
-export const getProviderDisplayName = (provider: string): string => {
-  switch (provider) {
-    case AUTH_PROVIDERS.AZURE_AD:
-      return 'Microsoft Entra ID'
-    case AUTH_PROVIDERS.GOOGLE:
-      return 'Google'
-    case AUTH_PROVIDERS.CREDENTIALS:
-      return 'Email & Password'
-    default:
-      return provider
-  }
-}
-
-// Export auth configuration for use in other parts of the app
-export const authConfig = getAuthConfig()

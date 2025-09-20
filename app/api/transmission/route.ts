@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 // Production API base URL (single source of truth)
-const PRODUCTION_API_BASE = process.env.API_BASE_URL || 'https://reportmate-api.azurewebsites.net';
+const PRODUCTION_API_BASE = process.env.API_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io';
 
 export async function GET() {
     return NextResponse.json({ 
