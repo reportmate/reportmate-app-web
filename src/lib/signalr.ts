@@ -28,7 +28,7 @@ export function useLiveEvents() {
         setConnectionStatus("connecting")
         
         // Get connection info from negotiate endpoint
-        const negotiateResponse = await fetch('https://reportmate-api.azurewebsites.net/api/negotiate')
+        const negotiateResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/negotiate')
         if (!negotiateResponse.ok) {
           throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
         }
