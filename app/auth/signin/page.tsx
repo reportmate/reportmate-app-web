@@ -131,31 +131,10 @@ function SignInContent() {
               Welcome to ReportMate
             </h1>
             <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
-              Fleet Management Dashboard
+              Fleet Live Reporting Dashboard
             </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Sign in to access your device inventory and monitoring dashboard
-            </p>
           </div>
         </div>
-
-        {error && (
-          <div className="rounded-md bg-red-50 dark:bg-red-900/20 p-4 border dark:border-red-800">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400 dark:text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800 dark:text-red-400">Authentication Error</h3>
-                <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                  <p>{getErrorMessage(error)}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="mt-8 space-y-4">
           {providers && Object.values(providers)
@@ -217,20 +196,6 @@ function SignInContent() {
           )}
         </div>
 
-        <div className="mt-8">
-          <div className="text-center text-xs text-gray-500 dark:text-gray-400">
-            <p>
-              By signing in, you agree to our{' '}
-              <a href="/terms" className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline">
-                Terms of Service
-              </a>{' '}
-              and{' '}
-              <a href="/privacy" className="text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 underline">
-                Privacy Policy
-              </a>
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   )
