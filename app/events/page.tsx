@@ -145,11 +145,27 @@ function EventsPageContent() {
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
+  const [inventoryMap, setInventoryMap] = useState<Record<string, { deviceName: string; serialNumber: string; assetTag?: string }>>({})
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
+  const [totalEvents, setTotalEvents] = useState(0)
+  
+  // Date range state (default to last 48 hours)
+  const [startDate, setStartDate] = useState(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 2) // 48 hours ago (2 days)
+    return date.toISOString().split('T')[0] // YYYY-MM-DD format
+  })
+  const [endDate, setEndDate] = useState(() => {
+    return new Date().toISOString().split('T')[0] // Today
+  })
+  
+  // Filter counts from API (show total counts regardless of current page)
+  // REMOVED: No longer displaying counts in filter buttons
+  
   const searchParams = useSearchParams()
   
-  const EVENTS_PER_PAGE = 10
+  const EVENTS_PER_PAGE = 100  // 100 events per page for /events page
   
   // Valid event categories - filter out everything else
   const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
@@ -195,16 +211,26 @@ function EventsPageContent() {
           // Handle both response formats: direct array or {success: true, devices: [...]}
           const devices = Array.isArray(data) ? data : (data.devices || [])
           
-          // Build device name mapping (serial -> name)
+          // Build device name mapping (serial -> name) and inventory mapping
           const nameMap: Record<string, string> = {}
+          const inventoryMap: Record<string, { deviceName: string; serialNumber: string; assetTag?: string }> = {}
+          
           devices.forEach((device: any) => {
             if (device.serialNumber) {
               // Use inventory deviceName if available, otherwise fall back to name or serialNumber
               const deviceName = device.modules?.inventory?.deviceName || device.serialNumber
               nameMap[device.serialNumber as string] = deviceName as string
+              
+              // Build inventory data mapping
+              inventoryMap[device.serialNumber as string] = {
+                deviceName: deviceName as string,
+                serialNumber: device.serialNumber as string,
+                assetTag: device.modules?.inventory?.assetTag || undefined
+              }
             }
           })
           setDeviceNameMap(nameMap)
+          setInventoryMap(inventoryMap)
         }
       } catch (error) {
         console.error('Failed to fetch device names:', error)
@@ -218,9 +244,35 @@ function EventsPageContent() {
   useEffect(() => {
     const fetchEvents = async () => {
       try {
-        console.log('[EVENTS PAGE] Fetching events...')
-        // Use Next.js API route
-        const response = await fetch('/api/events')
+        setLoading(true)
+        console.log('[EVENTS PAGE] Fetching events with pagination and date range...', { 
+          currentPage, 
+          EVENTS_PER_PAGE, 
+          startDate, 
+          endDate 
+        })
+        
+        // Calculate offset for API pagination
+        const offset = (currentPage - 1) * EVENTS_PER_PAGE
+        
+        // Build query parameters
+        const queryParams = new URLSearchParams()
+        queryParams.append('limit', EVENTS_PER_PAGE.toString())
+        queryParams.append('offset', offset.toString())
+        if (startDate) {
+          // Convert YYYY-MM-DD to ISO string with start of day
+          const startDateTime = new Date(startDate + 'T00:00:00.000Z').toISOString()
+          queryParams.append('startDate', startDateTime)
+        }
+        if (endDate) {
+          // Convert YYYY-MM-DD to ISO string with end of day
+          const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString()
+          queryParams.append('endDate', endDateTime)
+        }
+        
+        // Use Next.js API route with pagination and date filtering parameters
+        const apiUrl = `/api/events?${queryParams.toString()}`
+        const response = await fetch(apiUrl)
         if (!response.ok) {
           throw new Error('Failed to fetch events')
         }
@@ -237,8 +289,24 @@ function EventsPageContent() {
           const filteredEvents = data.events.filter((event: Event) => 
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           )
-          // Filtered events processed
+          
           setEvents(filteredEvents)
+          
+          // Set API filter counts (total counts for the date range, not just current page)
+          // REMOVED: No longer displaying counts in filter buttons
+          
+          // Set total events count for pagination (if provided by API)
+          if (data.totalEvents) {
+            setTotalEvents(data.totalEvents)
+          } else {
+            // If we get less than requested, we've reached the end
+            if (filteredEvents.length < EVENTS_PER_PAGE) {
+              setTotalEvents(offset + filteredEvents.length)
+            } else {
+              // Estimate total (this will be corrected when we reach the end)
+              setTotalEvents(Math.max(totalEvents, offset + EVENTS_PER_PAGE + 1))
+            }
+          }
         } else {
           console.error('[EVENTS PAGE] Invalid events data received:', data)
           setError('Invalid events data received from API')
@@ -252,9 +320,9 @@ function EventsPageContent() {
     }
 
     fetchEvents()
-  }, [])
+  }, [currentPage, EVENTS_PER_PAGE, startDate, endDate]) // Re-fetch when page or date range changes
 
-  // Filter events based on selected type and search query
+  // Filter events based on selected type and search query (client-side)
   const filteredEvents = bundledEvents.filter(event => {
     // Filter by type first
     const typeMatch = filterType === 'all' || (event.bundledKinds || []).some(kind => kind.toLowerCase() === filterType.toLowerCase())
@@ -276,16 +344,21 @@ function EventsPageContent() {
     return typeMatch && searchMatch
   })
 
-  // Reset to page 1 when filter or search changes
+  // Reset to page 1 when filter or search changes, but NOT when page changes
   useEffect(() => {
     setCurrentPage(1)
   }, [filterType, searchQuery])
 
-  // Calculate pagination
+  // Calculate pagination for filtered events (client-side pagination on current page)
   const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
-  const startIndex = (currentPage - 1) * EVENTS_PER_PAGE
-  const endIndex = startIndex + EVENTS_PER_PAGE
-  const currentEvents = filteredEvents.slice(startIndex, endIndex)
+  const startIndex = 0 // Always show from start since we're paginating server-side
+  const endIndex = filteredEvents.length
+  const currentEvents = filteredEvents // Show all filtered events from current server page
+
+  // Calculate actual total pages based on total events and whether we're filtering
+  const actualTotalPages = searchQuery.trim() || filterType !== 'all' 
+    ? totalPages // Use client-side calculation when filtering
+    : Math.ceil(totalEvents / EVENTS_PER_PAGE) // Use server-side total when not filtering
 
   // Helper function to format full payload for display
   const formatFullPayload = (payload: any): string => {
@@ -544,18 +617,8 @@ function EventsPageContent() {
     }
   }
 
-  const getFilterCounts = () => {
-    return {
-      all: bundledEvents.length,
-      success: bundledEvents.filter(e => (e.bundledKinds || []).includes('success')).length,
-      warning: bundledEvents.filter(e => (e.bundledKinds || []).includes('warning')).length,
-      error: bundledEvents.filter(e => (e.bundledKinds || []).includes('error')).length,
-      info: bundledEvents.filter(e => (e.bundledKinds || []).includes('info')).length,
-      system: bundledEvents.filter(e => (e.bundledKinds || []).includes('system')).length,
-    }
-  }
-
-  const filterCounts = getFilterCounts()
+  // Use API filter counts (total counts for the entire date range, not just current page)
+  // REMOVED: No longer displaying counts - filters now work without count display
 
   if (loading) {
     return <EventsPageSkeleton />
@@ -671,6 +734,33 @@ function EventsPageContent() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
+                  {/* Date Range Picker */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <label className="text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
+                      Date Range:
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value)
+                          setCurrentPage(1) // Reset to first page when date changes
+                        }}
+                        className="block text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                      <span className="text-gray-400">to</span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value)
+                          setCurrentPage(1) // Reset to first page when date changes
+                        }}
+                        className="block text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
                   {/* Search Input */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -707,20 +797,19 @@ function EventsPageContent() {
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
-                            { key: 'all', label: 'All', count: filterCounts.all },
-                            { key: 'success', label: 'Success', count: filterCounts.success },
-                            { key: 'warning', label: 'Warnings', count: filterCounts.warning },
-                            { key: 'error', label: 'Errors', count: filterCounts.error },
-                            { key: 'info', label: 'Info', count: filterCounts.info },
-                            { key: 'system', label: 'System', count: filterCounts.system },
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'info', label: 'Info' },
+                            { key: 'system', label: 'System' },
                           ].map((filter) => {
                             const isActive = filterType === filter.key
-                            const statusConfig = filter.key !== 'all' ? getStatusConfig(filter.key) : null
+                            const statusConfig = getStatusConfig(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(filter.key)}
+                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -733,14 +822,7 @@ function EventsPageContent() {
                                   </div>
                                 )}
                                 <span className="hidden md:inline">{filter.label}</span>
-                                <span className="md:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
-                                <span className={`${
-                                  isActive 
-                                    ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                                } inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ml-1`}>
-                                  {filter.count}
-                                </span>
+                                <span className="md:hidden">{filter.label.split(' ')[0]}</span>
                               </button>
                             )
                           })}
@@ -754,15 +836,15 @@ function EventsPageContent() {
                               className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
                             >
                               {[
-                                { key: 'all', label: 'All', count: filterCounts.all },
-                                { key: 'success', label: 'Success Events', count: filterCounts.success },
-                                { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
-                                { key: 'error', label: 'Error Events', count: filterCounts.error },
-                                { key: 'info', label: 'Info Events', count: filterCounts.info },
-                                { key: 'system', label: 'System Events', count: filterCounts.system },
+                                { key: 'all', label: 'All Events' },
+                                { key: 'success', label: 'Success Events' },
+                                { key: 'warning', label: 'Warning Events' },
+                                { key: 'error', label: 'Error Events' },
+                                { key: 'info', label: 'Info Events' },
+                                { key: 'system', label: 'System Events' },
                               ].map((filter) => (
                                 <option key={filter.key} value={filter.key}>
-                                  {filter.label} ({filter.count})
+                                  {filter.label}
                                 </option>
                               ))}
                             </select>
@@ -780,7 +862,7 @@ function EventsPageContent() {
                       <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="w-20 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="w-16 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         ID
                       </th>
                       <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -829,18 +911,31 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
-                              <span className="text-sm text-gray-900 dark:text-gray-100 font-mono">
+                              <span 
+                                className="text-sm text-gray-900 dark:text-gray-100 font-mono truncate block max-w-16" 
+                                title={`#${event.id}`}
+                              >
                                 #{event.id}
                               </span>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
-                              <Link
-                                href={`/device/${encodeURIComponent(event.device)}#events`}
-                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                                title={deviceNameMap[event.device] || event.device}
-                              >
-                                {deviceNameMap[event.device] || event.device}
-                              </Link>
+                              <div>
+                                <Link
+                                  href={`/device/${encodeURIComponent(event.device)}#events`}
+                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                  title={inventoryMap[event.device]?.deviceName || event.device}
+                                >
+                                  {inventoryMap[event.device]?.deviceName || event.device}
+                                </Link>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {event.device}
+                                  {inventoryMap[event.device]?.assetTag && (
+                                    <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                      {inventoryMap[event.device].assetTag}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-6 py-4 overflow-hidden">
                               <div className="text-sm text-gray-900 dark:text-white truncate">
@@ -979,6 +1074,33 @@ function EventsPageContent() {
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  {/* Date Range Picker */}
+                  <div className="flex items-center gap-2 text-xs">
+                    <label className="text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
+                      Date:
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="block text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-400 text-xs">to</span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="block text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
                   {/* Search Input */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1015,20 +1137,19 @@ function EventsPageContent() {
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
-                            { key: 'all', label: 'All', count: filterCounts.all },
-                            { key: 'success', label: 'Success', count: filterCounts.success },
-                            { key: 'warning', label: 'Warnings', count: filterCounts.warning },
-                            { key: 'error', label: 'Errors', count: filterCounts.error },
-                            { key: 'info', label: 'Info', count: filterCounts.info },
-                            { key: 'system', label: 'System', count: filterCounts.system },
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'info', label: 'Info' },
+                            { key: 'system', label: 'System' },
                           ].map((filter) => {
                             const isActive = filterType === filter.key
-                            const statusConfig = filter.key !== 'all' ? getStatusConfig(filter.key) : null
+                            const statusConfig = getStatusConfig(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(filter.key)}
+                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1041,14 +1162,7 @@ function EventsPageContent() {
                                   </div>
                                 )}
                                 <span className="hidden lg:inline">{filter.label}</span>
-                                <span className="lg:hidden">{filter.key === 'all' ? 'All' : filter.label.split(' ')[0]}</span>
-                                <span className={`${
-                                  isActive 
-                                    ? 'bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200'
-                                    : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                                } inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-medium ml-1`}>
-                                  {filter.count}
-                                </span>
+                                <span className="lg:hidden">{filter.label.split(' ')[0]}</span>
                               </button>
                             )
                           })}
@@ -1062,15 +1176,15 @@ function EventsPageContent() {
                               className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
                             >
                               {[
-                                { key: 'all', label: 'All', count: filterCounts.all },
-                                { key: 'success', label: 'Success Events', count: filterCounts.success },
-                                { key: 'warning', label: 'Warning Events', count: filterCounts.warning },
-                                { key: 'error', label: 'Error Events', count: filterCounts.error },
-                                { key: 'info', label: 'Info Events', count: filterCounts.info },
-                                { key: 'system', label: 'System Events', count: filterCounts.system },
+                                { key: 'all', label: 'All Events' },
+                                { key: 'success', label: 'Success Events' },
+                                { key: 'warning', label: 'Warning Events' },
+                                { key: 'error', label: 'Error Events' },
+                                { key: 'info', label: 'Info Events' },
+                                { key: 'system', label: 'System Events' },
                               ].map((filter) => (
                                 <option key={filter.key} value={filter.key}>
-                                  {filter.label} ({filter.count})
+                                  {filter.label}
                                 </option>
                               ))}
                             </select>
@@ -1142,13 +1256,23 @@ function EventsPageContent() {
                               </span>
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
-                              <Link
-                                href={`/device/${encodeURIComponent(event.device)}#events`}
-                                className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors"
-                                title={deviceNameMap[event.device] || event.device}
-                              >
-                                {deviceNameMap[event.device] || event.device}
-                              </Link>
+                              <div>
+                                <Link
+                                  href={`/device/${encodeURIComponent(event.device)}#events`}
+                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block"
+                                  title={inventoryMap[event.device]?.deviceName || event.device}
+                                >
+                                  {inventoryMap[event.device]?.deviceName || event.device}
+                                </Link>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                  {event.device}
+                                  {inventoryMap[event.device]?.assetTag && (
+                                    <span className="ml-1 px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                                      {inventoryMap[event.device].assetTag}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </td>
                             <td className="px-4 py-3 max-w-xs">
                               <div className="text-sm text-gray-900 dark:text-white truncate">
@@ -1248,6 +1372,33 @@ function EventsPageContent() {
                       Real-time activity from all fleet devices
                     </p>
                   </div>
+                  {/* Date Range Picker */}
+                  <div className="flex flex-col gap-2">
+                    <label className="text-sm text-gray-600 dark:text-gray-400 font-medium">
+                      Date Range
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => {
+                          setStartDate(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-400 text-sm">to</span>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => {
+                          setEndDate(e.target.value)
+                          setCurrentPage(1)
+                        }}
+                        className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
                   {/* Search Input */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -1311,12 +1462,22 @@ function EventsPageContent() {
                     {/* Device */}
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</div>
-                      <Link
-                        href={`/device/${encodeURIComponent(event.device)}#events`}
-                        className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm"
-                      >
-                        {deviceNameMap[event.device] || event.device}
-                      </Link>
+                      <div>
+                        <Link
+                          href={`/device/${encodeURIComponent(event.device)}#events`}
+                          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
+                        >
+                          {inventoryMap[event.device]?.deviceName || event.device}
+                        </Link>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                          {event.device}
+                          {inventoryMap[event.device]?.assetTag && (
+                            <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
+                              {inventoryMap[event.device].assetTag}
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Message */}
@@ -1393,7 +1554,7 @@ function EventsPageContent() {
             </div>
 
             {/* Pagination */}
-            {totalPages > 1 && (
+            {actualTotalPages > 1 && (
               <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-l border-r border-b border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-xl shadow-sm">
                 <div className="flex-1 flex justify-between sm:hidden">
                   <button
@@ -1404,8 +1565,8 @@ function EventsPageContent() {
                     Previous
                   </button>
                   <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, actualTotalPages))}
+                    disabled={currentPage === actualTotalPages}
                     className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Next
@@ -1414,9 +1575,13 @@ function EventsPageContent() {
                 <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                   <div>
                     <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                      <span className="font-medium">{Math.min(endIndex, filteredEvents.length)}</span> of{' '}
-                      <span className="font-medium">{filteredEvents.length}</span> results
+                      Showing page <span className="font-medium">{currentPage}</span> of{' '}
+                      <span className="font-medium">{actualTotalPages}</span> 
+                      {searchQuery.trim() || filterType !== 'all' ? (
+                        <span className="ml-1 text-gray-500">({filteredEvents.length} filtered events)</span>
+                      ) : (
+                        <span className="ml-1 text-gray-500">({totalEvents.toLocaleString()} total events)</span>
+                      )}
                     </p>
                   </div>
                   <div>
@@ -1433,10 +1598,10 @@ function EventsPageContent() {
                       </button>
                       
                       {/* Page numbers */}
-                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      {Array.from({ length: actualTotalPages }, (_, i) => i + 1)
                         .filter(page => {
                           // Show first page, last page, current page, and 2 pages before/after current
-                          return page === 1 || page === totalPages || Math.abs(page - currentPage) <= 2
+                          return page === 1 || page === actualTotalPages || Math.abs(page - currentPage) <= 2
                         })
                         .map((page, index, array) => (
                           <React.Fragment key={page}>
@@ -1460,8 +1625,8 @@ function EventsPageContent() {
                         ))}
                       
                       <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, actualTotalPages))}
+                        disabled={currentPage === actualTotalPages}
                         className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <span className="sr-only">Next</span>
