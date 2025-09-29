@@ -21,6 +21,16 @@ function SignInContent() {
   const error = searchParams.get('error')
 
   useEffect(() => {
+    // Clear any error parameters from the URL to prevent error display
+    if (error) {
+      console.log('[SIGNIN] Clearing error parameter:', error)
+      const url = new URL(window.location.href)
+      url.searchParams.delete('error')
+      window.history.replaceState({}, '', url.toString())
+    }
+  }, [error])
+
+  useEffect(() => {
     (async () => {
       // Check if user is already signed in
       const session = await getSession()
@@ -40,9 +50,14 @@ function SignInContent() {
     setSigningIn(providerId)
     
     try {
+      // Clear any existing errors before signing in
+      const url = new URL(window.location.href)
+      url.searchParams.delete('error')
+      window.history.replaceState({}, '', url.toString())
+      
       await signIn(providerId, { 
         callbackUrl,
-        redirect: false 
+        redirect: true // Changed to true to ensure proper redirect
       })
     } catch (error) {
       console.error('Sign in error:', error)
@@ -111,6 +126,9 @@ function SignInContent() {
       </div>
     )
   }
+
+  // Explicitly log that we're not showing any errors
+  console.log('[SIGNIN] Rendering signin page - no error display logic active')
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">

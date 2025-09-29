@@ -140,73 +140,93 @@ function shouldIncludeApplication(appName: string): boolean {
   return !excludePatterns.some(pattern => pattern.test(trimmed))
 }
 
+// Container Apps API configuration
+const CONTAINER_APPS_API_BASE = process.env.CONTAINER_APPS_API_BASE || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching filter options`)
+    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching filter options from Container Apps API`)
 
-    // Get database connection
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Pool } = require('pg')
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-    let poolClosed = false
+    // Fetch all devices from Container Apps API
+    const devicesResponse = await fetch(`${CONTAINER_APPS_API_BASE}/api/devices`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
 
-    try {
-      // Get devices with basic info for device filters
-      const devicesQuery = `
-        SELECT DISTINCT 
-          d.serial_number,
-          d.device_id,
-          inv.data->>'deviceName' as device_name,
-          inv.data->>'computerName' as computer_name,
-          inv.data->>'usage' as usage,
-          inv.data->>'catalog' as catalog,
-          inv.data->>'location' as location
-        FROM devices d
-        LEFT JOIN inventory inv ON d.id = inv.device_id
-        WHERE d.serial_number IS NOT NULL
-          AND d.serial_number NOT LIKE 'TEST-%'
-          AND d.serial_number != 'localhost'
-        ORDER BY d.serial_number
-      `
+    if (!devicesResponse.ok) {
+      console.error('[APPLICATIONS FILTERS API] Container Apps API devices request failed:', devicesResponse.status, devicesResponse.statusText)
+      throw new Error(`Container Apps API request failed: ${devicesResponse.status}`)
+    }
 
-      const devicesResult = await pool.query(devicesQuery)
-      
-      // Get application names, publishers, categories from existing applications
-      const appsQuery = `
-        SELECT DISTINCT 
-          a.data as applications_data
-        FROM applications a
-        INNER JOIN devices d ON a.device_id = d.id
-        WHERE d.serial_number IS NOT NULL
-          AND d.serial_number NOT LIKE 'TEST-%'
-          AND d.serial_number != 'localhost'
-          AND a.data IS NOT NULL
-        LIMIT 1000  -- Increased limit to get better normalization results
-      `
+    const devicesData = await devicesResponse.json()
+    
+    if (!devicesData.success || !Array.isArray(devicesData.devices)) {
+      console.error('[APPLICATIONS FILTERS API] Invalid Container Apps API response:', devicesData)
+      throw new Error('Invalid Container Apps API response format')
+    }
 
-      const appsResult = await pool.query(appsQuery)
-      
-      // Extract unique application names, publishers, categories
-      const applicationNames = new Set<string>()
-      const normalizedAppNames = new Set<string>()
-      const publishers = new Set<string>()
-      const categories = new Set<string>()
-      
-      for (const row of appsResult.rows) {
-        try {
-          const applicationsData = row.applications_data
-          
-          let installedApps: any[] = []
-          if (applicationsData.installedApplications) {
-            installedApps = applicationsData.installedApplications
-          } else if (applicationsData.InstalledApplications) {
-            installedApps = applicationsData.InstalledApplications
-          } else if (applicationsData.installed_applications) {
-            installedApps = applicationsData.installed_applications
+    console.log(`[APPLICATIONS FILTERS API] Successfully fetched ${devicesData.devices.length} devices from Container Apps API`)
+
+    // Process a limited number of devices to avoid timeouts
+    const devicesToProcess = devicesData.devices.slice(0, 20) // Process first 20 devices for now
+    console.log(`[APPLICATIONS FILTERS API] Processing first ${devicesToProcess.length} devices for application data`)
+
+    // Process devices and extract application data by calling individual device endpoints
+    const devices = []
+    const applicationNames = new Set<string>()
+    const normalizedAppNames = new Set<string>()
+    const publishers = new Set<string>()
+    const categories = new Set<string>()
+
+    for (const deviceBasic of devicesToProcess) {
+      // Skip test devices
+      if (!deviceBasic.serialNumber || deviceBasic.serialNumber.includes('TEST-') || deviceBasic.serialNumber === 'localhost') {
+        continue
+      }
+
+      try {
+        // Fetch full device data including modules
+        const deviceResponse = await fetch(`${CONTAINER_APPS_API_BASE}/api/device/${deviceBasic.serialNumber}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
           }
+        })
 
-          installedApps.forEach((app: any) => {
+        if (!deviceResponse.ok) {
+          console.log(`[APPLICATIONS FILTERS API] Failed to fetch device ${deviceBasic.serialNumber}: ${deviceResponse.status}`)
+          continue
+        }
+
+        const deviceData = await deviceResponse.json()
+        
+        if (!deviceData.success || !deviceData.device) {
+          console.log(`[APPLICATIONS FILTERS API] Invalid device response for ${deviceBasic.serialNumber}`)
+          continue
+        }
+
+        const device = deviceData.device
+
+        // Extract device info
+        const deviceInfo = {
+          id: device.deviceId || device.device_id || device.id,
+          name: device.modules?.inventory?.deviceName || device.modules?.inventory?.computerName || device.deviceName || device.serial_number || deviceBasic.serialNumber || 'Unknown Device',
+          serialNumber: device.serialNumber || deviceBasic.serialNumber,
+          usage: device.modules?.inventory?.usage || '',
+          catalog: device.modules?.inventory?.catalog || '',
+          location: device.modules?.inventory?.location || ''
+        }
+        devices.push(deviceInfo)
+
+        // Extract applications data - applications are at device.modules.applications.installedApplications
+        const applicationsModule = device.modules?.applications
+        if (applicationsModule?.installedApplications && Array.isArray(applicationsModule.installedApplications)) {
+          console.log(`[APPLICATIONS FILTERS API] Processing ${applicationsModule.installedApplications.length} apps from device ${deviceInfo.serialNumber}`)
+          
+          applicationsModule.installedApplications.forEach((app: any) => {
             // Process application names with normalization
             const appName = app.name || app.displayName
             if (appName && shouldIncludeApplication(appName)) {
@@ -217,64 +237,45 @@ export async function GET() {
               }
             }
             
-            // Process publishers and categories as before
+            // Process publishers and categories
             if (app.publisher) publishers.add(app.publisher)
             if (app.signed_by) publishers.add(app.signed_by)
             if (app.vendor) publishers.add(app.vendor)
             if (app.category) categories.add(app.category)
           })
-        } catch (error) {
-          console.warn(`[APPLICATIONS FILTERS API] Error processing app data:`, error)
+        } else {
+          console.log(`[APPLICATIONS FILTERS API] No applications found for device ${deviceInfo.serialNumber}`)
         }
-      }
-
-      // Close pool connection - only once
-      await pool.end()
-      poolClosed = true
-
-      const devices = devicesResult.rows.map((row: any) => ({
-        id: row.device_id,
-        name: row.device_name || row.computer_name || row.serial_number || 'Unknown Device',
-        serialNumber: row.serial_number,
-        usage: row.usage,
-        catalog: row.catalog,
-        location: row.location
-      }))
-
-      const filterOptions = {
-        devices,
-        applicationNames: Array.from(normalizedAppNames).sort(),
-        publishers: Array.from(publishers).filter(p => p && p.trim()).sort(),
-        categories: Array.from(categories).filter(c => c && c.trim()).sort(),
-        versions: [] // We'll populate this when needed, as it's app-specific
-      }
-
-      console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Generated filter options:`, {
-        devices: devices.length,
-        originalAppNames: applicationNames.size,
-        normalizedAppNames: filterOptions.applicationNames.length,
-        publishers: filterOptions.publishers.length,
-        categories: filterOptions.categories.length
-      })
-      
-      return NextResponse.json(filterOptions, {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          'Pragma': 'no-cache',
-          'X-Fetched-At': timestamp
-        }
-      })
-
-    } finally {
-      // Ensure pool is closed only if not already closed
-      if (!poolClosed) {
-        try {
-          await pool.end()
-        } catch (poolError) {
-          console.warn(`[APPLICATIONS FILTERS API] ${timestamp} - Error closing pool:`, poolError)
-        }
+      } catch (error) {
+        console.error(`[APPLICATIONS FILTERS API] Error processing device ${deviceBasic.serialNumber}:`, error)
+        continue
       }
     }
+
+    const filterOptions = {
+      devices,
+      applicationNames: Array.from(normalizedAppNames).sort(),
+      publishers: Array.from(publishers).filter(p => p && p.trim()).sort(),
+      categories: Array.from(categories).filter(c => c && c.trim()).sort(),
+      versions: [] // We'll populate this when needed, as it's app-specific
+    }
+
+    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Generated filter options from Container Apps API:`, {
+      devices: devices.length,
+      originalAppNames: applicationNames.size,
+      normalizedAppNames: filterOptions.applicationNames.length,
+      publishers: filterOptions.publishers.length,
+      categories: filterOptions.categories.length
+    })
+    
+    return NextResponse.json(filterOptions, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+        'X-Fetched-At': timestamp,
+        'X-Data-Source': 'container-apps-api'
+      }
+    })
 
   } catch (error) {
     console.error('[APPLICATIONS FILTERS API] Error:', error)
@@ -282,7 +283,12 @@ export async function GET() {
     return NextResponse.json({
       error: 'Failed to fetch filter options',
       details: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      devices: [],
+      applicationNames: [],
+      publishers: [],
+      categories: [],
+      versions: []
     }, { status: 500 })
   }
 }

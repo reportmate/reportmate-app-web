@@ -11,8 +11,9 @@ interface Device {
   name: string
   model?: string
   os?: string // Legacy field for backward compatibility
+  platform?: string  // Fast API platform detection  
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string  // Made flexible to handle API response variations
   uptime?: string
   location?: string
   ipAddress?: string
@@ -24,6 +25,15 @@ interface Device {
   architecture?: string
   processor?: string
   memory?: string
+  // New OS version field from enhanced devices API
+  osVersion?: {
+    name?: string
+    version?: string
+    build?: string
+    edition?: string
+    displayVersion?: string
+    featureUpdate?: string
+  }
   // Modular data structure
   modules?: {
     system?: {
@@ -65,19 +75,59 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
   if (devices.length === 0) {
     return []
   }
+
+  // Helper function to get platform from device (trust API platform field)
+  const detectPlatformFromSerial = (device: Device): 'Windows' | 'macOS' | 'Unknown' => {
+    // CRITICAL FIX: Trust the API platform field - it's already correctly detected
+    if (device.platform) {
+      const platformLower = device.platform.toLowerCase()
+      if (platformLower === 'windows') return 'Windows'
+      if (platformLower === 'macos') return 'macOS'
+    }
+    
+    // Fallback: Check system module OS info
+    const systemOS = device.modules?.system?.operatingSystem?.name?.toLowerCase()
+    if (systemOS) {
+      if (systemOS.includes('windows')) return 'Windows'
+      if (systemOS.includes('mac') || systemOS.includes('darwin')) return 'macOS'
+    }
+
+    return 'Unknown'
+  }
   
   const versions: { [key: string]: { count: number; displayName: string } } = {}
 
   devices.forEach(device => {
-    // Get OS data from modular structure first, fallback to legacy field
-    const osInfo = device.modules?.system?.operatingSystem
-    const osString = osInfo?.name || device.os || 'Unknown'
+    // FAST FIX: Use platform field first, then fallback to detailed OS info
+    let osString = ''
+    let osInfo = null
+    
+    // Get OS data from new osVersion field first, then fallback to legacy modular structure
+    osInfo = device.osVersion || device.modules?.system?.operatingSystem
+    
+    // Use fast platform field as primary OS detection method
+    if (device.platform) {
+      osString = device.platform
+    } else {
+      // CRITICAL FIX: Try serial number pattern detection
+      const detectedPlatform = detectPlatformFromSerial(device)
+      if (detectedPlatform !== 'Unknown') {
+        osString = detectedPlatform
+      } else {
+        // Fallback to osInfo or legacy os field
+        osString = osInfo?.name || device.os || 'Unknown'
+      }
+    }
+    
     const osVersion = osInfo?.version || ''
     const _osDisplayVersion = osInfo?.displayVersion || ''
     const _osBuild = osInfo?.build || ''
     
     console.log(`[processOSVersions ${osType}] Processing device:`, {
       deviceName: device.name,
+      serialNumber: device.serialNumber,
+      detectedPlatform: detectPlatformFromSerial(device),
+      platform: device.platform,
       osString,
       osInfo: osInfo ? {
         name: osInfo.name,
@@ -90,7 +140,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     if (osType === 'macOS') {
       // macOS detection and parsing
       const osLower = osString.toLowerCase()
-      if (osLower.includes('macos') || osLower.includes('mac os') || osLower.includes('darwin')) {
+      if (osLower.includes('macos') || osLower.includes('mac os') || osLower.includes('darwin') || osString === 'macOS') {
         let version = 'Unknown'
         
         if (osVersion) {
@@ -99,12 +149,17 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           if (versionMatch) {
             version = versionMatch[1]
           }
-        } else if (osString) {
-          // Fallback to parsing from name
-          const versionMatch = osString.match(/(\d+\.\d+(?:\.\d+)?)/)
+        } else if (osInfo?.name && osInfo.name !== osString) {
+          // Fallback to parsing from detailed name
+          const versionMatch = osInfo.name.match(/(\d+\.\d+(?:\.\d+)?)/)
           if (versionMatch) {
             version = versionMatch[1]
           }
+        } else {
+          // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
+          // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
+          console.log(`[processOSVersions macOS] SKIPPING device without real OS info: ${device.name} (${device.serialNumber})`)
+          return // Skip this device entirely
         }
         
         if (!versions[version]) {
@@ -115,7 +170,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     } else {
       // Windows detection and parsing
       const osLower = osString.toLowerCase()
-      if (osLower.includes('windows') || osLower.includes('microsoft windows')) {
+      if (osLower.includes('windows') || osLower.includes('microsoft windows') || osString === 'Windows') {
         let displayVersion = 'Unknown'
         let groupingKey = 'Unknown'
         
@@ -168,22 +223,11 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           // Fallback to version field
           displayVersion = osVersion
           groupingKey = osVersion
-        } else if (osString) {
-          // Legacy fallback for old data format
-          const osLower = osString.toLowerCase()
-          if (osLower.includes('windows 11') || osLower.includes('win 11')) {
-            displayVersion = 'Windows 11'
-            groupingKey = 'Windows 11'
-          } else if (osLower.includes('windows 10') || osLower.includes('win 10')) {
-            displayVersion = 'Windows 10'
-            groupingKey = 'Windows 10'
-          } else if (osLower.includes('windows 8') || osLower.includes('win 8')) {
-            displayVersion = 'Windows 8'
-            groupingKey = 'Windows 8'
-          } else if (osLower.includes('windows 7') || osLower.includes('win 7')) {
-            displayVersion = 'Windows 7'
-            groupingKey = 'Windows 7'
-          }
+        } else {
+          // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
+          // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
+          console.log(`[processOSVersions Windows] SKIPPING device without real OS info: ${device.name} (${device.serialNumber})`)
+          return // Skip this device entirely
         }
         
         // Group by version number for chart bars, but display the full name with build
@@ -318,30 +362,24 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   // Fetch devices directly if not provided via props
   useEffect(() => {
     const fetchDevices = async () => {
+      // Only fetch if we have no devices AND we're loading
+      // Don't fetch if we already have devices from props
       if (devices.length === 0 && loading) {
         try {
-          console.log(`[OSVersionBarChart ${osType}] Fetching devices directly from API`)
-          const response = await fetch('/api/devices')
+          console.log(`[OSVersionBarChart ${osType}] Fetching devices with OS data from fast API`)
+          const response = await fetch('/api/devices?includeOSVersions=true')
           if (response.ok) {
             const data = await response.json()
-            console.log(`[OSVersionBarChart ${osType}] Got ${data.length} devices from API:`, data.map((d: Device) => ({
-              name: d.name,
-              serialNumber: d.serialNumber,
-              os: d.os,
-              modules: d.modules ? {
-                system: d.modules.system ? {
-                  operatingSystem: d.modules.system.operatingSystem
-                } : 'NO_SYSTEM_MODULE'
-              } : 'NO_MODULES'
-            })))
-            setLocalDevices(data)
-            setLocalLoading(false)
+            console.log(`[OSVersionBarChart ${osType}] Got ${data.devices?.length || 0} devices with OS data from fast API`)
+            setLocalDevices(data.devices || [])
           }
         } catch (error) {
           console.error(`[OSVersionBarChart ${osType}] API fetch error:`, error)
+        } finally {
           setLocalLoading(false)
         }
       } else {
+        // Use the devices provided via props
         setLocalDevices(devices)
         setLocalLoading(loading)
       }

@@ -63,87 +63,48 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        // Use devices API endpoint which has proper status calculation logic
-        const apiUrl = '/api/devices'
-        const timestamp = new Date().toISOString()
-        console.log(`${timestamp} - Fetching devices from Next.js API route:`, apiUrl)
-        
-        const response = await fetch(apiUrl, {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-        
-        console.log(`${timestamp} - API Response Status:`, response.status)
-        
-        if (!response.ok) {
-          throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-        }
-        
+        const response = await fetch('/api/devices')
         const data = await response.json()
-        console.log(`${timestamp} - API response received:`, { 
-          type: typeof data, 
-          isArray: Array.isArray(data), 
-          length: Array.isArray(data) ? data.length : 'N/A',
-          fullResponse: data
-        })
         
-        // The devices API returns a direct array of device items with proper status calculation
-        let inventoryArray: InventoryItem[]
+        // FIXED: API returns {devices: [...], count: N} structure
+        const devices = data.devices || []
         
-        if (Array.isArray(data)) {
-          // Transform device data to match inventory structure
-          inventoryArray = data.map(device => ({
-            id: device.deviceId,
+        if (Array.isArray(devices) && devices.length > 0) {
+          // FIXED: Process devices with correct nested structure
+          const inventoryItems = devices.map((device: any) => ({
+            id: device.serialNumber || device.deviceId,
             deviceId: device.deviceId,
-            deviceName: device.name,
+            // FIXED: Get deviceName from device.name (not nested in modules)
+            deviceName: device.name || device.serialNumber,
             serialNumber: device.serialNumber,
             lastSeen: device.lastSeen,
-            collectedAt: device.lastSeen, // Use lastSeen as collectedAt
-            assetTag: device.modules?.inventory?.assetTag || device.assetTag,
-            location: device.modules?.inventory?.location || device.location,
-            usage: device.modules?.inventory?.usage,
-            catalog: device.modules?.inventory?.catalog,
-            computerName: device.modules?.inventory?.computerName || device.name,
-            domain: device.modules?.inventory?.domain,
-            organizationalUnit: device.modules?.inventory?.organizationalUnit,
-            manufacturer: device.modules?.inventory?.manufacturer,
-            model: device.modules?.inventory?.model,
-            uuid: device.modules?.inventory?.uuid || device.deviceId,
-            raw: { 
-              ...device, 
-              // Include the calculated status from the API
-              status: device.status 
-            }
+            collectedAt: device.lastSeen, // Use lastSeen as collectedAt for /api/devices
+            assetTag: device.assetTag,
+            location: device.location,
+            usage: device.usage,
+            catalog: device.catalog,
+            computerName: device.name, // Use device name as computer name
+            domain: device.domain,
+            organizationalUnit: device.organizationalUnit,
+            manufacturer: device.manufacturer,
+            model: device.model,
+            uuid: device.uuid || device.deviceId,
+            department: device.department,
+            owner: device.owner,
+            raw: { status: device.status, ...device } // Include status and full device data
           }))
-          console.log('✅ Successfully received devices array:', inventoryArray.length, 'items')
-          console.log('📋 First device item sample:', inventoryArray[0])
+          
+          console.log('[DEVICES PAGE] Processed inventory items:', inventoryItems.length, 'First item:', inventoryItems[0])
+          setInventory(inventoryItems)
         } else {
-          console.error('❌ Invalid API response format:', data)
-          throw new Error('API returned invalid data format')
-        }
-        
-        if (inventoryArray.length === 0) {
-          console.warn('⚠️ No devices found in API response')
+          console.log('[DEVICES PAGE] No devices found in response')
           setInventory([])
-          setError(null)
-        } else {
-          console.log('✅ Successfully loaded', inventoryArray.length, 'device items from API')
-          console.log('📋 Setting inventory state with:', inventoryArray)
-          setInventory(inventoryArray)
-          setError(null)
         }
-        
-      } catch (error) {
-        console.error('❌ Failed to fetch devices:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-        setError(errorMessage)
-        setInventory([]) // Set empty array on error
+      } catch (err) {
+        console.error('Error fetching inventory:', err)
+        setError('Failed to fetch inventory data')
       } finally {
         setLoading(false)
-        console.log('✅ Loading state cleared')
       }
     }
 
@@ -703,26 +664,14 @@ function DevicesPageContent() {
                     filteredInventory.map((item) => (
                     <tr key={`${item.serialNumber}-${item.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                       <td className="px-4 lg:px-6 py-4">
-                        <Link
-                          href={`/device/${encodeURIComponent(item.serialNumber)}`}
-                          className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                        >
-                          <div className="min-w-0">
-                            <div className="font-medium text-gray-900 dark:text-white truncate">
-                              {item.deviceName || item.computerName || item.serialNumber || 'Unknown Device'}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                              {(() => {
-                                const manufacturer = item.manufacturer && item.manufacturer !== 'Unknown' ? item.manufacturer : null;
-                                const model = item.model && item.model !== 'Unknown' ? item.model : null;
-                                if (manufacturer && model) return `${manufacturer} ${model}`;
-                                if (manufacturer) return manufacturer;
-                                if (model) return model;
-                                return '';
-                              })()}
-                            </div>
-                          </div>
-                        </Link>
+                        <div>
+                          <Link 
+                            href={`/device/${encodeURIComponent(item.serialNumber)}`}
+                            className="text-base font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+                          >
+                            {item.deviceName || 'Unknown Device'}
+                          </Link>
+                        </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         <div className="text-sm text-gray-900 dark:text-white font-mono">

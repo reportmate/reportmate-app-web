@@ -188,61 +188,10 @@ export async function GET(
       }
       */
       
-      // Try local sample file fallback for development
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[DEVICE API] Trying local sample file fallback...')
-        try {
-          const sampleFilePath = path.join(process.cwd(), '../../sample-device.json')
-          if (fs.existsSync(sampleFilePath)) {
-            const sampleData = JSON.parse(fs.readFileSync(sampleFilePath, 'utf8'))
-            console.log('[DEVICE API] ✅ Using sample device data for development')
-            
-            // Check if this device ID matches the sample device
-            if (sampleData.device && 
-                (sampleData.device.serialNumber === deviceId || 
-                 sampleData.device.deviceId === deviceId ||
-                 deviceId === 'MJ0KP6EX')) {
-              console.log('[DEVICE API] 📋 Device ID matches sample data, using it')
-              
-              // Continue with normal processing using sample data
-              const data = sampleData.device
-              const device = data
-              let modules = data.modules || {}
-              
-              // Apply PowerShell object conversion
-              const cleanedModules = convertPowerShellObjects(modules, 'modules', data) as Record<string, unknown>
-              
-              const responseData = {
-                success: true,
-                device: {
-                  deviceId: device.deviceId,
-                  serialNumber: device.serialNumber,
-                  lastSeen: device.lastSeen || new Date().toISOString(),
-                  clientVersion: device.clientVersion || '1.0.0',
-                  modules: cleanedModules
-                }
-              }
-              
-              console.log('[DEVICE API] 📋 Sample device response prepared:', {
-                deviceId: responseData.device.deviceId,
-                serialNumber: responseData.device.serialNumber,
-                moduleCount: Object.keys(responseData.device.modules).length,
-                moduleNames: Object.keys(responseData.device.modules)
-              })
-              
-              return NextResponse.json(responseData, {
-                headers: {
-                  'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-                  'Pragma': 'no-cache',
-                  'Expires': '0'
-                }
-              })
-            }
-          }
-        } catch (sampleError) {
-          console.error('[DEVICE API] Sample file fallback failed:', sampleError)
-        }
-      }
+      // 🚨🚨🚨 NO FAKE DATA GENERATION ALLOWED 🚨🚨🚨
+      // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
+      // Frontend is a READER ONLY - show real state or empty/error
+      console.log('[DEVICE API] NO SAMPLE DATA FALLBACK - Production system shows real data only')
       
       // No fallback data - return error if Azure Functions API fails
       console.log('[DEVICE API] Azure Functions API failed, no fallback available')

@@ -3,8 +3,10 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
     const timestamp = new Date().toISOString()
     console.log(`[SECURITY API] ${timestamp} - Fetching security data`)
 
@@ -38,8 +40,8 @@ export async function GET() {
           FROM security s
           JOIN devices d ON s.device_id = d.id
           ORDER BY s.updated_at DESC
-          LIMIT 1000
-        `)
+          LIMIT $1
+        `, [limit])
         
         const securityData = result.rows.map((row: any) => {
           const data = row.data || {}

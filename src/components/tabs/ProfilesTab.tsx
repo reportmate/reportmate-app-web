@@ -34,6 +34,14 @@ interface ProfilesTabProps {
   data?: any
 }
 
+// Helper function to safely ensure we have an array
+function ensureProfilesArray(data: any): ProfileInfo[] {
+  if (!data) return []
+  if (Array.isArray(data)) return data
+  console.warn('⚠️ Profiles data is not an array:', typeof data, data)
+  return []
+}
+
 export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   const [searchTerm, setSearchTerm] = useState('')
   const [expandedProfile, setExpandedProfile] = useState<string | null>(null)
@@ -94,8 +102,10 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   console.log('🔍 ProfilesTab Debug:', {
     hasDataProp: !!data,
     dataProfilesLength: data?.profiles?.length,
+    dataProfilesIsArray: Array.isArray(data?.profiles),
     hasDeviceProfiles: !!device?.profiles,
     deviceProfilesLength: device?.profiles?.length,
+    deviceProfilesIsArray: Array.isArray(device?.profiles),
     hasModuleProfiles: !!device?.modules?.profiles,
     moduleConfigurationProfilesLength: device?.modules?.profiles?.ConfigurationProfiles?.length,
     moduleConfigurationProfilesLengthCamel: device?.modules?.profiles?.configurationProfiles?.length,
@@ -104,6 +114,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     moduleRegistryPoliciesLength: device?.modules?.profiles?.RegistryPolicies?.length,
     moduleRegistryPoliciesLengthCamel: device?.modules?.profiles?.registryPolicies?.length,
     hasProcessedData: !!profilesModuleData?.profiles?.length,
+    processedProfilesIsArray: Array.isArray(profilesModuleData?.profiles),
     hasProfilesData,
     fullDevice: JSON.stringify(device).substring(0, 1000),
     deviceModuleKeys: device?.modules ? Object.keys(device.modules) : 'NO_MODULES',
@@ -115,13 +126,14 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   let profiles: ProfileInfo[] = []
   if (data?.profiles?.length > 0) {
     console.log('✅ Using data prop (processedData.profiles)');
-    profiles = data.profiles
+    profiles = ensureProfilesArray(data.profiles)
   } else if (profilesModuleData?.profiles?.length > 0) {
     console.log('✅ Using processed profiles data');
-    profiles = profilesModuleData.profiles
+    profiles = ensureProfilesArray(profilesModuleData.profiles)
   } else if (device?.modules?.profiles?.intunePolicies?.length > 0) {
     console.log('⚠️ Falling back to raw module intunePolicies data (camelCase)');
-    profiles = device.modules.profiles.intunePolicies.map((policy: any) => ({
+    const intunePolicies = ensureProfilesArray(device.modules.profiles.intunePolicies)
+    profiles = intunePolicies.map((policy: any) => ({
       id: policy.policyId || 'unknown',
       displayName: policy.policyName || 'Unknown Policy',
       uuid: policy.policyId || 'unknown',
@@ -136,7 +148,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }))
   } else if (device?.modules?.profiles?.ConfigurationProfiles) {
     console.log('⚠️ Falling back to raw module ConfigurationProfiles data (PascalCase)');
-    profiles = device.modules.profiles.ConfigurationProfiles.map((profile: any) => ({
+    const configurationProfiles = ensureProfilesArray(device.modules.profiles.ConfigurationProfiles)
+    profiles = configurationProfiles.map((profile: any) => ({
       ...profile,
       displayName: profile.Name || profile.name || 'Unknown',
       uuid: profile.id || profile.identifier || 'unknown',
@@ -147,7 +160,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }))
   } else if (device?.modules?.profiles?.IntunePolicies) {
     console.log('⚠️ Falling back to raw module IntunePolicies data (PascalCase)');
-    profiles = device.modules.profiles.IntunePolicies.map((policy: any) => ({
+    const intunePolicies = ensureProfilesArray(device.modules.profiles.IntunePolicies)
+    profiles = intunePolicies.map((policy: any) => ({
       id: policy.PolicyId || 'unknown',
       displayName: policy.PolicyName || 'Unknown Policy',
       uuid: policy.PolicyId || 'unknown',
@@ -162,7 +176,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }))
   } else if (device?.profiles) {
     console.log('⚠️ Falling back to device.profiles');
-    profiles = device.profiles
+    profiles = ensureProfilesArray(device.profiles)
   } else {
     console.log('❌ No profiles data found');
     profiles = []
@@ -172,7 +186,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   const userProfiles = profiles.filter((p: ProfileInfo) => p.type === 'User')
 
   // Filter profiles based on search term
-  const filteredProfiles = useMemo(() => {
+  const filteredProfiles = useMemo(() => {    
     if (!searchTerm.trim()) {
       return profiles;
     }

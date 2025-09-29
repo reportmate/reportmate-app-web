@@ -124,18 +124,19 @@ export function MemoryBreakdownChart({
     }
 
     // Helper functions for filtering (same as hardware page)
-    const getDeviceModel = (device: Device): string => {
+    const getDeviceModel = (device: Device): string | null => {
       return device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
-             (device as any).raw?.model ||
-             (device as any).raw?.system?.hardwareInfo?.model ||
-             (device as any).raw?.hardware?.model ||
-             'Unknown Model'
+             // 🚨🚨🚨 NO FAKE DATA - Return null for unknown models 🚨🚨🚨
+             null
     }
 
-    const getDeviceType = (device: Device): string => {
+    const getDeviceType = (device: Device): string | null => {
       const model = getDeviceModel(device)
+      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      if (!model) return null
+      
       if (model.toLowerCase().includes('macbook') || model.toLowerCase().includes('imac') || model.toLowerCase().includes('mac')) {
         return 'Mac'
       }
@@ -153,11 +154,11 @@ export function MemoryBreakdownChart({
 
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
       const model = getDeviceModel(device)
-      if (model.toLowerCase().includes('macbook') || 
+      if (model && (model.toLowerCase().includes('macbook') || 
           model.toLowerCase().includes('imac') || 
           model.toLowerCase().includes('mac mini') ||
           model.toLowerCase().includes('mac pro') ||
-          model.toLowerCase().includes('mac studio')) {
+          model.toLowerCase().includes('mac studio'))) {
         return 'Macintosh'
       }
       return 'Windows'
@@ -174,7 +175,7 @@ export function MemoryBreakdownChart({
       // Model filter
       if (globalSelectedModels.length > 0) {
         const model = getDeviceModel(device)
-        if (!globalSelectedModels.includes(model)) return false
+        if (!model || !globalSelectedModels.includes(model)) return false
       }
 
       // Architecture filter
@@ -186,7 +187,7 @@ export function MemoryBreakdownChart({
       // Device type filter
       if (globalSelectedDeviceTypes.length > 0) {
         const deviceType = getDeviceType(device)
-        if (!globalSelectedDeviceTypes.includes(deviceType)) return false
+        if (!deviceType || !globalSelectedDeviceTypes.includes(deviceType)) return false
       }
 
       return true

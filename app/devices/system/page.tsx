@@ -467,7 +467,7 @@ function SystemPageContent() {
                             {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
                           </div>
                           <div className="text-gray-500 dark:text-gray-400">
-                            {sys.systemInfo.operatingSystem.displayVersion || sys.systemInfo.operatingSystem.version || sys.osVersion || 'Unknown Version'}
+                            {sys.systemInfo.operatingSystem.displayVersion || sys.systemInfo.operatingSystem.version || sys.osVersion || null}
                           </div>
                         </div>
                       </td>

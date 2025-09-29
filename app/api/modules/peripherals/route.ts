@@ -4,8 +4,11 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const createModuleAPI = (moduleName: string, moduleFields: any) => {
-  return async function GET() {
+  return async function GET(request: Request) {
     try {
+      const { searchParams } = new URL(request.url)
+      const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
+      
       const timestamp = new Date().toISOString()
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { Pool } = require('pg')
@@ -17,8 +20,8 @@ const createModuleAPI = (moduleName: string, moduleFields: any) => {
           m.data, m.collected_at
         FROM ${moduleName} m
         JOIN devices d ON m.device_id = d.id
-        ORDER BY m.updated_at DESC LIMIT 1000
-      `)
+        ORDER BY m.updated_at DESC LIMIT $1
+      `, [limit])
       
       const moduleData = result.rows.map((row: any) => {
         const data = row.data || {}

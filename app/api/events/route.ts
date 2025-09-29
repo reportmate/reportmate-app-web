@@ -1,14 +1,10 @@
 import { NextResponse } from 'next/server';
+import { getDeviceNames, getDeviceNamesFromCache } from '../../../lib/device-names';
 
 // Cache for API responses (30 second cache)
 let eventsCache: NormalizedEvent[] = []
 let eventsCacheTimestamp: number = 0
 const EVENTS_CACHE_DURATION = 30 * 1000 // 30 seconds
-
-// Cache for device names (shared with devices endpoint)
-let deviceNamesCache: Map<string, string> = new Map()
-let deviceNamesCacheTimestamp: number = 0
-const DEVICE_NAMES_CACHE_DURATION = 60 * 1000 // 1 minute
 
 // DISABLED - Always use cloud infrastructure only
 async function getEventsFromDatabase(limit = 100) {
@@ -18,12 +14,19 @@ async function getEventsFromDatabase(limit = 100) {
 
 interface RawEvent {
   id: string
+  // Container Apps API fields (new)
+  deviceId?: string
+  serialNumber?: string
+  deviceName?: string
+  eventType?: string
+  timestamp?: string
+  details?: Record<string, unknown>
+  message?: string
+  // Legacy Azure Functions fields (for compatibility)
   device?: string
   device_id?: string
   kind?: string
   ts?: string
-  timestamp?: string
-  message?: string  // User-friendly message from the database
   payload?: Record<string, unknown>
 }
 
@@ -37,138 +40,114 @@ interface NormalizedEvent {
   payload: Record<string, unknown>
 }
 
-const AZURE_FUNCTIONS_BASE_URL = process.env.AZURE_FUNCTIONS_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io';
-
-// Function to get device names for events enrichment
-async function getDeviceNames(): Promise<Map<string, string>> {
-  const now = Date.now()
-  
-  // Return cached device names if still fresh
-  if (deviceNamesCache.size > 0 && (now - deviceNamesCacheTimestamp) < DEVICE_NAMES_CACHE_DURATION) {
-    console.log('[EVENTS API] Using cached device names:', deviceNamesCache.size, 'devices')
-    return deviceNamesCache
-  }
-  
-  try {
-    console.log('[EVENTS API] Fetching device names for enrichment...')
-    
-    // Fetch inventory data to get proper device names
-    const inventoryResponse = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/inventory`, {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-Events/1.0'
-      }
-    })
-    
-    if (inventoryResponse.ok) {
-      const inventoryData = await inventoryResponse.json()
-      const newDeviceNames = new Map<string, string>()
-      
-      if (Array.isArray(inventoryData)) {
-        console.log(`[EVENTS API] Processing ${inventoryData.length} inventory items for device names`)
-        
-        inventoryData.forEach((item: any) => {
-          if (item.serialNumber) {
-            let deviceName = item.serialNumber
-            
-            // Priority 1: Use inventory deviceName if available and meaningful
-            if (item.deviceName && 
-                item.deviceName.trim() !== '' && 
-                item.deviceName !== item.serialNumber &&
-                !item.deviceName.toLowerCase().includes('unknown')) {
-              deviceName = item.deviceName.trim()
-              console.log(`[EVENTS API] Found deviceName for ${item.serialNumber}: "${deviceName}"`)
-            } 
-            // Priority 2: Fallback to manufacturer + model if deviceName is empty/same as serial
-            else if (item.manufacturer && item.model) {
-              const manufacturer = item.manufacturer.replace(/Unknown/gi, '').trim()
-              const model = item.model.replace(/Unknown/gi, '').trim()
-              if (manufacturer && model) {
-                deviceName = `${manufacturer} ${model}`
-              } else if (manufacturer) {
-                deviceName = manufacturer
-              } else if (model) {
-                deviceName = model
-              }
-            }
-            
-            newDeviceNames.set(item.serialNumber, deviceName)
-          }
-        })
-      }
-      
-      deviceNamesCache = newDeviceNames
-      deviceNamesCacheTimestamp = now
-      console.log('[EVENTS API] Successfully cached device names for', newDeviceNames.size, 'devices')
-      console.log('[EVENTS API] Sample device names:', Array.from(newDeviceNames.entries()).slice(0, 3))
-      return newDeviceNames
-    } else {
-      console.error('[EVENTS API] Inventory API returned error:', inventoryResponse.status, inventoryResponse.statusText)
-    }
-  } catch (error) {
-    console.error('[EVENTS API] Failed to fetch device names:', error)
-  }
-  
-  return deviceNamesCache // Return existing cache even if fetch failed
-}
+// Function to get device names for events enrichment - now uses shared utility
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const limitParam = searchParams.get('limit')
+    const offsetParam = searchParams.get('offset')
+    const startDateParam = searchParams.get('startDate')
+    const endDateParam = searchParams.get('endDate')
     const limit = limitParam ? parseInt(limitParam, 10) : 100
+    const offset = offsetParam ? parseInt(offsetParam, 10) : 0
     
-    // Validate limit parameter
+    // Validate parameters  
     const validLimit = Math.min(Math.max(limit, 1), 500) // Between 1 and 500 events
+    const validOffset = Math.max(offset, 0) // Non-negative offset
+    
+    // Validate and format date parameters
+    let validStartDate = null
+    let validEndDate = null
+    if (startDateParam) {
+      try {
+        validStartDate = new Date(startDateParam).toISOString()
+      } catch (e) {
+        console.warn('[EVENTS API] Invalid startDate parameter:', startDateParam)
+      }
+    }
+    if (endDateParam) {
+      try {
+        validEndDate = new Date(endDateParam).toISOString()
+      } catch (e) {
+        console.warn('[EVENTS API] Invalid endDate parameter:', endDateParam)
+      }
+    }
     
     const timestamp = new Date().toISOString()
-    console.log(`[EVENTS API CACHED] ${timestamp} - Cached events endpoint (limit: ${validLimit})`)
+    console.log(`[EVENTS API CACHED] ${timestamp} - Cached events endpoint (limit: ${validLimit}, offset: ${validOffset}, dateRange: ${validStartDate || 'none'} - ${validEndDate || 'none'})`)
 
-    // Check cache first - but only if requesting same or fewer events than cached
-    const now = Date.now()
-    if (eventsCache.length > 0 && 
-        (now - eventsCacheTimestamp) < EVENTS_CACHE_DURATION && 
-        validLimit <= eventsCache.length) {
-      console.log(`[EVENTS API CACHED] ${timestamp} - Serving from cache: ${validLimit}/${eventsCache.length} events`)
-      const limitedEvents = eventsCache.slice(0, validLimit)
+    // Get API base URL (consistent with other routes)
+    const apiBaseUrl = process.env.API_BASE_URL
+    
+    if (!apiBaseUrl) {
+      console.error('[EVENTS API] API_BASE_URL environment variable not configured')
       return NextResponse.json({
-        success: true,
-        events: limitedEvents,
-        count: limitedEvents.length,
-        totalCached: eventsCache.length
-      }, {
-        headers: {
-          'Cache-Control': 'no-store, no-cache, must-revalidate',
-          'Pragma': 'no-cache',
-          'X-Fetched-At': new Date(eventsCacheTimestamp).toISOString(),
-          'X-Data-Source': 'in-memory-cache',
-          'X-Event-Limit': validLimit.toString()
-        }
-      })
+        error: 'Configuration error',
+        details: 'API_BASE_URL environment variable not configured'
+      }, { status: 500 })
     }
 
-    console.log(`[EVENTS API CACHED] ${timestamp} - Fetching fresh data from Azure Functions (limit: ${validLimit})`)
+    // For pagination with date filters, we need fresh data each time
+    // Only use cache for limit=50 and offset=0 with no date filters (dashboard requests)
+    const shouldCache = validLimit <= 50 && validOffset === 0 && !validStartDate && !validEndDate
+    
+    if (shouldCache) {
+      // Check cache first - but only for dashboard requests
+      const now = Date.now()
+      if (eventsCache.length > 0 && 
+          (now - eventsCacheTimestamp) < EVENTS_CACHE_DURATION && 
+          validLimit <= eventsCache.length) {
+        console.log(`[EVENTS API CACHED] ${timestamp} - Serving from cache: ${validLimit}/${eventsCache.length} events`)
+        const limitedEvents = eventsCache.slice(0, validLimit)
+        return NextResponse.json({
+          success: true,
+          events: limitedEvents,
+          totalEvents: eventsCache.length, // Frontend expects totalEvents field
+          count: limitedEvents.length
+        }, {
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate',
+            'Pragma': 'no-cache',
+            'X-Fetched-At': new Date(eventsCacheTimestamp).toISOString(),
+            'X-Data-Source': 'in-memory-cache',
+            'X-Event-Limit': validLimit.toString()
+          }
+        })
+      }
+    }
+
+    console.log(`[EVENTS API CACHED] ${timestamp} - Fetching fresh data from Azure Functions (limit: ${validLimit}, offset: ${validOffset}, dateRange: ${validStartDate || 'none'} - ${validEndDate || 'none'})`)
     console.log('[EVENTS API] Fetching events from Azure Functions API');
-    console.log('[EVENTS API] Using API base URL:', AZURE_FUNCTIONS_BASE_URL);
+    console.log('[EVENTS API] Using API base URL:', apiBaseUrl);
 
     // Valid event categories - filter out everything else
     const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection'];
 
-    // Try Azure Functions API with very short timeout
+    // Try Azure Functions API with pagination and date filtering support
     try {
-      console.log('[EVENTS API] Attempting to fetch from:', `${AZURE_FUNCTIONS_BASE_URL}/api/events?limit=${validLimit}`);
+      // Build query parameters
+      const queryParams = new URLSearchParams()
+      queryParams.append('limit', validLimit.toString())
+      queryParams.append('offset', validOffset.toString())
+      if (validStartDate) queryParams.append('startDate', validStartDate)
+      if (validEndDate) queryParams.append('endDate', validEndDate)
+      
+      const queryString = queryParams.toString()
+      const apiUrl = `${apiBaseUrl}/api/events?${queryString}`
+      
+      console.log('[EVENTS API] Attempting to fetch from:', apiUrl);
       
       // Use longer timeout (15 seconds) for Azure Functions
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
       
-      const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events?limit=${validLimit}`, {
+      const response = await fetch(apiUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
         },
-        cache: 'no-store', // Ensure fresh data
+        cache: 'no-store', // Ensure fresh data for pagination
         signal: controller.signal
       });
       
@@ -182,33 +161,46 @@ export async function GET(request: Request) {
           eventCount: data.events?.length || 0,
           firstEvent: data.events?.[0] ? {
             id: data.events[0].id,
+            // Container Apps API fields
+            deviceId: data.events[0].deviceId,
+            serialNumber: data.events[0].serialNumber,
+            eventType: data.events[0].eventType,
+            timestamp: data.events[0].timestamp,
+            // Legacy fields for compatibility
             device: data.events[0].device || data.events[0].device_id,
             kind: data.events[0].kind,
-            ts: data.events[0].ts || data.events[0].timestamp,
-            payloadType: typeof data.events[0].payload,
-            payloadKeys: data.events[0].payload && typeof data.events[0].payload === 'object' 
-              ? Object.keys(data.events[0].payload) 
+            ts: data.events[0].ts,
+            payloadType: typeof (data.events[0].details || data.events[0].payload),
+            payloadKeys: (data.events[0].details || data.events[0].payload) && typeof (data.events[0].details || data.events[0].payload) === 'object' 
+              ? Object.keys(data.events[0].details || data.events[0].payload) 
               : 'not object'
           } : 'no events'
         });
         
         // Filter events to only include valid categories and normalize field names
         if (data.success && Array.isArray(data.events)) {
-          // Get device names for enrichment
-          const deviceNames = await getDeviceNames()
+          // Extract device serials from events first
+          const eventDeviceSerials = data.events.map((event: RawEvent) => 
+            event.serialNumber || event.device || event.device_id || 'unknown'
+          ).filter(Boolean)
+          
+          // Get device names using shared utility (no HTTP calls)
+          await getDeviceNames(eventDeviceSerials)
+          const deviceNamesMap = getDeviceNamesFromCache(eventDeviceSerials)
           
           const normalizedEvents = data.events.map((event: RawEvent): NormalizedEvent => {
-            const deviceSerial = event.device || event.device_id || 'unknown'
-            const deviceName = deviceNames.get(deviceSerial) || deviceSerial
+            // Handle both Container Apps API and legacy Azure Functions field names
+            const deviceSerial = event.serialNumber || event.device || event.device_id || 'unknown'
+            const deviceName = event.deviceName || deviceNamesMap[deviceSerial] || deviceSerial
             
             return {
               id: event.id,
               device: deviceSerial,  // Keep original serial for compatibility
               deviceName: deviceName,  // Add enriched device name
-              kind: event.kind || 'unknown',
-              ts: event.ts || event.timestamp || new Date().toISOString(),
+              kind: event.eventType || event.kind || 'unknown',
+              ts: event.timestamp || event.ts || new Date().toISOString(),
               message: event.message,  // Include user-friendly message from database
-              payload: event.payload || {}
+              payload: event.details || event.payload || {}
             }
           })
           
@@ -219,12 +211,15 @@ export async function GET(request: Request) {
           const filteredData = {
             ...data,
             events: filteredEvents,
+            totalEvents: data.count || 0, // Frontend expects totalEvents field
             count: filteredEvents.length
           };
           
-          // Cache the normalized events
-          eventsCache = filteredEvents
-          eventsCacheTimestamp = now
+          // Cache the normalized events only for dashboard requests
+          if (shouldCache) {
+            eventsCache = filteredEvents
+            eventsCacheTimestamp = Date.now()
+          }
           
           console.log('[EVENTS API] Normalized and filtered events count:', filteredEvents.length);
           console.log(`[EVENTS API CACHED] ${timestamp} - Cached ${filteredEvents.length} events`)

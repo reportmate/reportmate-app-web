@@ -1,9 +1,9 @@
+/* Import skeleton animations */
+@import '../src/styles/skeleton.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* Import skeleton animations */
-@import '../src/styles/skeleton.css';
 
 :root {
   --background: 0 0% 100%;
