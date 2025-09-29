@@ -7,7 +7,7 @@ import { useEffect, useState, useRef, useMemo } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
-import { mapDeviceData, type ProcessedDeviceInfo } from "../../../src/lib/data-processing"
+import { mapDeviceData, type ProcessedDeviceInfo, type DeviceStatus } from "../../../src/lib/data-processing"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
 // Import modular data processors
 import { extractInstalls, type InstallsInfo } from "../../../src/lib/data-processing/modules/installs"
@@ -500,7 +500,7 @@ export default function DeviceDetailPage() {
     }
   }, [])
   const [events, setEvents] = useState<FleetEvent[]>([])
-  const [deviceInfo, setDeviceInfo] = useState<ProcessedDeviceInfo | null>(null)
+  const [device, setDevice] = useState<any>(null)
   const [loading, setLoading] = useState(true) // Start with loading true to prevent flash
   const [error, setError] = useState<string | null>(null)
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
@@ -775,32 +775,32 @@ export default function DeviceDetailPage() {
   // Compute installs data for InstallsTab
   const computedInstallsData = useMemo(() => {
     console.log('🔄 Computing installs data:', {
-      hasDeviceInfo: !!deviceInfo,
-      hasInstallsModule: !!deviceInfo?.modules?.installs,
-      hasProcessedInstalls: !!deviceInfo?.installs,
-      deviceInfoKeys: deviceInfo ? Object.keys(deviceInfo) : [],
-      deviceId: deviceInfo?.deviceId,
-      serialNumber: deviceInfo?.serialNumber
+      hasDeviceInfo: !!device,
+      hasInstallsModule: !!device?.modules?.installs,
+      hasProcessedInstalls: !!device?.installs,
+      deviceInfoKeys: device ? Object.keys(device) : [],
+      deviceId: device?.deviceId,
+      serialNumber: device?.serialNumber
     })
     
-    if (!deviceInfo?.modules?.installs && !deviceInfo?.installs) {
+    if (!device?.modules?.installs && !device?.installs) {
       return undefined
     }
     
     // Check if we already have processed installs data
-    if (deviceInfo.installs) {
+    if (device.installs) {
       console.log('✅ Using already processed installs data')
-      return deviceInfo.installs
+      return device.installs
     }
     
     // Otherwise, extract from raw module - FIXED: pass full modules, not just installs
-    if (deviceInfo.modules?.installs) {
+    if (device.modules?.installs) {
       console.log('🔧 Extracting installs from raw modules')
-      return extractInstalls(deviceInfo.modules)  // CRITICAL FIX: Pass full modules
+      return extractInstalls(device.modules)  // CRITICAL FIX: Pass full modules
     }
     
     return undefined
-  }, [deviceInfo?.modules?.installs, deviceInfo?.installs])
+  }, [device?.modules?.installs, device?.installs])
   
   // Device identifier resolution effect
   useEffect(() => {
@@ -923,7 +923,7 @@ export default function DeviceDetailPage() {
             });
             
             // Set the processed device data
-            setDeviceInfo(processedDevice);
+            setDevice(processedDevice);
             console.log('[DEVICE PAGE] setDeviceInfo called successfully');
           } catch (mapError) {
             console.error('[DEVICE PAGE] mapDeviceData failed:', mapError);
@@ -975,11 +975,11 @@ export default function DeviceDetailPage() {
                       // Override the lastSeen with the most recent event time
                       processedDevice.lastSeen = mostRecentEventTime
                       processedDevice.lastEventTime = mostRecentEventTime
-                      setDeviceInfo(processedDevice)
+                      setDevice(processedDevice)
                     } catch (mappingError) {
                       console.error('Error in mapDeviceData during lastSeen update:', mappingError)
                       // Fallback: update direct device
-                      setDeviceInfo(prev => prev ? {
+                      setDevice((prev: any) => prev ? {
                         ...prev,
                         lastSeen: mostRecentEventTime,
                         lastEventTime: mostRecentEventTime
@@ -987,7 +987,7 @@ export default function DeviceDetailPage() {
                     }
                   } else {
                     // Update direct device
-                    setDeviceInfo(prev => prev ? {
+                    setDevice((prev: any) => prev ? {
                       ...prev,
                       lastSeen: mostRecentEventTime,
                       lastEventTime: mostRecentEventTime
@@ -1024,6 +1024,33 @@ export default function DeviceDetailPage() {
     
     fetchDeviceData()
   }, [deviceId, isResolving, initializing]) // Force re-execution when initializing or isResolving changes
+
+  // Process device info from API response using the modular mapper
+  const deviceInfo = useMemo(() => {
+    if (!device) {
+      return {
+        name: 'Unknown Device',
+        serialNumber: deviceId,
+        deviceId: '',
+        lastSeen: '',
+        status: 'unknown' as DeviceStatus,
+        totalEvents: 0,
+        lastEventTime: ''
+      } as ProcessedDeviceInfo
+    }
+
+    // Use the proper modular device mapper
+    const processedDevice = mapDeviceData(device)
+    
+    console.log('🔍 DEVICE INFO DEBUG:', {
+      name: processedDevice.name,
+      serialNumber: processedDevice.serialNumber,
+      hasModules: !!processedDevice.modules,
+      hasInventory: !!processedDevice.inventory
+    })
+    
+    return processedDevice
+  }, [device, deviceId])
 
   // Early returns AFTER all useEffects are defined
   if (loading || isResolving || initializing || !minimumLoadTime) {

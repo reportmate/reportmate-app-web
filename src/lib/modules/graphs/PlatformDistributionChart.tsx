@@ -11,8 +11,9 @@ interface Device {
   name: string
   model?: string
   os?: string
+  platform?: string  // Fast API platform detection
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string  // Made flexible to handle API response variations
   modules?: {
     system?: {
       operatingSystem?: {
@@ -61,19 +62,15 @@ interface PlatformStats {
 
 // Helper function to detect platform from device
 const detectPlatform = (device: Device): 'Windows' | 'macOS' | 'Linux' | 'Unknown' => {
-  // Debug logging for first few devices
-  if (Math.random() < 0.1) { // Log 10% of devices to avoid spam
-    console.log('[PlatformDistributionChart] detectPlatform debug:', {
-      deviceName: device.name,
-      systemOS: device.modules?.system?.operatingSystem?.name,
-      legacyOS: device.os,
-      hasModules: !!device.modules,
-      hasSystem: !!device.modules?.system,
-      hasOperatingSystem: !!device.modules?.system?.operatingSystem
-    })
+  // CRITICAL FIX: Always trust the API platform field - it's already correctly detected
+  if (device.platform) {
+    const platformLower = device.platform.toLowerCase()
+    if (platformLower === 'windows') return 'Windows'
+    if (platformLower === 'macos') return 'macOS'
+    if (platformLower === 'linux') return 'Linux'
   }
   
-  // Check system module OS info first (most reliable)
+  // Fallback: Check system module OS info (for devices with detailed data)
   const systemOS = device.modules?.system?.operatingSystem?.name?.toLowerCase()
   if (systemOS) {
     if (systemOS.includes('windows')) return 'Windows'
@@ -81,7 +78,7 @@ const detectPlatform = (device: Device): 'Windows' | 'macOS' | 'Linux' | 'Unknow
     if (systemOS.includes('linux')) return 'Linux'
   }
 
-  // Check legacy OS field
+  // Fallback: Check legacy OS field
   const os = device.os?.toLowerCase()
   if (os) {
     if (os.includes('windows')) return 'Windows'
@@ -137,16 +134,16 @@ const getUsage = (device: Device): string => {
 const processPlatformData = (devices: Device[], filters?: any): PlatformStats[] => {
   console.log('[PlatformDistributionChart] processPlatformData: Processing', devices.length, 'devices')
   
-  // Debug: log sample device structure
+  // DEBUG: Log first few devices to see their structure
   if (devices.length > 0) {
-    console.log('[PlatformDistributionChart] Sample device structure:', {
-      deviceId: devices[0].deviceId,
-      hasModules: !!devices[0].modules,
-      hasSystemModule: !!devices[0].modules?.system,
-      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
-      legacyOs: devices[0].os,
-      modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : []
-    })
+    console.log('[PlatformDistributionChart] First 3 devices:', devices.slice(0, 3).map(d => ({
+      deviceId: d.deviceId,
+      name: d.name,
+      platform: d.platform,
+      hasModules: !!d.modules,
+      hasSystemModule: !!d.modules?.system,
+      hasOperatingSystem: !!d.modules?.system?.operatingSystem
+    })))
   }
   
   let filteredDevices = devices
@@ -200,8 +197,10 @@ const processPlatformData = (devices: Device[], filters?: any): PlatformStats[] 
     platformCounts[platform].count++
     
     // Track architectures
-    platformCounts[platform].architectures[architecture] = 
-      (platformCounts[platform].architectures[architecture] || 0) + 1
+    if (architecture !== 'Unknown') {
+      platformCounts[platform].architectures[architecture] = 
+        (platformCounts[platform].architectures[architecture] || 0) + 1
+    }
     
     // Track catalogs
     if (catalog !== 'Unknown') {

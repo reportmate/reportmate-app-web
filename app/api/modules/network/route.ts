@@ -9,7 +9,11 @@ export async function GET() {
     console.log(`[NETWORK API] ${timestamp} - Fetching network data from Azure Functions`)
     
     // Fetch from Azure Functions API - use dedicated network endpoint
-    const apiBaseUrl = process.env.API_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+    const apiBaseUrl = process.env.API_BASE_URL;
+    
+    if (!apiBaseUrl) {
+      return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
+    }
     
     const response = await fetch(`${apiBaseUrl}/api/network`, {
       headers: {

@@ -21,19 +21,22 @@ export interface InventoryInfo {
  * Extract inventory information from device modules
  * MODULAR: Self-contained inventory data processing
  */
-export function extractInventory(deviceModules: any): InventoryInfo {
-  if (!deviceModules?.inventory) {
-    console.log('[INVENTORY MODULE] No inventory data found in modules')
+export function extractInventory(inventoryData: any): InventoryInfo {
+  if (!inventoryData) {
+    console.log('[INVENTORY MODULE] No inventory data found')
     return {}
   }
 
-  const inventory = deviceModules.inventory
+  // Handle both direct inventory data and nested modules structure
+  const inventory = inventoryData.inventory || inventoryData
   
   console.log('[INVENTORY MODULE] Processing inventory data:', {
     hasDeviceName: !!inventory.deviceName,
     hasLocation: !!inventory.location,
     hasAssetTag: !!inventory.assetTag,
-    hasOwner: !!inventory.owner
+    hasOwner: !!inventory.owner,
+    deviceName: inventory.deviceName,
+    rawData: inventory
   })
 
   const inventoryInfo: InventoryInfo = {}
@@ -51,6 +54,10 @@ export function extractInventory(deviceModules: any): InventoryInfo {
   if (inventory.serialNumber) inventoryInfo.serialNumber = inventory.serialNumber
   if (inventory.description) inventoryInfo.description = inventory.description
 
-  console.log('[INVENTORY MODULE] Inventory info extracted:', Object.keys(inventoryInfo))
+  console.log('[INVENTORY MODULE] Inventory info extracted:', {
+    keys: Object.keys(inventoryInfo),
+    deviceName: inventoryInfo.deviceName,
+    fullObject: inventoryInfo
+  })
   return inventoryInfo
 }

@@ -4,12 +4,15 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-const AZURE_FUNCTIONS_BASE_URL = process.env.AZURE_FUNCTIONS_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io';
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
+  const AZURE_FUNCTIONS_BASE_URL = process.env.API_BASE_URL;
+
+  if (!AZURE_FUNCTIONS_BASE_URL) {
+    return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
+  }
   try {
     const { eventId } = await params
     console.log('[EVENT PAYLOAD API] Fetching payload for event:', eventId)

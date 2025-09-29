@@ -629,9 +629,11 @@ function ApplicationsPageContent() {
         // Handle both app-specific (appName:version) and general version filters
         if (versionFilter.includes(':')) {
           const [filterAppName, filterVersion] = versionFilter.split(':')
-          return app.name === filterAppName && (app.version || 'Unknown') === filterVersion
+          if (filterVersion === 'Unknown') return false
+          return app.name === filterAppName && app.version === filterVersion
         } else {
-          return (app.version || 'Unknown') === versionFilter
+          if (versionFilter === 'Unknown') return false
+          return app.version === versionFilter
         }
       })
     

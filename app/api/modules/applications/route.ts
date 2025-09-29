@@ -4,10 +4,13 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
+    
     const timestamp = new Date().toISOString()
-    console.log(`[APPLICATIONS API] ${timestamp} - Fetching applications data`)
+    console.log(`[APPLICATIONS API] ${timestamp} - Fetching applications data (limit: ${limit})`)
 
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
@@ -70,8 +73,8 @@ export async function GET() {
           FROM applications a
           JOIN devices d ON a.device_id = d.id
           ORDER BY a.updated_at DESC
-          LIMIT 1000
-        `)
+          LIMIT $1
+        `, [limit])
         
         // Flatten applications data to create individual records for each app
         const applicationsData: any[] = []
