@@ -4,6 +4,12 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  const API_BASE_URL = process.env.API_BASE_URL;
+
+  if (!API_BASE_URL) {
+    return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
+  }
+
   const { searchParams } = new URL(request.url);
   const sessionId = searchParams.get('sessionId') || Date.now().toString();
 
@@ -63,7 +69,7 @@ export async function GET(request: Request) {
           console.log(`[INSTALLS PROGRESS API] ${timestamp} - Starting installs fetch with progress updates`);
           
           // Fetch all devices first
-          const apiResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/devices', {
+          const apiResponse = await fetch(`${API_BASE_URL}/api/devices`, {
             cache: 'no-store',
             headers: {
               'Cache-Control': 'no-cache',
@@ -152,7 +158,7 @@ export async function GET(request: Request) {
               }
 
               try {
-                const deviceApiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(serialNumber)}`, {
+                const deviceApiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(serialNumber)}`, {
                   cache: 'no-store',
                   headers: {
                     'Cache-Control': 'no-cache',

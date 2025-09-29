@@ -27,8 +27,14 @@ export function useLiveEvents() {
         console.log("🔌 Attempting SignalR connection...")
         setConnectionStatus("connecting")
         
+        // Get API base URL from environment
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL;
+        if (!apiBaseUrl) {
+          throw new Error('API_BASE_URL or NEXT_PUBLIC_API_BASE_URL environment variable is required for SignalR');
+        }
+        
         // Get connection info from negotiate endpoint
-        const negotiateResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/negotiate')
+        const negotiateResponse = await fetch(`${apiBaseUrl}/api/negotiate`)
         if (!negotiateResponse.ok) {
           throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
         }

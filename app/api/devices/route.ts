@@ -1,35 +1,56 @@
 import { NextResponse } from 'next/server'
 
+// Device status calculation (inline to avoid import issues)
+type DeviceStatus = 'active' | 'stale' | 'warning' | 'error' | 'missing'
+
+function calculateDeviceStatus(lastSeen: string | Date | null | undefined): DeviceStatus {
+  const activeThresholdHours = 24
+  const staleThresholdHours = 168 // 7 days
+  
+  if (!lastSeen) return 'missing'
+  
+  try {
+    const lastSeenDate = new Date(lastSeen)
+    if (isNaN(lastSeenDate.getTime())) return 'missing'
+    
+    const now = new Date()
+    const diffHours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+    
+    if (diffHours < activeThresholdHours) return 'active'
+    if (diffHours < staleThresholdHours) return 'stale'
+    return 'missing'
+    
+  } catch (error) {
+    return 'missing'
+  }
+}
+
 // Quick cache for devices data (in memory, resets on server restart)
 let devicesCache: any[] = []
 let cacheTimestamp: number = 0
 const CACHE_DURATION = 60 * 1000 // 60 seconds for better performance
 
-interface RawDevice {
-  serialNumber?: string
-  serial_number?: string
-  deviceId?: string
-  id?: string
-  name?: string
-  lastSeen?: string
-  last_seen?: string
-  createdAt?: string
-  clientVersion?: string
-  [key: string]: unknown
-}
-
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const includeOSVersions = searchParams.get('includeOSVersions') === 'true'
+  const includeDashboardData = searchParams.get('includeDashboardData') === 'true'
   const timestamp = new Date().toISOString()
   
   try {
-    // Check cache first
+    // Check cache first - but check if OS versions or dashboard data are requested
     const now = Date.now()
-    if (devicesCache.length > 0 && (now - cacheTimestamp) < CACHE_DURATION) {
-      return NextResponse.json(devicesCache, {
+    const needsModuleData = includeOSVersions || includeDashboardData
+    if (devicesCache.length > 0 && (now - cacheTimestamp) < CACHE_DURATION && !needsModuleData) {
+      console.log(`[DEVICES API] ${timestamp} - Returning cached data (${devicesCache.length} devices)`)
+      return NextResponse.json({
+        success: true,
+        devices: devicesCache,
+        count: devicesCache.length
+      }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Pragma': 'no-cache',
@@ -42,270 +63,173 @@ export async function GET() {
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
+      console.error(`[DEVICES API] ${timestamp} - API_BASE_URL environment variable not configured`)
       return NextResponse.json({
         error: 'API configuration error',
         details: 'API_BASE_URL environment variable not configured'
       }, { status: 500 })
     }
     
-    // Fetch devices and inventory data concurrently
-  
-    // Fetch devices and inventory data from Azure Functions
-    const [devicesResponse, inventoryResponse] = await Promise.all([
-      fetch(`${apiBaseUrl}/api/devices`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        }
-      }),
-      fetch(`${apiBaseUrl}/api/inventory`, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        }
-      })
-    ])
+    console.log(`[DEVICES API] ${timestamp} - Fetching devices from Container Apps API${needsModuleData ? ' (with module data)' : ''} - URL: ${apiBaseUrl}/api/devices`)
     
-    if (!devicesResponse.ok) {
-      throw new Error(`Devices API failed: ${devicesResponse.status} ${devicesResponse.statusText}`)
+    // Fetch devices from Container Apps API with timeout and error handling
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
+    
+    const response = await fetch(`${apiBaseUrl}/api/devices`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'User-Agent': 'ReportMate-Frontend/1.0'
+      },
+      signal: controller.signal
+    })
+    
+    clearTimeout(timeoutId)
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[DEVICES API] ${timestamp} - Container Apps API failed:`, {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText.substring(0, 500)
+      })
+      throw new Error(`Container Apps API failed: ${response.status} ${response.statusText}`)
     }
     
-    const devicesData = await devicesResponse.json()
+    const data = await response.json()
+    console.log(`[DEVICES API] ${timestamp} - Container Apps API response:`, {
+      success: data.success,
+      deviceCount: data.devices ? data.devices.length : 'no devices property',
+      isArray: Array.isArray(data),
+      arrayLength: Array.isArray(data) ? data.length : 'not array',
+      firstDeviceKeys: data.devices && data.devices.length > 0 ? Object.keys(data.devices[0]) : 'no devices'
+    })
     
-    // Get inventory data for device names (same as inventory page uses)
-    let inventoryData = []
-    if (inventoryResponse.ok) {
-      inventoryData = await inventoryResponse.json()
-    } else {
-      console.warn(`[DEVICES API] Inventory API failed: ${inventoryResponse.status}`)
+    // Extract devices array - Container Apps API returns { success: true, devices: [...] }
+    const devicesArray = data.success ? (data.devices || []) : (Array.isArray(data) ? data : [])
+    
+    if (!Array.isArray(devicesArray)) {
+      console.error(`[DEVICES API] ${timestamp} - Invalid devices data structure:`, {
+        devicesArray: typeof devicesArray,
+        dataKeys: Object.keys(data)
+      })
+      throw new Error('Invalid devices data structure returned from API')
+    }
+    
+    // Helper function to detect platform from serial number patterns
+    const detectPlatform = (serialNumber: string): string => {
+      if (!serialNumber) return 'Windows' // Default to Windows for unknown
+      
+      // Windows serial number patterns (most common in this fleet)
+      if (serialNumber.match(/^[0-9][A-Z0-9]{11,13}$/)) return 'Windows' // 0F33V9G25083HJ
+      if (serialNumber.match(/^WIN-/)) return 'Windows'                  // WIN-prefixed
+      if (serialNumber.match(/^[A-Z0-9]{7,8}$/)) return 'Windows'        // PF4QEAX7, 3GWCPY2, 3H19PY2 etc.
+      if (serialNumber.match(/^[A-Z]{2}[0-9][A-Z0-9]{4}$/)) return 'Windows' // CTDQ0Q2
+      if (serialNumber.match(/^[0-9]{2}[A-Z0-9]{5}$/)) return 'Windows'  // 53G4FF3, 37BQKQ3
+      
+      // macOS serial number patterns (Apple-specific - very narrow patterns)
+      if (serialNumber.match(/^[FM][A-Z0-9]{10}$/)) return 'macOS'       // MJ0KP6FK, MZ008KGX (true Apple serials)
+      if (serialNumber.match(/^G[A-Z0-9]{7}$/)) return 'macOS'           // GM0MB0JS (true Apple serials)
+      if (serialNumber.match(/^[8-9][A-Z0-9]{6}$/)) return 'macOS'       // 8LCX9Z2 (true Apple serials)
+      if (serialNumber.match(/^[CDF][A-Z0-9]{9}$/)) return 'macOS'       // D7C10R3, F7C10R3 (true Apple serials)
+      
+      // Default to Windows since this fleet is primarily Windows
+      return 'Windows'
+      
+      return 'unknown'
     }
 
-    // Get system data from database for OS information
-    let systemData: any[] = []
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Pool } = require('pg')
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL })
+    // Enhanced transformation with platform detection using module data when available
+    const transformedDevices = Array.isArray(devicesArray) ? devicesArray.map((device: any) => {
+      // Calculate proper device status based on lastSeen timestamp
+      const calculatedStatus = calculateDeviceStatus(device.lastSeen)
       
-      // Query system table for OS information with device serial numbers
-      const systemQuery = `
-        SELECT 
-          device_id as system_device_id,
-          data,
-          collected_at
-        FROM system
-        WHERE collected_at IS NOT NULL 
-          AND data IS NOT NULL
-          AND device_id IS NOT NULL
-        ORDER BY collected_at DESC
-      `
+      // Use OS data from modules if available (FastAPI Container provides this)
+      const osData = device.modules?.system?.operatingSystem
+      let platform = detectPlatform(device.serialNumber)
+      let osVersionForGraphs = null
+      let friendlyOSVersion = device.os || 'Unknown OS'
       
-      const systemResult = await pool.query(systemQuery)
-      systemData = systemResult.rows || []
+      // If OS data is available from the Container API, use it
+      if (osData) {
+        if (osData.name?.toLowerCase().includes('windows')) {
+          platform = 'Windows'
+          // Windows version: major.build.featureUpdate
+          osVersionForGraphs = `${osData.major || 10}.${osData.build}.${osData.featureUpdate || '0'}`
+          friendlyOSVersion = `${osData.name} ${osData.displayVersion || osData.version}`
+        } else if (osData.name?.toLowerCase().includes('macos')) {
+          platform = 'macOS'
+          // macOS version: major.minor.patch  
+          osVersionForGraphs = `${osData.major}.${osData.minor}.${osData.patch}`
+          friendlyOSVersion = `${osData.name} ${osData.version}`
+        }
+      }
       
-      await pool.end()
-    } catch (systemError) {
-      console.warn(`[DEVICES API] System database query failed:`, systemError)
-    }
+      const transformedDevice: any = {
+        deviceId: device.deviceId || device.serialNumber,
+        serialNumber: device.serialNumber,
+        name: device.deviceName || device.name || device.serialNumber,
+        lastSeen: device.lastSeen,
+        createdAt: device.createdAt,
+        status: calculatedStatus, // Use calculated status instead of API's "online"
+        platform: platform,
+        clientVersion: device.clientVersion || '1.0.0',
+        totalEvents: device.totalEvents || 0,
+        hasData: true,
+        os_version: friendlyOSVersion,
+        osVersionForGraphs: osVersionForGraphs,
+        // Include inventory fields from the enhanced FastAPI Container endpoint
+        assetTag: device.assetTag || null,
+        usage: device.usage || null,
+        catalog: device.catalog || null,
+        location: device.location || null,
+        department: device.department || null
+      }
+      
+      // Include the complete modules structure if available (needed for dashboard charts)
+      if (device.modules) {
+        transformedDevice.modules = device.modules
+      }
+      
+      return transformedDevice
+    }) : []
     
-    // Get ALL modules' latest timestamps for proper status calculation
-    let allModulesData = []
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { Pool } = require('pg')
-      const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-      
-      // Query all module tables to get latest collectedAt timestamps per device
-      const moduleTableQueries = [
-        'SELECT device_id, collected_at, \'system\' as module_name FROM system WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'inventory\' as module_name FROM inventory WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'hardware\' as module_name FROM hardware WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'installs\' as module_name FROM installs WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'applications\' as module_name FROM applications WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'management\' as module_name FROM management WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'network\' as module_name FROM network WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'security\' as module_name FROM security WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'profiles\' as module_name FROM profiles WHERE collected_at IS NOT NULL',
-        'SELECT device_id, collected_at, \'printers\' as module_name FROM printers WHERE collected_at IS NOT NULL'
-      ]
-      
-      const unionQuery = `
-        WITH all_modules AS (
-          ${moduleTableQueries.join(' UNION ALL ')}
-        ),
-        latest_per_device AS (
-          SELECT 
-            device_id,
-            MAX(collected_at) as latest_collected_at
-          FROM all_modules 
-          GROUP BY device_id
-        )
-        SELECT 
-          d.serial_number,
-          l.latest_collected_at
-        FROM latest_per_device l
-        JOIN devices d ON l.device_id = d.id
-        WHERE d.serial_number IS NOT NULL
-      `
-      
-      const result = await pool.query(unionQuery)
-      allModulesData = result.rows
-      
-      await pool.end()
-    } catch (dbError) {
-      console.warn(`[DEVICES API] Module timestamps query failed:`, dbError)
-    }
-    
-    // Build inventory lookup map for fast device name resolution (same as inventory page)
-    const inventoryMap = new Map<string, any>()
-    if (Array.isArray(inventoryData)) {
-      inventoryData.forEach((item: any) => {
-        if (item.serialNumber) {
-          inventoryMap.set(item.serialNumber, item)
-        }
-      })
-    }
-
-    // Build system map for OS information using database data
-    const systemMap = new Map<string, any>()
-    if (Array.isArray(systemData)) {
-      systemData.forEach((item: any) => {
-        if (item.system_device_id && item.data) {
-          // Parse the data JSON field from database to extract operatingSystem
-          let systemInfo = null
-          let operatingSystem = null
-          try {
-            systemInfo = typeof item.data === 'string' 
-              ? JSON.parse(item.data) 
-              : item.data
-            
-            // Extract operatingSystem from the system data
-            operatingSystem = systemInfo?.operatingSystem
-          } catch (parseError) {
-            console.warn(`[DEVICES API] Failed to parse system data for ${item.system_device_id}:`, parseError)
-          }
-          
-          if (operatingSystem) {
-            // Use device_id from system table as the serial number
-            systemMap.set(item.system_device_id, {
-              operatingSystem,
-              collected_at: item.collected_at,
-              device_id: item.system_device_id
-            })
-          }
-        }
-      })
-    }
-    
-    // Build module timestamps map for latest activity per device
-    const moduleTimestampsMap = new Map<string, Date>()
-    if (Array.isArray(allModulesData)) {
-      allModulesData.forEach((item: any) => {
-        if (item.serial_number && item.latest_collected_at) {
-          moduleTimestampsMap.set(item.serial_number, new Date(item.latest_collected_at))
-        }
-      })
-    }
-    
-    // Extract devices array from Azure Functions response structure
-    // Azure Functions returns array directly, not wrapped in devices property
-    const devicesArray = Array.isArray(devicesData) ? devicesData : (devicesData.devices || devicesData || [])
-    
-    // Enhanced transformation using inventory data (same logic as inventory page)
-    const transformedDevices = (Array.isArray(devicesArray) ? devicesArray : [])
-      .filter((device: RawDevice) => {
-        const serialNumber = device.serialNumber || device.serial_number
-        return serialNumber && 
-               !serialNumber.startsWith('TEST-') && 
-               !serialNumber.includes('test-device') &&
-               serialNumber !== 'localhost'
-      })
-      .map((device: any) => {
-        const serialNumber = device.serialNumber || device.serial_number
-        
-        // Status calculation using module timestamps (matches Azure Functions logic)
-        const calculateStatus = (lastSeen: string | null, serialNumber: string) => {
-          // Check for most recent module timestamp first (like Azure Functions)
-          const latestModuleTimestamp = moduleTimestampsMap.get(serialNumber)
-          
-          // Use latest module timestamp if available, otherwise fall back to lastSeen
-          const timestampToUse = latestModuleTimestamp || (lastSeen ? new Date(lastSeen) : null)
-          
-          if (!timestampToUse || isNaN(timestampToUse.getTime())) return 'missing'
-          
-          const hours = (Date.now() - timestampToUse.getTime()) / (1000 * 60 * 60)
-          return hours < 24 ? 'active' : hours < 168 ? 'stale' : 'missing'
-        }
-
-        const lastSeenValue = (device.lastSeen || device.last_seen) as string | null
-        
-        // Get inventory info for this device (same as inventory page)
-        const inventoryInfo = inventoryMap.get(serialNumber) || {}
-        
-        // Build proper device name using EXACT SAME logic as inventory page
-        const deviceName = inventoryInfo.deviceName || inventoryInfo.computerName || serialNumber || 'Unknown Device'
-        
-        // Get system info for this device
-        const systemInfo = systemMap.get(serialNumber) || {}
-        
-        // Build modules structure with system and inventory data
-        const modules = {
-          inventory: {
-            catalog: inventoryInfo?.catalog || 'Unknown',
-            usage: inventoryInfo?.usage || 'Unknown',
-            ...inventoryInfo // Include all other inventory fields
-          },
-          system: {
-            // Include system module data if available from database
-            operatingSystem: systemInfo?.operatingSystem,
-            ...systemInfo // Include all other system fields (collected_at, device_id)
-          }
-        }
-        
-        // Create clean device object to avoid property duplication
-        const cleanDevice = {
-          deviceId: device.deviceId || device.id || serialNumber,
-          serialNumber: serialNumber,
-          name: deviceName, // Use name for consistency with component interface
-          lastSeen: lastSeenValue,
-          createdAt: device.createdAt,
-          status: calculateStatus(lastSeenValue, serialNumber),
-          clientVersion: device.clientVersion || '1.0.0',
-          assetTag: inventoryInfo?.assetTag,
-          location: inventoryInfo?.location,
-          os: systemInfo?.operatingSystem?.name || inventoryInfo?.operatingSystem || device.os,
-          modules,
-          totalEvents: device.totalEvents || 0,
-          lastEventTime: lastSeenValue,
-          hasData: true // Explicitly set since these devices have data
-        }
-        
-        return cleanDevice
-      })
+    console.log(`[DEVICES API] ${timestamp} - Transformed ${transformedDevices.length} devices with OS data from Container API`)
     
     // Update cache
     devicesCache = transformedDevices
     cacheTimestamp = now
     
-    return NextResponse.json(transformedDevices, {
+    return NextResponse.json({
+      success: true,
+      devices: transformedDevices,
+      count: transformedDevices.length
+    }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
         'X-Fetched-At': timestamp,
-        'X-Data-Source': 'azure-functions-fresh'
+        'X-Data-Source': 'container-apps-api'
       }
     })
       
   } catch (error) {
-    console.error('[DEVICES API] Error:', error)
+    console.error(`[DEVICES API] ${timestamp} - Error occurred:`, {
+      errorMessage: error instanceof Error ? error.message : String(error),
+      errorStack: error instanceof Error ? error.stack : 'No stack trace',
+      errorName: error instanceof Error ? error.name : typeof error
+    })
     
     // If we have cached data, return it even if fresh fetch fails
     if (devicesCache.length > 0) {
-      return NextResponse.json(devicesCache, {
+      console.log(`[DEVICES API] ${timestamp} - Returning stale cache data due to error`)
+      return NextResponse.json({
+        success: true,
+        devices: devicesCache,
+        count: devicesCache.length
+      }, {
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate',
           'Pragma': 'no-cache',
@@ -317,9 +241,11 @@ export async function GET() {
     }
     
     return NextResponse.json({
+      success: false,
       error: 'Failed to fetch devices',
       details: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString()
+      devices: [],
+      count: 0
     }, { status: 500 })
   }
 }

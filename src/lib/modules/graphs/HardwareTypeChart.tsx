@@ -74,19 +74,20 @@ export function HardwareTypeChart({
     if (!devices || devices.length === 0) return []
 
     // Helper function to get model name
-    const getModelName = (device: Device): string => {
+    const getModelName = (device: Device): string | null => {
       return device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
-             (device as any).raw?.model ||
-             (device as any).raw?.system?.hardwareInfo?.model ||
-             (device as any).raw?.hardware?.model ||
-             'Unknown Model'
+             // 🚨🚨🚨 NO FAKE DATA - Return null for unknown models 🚨🚨🚨
+             null
     }
 
     // Helper function to determine device type
-    const getDeviceType = (device: Device): string => {
+    const getDeviceType = (device: Device): string | null => {
       const model = getModelName(device)
+      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      if (!model) return null
+      
       const modelLower = model.toLowerCase()
       
       // Desktop indicators
@@ -124,29 +125,28 @@ export function HardwareTypeChart({
     }
 
     // Helper function to get processor name
-    const getProcessorName = (device: Device): string => {
+    const getProcessorName = (device: Device): string | null => {
       const processor = device.processor || 
-                       device.modules?.hardware?.processor ||
-                       (device as any).raw?.processor ||
-                       'Unknown Processor'
+                       device.modules?.hardware?.processor
 
-      if (typeof processor === 'string') {
+      if (typeof processor === 'string' && processor.trim()) {
         return processor
       }
 
       if (typeof processor === 'object' && processor !== null) {
-        return processor.name || processor.model || processor.brand || 'Unknown Processor'
+        return processor.name || processor.model || processor.brand || null
       }
 
-      return 'Unknown Processor'
+      // 🚨🚨🚨 NO FAKE DATA - Return null for unknown processors 🚨🚨🚨
+      return null
     }
 
     // Helper function to get memory range
-    const getMemoryRange = (device: Device): string => {
+    const getMemoryRange = (device: Device): string | null => {
       const memory = (device as any).memory
-      if (!memory) return 'Unknown'
+      if (!memory) return null // 🚨🚨🚨 NO FAKE DATA - Return null for unknown memory 🚨🚨🚨
       const memGb = parseFloat(memory)
-      if (isNaN(memGb)) return 'Unknown'
+      if (isNaN(memGb)) return null
       if (memGb <= 8) return '≤8 GB'
       if (memGb <= 16) return '9-16 GB'
       if (memGb <= 32) return '17-32 GB'
@@ -164,8 +164,11 @@ export function HardwareTypeChart({
     }
 
     // Helper function to get platform
-    const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
+    const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' | null => {
       const model = getModelName(device)
+      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      if (!model) return null
+      
       if (model.toLowerCase().includes('macbook') || 
           model.toLowerCase().includes('imac') || 
           model.toLowerCase().includes('mac mini') ||
@@ -181,13 +184,15 @@ export function HardwareTypeChart({
       // Platform filter
       if (globalSelectedPlatforms.length > 0) {
         const platform = getDevicePlatform(device)
-        if (!globalSelectedPlatforms.includes(platform)) return false
+        // 🚨🚨🚨 NO FAKE DATA - Skip devices without platform info 🚨🚨🚨
+        if (!platform || !globalSelectedPlatforms.includes(platform)) return false
       }
 
       // Processor filter
       if (globalSelectedProcessors.length > 0) {
         const processor = getProcessorName(device)
-        if (!globalSelectedProcessors.includes(processor)) return false
+        // 🚨🚨🚨 NO FAKE DATA - Skip devices without real processor info 🚨🚨🚨
+        if (!processor || !globalSelectedProcessors.includes(processor)) return false
       }
 
       // Architecture filter
@@ -199,13 +204,15 @@ export function HardwareTypeChart({
       // Device type filter
       if (globalSelectedDeviceTypes.length > 0) {
         const deviceType = getDeviceType(device)
-        if (!globalSelectedDeviceTypes.includes(deviceType)) return false
+        // 🚨🚨🚨 NO FAKE DATA - Skip devices without device type info 🚨🚨🚨
+        if (!deviceType || !globalSelectedDeviceTypes.includes(deviceType)) return false
       }
 
       // Memory range filter
       if (globalSelectedMemoryRanges.length > 0) {
         const memoryRange = getMemoryRange(device)
-        if (!globalSelectedMemoryRanges.includes(memoryRange)) return false
+        // 🚨🚨🚨 NO FAKE DATA - Skip devices without real memory info 🚨🚨🚨
+        if (!memoryRange || !globalSelectedMemoryRanges.includes(memoryRange)) return false
       }
 
       // Storage range filter
@@ -222,12 +229,13 @@ export function HardwareTypeChart({
     
     filteredDevices.forEach(device => {
       const model = getModelName(device)
+      // 🚨🚨🚨 NO FAKE DATA - Skip devices without real model info 🚨🚨🚨
+      if (!model) return
       counts[model] = (counts[model] || 0) + 1
     })
 
-    // Get top models
+    // Get top models - no need to filter "Unknown Model" since we don't generate it
     const sortedModels = Object.entries(counts)
-      .filter(([model]) => model !== 'Unknown Model') // Don't show unknown models
       .sort(([, a], [, b]) => b - a)
       .slice(0, 10) // Show top 10 models
 

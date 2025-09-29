@@ -45,15 +45,15 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
   
   console.log('[PROFILES MODULE] Reading pre-processed profiles data:', {
     hasIntunePolicies: !!profilesData.intunePolicies,
-    policyCount: profilesData.intunePolicies?.length || 0,
+    policyCount: Array.isArray(profilesData.intunePolicies) ? profilesData.intunePolicies.length : 0,
     hasConfigurationProfiles: !!profilesData.configurationProfiles,
-    configProfileCount: profilesData.configurationProfiles?.length || 0
+    configProfileCount: Array.isArray(profilesData.configurationProfiles) ? profilesData.configurationProfiles.length : 0
   })
 
   // Process profiles from different sources
   const profiles: ProfileItem[] = []
 
-  // Add Intune policies
+  // Add Intune policies - Ensure it's an array
   if (profilesData.intunePolicies && Array.isArray(profilesData.intunePolicies)) {
     profilesData.intunePolicies.forEach((policy: any) => {
       profiles.push({
@@ -64,7 +64,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
         installDate: policy.assignedDate || policy.lastSync || '',
         organization: 'Microsoft Intune',
         description: policy.policyType || '',
-        payloads: policy.settings || [],
+        payloads: Array.isArray(policy.settings) ? policy.settings : [],
         isRemovable: policy.isRemovable !== false,
         hasRemovalPasscode: !!policy.removalPasscode,
         isEncrypted: !!policy.isEncrypted
@@ -72,7 +72,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
     })
   }
 
-  // Add configuration profiles
+  // Add configuration profiles - Ensure it's an array
   if (profilesData.configurationProfiles && Array.isArray(profilesData.configurationProfiles)) {
     profilesData.configurationProfiles.forEach((profile: any) => {
       profiles.push({
@@ -83,7 +83,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
         installDate: profile.installDate || '',
         organization: profile.organization || '',
         description: profile.description || '',
-        payloads: profile.payloads || [],
+        payloads: Array.isArray(profile.payloads) ? profile.payloads : [],
         isRemovable: profile.isRemovable !== false,
         hasRemovalPasscode: !!profile.removalPasscode,
         isEncrypted: !!profile.isEncrypted

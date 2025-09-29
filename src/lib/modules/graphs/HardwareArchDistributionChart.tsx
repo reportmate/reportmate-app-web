@@ -11,8 +11,13 @@ interface Device {
   name: string
   model?: string
   os?: string
+  platform?: string  // API platform detection
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string  // Made flexible to handle API response variations
+  
+  
+  
+  
   modules?: {
     system?: {
       operatingSystem?: {
@@ -67,7 +72,15 @@ interface ArchStats {
 }
 
 // Helper function to detect platform from device
-const detectPlatform = (device: Device): string => {
+const detectPlatform = (device: Device): string | null => {
+  // CRITICAL FIX: Trust the API platform field - it's already correctly detected
+  if (device.platform) {
+    const platformLower = device.platform.toLowerCase()
+    if (platformLower === 'windows') return 'Windows'
+    if (platformLower === 'macos') return 'macOS'
+    if (platformLower === 'linux') return 'Linux'
+  }
+  
   const systemOS = device.modules?.system?.operatingSystem?.name?.toLowerCase()
   if (systemOS) {
     if (systemOS.includes('windows')) return 'Windows'
@@ -82,7 +95,8 @@ const detectPlatform = (device: Device): string => {
     if (os.includes('linux')) return 'Linux'
   }
 
-  return 'Unknown'
+  // 🚨🚨🚨 NO FAKE DATA - Return null for unknown platforms 🚨🚨🚨
+  return null
 }
 
 // Helper function to get architecture from device
@@ -219,7 +233,7 @@ const processArchitectureData = (devices: Device[], filters?: any): ArchStats[] 
     archCounts[architecture].count++
     
     // Track platforms
-    if (platform !== 'Unknown') {
+    if (platform) {
       archCounts[architecture].platforms[platform] = 
         (archCounts[architecture].platforms[platform] || 0) + 1
     }
@@ -293,7 +307,7 @@ export const HardwareArchDistributionChart: React.FC<HardwareArchDistributionCha
 
     devices.forEach(device => {
       const platform = detectPlatform(device)
-      if (platform !== 'Unknown') platforms.add(platform)
+      if (platform) platforms.add(platform)
       
       const manufacturer = getProcessorManufacturer(device)
       if (manufacturer !== 'Unknown') manufacturers.add(manufacturer)

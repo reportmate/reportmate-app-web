@@ -13,8 +13,9 @@ interface Device {
   name: string
   model?: string
   os?: string
+  platform?: string  // API platform detection
   lastSeen: string
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string  // Made flexible to handle API response variations
   modules?: {
     system?: {
       operatingSystem?: {

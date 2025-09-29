@@ -31,9 +31,10 @@ interface Device {
   name: string
   model?: string
   os?: string
+  platform?: string     // Fast API platform field
   lastSeen: string
   createdAt?: string    // Registration date - when device first appeared in ReportMate
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string        // Made flexible to handle API response variations
   uptime?: string
   location?: string
   ipAddress?: string
@@ -82,6 +83,13 @@ export default function Dashboard() {
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
 
+  // Debug current state
+  console.log('[DASHBOARD DEBUG] Component render:', {
+    devicesCount: devices.length,
+    devicesLoading,
+    devicesState: devices.length > 0 ? 'HAS_DEVICES' : 'EMPTY_DEVICES'
+  })
+
   // Memory monitoring and cleanup
   useEffect(() => {
     const interval = setInterval(() => {
@@ -106,6 +114,80 @@ export default function Dashboard() {
     }
   }, [])
 
+  // Function to fetch OS data for dashboard charts
+  const fetchOSDataForCharts = async (devices: Device[]) => {
+    if (devices.length === 0) return
+    
+    try {
+      console.log('[DASHBOARD] Fetching OS data for charts from first 20 devices')
+      const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+      
+      // Get first 20 devices for sampling
+      const sampleDevices = devices.slice(0, 20)
+      
+      const osPromises = sampleDevices.map(async (device: Device) => {
+        try {
+          const response = await fetch(`${containerApiUrl}/api/device/${device.serialNumber}`, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' },
+            signal: AbortSignal.timeout(3000)
+          })
+          
+          if (response.ok) {
+            const deviceData = await response.json()
+            const osData = deviceData.device?.modules?.system?.operatingSystem
+            
+            if (osData) {
+              return {
+                serialNumber: device.serialNumber,
+                platform: osData.name?.toLowerCase().includes('windows') ? 'Windows' : 'macOS',
+                osVersion: osData.displayVersion || osData.version || 'Unknown',
+                osVersionForGraphs: osData.name?.toLowerCase().includes('windows') 
+                  ? `${osData.major || 10}.${osData.build}.${osData.featureUpdate || '0'}`
+                  : `${osData.major}.${osData.minor}.${osData.patch}`,
+                osData: osData
+              }
+            }
+          }
+          return null
+        } catch (error) {
+          return null
+        }
+      })
+      
+      const results = await Promise.allSettled(osPromises)
+      const successfulResults = results
+        .filter(r => r.status === 'fulfilled' && r.value)
+        .map(r => (r as PromiseFulfilledResult<any>).value)
+      
+      console.log(`[DASHBOARD] Got OS data for ${successfulResults.length} devices`)
+      
+      // Update devices with OS data
+      setDevices(prevDevices => 
+        prevDevices.map(device => {
+          const osResult = successfulResults.find(r => r.serialNumber === device.serialNumber)
+          if (osResult) {
+            return {
+              ...device,
+              platform: osResult.platform,
+              os: osResult.osVersion,
+              modules: {
+                ...device.modules,
+                system: {
+                  operatingSystem: osResult.osData
+                }
+              }
+            }
+          }
+          return device
+        })
+      )
+      
+    } catch (error) {
+      console.error('[DASHBOARD] Error fetching OS data for charts:', error)
+    }
+  }
+
   // Fetch devices data (same as original dashboard)
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
@@ -126,8 +208,10 @@ export default function Dashboard() {
       }, 15000) // 15 second timeout
 
       try {
-        // Use production API 
-        const response = await fetch('/api/devices', {
+        // FIXED: Use regular devices API to get ALL devices for accurate counts
+        // Fetch directly from container API since local /api/devices has issues
+        const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+        const response = await fetch(`${containerApiUrl}/api/devices`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -162,23 +246,46 @@ export default function Dashboard() {
             // Received device data from API
           }
           
-          // Handle both response formats: {success: true, devices: [...]} or direct array
+          // Handle local inventory API response format: direct array of processed devices
+          let deviceArray = []
           if (Array.isArray(data)) {
+            // Local inventory API returns direct array format
+            deviceArray = data
+          } else if (data.success && Array.isArray(data.devices)) {
+            // Azure Functions API format (fallback)
+            deviceArray = data.devices
+          } else {
+            console.error('[DASHBOARD] Unexpected response format:', typeof data)
+            throw new Error('Unexpected response format from API')
+          }
+          
+          if (deviceArray.length > 0) {
             // MEMORY OPTIMIZATION: Use optimized processing
-            const optimizedDevices = optimizeDevicesArray(data)
+            const optimizedDevices = optimizeDevicesArray(deviceArray)
             
-            // Process remaining devices for backwards compatibility
-            const processedDevices = optimizedDevices.map((device: Device) => {
+            // SIMPLIFIED: Process devices with or without inventory data  
+            const processedDevices = optimizedDevices.map((device: any) => {
+              // Get inventory from modules if available, otherwise use device properties directly
               const inventory = device.modules?.inventory || {}
-              // Removed excessive debug logging to prevent memory issues
               
               return {
-                ...device,
-                // Modules are already optimized
-                modules: { ...device.modules },
-                // Extract inventory fields for backwards compatibility
-                assetTag: inventory.assetTag,
-                name: inventory.deviceName || device.name || device.serialNumber || 'Unknown Device'
+                deviceId: device.deviceId || device.id,
+                serialNumber: device.serialNumber || device.deviceId,
+                // Use device name directly, fallback to inventory if available
+                name: device.name || inventory.deviceName || device.deviceName || device.serialNumber,
+                assetTag: device.assetTag || inventory.assetTag,
+                location: device.location || inventory.location,
+                usage: device.usage || inventory.usage,
+                catalog: device.catalog || inventory.catalog,
+                department: device.department || inventory.department,
+                owner: device.owner || inventory.owner,
+                lastSeen: device.lastSeen || device.timestamp,
+                createdAt: device.createdAt,
+                status: device.status || 'unknown',
+                platform: device.platform, // CRITICAL: Preserve platform field from API
+                totalEvents: device.totalEvents || 0,
+                lastEventTime: device.lastEventTime || device.lastSeen,
+                modules: device.modules // Preserve modules if present
               }
             })
             
@@ -189,10 +296,26 @@ export default function Dashboard() {
             
             // Setting device state
             // Removed detailed device array logging to prevent memory issues
+            console.log('[DASHBOARD DEBUG] About to set devices state:', {
+              processedDevicesLength: processedDevices.length,
+              sortedDevicesLength: sortedDevices.length,
+              firstDeviceDebug: sortedDevices[0] ? {
+                name: sortedDevices[0].name,
+                serialNumber: sortedDevices[0].serialNumber,
+                status: sortedDevices[0].status,
+                hasModules: !!sortedDevices[0].modules,
+                inventoryName: sortedDevices[0].modules?.inventory?.deviceName
+              } : null
+            })
             
             try {
               setDevices(sortedDevices)
               setDevicesLoading(false)
+              
+              console.log('[DASHBOARD DEBUG] Devices state set successfully')
+              
+              // Fetch OS version data for charts after devices are loaded
+              fetchOSDataForCharts(sortedDevices)
               
               // Clear the timeout since we got data
               if (timeoutId) {
@@ -243,6 +366,7 @@ export default function Dashboard() {
                 ...device,
                 // Preserve all modules (including system)
                 modules: { ...device.modules },
+                platform: device.platform, // Preserve fast API platform field
                 assetTag: inventory.assetTag,
                 name: inventory.deviceName || device.name || device.serialNumber || 'Unknown Device'
               }
@@ -322,12 +446,14 @@ export default function Dashboard() {
     // TEMPORARY FIX: Direct API call to ensure devices data is loaded
     const loadDevicesDirectly = async () => {
       try {
-        const response = await fetch('/api/devices')
+        // Fetch directly from container API
+        const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+        const response = await fetch(`${containerApiUrl}/api/devices`)
         if (response.ok) {
           const data = await response.json()
           // Got devices from direct API call
-          if (data && data.length > 0) {
-            setDevices(data)
+          if (data && data.devices && data.devices.length > 0) {
+            setDevices(data.devices)
             setDevicesLoading(false)
             // Successfully set devices state
           }

@@ -9,6 +9,9 @@ import { extractSystem, type SystemInfo } from './modules/system'
 import { extractInventory, type InventoryInfo } from './modules/inventory'
 import { extractInstalls, type InstallsInfo } from './modules/installs'
 import { extractApplications } from './modules/applications'
+import { extractSecurity, type SecurityInfo } from './modules/security'
+import { extractManagement, type ManagementInfo } from './modules/management'
+import { extractProfiles, type ProfilesInfo } from './modules/profiles'
 
 export interface ProcessedDeviceInfo {
   // Core identifiers
@@ -35,6 +38,9 @@ export interface ProcessedDeviceInfo {
   installs?: InstallsInfo
   applications?: any
   peripherals?: any
+  security?: SecurityInfo
+  management?: ManagementInfo
+  profiles?: ProfilesInfo
   
   // Legacy compatibility (deprecated - use modular data instead)
   model?: string
@@ -85,123 +91,73 @@ export function validateDeviceStructure(rawDevice: any): void {
  * Each aspect is processed by dedicated modules
  */
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
-  console.log('🚨🚨🚨 MODULAR DEVICE MAPPER - CALLED WITH DATA!')
-  console.log('🚨🚨🚨 DEVICE MAPPER - USING ISOLATED PROCESSING MODULES')
-  
-  if (!rawDevice) {
-    throw new Error('No device data provided to mapper')
-  }
-
-  // Validate structure
-  validateDeviceStructure(rawDevice)
-
-  // Normalize core data using modules
-  const validLastSeen = normalizeLastSeen(rawDevice.lastSeen)
-  const deviceStatus = calculateDeviceStatus(validLastSeen)
-
-  // Extract modular data using dedicated processors
-  console.log('🔧 MODULAR EXTRACTION - Starting module processing')
-  console.log('🔧 MODULES AVAILABLE:', Object.keys(rawDevice.modules))
-  
-  const hardware = extractHardware(rawDevice.modules)
-  console.log('✅ Hardware extraction complete')
-  
-  const network = extractNetwork(rawDevice.modules)
-  console.log('✅ Network extraction complete')
-  
-  const system = extractSystem(rawDevice.modules)
-  console.log('✅ System extraction complete')
-  
-  const inventory = extractInventory(rawDevice.modules)
-  console.log('✅ Inventory extraction complete')
-  
-  console.log('🎯 ABOUT TO CALL extractInstalls with modules:', {
-    hasInstalls: !!rawDevice.modules?.installs,
-    installsKeys: rawDevice.modules?.installs ? Object.keys(rawDevice.modules.installs) : 'no installs'
-  })
-  const installs = extractInstalls(rawDevice.modules)  // FIXES status capitalization
-  console.log('✅ Installs extraction complete')
-
-  // Core device info
-  const mappedDevice: ProcessedDeviceInfo = {
-    // Core identifiers
-    deviceId: rawDevice.deviceId,
+  console.log('[DEVICE MAPPER] Processing device:', {
     serialNumber: rawDevice.serialNumber,
-    name: inventory.deviceName || rawDevice.serialNumber || 'Unknown Device',
+    hasModules: !!rawDevice.modules,
+    hasInventory: !!rawDevice.modules?.inventory,
+    inventoryDeviceName: rawDevice.modules?.inventory?.deviceName,
+    rawInventoryData: rawDevice.modules?.inventory
+  })
+  
+  // Extract modules data with correct nesting
+  const modules = rawDevice.modules || {}
+  
+  // FIXED: Extract inventory from the correct nested path
+  const inventory = extractInventory(modules.inventory || {})
+  const system = extractSystem(modules.system || {})
+  const hardware = extractHardware(modules.hardware || {})
+  const network = extractNetwork(modules.network || {})
+  const security = extractSecurity(modules.security || {})
+  const applications = extractApplications(modules.applications || {})
+  const management = extractManagement(modules.management || {})
+  const installs = extractInstalls(modules.installs || {})
+  const profiles = extractProfiles(modules.profiles || {})
+  
+  console.log('[DEVICE MAPPER] Extracted inventory:', {
+    deviceName: inventory.deviceName,
+    assetTag: inventory.assetTag,
+    location: inventory.location,
+    fullInventoryObject: inventory
+  })
+  
+  const finalName = inventory.deviceName || rawDevice.name || rawDevice.serialNumber || 'Unknown Device'
+  console.log('[DEVICE MAPPER] Final device name logic:', {
+    inventoryDeviceName: inventory.deviceName,
+    rawDeviceName: rawDevice.name,
+    rawDeviceSerial: rawDevice.serialNumber,
+    finalName: finalName
+  })
+  
+  return {
+    // Core identifiers  
+    deviceId: rawDevice.deviceId,
+    serialNumber: rawDevice.serialNumber || 'Unknown',
+    name: finalName,
     
-    // Status and timestamps  
-    lastSeen: validLastSeen,
-    status: deviceStatus,
+    // Status and timestamps
+    lastSeen: rawDevice.lastSeen || new Date().toISOString(),
+    status: rawDevice.status || 'unknown',
     createdAt: rawDevice.createdAt,
     
     // Client information
     clientVersion: rawDevice.clientVersion,
     
-    // Pass through modules (source of truth)
-    modules: rawDevice.modules,
+    // Required properties
+    totalEvents: 0,
+    lastEventTime: rawDevice.lastSeen || new Date().toISOString(),
     
-    // Processed modular data (easy access)
+    // Module data
+    inventory,
+    system,
     hardware,
     network,
-    system,
-    inventory,
-    installs,  // CONTAINS PROPERLY CAPITALIZED STATUSES
+    security,
+    applications,
+    management,
+    installs,
+    profiles,
     
-    // Legacy compatibility fields (deprecated)
-    model: hardware.processor,
-    os: system.operatingSystem?.name || '',
-    platform: system.operatingSystem?.version || '',
-    uptime: system.bootTime || '',
-    location: inventory.location,
-    assetTag: inventory.assetTag,
-    ipAddress: network.ipAddress,
-    macAddress: network.macAddress,
-    totalEvents: 0,
-    lastEventTime: validLastSeen,
-    processor: hardware.processor,
-    processorSpeed: hardware.processorSpeed,
-    cores: hardware.cores,
-    memory: hardware.memory,
-    availableRAM: hardware.availableRAM,
-    storage: hardware.storage,
-    graphics: hardware.graphics,
-    architecture: hardware.architecture,
-    batteryLevel: hardware.batteryLevel,
-    batteryHealth: hardware.batteryHealth,
-    batteryCycleCount: hardware.batteryCycleCount,
-    isCharging: hardware.isCharging,
-    bootTime: hardware.bootTime
+    // Keep original modules for any unprocessed data
+    modules: modules
   }
-
-  // Process additional modular data
-  if (rawDevice.modules?.applications?.installed_applications) {
-    mappedDevice.applications = extractApplications(rawDevice)
-  }
-
-  if (rawDevice.modules?.peripherals || rawDevice.modules?.displays || rawDevice.modules?.printers) {
-    mappedDevice.peripherals = extractHardware(rawDevice)
-  }
-
-  console.log('🧩 MODULAR DEVICE MAPPER - Processing complete:', {
-    deviceId: mappedDevice.deviceId,
-    serialNumber: mappedDevice.serialNumber,
-    status: mappedDevice.status,
-    modulesProcessed: {
-      hardware: !!mappedDevice.hardware && Object.keys(mappedDevice.hardware).length > 0,
-      network: !!mappedDevice.network && Object.keys(mappedDevice.network).length > 0,
-      system: !!mappedDevice.system && Object.keys(mappedDevice.system).length > 0,
-      inventory: !!mappedDevice.inventory && Object.keys(mappedDevice.inventory).length > 0,
-      installs: !!mappedDevice.installs && mappedDevice.installs.totalPackages > 0
-    },
-    installsStatus: mappedDevice.installs ? {
-      totalPackages: mappedDevice.installs.totalPackages,
-      statusBreakdown: {
-        installed: mappedDevice.installs.installed,
-        pending: mappedDevice.installs.pending,
-        failed: mappedDevice.installs.failed
-      }
-    } : 'No installs data'
-  })
-
-  return mappedDevice
 }

@@ -4,9 +4,6 @@ import { NextRequest, NextResponse } from 'next/server';
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Production API base URL (single source of truth)
-const PRODUCTION_API_BASE = process.env.API_BASE_URL || 'https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io';
-
 export async function GET() {
     return NextResponse.json({ 
         error: 'Method not allowed',
@@ -19,6 +16,16 @@ export async function POST(request: NextRequest) {
     console.log(`[TRANSMISSION] ${timestamp} - Received device data transmission`);
     
     try {
+        // Get API base URL
+        const PRODUCTION_API_BASE = process.env.API_BASE_URL;
+        
+        if (!PRODUCTION_API_BASE) {
+            return NextResponse.json({ 
+                error: 'Configuration error',
+                message: 'API_BASE_URL environment variable not configured'
+            }, { status: 500 });
+        }
+        
         // Forward the entire request without consuming the body
         const productionUrl = `${PRODUCTION_API_BASE}/api/device`;
         console.log(`[TRANSMISSION] ${timestamp} - Forwarding to production API: ${productionUrl}`);

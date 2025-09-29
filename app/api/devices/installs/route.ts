@@ -4,6 +4,12 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  const API_BASE_URL = process.env.API_BASE_URL;
+
+  if (!API_BASE_URL) {
+    return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('id');
@@ -14,7 +20,7 @@ export async function GET(request: Request) {
       console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
 
       // Fetch device data from Azure Functions device endpoint
-      const apiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(deviceId)}`, {
+      const apiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -62,7 +68,7 @@ export async function GET(request: Request) {
     console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for all devices`);
     
     // Fetch all devices from Azure Functions
-    const apiResponse = await fetch('https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/devices', {
+    const apiResponse = await fetch(`${API_BASE_URL}/api/devices`, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
@@ -131,7 +137,7 @@ export async function GET(request: Request) {
         try {
           // Use the same Azure Functions endpoint that works for single device installs
           // CRITICAL: Use serialNumber (not deviceId) as that's what works for /api/device/{serialNumber}
-          const deviceApiResponse = await fetch(`https://reportmate-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/device/${encodeURIComponent(serialNumber)}`, {
+          const deviceApiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(serialNumber)}`, {
             cache: 'no-store',
             headers: {
               'Cache-Control': 'no-cache',

@@ -11,6 +11,60 @@ import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkel
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 
+// Helper function to get circular status icons (from RecentEventsWidget)
+const getStatusIcon = (kind: string) => {
+  switch (kind.toLowerCase()) {
+    case 'success':
+      return (
+        <div className="w-6 h-6 bg-green-400 rounded-full flex items-center justify-center" title="Success">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'warning':
+      return (
+        <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center" title="Warning">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-4a1 1 0 011 1v2a1 1 0 11-2 0v-2a1 1 0 011-1z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'error':
+      return (
+        <div className="w-6 h-6 bg-red-400 rounded-full flex items-center justify-center" title="Error">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'info':
+      return (
+        <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center" title="Info">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+    case 'system':
+      return (
+        <div className="w-6 h-6 bg-purple-400 rounded-full flex items-center justify-center" title="System">
+          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+        </div>
+      )
+    default:
+      return (
+        <div className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center" title="Unknown">
+          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
+  }
+}
+
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
 
 // Use FleetEvent type directly instead of empty interface
@@ -153,7 +207,7 @@ function EventsPageContent() {
   // Date range state (default to last 48 hours)
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
-    date.setDate(date.getDate() - 2) // 48 hours ago (2 days)
+    date.setTime(date.getTime() - (48 * 60 * 60 * 1000)) // 48 hours ago in milliseconds
     return date.toISOString().split('T')[0] // YYYY-MM-DD format
   })
   const [endDate, setEndDate] = useState(() => {
@@ -208,8 +262,16 @@ function EventsPageContent() {
         })
         if (response.ok) {
           const data = await response.json()
-          // Handle both response formats: direct array or {success: true, devices: [...]}
-          const devices = Array.isArray(data) ? data : (data.devices || [])
+          
+          // Handle the response format from /api/devices  
+          let devices = []
+          if (Array.isArray(data)) {
+            // Direct array format
+            devices = data
+          } else if (data.success && Array.isArray(data.devices)) {
+            // Wrapped format: {success: true, devices: [...]}
+            devices = data.devices
+          }
           
           // Build device name mapping (serial -> name) and inventory mapping
           const nameMap: Record<string, string> = {}
@@ -217,20 +279,23 @@ function EventsPageContent() {
           
           devices.forEach((device: any) => {
             if (device.serialNumber) {
-              // Use inventory deviceName if available, otherwise fall back to name or serialNumber
-              const deviceName = device.modules?.inventory?.deviceName || device.serialNumber
+              // Get inventory from the correct nested path (like dashboard does)
+              const inventory = device.modules?.inventory || {}
+              const deviceName = inventory.deviceName || device.name || device.serialNumber
+              
               nameMap[device.serialNumber as string] = deviceName as string
               
               // Build inventory data mapping
               inventoryMap[device.serialNumber as string] = {
                 deviceName: deviceName as string,
                 serialNumber: device.serialNumber as string,
-                assetTag: device.modules?.inventory?.assetTag || undefined
+                assetTag: inventory.assetTag || undefined
               }
             }
           })
           setDeviceNameMap(nameMap)
           setInventoryMap(inventoryMap)
+          console.log('[EVENTS PAGE] Device inventory loaded from /api/devices:', { devices: devices.length, nameMap, inventoryMap })
         }
       } catch (error) {
         console.error('Failed to fetch device names:', error)
@@ -733,8 +798,8 @@ function EventsPageContent() {
                     Real-time activity from fleet
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4 sm:items-center">
-                  {/* Date Range Picker */}
+                <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                  {/* Date Range Picker - Back on left */}
                   <div className="flex items-center gap-2 text-sm">
                     <label className="text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
                       Date Range:
@@ -761,7 +826,8 @@ function EventsPageContent() {
                       />
                     </div>
                   </div>
-                  {/* Search Input */}
+                  
+                  {/* Search Input - Moved to right */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -789,11 +855,19 @@ function EventsPageContent() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 table-fixed">
+                <table className="w-full table-fixed">
+                  <colgroup>
+                    <col style={{width: '12%'}} />
+                    <col style={{width: '8.5%'}} />
+                    <col style={{width: '20%'}} />
+                    <col style={{width: '35%'}} />
+                    <col style={{width: '12.75%'}} />
+                    <col style={{width: '11.75%'}} />
+                  </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={5} className="px-6 py-3">
+                      <td colSpan={6} className="px-6 py-3">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -859,23 +933,23 @@ function EventsPageContent() {
                     </tr>
                     {/* Header Row */}
                     <tr>
-                      <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="w-16 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         ID
                       </th>
-                      <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="w-64 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Message
                       </th>
-                      <th className="w-44 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
                       </th>
-                      <th className="w-32 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Actions
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Payloads
                       </th>
                     </tr>
                   </thead>
@@ -900,25 +974,20 @@ function EventsPageContent() {
                       return (
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
-                                  {statusConfig.icon}
-                                </div>
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${statusConfig.badge} truncate`}>
-                                  {event.kind}
-                                </span>
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center justify-center">
+                                {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <span 
-                                className="text-sm text-gray-900 dark:text-gray-100 font-mono truncate block max-w-16" 
+                                className="text-sm text-gray-900 dark:text-gray-100 font-mono truncate block max-w-20" 
                                 title={`#${event.id}`}
                               >
                                 #{event.id}
                               </span>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <div>
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
@@ -937,22 +1006,19 @@ function EventsPageContent() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 overflow-hidden">
+                            <td className="px-4 lg:px-6 py-4">
                               <div className="text-sm text-gray-900 dark:text-white truncate">
                                 {getEventMessage(event)}
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap overflow-hidden">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <div className="font-medium truncate">
                                   {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                                 </div>
-                                <div className="text-xs opacity-75 truncate" title={event.ts ? formatExactTime(event.ts) : 'No timestamp'}>
-                                  {event.ts ? formatExactTime(event.ts) : 'No timestamp'}
-                                </div>
                               </div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium overflow-hidden">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
                               <button
                                 onClick={async (e) => {
                                   e.preventDefault()
@@ -964,23 +1030,17 @@ function EventsPageContent() {
                                     await fetchFullPayload(event.id)
                                   }
                                 }}
-                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1 truncate"
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center justify-center"
                                 disabled={loadingPayloads.has(event.id)}
                               >
                                 {loadingPayloads.has(event.id) ? (
-                                  <>
-                                    <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                    </svg>
-                                    Loading...
-                                  </>
+                                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
                                 ) : (
-                                  <>
-                                    {isExpanded ? 'Hide' : 'Show'} Payload
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isExpanded ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
-                                    </svg>
-                                  </>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
                                 )}
                               </button>
                             </td>
@@ -990,14 +1050,23 @@ function EventsPageContent() {
                               <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-6 py-4">
                                   <div className="space-y-3">
+                                    {/* Event Details */}
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-4">
+                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                                          #{event.id}
+                                        </span>
+                                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                                          <div className="font-medium">Full Timestamp:</div>
+                                          <div className="text-xs">{event.ts ? formatExactTime(event.ts) : 'No timestamp'}</div>
+                                        </div>
+                                      </div>
+                                    </div>
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                                           {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
                                         </h4>
-                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
-                                          #{event.id}
-                                        </span>
                                       </div>
                                       <button
                                         onClick={() => {
@@ -1073,8 +1142,8 @@ function EventsPageContent() {
                     Real-time activity from all fleet devices
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-                  {/* Date Range Picker */}
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                  {/* Date Range Picker - Back on left */}
                   <div className="flex items-center gap-2 text-xs">
                     <label className="text-gray-600 dark:text-gray-400 font-medium whitespace-nowrap">
                       Date:
@@ -1101,7 +1170,8 @@ function EventsPageContent() {
                       />
                     </div>
                   </div>
-                  {/* Search Input */}
+                  
+                  {/* Search Input - Moved to right */}
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1129,11 +1199,19 @@ function EventsPageContent() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <table className="w-full table-fixed">
+                  <colgroup>
+                    <col style={{width: '12%'}} />
+                    <col style={{width: '8.5%'}} />
+                    <col style={{width: '20%'}} />
+                    <col style={{width: '35%'}} />
+                    <col style={{width: '12.75%'}} />
+                    <col style={{width: '11.75%'}} />
+                  </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={5} className="px-4 py-3">
+                      <td colSpan={6} className="px-4 py-3">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -1199,23 +1277,23 @@ function EventsPageContent() {
                     </tr>
                     {/* Header Row */}
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         ID
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Message
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                        Actions
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Payloads
                       </th>
                     </tr>
                   </thead>
@@ -1240,26 +1318,24 @@ function EventsPageContent() {
                       return (
                         <React.Fragment key={event.id}>
                           <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <div className="flex items-center gap-2">
-                                <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
-                                  {statusConfig.icon}
-                                </div>
-                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                                  {event.kind}
-                                </span>
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
+                              <div className="flex items-center justify-center">
+                                {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <span className="text-sm text-gray-900 dark:text-gray-100 font-mono">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
+                              <span 
+                                className="text-sm text-gray-900 dark:text-gray-100 font-mono max-w-20 block truncate"
+                                title={`#${event.id}`}
+                              >
                                 #{event.id}
                               </span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <div>
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
-                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block"
+                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                   title={inventoryMap[event.device]?.deviceName || event.device}
                                 >
                                   {inventoryMap[event.device]?.deviceName || event.device}
@@ -1279,17 +1355,14 @@ function EventsPageContent() {
                                 {getEventMessage(event)}
                               </div>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                <div className="font-medium">
+                                <div className="font-medium truncate">
                                   {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
-                                </div>
-                                <div className="text-xs opacity-75">
-                                  {event.ts ? formatExactTime(event.ts).split(' ')[1] : 'No timestamp'}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap text-sm font-medium">
                               <button
                                 onClick={async (e) => {
                                   e.preventDefault()
@@ -1300,13 +1373,17 @@ function EventsPageContent() {
                                     await fetchFullPayload(event.id)
                                   }
                                 }}
-                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center gap-1"
+                                className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 flex items-center justify-center"
                                 disabled={loadingPayloads.has(event.id)}
                               >
                                 {loadingPayloads.has(event.id) ? (
-                                  <span className="text-xs">Loading...</span>
+                                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                  </svg>
                                 ) : (
-                                  <span className="text-xs">{isExpanded ? 'Hide' : 'Show'}</span>
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
                                 )}
                               </button>
                             </td>
@@ -1447,13 +1524,11 @@ function EventsPageContent() {
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <div className={`w-4 h-4 flex-shrink-0 ${statusConfig.text}`}>
-                          {statusConfig.icon}
-                        </div>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium capitalize ${statusConfig.badge}`}>
-                          {event.kind}
-                        </span>
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
+                        {getStatusIcon(event.kind)}
+                        <span 
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono max-w-24 truncate"
+                          title={`#${event.id}`}
+                        >
                           #{event.id}
                         </span>
                       </div>
@@ -1494,9 +1569,6 @@ function EventsPageContent() {
                         <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                           {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-500">
-                          {event.ts ? formatExactTime(event.ts) : 'No timestamp'}
-                        </div>
                       </div>
                       <button
                         onClick={async (e) => {
@@ -1508,24 +1580,44 @@ function EventsPageContent() {
                             await fetchFullPayload(event.id)
                           }
                         }}
-                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium"
+                        className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium flex items-center justify-center"
                         disabled={loadingPayloads.has(event.id)}
                       >
-                        {loadingPayloads.has(event.id) ? 'Loading...' : (isExpanded ? 'Hide Payload' : 'Show Payload')}
+                        {loadingPayloads.has(event.id) ? (
+                          <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        )}
                       </button>
                     </div>
 
                     {/* Expanded Payload */}
                     {isExpanded && (
                       <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        {/* Event Details */}
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-3">
+                            <span 
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono max-w-24 truncate"
+                              title={`#${event.id}`}
+                            >
+                              #{event.id}
+                            </span>
+                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                              <div className="font-medium">Full Timestamp:</div>
+                              <div>{event.ts ? formatExactTime(event.ts) : 'No timestamp'}</div>
+                            </div>
+                          </div>
+                        </div>
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                               Raw Payload
                             </h4>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
-                              #{event.id}
-                            </span>
                           </div>
                           <button
                             onClick={() => {

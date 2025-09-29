@@ -462,7 +462,7 @@ export default function SettingsPage() {
                           <h3 className="font-medium text-gray-900 dark:text-white">Azure Active Directory</h3>
                         </div>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                          Integrate with Azure AD for authentication and user management
+                          Integrate with Entra ID for authentication and user management
                         </p>
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900 px-2 py-1 rounded">

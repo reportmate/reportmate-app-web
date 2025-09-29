@@ -40,24 +40,24 @@ const buildProviders = () => {
   const providers = []
 
   console.log('[AUTH] Config:', config)
-  console.log('[AUTH] Azure AD Client ID:', process.env.AZURE_AD_CLIENT_ID ? 'SET' : 'MISSING')
-  console.log('[AUTH] Azure AD Client Secret:', process.env.AZURE_AD_CLIENT_SECRET ? 'SET' : 'MISSING') 
-  console.log('[AUTH] Azure AD Tenant ID:', process.env.AZURE_AD_TENANT_ID ? 'SET' : 'MISSING')
+  console.log('[AUTH] Entra ID Client ID:', process.env.AZURE_AD_CLIENT_ID ? 'SET' : 'MISSING')
+  console.log('[AUTH] Entra ID Client Secret:', process.env.AZURE_AD_CLIENT_SECRET ? 'SET' : 'MISSING') 
+  console.log('[AUTH] Entra ID Tenant ID:', process.env.AZURE_AD_TENANT_ID ? 'SET' : 'MISSING')
   console.log('[AUTH] NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
   console.log('[AUTH] NODE_ENV:', process.env.NODE_ENV)
 
-  // Azure AD / Entra ID Provider
+  // Entra ID / Entra ID Provider
   if (config.providers.includes(AUTH_PROVIDERS.AZURE_AD)) {
     const clientId = process.env.AZURE_AD_CLIENT_ID
     const clientSecret = process.env.AZURE_AD_CLIENT_SECRET
     const tenantId = process.env.AZURE_AD_TENANT_ID
 
     if (!clientId || !clientSecret || !tenantId) {
-      console.error('[AUTH] Missing required Azure AD environment variables')
-      throw new Error('Missing required Azure AD environment variables')
+      console.error('[AUTH] Missing required Entra ID environment variables')
+      throw new Error('Missing required Entra ID environment variables')
     }
 
-    console.log('[AUTH] Adding Azure AD provider')
+    console.log('[AUTH] Adding Entra ID provider')
     providers.push(
       AzureADProvider({
         clientId: clientId,

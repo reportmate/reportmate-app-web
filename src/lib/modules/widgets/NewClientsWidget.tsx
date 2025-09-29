@@ -15,14 +15,18 @@ interface Device {
   os?: string
   lastSeen: string
   createdAt?: string    // Registration date - when device first appeared in ReportMate
-  status: 'active' | 'stale' | 'missing' | 'warning' | 'error' | 'offline'
+  status: string  // Made flexible to handle API response variations
   uptime?: string
   location?: string
   ipAddress?: string
   totalEvents: number
   lastEventTime: string
-  assetTag?: string     // Asset tag for primary display
-  // Modular structure from API
+  assetTag?: string     // Asset tag directly from API (not nested)
+  // Additional fields from enhanced API
+  usage?: string
+  catalog?: string
+  department?: string
+  // Modular structure from API (legacy/backup access)
   modules?: {
     inventory?: {
       uuid?: string
@@ -48,14 +52,19 @@ interface NewClientsWidgetProps {
 }
 
 export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }: NewClientsWidgetProps) => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'bg-green-500'
-      case 'warning': return 'bg-yellow-500'
-      case 'error': return 'bg-red-400'
-      default: return 'bg-gray-500'
-    }
-  }
+  // Debug logging for devices received
+  console.log(`[NEW CLIENTS WIDGET] Rendered with:`, {
+    devicesCount: devices.length,
+    loading: loading,
+    firstDeviceCheck: devices.length > 0 ? {
+      name: devices[0].name,
+      serialNumber: devices[0].serialNumber,
+      assetTag: devices[0].assetTag,
+      lastSeen: devices[0].lastSeen,
+      hasAssetTag: !!devices[0].assetTag,
+      assetTagValue: devices[0].assetTag || 'NO ASSET TAG'
+    } : 'NO DEVICES'
+  })
 
   // Sort devices by registration date (createdAt) descending to show newest registrations first
   const sortedDevices = [...devices].sort((a, b) => {
@@ -120,29 +129,47 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
                 className="block p-4 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-start gap-3">
-                  {/* Status Indicator */}
-                  <div className={`w-3 h-3 rounded-full ${getStatusColor(device.status)} flex-shrink-0 mt-1`}></div>
-                  
                   {/* Device Info */}
-                  <div className="flex-1 min-w-0">
-                    {/* Primary - Device Name (Rod Christiansen) */}
+                  <div className="flex-1 min-w-0 pl-4">
+                    {/* Primary - Device Name (Rod Christiansen) or fallback to asset tag */}
                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {device.name}
+                      {device.modules?.inventory?.deviceName || device.name}
                     </div>
                     
-                    {/* Secondary - Asset Tag and Serial Number */}
-                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      {device.modules?.inventory?.assetTag && device.serialNumber ? (
-                        `${device.modules.inventory.assetTag} | ${device.serialNumber}`
-                      ) : device.serialNumber ? (
-                        device.serialNumber
-                      ) : (
-                        'No identifier available'
-                      )}
+                    {/* Secondary - Show identifiers but avoid duplication */}
+                    <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 pl-2">
+                      {(() => {
+                        const displayName = device.modules?.inventory?.deviceName || device.name;
+                        const isNameSerial = displayName === device.serialNumber;
+                        
+                        // If we have asset tag and serial, and name isn't the serial
+                        if (device.assetTag && device.serialNumber && !isNameSerial) {
+                          return `${device.assetTag} | ${device.serialNumber}`;
+                        }
+                        // If we have asset tag but name is the serial (avoid duplication)
+                        else if (device.assetTag && isNameSerial) {
+                          return device.assetTag;
+                        }
+                        // If we have asset tag but no serial
+                        else if (device.assetTag && !device.serialNumber) {
+                          return device.assetTag;
+                        }
+                        // If we have serial but name isn't the serial
+                        else if (device.serialNumber && !isNameSerial) {
+                          return device.serialNumber;
+                        }
+                        // If name is serial (avoid showing serial twice)
+                        else if (isNameSerial) {
+                          return '';
+                        }
+                        else {
+                          return 'No identifier available';
+                        }
+                      })()}
                     </div>
                     
                     {/* Registration Date - Static based on when device first appeared */}
-                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-2 pl-2">
                       Registered: {device.createdAt ? formatRelativeTime(device.createdAt) : 'Unknown'}
                     </div>
                   </div>

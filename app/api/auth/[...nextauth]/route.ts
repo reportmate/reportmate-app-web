@@ -37,6 +37,10 @@ const authOptions: NextAuthOptions = {
   },
   useSecureCookies: true,
   callbacks: {
+    async signIn({ user, account, profile, email, credentials }) {
+      // Always allow sign in - let NextAuth handle any issues
+      return true
+    },
     async redirect({ url, baseUrl }) {
       const correctBaseUrl = 'https://reportmate.ecuad.ca'
       console.log(`[NEXTAUTH] Redirect - URL: ${url}, baseUrl: ${baseUrl}, forcing: ${correctBaseUrl}`)

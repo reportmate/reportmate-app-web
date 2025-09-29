@@ -5,6 +5,8 @@ import { getToken } from 'next-auth/jwt'
 // Define routes that should not trigger auto-redirect
 const publicRoutes = [
   '/api/auth',
+  '/api/devices',       // Devices data endpoint for dashboard charts
+  '/api/device',        // Individual device endpoint  
   '/api/transmission',  // Device data transmission endpoint
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
@@ -195,18 +197,21 @@ export default async function middleware(request: NextRequest) {
     }
     
     console.log('[MIDDLEWARE] No valid session - redirecting to sign in')
-    const correctUrl = getCorrectUrl(request.url)
+    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
+    const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)
+    // Redirect directly to signin without error parameters
     return NextResponse.redirect(
-      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, 'https://reportmate.ecuad.ca')
+      new URL(`/auth/signin?callbackUrl=${callbackUrl}`, correctBaseUrl)
     )
   } catch (error) {
     console.error('[MIDDLEWARE] Error checking session:', error)
-    // If there's an error checking the session, redirect to sign in
-    const correctUrl = getCorrectUrl(request.url)
+    // If there's an error checking the session, redirect to sign in without error parameters
+    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
+    const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)
     return NextResponse.redirect(
-      new URL(`/api/auth/signin/azure-ad?callbackUrl=${callbackUrl}`, 'https://reportmate.ecuad.ca')
+      new URL(`/auth/signin?callbackUrl=${callbackUrl}`, correctBaseUrl)
     )
   }
 }

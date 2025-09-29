@@ -18,6 +18,12 @@ export async function GET(
     const { deviceId } = await params
     console.log('[DEVICE EVENTS API] Fetching events for device:', deviceId)
 
+    // Extract query parameters for pagination
+    const { searchParams } = new URL(request.url)
+    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500, default 100
+    const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
+    console.log('[DEVICE EVENTS API] Query params - limit:', limit, 'offset:', offset)
+
     // Valid event categories - filter out everything else
     const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
 
@@ -99,9 +105,9 @@ export async function GET(
         FROM events 
         WHERE device_id = $1
         ORDER BY timestamp DESC
-        LIMIT 50`
+        LIMIT $2 OFFSET $3`
       
-      const eventsResult = await pool.query(eventsQuery, [deviceId])
+      const eventsResult = await pool.query(eventsQuery, [deviceId, limit, offset])
       
       if (eventsResult.rows.length > 0) {
         console.log(`[DEVICE EVENTS API] ✅ Retrieved ${eventsResult.rows.length} real events from database`)
@@ -124,7 +130,12 @@ export async function GET(
           count: realEvents.length,
           deviceId: deviceId,
           source: 'direct-database',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          pagination: {
+            limit: limit,
+            offset: offset,
+            returned: realEvents.length
+          }
         }, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -188,7 +199,12 @@ export async function GET(
       deviceId: deviceId,
       source: 'local-fallback',
       timestamp: new Date().toISOString(),
-      note: 'Azure Functions API not available, using local fallback data'
+      note: 'Azure Functions API not available, using local fallback data',
+      pagination: {
+        limit: limit,
+        offset: offset,
+        returned: sampleEvents.length
+      }
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

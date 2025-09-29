@@ -50,9 +50,9 @@ export default function AutoAuth({ children }: AutoAuthProps) {
       return
     }
 
-    // If not authenticated, automatically sign in with Azure AD
+    // If not authenticated, automatically sign in with Entra ID
     if (status === 'unauthenticated') {
-      console.log('Auto-redirecting to Azure AD SSO...')
+      console.log('Auto-redirecting to Entra ID SSO...')
       signIn('azure-ad', { 
         callbackUrl: pathname || '/dashboard',
         redirect: true 
