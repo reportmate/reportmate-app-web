@@ -23,25 +23,22 @@ import { SignalRStatus } from "../../src/components/SignalRStatus"
 import { MemoryWarning } from "../../src/components/MemoryWarning"
 import { optimizeDevicesArray, optimizeEventForMemory, checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
 
-// Import the same hooks and types from the original dashboard
-
+// NEW CLEAN API FORMAT - Updated for FastAPI container response
 interface Device {
   deviceId: string      // Internal UUID (unique)
   serialNumber: string  // Human-readable unique identifier
-  name: string
-  model?: string
-  os?: string
-  platform?: string     // Fast API platform field
+  deviceName: string    // Device name from API (replaces old 'name' field)
   lastSeen: string
-  createdAt?: string    // Registration date - when device first appeared in ReportMate
-  status: string        // Made flexible to handle API response variations
-  uptime?: string
-  location?: string
-  ipAddress?: string
-  totalEvents: number
-  lastEventTime: string
-  assetTag?: string     // Asset tag for primary display
-  // Modular structure from API
+  status: string
+  // Required fields for compatibility with existing components
+  name: string          // Required for widgets - will be set from deviceName or inventory.deviceName
+  // Additional fields that we'll extract from modules for compatibility
+  assetTag?: string     // Will be extracted from inventory module
+  location?: string     // Will be extracted from inventory module
+  department?: string   // Will be extracted from inventory module
+  platform?: string     // Will be derived from system.operatingSystem
+  os?: string           // Will be derived from system.operatingSystem
+  // Clean modular structure from new API
   modules?: {
     inventory?: {
       uuid?: string
@@ -60,17 +57,23 @@ interface Device {
     }
     system?: {
       operatingSystem?: {
-        name: string
-        version: string
-        build: string
-        architecture: string
+        name?: string
+        version?: string
+        build?: string
+        architecture?: string
         displayVersion?: string
         edition?: string
         featureUpdate?: string
+        major?: string
+        minor?: string
+        patch?: string
       }
     }
-    [key: string]: unknown;
   }
+  // Legacy fields for compatibility with existing widgets
+  totalEvents: number   // Required for widgets
+  lastEventTime: string // Required for widgets
+  createdAt?: string
 }
 
 // Reuse the live events hook from the original dashboard
@@ -83,41 +86,110 @@ export default function Dashboard() {
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
   
-  // SIMPLE DEVICE FETCH: Restore real device loading but ensure it works
+  // NEW API FORMAT DEVICE FETCH: Transform clean FastAPI format for dashboard compatibility
   useEffect(() => {
-    const fetchDevicesSimple = async () => {
+    const fetchDevicesWithTransformation = async () => {
       try {
-        console.log('[DASHBOARD] Simple fetch starting')
-        setDevicesLoading(true) // Ensure loading state is set
+        console.log('[DASHBOARD] Fetching from new clean API format')
+        setDevicesLoading(true)
         
         const response = await fetch('/api/devices')
-        console.log('[DASHBOARD] Simple fetch response:', response.status, response.ok)
+        console.log('[DASHBOARD] API response:', response.status, response.ok)
         
         if (response.ok) {
           const data = await response.json()
-          console.log('[DASHBOARD] Simple fetch data:', {
-            success: data.success,
+          console.log('[DASHBOARD] API data received:', {
+            hasDevices: !!data.devices,
             deviceCount: data.devices?.length || 0,
-            firstDeviceName: data.devices?.[0]?.name
+            total: data.total,
+            isArray: Array.isArray(data.devices),
+            dataKeys: Object.keys(data),
+            firstDevice: data.devices?.[0] ? {
+              serialNumber: data.devices[0].serialNumber,
+              deviceName: data.devices[0].deviceName,
+              hasInventory: !!data.devices[0].modules?.inventory,
+              hasSystem: !!data.devices[0].modules?.system,
+              inventoryDeviceName: data.devices[0].modules?.inventory?.deviceName,
+              systemOS: data.devices[0].modules?.system?.operatingSystem?.name
+            } : null
           })
           
-          if (data.success && Array.isArray(data.devices)) {
-            console.log('[DASHBOARD] Setting devices from simple fetch:', data.devices.length, 'devices')
-            setDevices(data.devices)
+          if (Array.isArray(data.devices)) {
+            // Transform new API format to dashboard-compatible format
+            const transformedDevices = data.devices.map((apiDevice: any) => {
+              const inventory = apiDevice.modules?.inventory || {}
+              const system = apiDevice.modules?.system || {}
+              const osData = system.operatingSystem || {}
+              
+              // Extract platform from OS data
+              const platform = osData.name?.toLowerCase().includes('windows') ? 'Windows' : 
+                              osData.name?.toLowerCase().includes('macos') ? 'macOS' :
+                              osData.name?.toLowerCase().includes('mac') ? 'macOS' : 'Unknown'
+              
+              // Extract OS version
+              const osVersion = osData.displayVersion || osData.version || 
+                               `${osData.major || ''}.${osData.minor || ''}.${osData.patch || ''}`.replace(/^\.+|\.+$/g, '') ||
+                               'Unknown'
+              
+              // Create compatible device object
+              const transformedDevice: Device = {
+                deviceId: apiDevice.deviceId,
+                serialNumber: apiDevice.serialNumber,
+                deviceName: apiDevice.deviceName,
+                lastSeen: apiDevice.lastSeen,
+                status: apiDevice.status,
+                // Compatibility fields extracted from modules
+                name: inventory.deviceName || apiDevice.deviceName || apiDevice.serialNumber,
+                assetTag: inventory.assetTag,
+                location: inventory.location,
+                department: inventory.department,
+                platform: platform,
+                os: osVersion,
+                // Preserve modules for detailed views
+                modules: apiDevice.modules,
+                // Default values for legacy compatibility
+                totalEvents: 0,
+                lastEventTime: apiDevice.lastSeen
+              }
+              
+              return transformedDevice
+            })
             
-            // Create device name map
+            console.log('[DASHBOARD] Transformed devices:', {
+              count: transformedDevices.length,
+              firstTransformed: transformedDevices[0] ? {
+                name: transformedDevices[0].name,
+                serialNumber: transformedDevices[0].serialNumber,
+                platform: transformedDevices[0].platform,
+                assetTag: transformedDevices[0].assetTag,
+                status: transformedDevices[0].status
+              } : null
+            })
+            
+            console.log('[DASHBOARD] About to call setDevices with', transformedDevices.length, 'devices')
+            setDevices(transformedDevices)
+            console.log('[DASHBOARD] setDevices called - component should re-render now')
+            
+            // Create device name map for events
             const nameMap: Record<string, string> = {}
-            data.devices.forEach((device: any) => {
+            transformedDevices.forEach((device: Device) => {
               if (device.serialNumber && device.name) {
                 nameMap[device.serialNumber] = device.name
                 if (device.deviceId && device.deviceId !== device.serialNumber) {
                   nameMap[device.deviceId] = device.name
                 }
+                if (device.assetTag) {
+                  nameMap[device.assetTag] = device.name
+                }
               }
             })
             setDeviceNameMap(nameMap)
+            
+            // Fetch additional OS data for enhanced charts (sample from first 20)
+            fetchOSDataForCharts(transformedDevices.slice(0, 20))
+            
           } else {
-            console.warn('[DASHBOARD] Invalid response format:', data)
+            console.warn('[DASHBOARD] Invalid devices array in response')
             setDevices([])
           }
         } else {
@@ -125,15 +197,14 @@ export default function Dashboard() {
           setDevices([])
         }
       } catch (error) {
-        console.error('[DASHBOARD] Simple fetch error:', error)
+        console.error('[DASHBOARD] Fetch error:', error)
         setDevices([])
       } finally {
-        console.log('[DASHBOARD] Setting devicesLoading to false')
         setDevicesLoading(false)
       }
     }
     
-    fetchDevicesSimple()
+    fetchDevicesWithTransformation()
   }, [])
 
   // Debug current state
@@ -593,7 +664,7 @@ export default function Dashboard() {
                 <DeviceSearchField 
                   className="w-full"
                   placeholder="Find device by name, serial, or asset tag"
-                  preloadedDevices={devices}
+                  preloadedDevices={devices as any}
                 />
               </div>
             </div>
@@ -625,7 +696,7 @@ export default function Dashboard() {
           <div className="lg:col-span-3 space-y-8">
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
-              <StatusWidget devices={devices} loading={devicesLoading} />
+              <StatusWidget devices={devices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
             {/* Error and Warning Stats Cards */}
@@ -638,7 +709,7 @@ export default function Dashboard() {
 
             {/* New Clients Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
-              <NewClientsWidget devices={devices} loading={devicesLoading} />
+              <NewClientsWidget devices={devices as any} loading={devicesLoading} />
             </ErrorBoundary>
           </div>
 
@@ -664,10 +735,10 @@ export default function Dashboard() {
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* macOS Versions */}
-                <OSVersionWidget devices={devices} loading={devicesLoading} osType="macOS" />
+                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
                 
                 {/* Windows Versions */}
-                <OSVersionWidget devices={devices} loading={devicesLoading} osType="Windows" />
+                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
               </div>
             </ErrorBoundary>
           </div>
