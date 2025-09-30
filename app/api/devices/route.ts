@@ -107,8 +107,17 @@ export async function GET(request: Request) {
       firstDeviceKeys: data.devices && data.devices.length > 0 ? Object.keys(data.devices[0]) : 'no devices'
     })
     
-    // Extract devices array - Container Apps API returns { success: true, devices: [...] }
-    const devicesArray = data.success ? (data.devices || []) : (Array.isArray(data) ? data : [])
+    // Extract devices array - handle multiple response formats
+    // Azure Functions API returns { devices: [...], total: N } without success field
+    // Container Apps API returns { success: true, devices: [...] }
+    let devicesArray = []
+    if (Array.isArray(data)) {
+      devicesArray = data
+    } else if (data.devices && Array.isArray(data.devices)) {
+      devicesArray = data.devices
+    } else if (data.success && Array.isArray(data.devices)) {
+      devicesArray = data.devices
+    }
     
     if (!Array.isArray(devicesArray)) {
       console.error(`[DEVICES API] ${timestamp} - Invalid devices data structure:`, {
