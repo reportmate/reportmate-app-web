@@ -79,9 +79,62 @@ export default function Dashboard() {
   const componentId = useComponentTracker('Dashboard')
   const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true)
+  const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
+  
+  // SIMPLE DEVICE FETCH: Restore real device loading but ensure it works
+  useEffect(() => {
+    const fetchDevicesSimple = async () => {
+      try {
+        console.log('[DASHBOARD] Simple fetch starting')
+        setDevicesLoading(true) // Ensure loading state is set
+        
+        const response = await fetch('/api/devices')
+        console.log('[DASHBOARD] Simple fetch response:', response.status, response.ok)
+        
+        if (response.ok) {
+          const data = await response.json()
+          console.log('[DASHBOARD] Simple fetch data:', {
+            success: data.success,
+            deviceCount: data.devices?.length || 0,
+            firstDeviceName: data.devices?.[0]?.name
+          })
+          
+          if (data.success && Array.isArray(data.devices)) {
+            console.log('[DASHBOARD] Setting devices from simple fetch:', data.devices.length, 'devices')
+            setDevices(data.devices)
+            
+            // Create device name map
+            const nameMap: Record<string, string> = {}
+            data.devices.forEach((device: any) => {
+              if (device.serialNumber && device.name) {
+                nameMap[device.serialNumber] = device.name
+                if (device.deviceId && device.deviceId !== device.serialNumber) {
+                  nameMap[device.deviceId] = device.name
+                }
+              }
+            })
+            setDeviceNameMap(nameMap)
+          } else {
+            console.warn('[DASHBOARD] Invalid response format:', data)
+            setDevices([])
+          }
+        } else {
+          console.error('[DASHBOARD] API error:', response.status, response.statusText)
+          setDevices([])
+        }
+      } catch (error) {
+        console.error('[DASHBOARD] Simple fetch error:', error)
+        setDevices([])
+      } finally {
+        console.log('[DASHBOARD] Setting devicesLoading to false')
+        setDevicesLoading(false)
+      }
+    }
+    
+    fetchDevicesSimple()
+  }, [])
 
   // Debug current state
   console.log('[DASHBOARD DEBUG] Component render:', {
@@ -188,30 +241,27 @@ export default function Dashboard() {
     }
   }
 
-  // Fetch devices data (same as original dashboard)
+  // DISABLED: Original complex device fetch - using simple version above instead
+  /*
   useEffect(() => {
     let timeoutId: NodeJS.Timeout
 
     const fetchDevices = async () => {
-      // Reduced debug logging to prevent memory issues (CRITICAL FIX)
-      if (process.env.NODE_ENV === 'development') {
-        // Fetching devices from API
-      }
+      console.log('[DASHBOARD] *** fetchDevices STARTED ***')
+      console.log('[DASHBOARD] Current devicesLoading state:', devicesLoading)
       
       // Set a timeout to prevent waiting forever
       timeoutId = setTimeout(() => {
-        if (process.env.NODE_ENV === 'development') {
-          // Fetch timeout reached after 15 seconds
-        }
+        console.log('[DASHBOARD] *** TIMEOUT TRIGGERED after 15 seconds ***')
+        console.log('[DASHBOARD] Setting devicesLoading to FALSE due to timeout')
         setDevicesLoading(false)
         setDevices([])
       }, 15000) // 15 second timeout
 
       try {
-        // FIXED: Use regular devices API to get ALL devices for accurate counts
-        // Fetch directly from container API since local /api/devices has issues
-        const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
-        const response = await fetch(`${containerApiUrl}/api/devices`, {
+        // Use local API which handles response format normalization
+        const timestamp = Date.now()
+        const response = await fetch(`/api/devices?t=${timestamp}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -219,12 +269,14 @@ export default function Dashboard() {
           }
         })
         
-        // Minimal response logging (CRITICAL MEMORY FIX)
+        console.log('[DASHBOARD] *** Fetch completed, response status:', response.status)
+        
         if (!response.ok) {
           console.error('[DASHBOARD] API Error:', response.status)
           throw new Error(`HTTP ${response.status}`)
         }
         
+        console.log('[DASHBOARD] *** Response OK, processing data ***')
         if (response.ok) {
           const text = await response.text()
           
@@ -246,16 +298,25 @@ export default function Dashboard() {
             // Received device data from API
           }
           
-          // Handle local inventory API response format: direct array of processed devices
+          // Handle API response format: check for success format first
           let deviceArray = []
-          if (Array.isArray(data)) {
-            // Local inventory API returns direct array format
-            deviceArray = data
-          } else if (data.success && Array.isArray(data.devices)) {
-            // Azure Functions API format (fallback)
+          if (data.success && Array.isArray(data.devices)) {
+            // Standard API format: {success: true, devices: [...]}
             deviceArray = data.devices
+            console.log('[DASHBOARD] Using standard API format, devices:', data.devices.length)
+          } else if (Array.isArray(data)) {
+            // Direct array format (fallback)
+            deviceArray = data
+            console.log('[DASHBOARD] Using direct array format, devices:', data.length)
           } else {
-            console.error('[DASHBOARD] Unexpected response format:', typeof data)
+            console.error('[DASHBOARD] Unexpected response format:', { 
+              hasSuccess: 'success' in data,
+              successValue: data.success,
+              hasDevices: 'devices' in data,
+              devicesType: typeof data.devices,
+              isArray: Array.isArray(data),
+              keys: Object.keys(data)
+            })
             throw new Error('Unexpected response format from API')
           }
           
@@ -303,16 +364,24 @@ export default function Dashboard() {
                 name: sortedDevices[0].name,
                 serialNumber: sortedDevices[0].serialNumber,
                 status: sortedDevices[0].status,
+                platform: sortedDevices[0].platform,
                 hasModules: !!sortedDevices[0].modules,
                 inventoryName: sortedDevices[0].modules?.inventory?.deviceName
               } : null
             })
             
+            console.log('[DASHBOARD] Setting devices array with', sortedDevices.length, 'devices')
+            
             try {
+              console.log('[DASHBOARD DEBUG] SETTING DEVICES STATE NOW:', {
+                sortedDevicesLength: sortedDevices.length,
+                loadingBefore: devicesLoading
+              })
+              
               setDevices(sortedDevices)
               setDevicesLoading(false)
               
-              console.log('[DASHBOARD DEBUG] Devices state set successfully')
+              console.log('[DASHBOARD DEBUG] Devices state set successfully - loading should now be FALSE')
               
               // Fetch OS version data for charts after devices are loaded
               fetchOSDataForCharts(sortedDevices)
@@ -322,10 +391,10 @@ export default function Dashboard() {
                 clearTimeout(timeoutId)
               }
               
-              // State update completed successfully
-              // Removed final devices state log to save memory
+              console.log('[DASHBOARD DEBUG] State update completed - devices should now be visible')
             } catch (error) {
               console.error('[DASHBOARD] Error setting devices:', error)
+              setDevicesLoading(false) // Ensure loading is set to false even on error
             }
             
             // Build device name mapping (serial -> name)
@@ -418,17 +487,19 @@ export default function Dashboard() {
           setDevicesLoading(false)
         }
       } catch (error) {
-        console.error('[DASHBOARD] Error in fetchDevices:', error)
-        // Error details removed to save memory
-        // Setting device loading to false due to error
+        console.error('[DASHBOARD] CRITICAL ERROR in fetchDevices:', {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorType: typeof error,
+          errorStack: error instanceof Error ? error.stack : 'No stack'
+        })
         
         // Clear the timeout
         if (timeoutId) {
           clearTimeout(timeoutId)
         }
         
+        console.log('[DASHBOARD] Setting devicesLoading to FALSE due to error')
         setDevicesLoading(false)
-        // Set empty devices array to prevent widgets from waiting indefinitely
         setDevices([])
       }
     }
@@ -443,30 +514,10 @@ export default function Dashboard() {
       }
     }
     
-    // TEMPORARY FIX: Direct API call to ensure devices data is loaded
-    const loadDevicesDirectly = async () => {
-      try {
-        // Fetch directly from container API
-        const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
-        const response = await fetch(`${containerApiUrl}/api/devices`)
-        if (response.ok) {
-          const data = await response.json()
-          // Got devices from direct API call
-          if (data && data.devices && data.devices.length > 0) {
-            setDevices(data.devices)
-            setDevicesLoading(false)
-            // Successfully set devices state
-          }
-        }
-      } catch (error) {
-        console.error('[DASHBOARD] Direct API error:', error)
-      }
-    }
-    
-    // Call direct API after a short delay
-    setTimeout(loadDevicesDirectly, 1000)
+    // Remove temporary direct API call - use local API instead
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Intentionally running once on mount
   }, [])
+  */
 
   // Update relative times every 60 seconds (increased from 30 to reduce processing)
   useEffect(() => {
@@ -486,7 +537,15 @@ export default function Dashboard() {
   }, [devices.length, devicesLoading]) // Use devices.length instead of full array
 
   // Show skeleton while data is loading
+  console.log('[DASHBOARD RENDER DEBUG]:', {
+    devicesLoading,
+    devicesCount: devices.length,
+    firstDevice: devices[0]?.name,
+    shouldShowSkeleton: devicesLoading
+  })
+  
   if (devicesLoading) {
+    console.log('[DASHBOARD] Showing skeleton due to devicesLoading =', devicesLoading)
     return <DashboardSkeleton />
   }
 
