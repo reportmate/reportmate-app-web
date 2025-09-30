@@ -178,9 +178,12 @@ export async function GET(request: Request) {
         });
         
         // Filter events to only include valid categories and normalize field names
-        if (data.success && Array.isArray(data.events)) {
+        // Handle both response formats: {success: true, events: []} or {events: [], total: N}
+        const eventsArray = data.events || (Array.isArray(data) ? data : [])
+        
+        if (Array.isArray(eventsArray) && eventsArray.length > 0) {
           // Extract device serials from events first
-          const eventDeviceSerials = data.events.map((event: RawEvent) => 
+          const eventDeviceSerials = eventsArray.map((event: RawEvent) => 
             event.serialNumber || event.device || event.device_id || 'unknown'
           ).filter(Boolean)
           
@@ -188,7 +191,7 @@ export async function GET(request: Request) {
           await getDeviceNames(eventDeviceSerials)
           const deviceNamesMap = getDeviceNamesFromCache(eventDeviceSerials)
           
-          const normalizedEvents = data.events.map((event: RawEvent): NormalizedEvent => {
+          const normalizedEvents = eventsArray.map((event: RawEvent): NormalizedEvent => {
             // Handle both Container Apps API and legacy Azure Functions field names
             const deviceSerial = event.serialNumber || event.device || event.device_id || 'unknown'
             const deviceName = event.deviceName || deviceNamesMap[deviceSerial] || deviceSerial
@@ -209,9 +212,9 @@ export async function GET(request: Request) {
           );
           
           const filteredData = {
-            ...data,
+            success: true, // Always include success field for frontend compatibility
             events: filteredEvents,
-            totalEvents: data.count || 0, // Frontend expects totalEvents field
+            totalEvents: data.total || data.count || filteredEvents.length, // Handle both total and count fields
             count: filteredEvents.length
           };
           
