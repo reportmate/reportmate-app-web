@@ -19,70 +19,50 @@ export async function GET(request: Request) {
       }, { status: 500 })
     }
     
-    const useLocalFallback = true
-    
-    if (useLocalFallback) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const { Pool } = require('pg')
-        const pool = new Pool({
-          connectionString: process.env.DATABASE_URL
-        })
-
-        const result = await pool.query(`
-          SELECT 
-            s.device_id,
-            d.name as device_name,
-            d.serial_number,
-            d.last_seen,
-            s.data,
-            s.collected_at
-          FROM security s
-          JOIN devices d ON s.device_id = d.id
-          ORDER BY s.updated_at DESC
-          LIMIT $1
-        `, [limit])
-        
-        const securityData = result.rows.map((row: any) => {
-          const data = row.data || {}
-          
-          return {
-            id: row.device_id,
-            deviceId: row.device_id,
-            deviceName: row.device_name || 'Unknown Device',
-            serialNumber: row.serial_number,
-            lastSeen: row.last_seen,
-            collectedAt: row.collected_at,
-            // Security-specific fields
-            antivirus: data.antivirus || data.antivirusStatus || null,
-            firewall: data.firewall || data.firewallStatus || null,
-            bitlocker: data.bitlocker || data.encryption || null,
-            tpm: data.tpm || data.trustedPlatformModule || null,
-            windowsDefender: data.windowsDefender || data.defender || null,
-            // Raw data
-            raw: data
-          }
-        })
-        
-        console.log(`[SECURITY API] ${timestamp} - Successfully fetched ${securityData.length} security records`)
-        
-        return NextResponse.json(securityData, {
-          headers: {
-            'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'Expires': '0',
-            'X-Fetched-At': timestamp,
-            'X-Data-Source': 'local-database'
-          }
-        })
-        
-      } catch (dbError) {
-        console.error(`[SECURITY API] ${timestamp} - Local database error:`, dbError)
-        return NextResponse.json({
-          error: 'Database error',
-          details: 'Failed to fetch security data'
-        }, { status: 500 })
+    // NO LOCAL FALLBACK: Call FastAPI container directly
+    try {
+      const url = `${apiBaseUrl}/api/modules/security?limit=${limit}`
+      console.log(`[SECURITY API] ${timestamp} - Calling FastAPI: ${url}`)
+      
+      const response = await fetch(url, {
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`FastAPI error: ${response.status} ${response.statusText}`)
       }
+      
+      const securityData = await response.json()
+      console.log(`[SECURITY API] ${timestamp} - Successfully fetched ${securityData.length || 0} security records from FastAPI`)
+      
+      return NextResponse.json(securityData, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache', 
+          'Expires': '0',
+          'X-Fetched-At': timestamp,
+          'X-Data-Source': 'fastapi-container'
+        }
+      })
+      
+    } catch (apiError) {
+      console.error(`[SECURITY API] ${timestamp} - FastAPI error:`, apiError)
+      
+      // NO FAKE DATA: Return error when real API fails
+      return NextResponse.json({
+        error: 'Security data not available',
+        message: 'No real data available from API',
+        details: apiError instanceof Error ? apiError.message : 'Unknown error'
+      }, { 
+        status: 503,
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
     }
     
   } catch (error) {

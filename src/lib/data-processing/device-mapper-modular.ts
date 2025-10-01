@@ -23,6 +23,7 @@ export interface ProcessedDeviceInfo {
   lastSeen: string
   status: DeviceStatus
   createdAt?: string
+  registrationDate?: string  // Alias for createdAt for clearer UI display
   
   // Client information
   clientVersion?: string
@@ -128,6 +129,10 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     finalName: finalName
   })
   
+  // Calculate status using centralized logic (single source of truth)
+  const normalizedLastSeen = normalizeLastSeen(rawDevice.lastSeen)
+  const calculatedStatus = calculateDeviceStatus(normalizedLastSeen)
+  
   return {
     // Core identifiers  
     deviceId: rawDevice.deviceId,
@@ -135,9 +140,10 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     name: finalName,
     
     // Status and timestamps
-    lastSeen: rawDevice.lastSeen || new Date().toISOString(),
-    status: rawDevice.status || 'unknown',
+    lastSeen: normalizedLastSeen,
+    status: calculatedStatus,
     createdAt: rawDevice.createdAt,
+    registrationDate: rawDevice.createdAt,  // Alias for clearer display
     
     // Client information
     clientVersion: rawDevice.clientVersion,

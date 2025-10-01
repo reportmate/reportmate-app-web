@@ -164,41 +164,35 @@ export async function GET(
       console.error('[DEVICE API] ❌ Azure Functions API error:', response.status, response.statusText)
       console.error('[DEVICE API] ❌ Response headers:', Object.fromEntries(response.headers.entries()))
       
-      // Log response body for debugging
+      // Read error body once and parse it
+      let errorDetails = `API returned ${response.status}: ${response.statusText}`
       try {
         const errorBody = await response.text()
         console.error('[DEVICE API] ❌ Error response body:', errorBody)
+        
+        // Try to parse error details from response
+        try {
+          const errorJson = JSON.parse(errorBody)
+          if (errorJson.detail) {
+            errorDetails = errorJson.detail
+          } else if (errorJson.error) {
+            errorDetails = errorJson.error
+          }
+        } catch {
+          // Not JSON, use text as-is
+          errorDetails = errorBody || errorDetails
+        }
       } catch (bodyError) {
         console.error('[DEVICE API] ❌ Could not read error response body:', bodyError)
       }
       
-      // TEMPORARILY DISABLED - DATABASE FALLBACK CAUSING WEBPACK ISSUES
-      console.log('[DEVICE API] Database fallback temporarily disabled due to webpack module loading issues')
-      /*
-      // Try direct database fallback first (for development/troubleshooting)
-      console.log('[DEVICE API] Trying direct database fallback...')
-      
-      try {
-        const { pool } = await import('../../../../src/lib/db')
-        
-        // [Database fallback code temporarily commented out]
-        
-      } catch (dbError) {
-        console.error('[DEVICE API] Direct database fallback failed:', dbError)
-      }
-      */
-      
-      // 🚨🚨🚨 NO FAKE DATA GENERATION ALLOWED 🚨🚨🚨
-      // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
-      // Frontend is a READER ONLY - show real state or empty/error
-      console.log('[DEVICE API] NO SAMPLE DATA FALLBACK - Production system shows real data only')
-      
-      // No fallback data - return error if Azure Functions API fails
-      console.log('[DEVICE API] Azure Functions API failed, no fallback available')
-      
+      // Pass through 404 errors cleanly (device not found)
       if (response.status === 404) {
+        console.log('[DEVICE API] ℹ️  Device not found (404) - passing through')
         return NextResponse.json({
-          error: 'Device not found'
+          success: false,
+          error: 'Device not found',
+          details: errorDetails
         }, { 
           status: 404,
           headers: {
@@ -208,11 +202,15 @@ export async function GET(
           }
         })
       }
+      
+      // For other errors, return 502 (Bad Gateway) to indicate upstream API failure
+      console.error('[DEVICE API] ❌ Upstream API error - returning 502')
       return NextResponse.json({
-        error: 'Failed to fetch device from API',
-        details: `API returned ${response.status}: ${response.statusText}`
+        success: false,
+        error: 'Failed to fetch device from upstream API',
+        details: errorDetails
       }, { 
-        status: 500,
+        status: 502,
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
