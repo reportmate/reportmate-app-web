@@ -149,7 +149,9 @@ export default function Dashboard() {
                 modules: apiDevice.modules,
                 // Default values for legacy compatibility
                 totalEvents: 0,
-                lastEventTime: apiDevice.lastSeen
+                lastEventTime: apiDevice.lastSeen,
+                // Registration date from API
+                createdAt: apiDevice.createdAt
               }
               
               return transformedDevice
