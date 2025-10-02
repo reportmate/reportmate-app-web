@@ -444,7 +444,7 @@ function InstallsPageContent() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Munki Versions
                 </h3>
-                <div className="h-64 overflow-y-auto space-y-2">
+                <div className="h-42 overflow-y-auto space-y-2">
                   {(() => {
                     console.log('[MUNKI WIDGET] Total devices:', devices?.length || 0)
                     
@@ -527,7 +527,7 @@ function InstallsPageContent() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Cimian Versions
                 </h3>
-                <div className="h-64 overflow-y-auto space-y-2">
+                <div className="h-42 overflow-y-auto space-y-2">
                   {(() => {
                     console.log('[CIMIAN WIDGET] Total devices:', devices?.length || 0)
                     
