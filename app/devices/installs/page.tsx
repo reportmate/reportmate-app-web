@@ -4,7 +4,6 @@ import { useState, useEffect, Suspense, useMemo } from 'react'
 import Link from 'next/link'
 import { DevicePageNavigation } from '../../../src/components/navigation/DevicePageNavigation'
 import { formatRelativeTime } from '../../../src/lib/time'
-import { WarningStatsWidget, ErrorStatsWidget } from '../../../src/lib/modules/widgets/DashboardStats'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -60,7 +59,6 @@ function InstallsPageContent() {
   const [filtersLoading, setFiltersLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [events, setEvents] = useState<any[]>([])
   const [devices, setDevices] = useState<any[]>([])
   
   // Filter state
@@ -234,24 +232,12 @@ function InstallsPageContent() {
     )
   }, [installs, searchQuery])
 
-  // Fetch events and devices for widgets
-  const fetchEventsAndDevices = async () => {
-    console.log('[INSTALLS PAGE] Starting to fetch events and devices...')
+  // Fetch devices for widgets
+  const fetchDevices = async () => {
     try {
-      const [eventsRes, devicesWithInstallsRes] = await Promise.all([
-        fetch('/api/events', { cache: 'no-store' }),
-        fetch('/api/devices/installs/data', { cache: 'no-store' })
-      ])
+      const devicesWithInstallsRes = await fetch('/api/devices/installs/data', { cache: 'no-store' })
       
-      console.log('[INSTALLS PAGE] Fetch complete. Events OK:', eventsRes.ok, 'Devices OK:', devicesWithInstallsRes.ok)
-      
-      if (eventsRes.ok) {
-        const eventsData = await eventsRes.json()
-        // Events API may return array directly or wrapped in object
-        const eventsArray = Array.isArray(eventsData) ? eventsData : (eventsData.events || [])
-        setEvents(eventsArray)
-        console.log('[INSTALLS PAGE] Loaded', eventsArray.length, 'events')
-      }
+      console.log('[INSTALLS PAGE] Fetch complete. Devices OK:', devicesWithInstallsRes.ok)
       
       if (devicesWithInstallsRes.ok) {
         const installsData = await devicesWithInstallsRes.json()
@@ -275,7 +261,7 @@ function InstallsPageContent() {
 
   useEffect(() => {
     fetchFilterOptions()
-    fetchEventsAndDevices()
+    fetchDevices()
   }, [])
 
   return (
@@ -328,7 +314,7 @@ function InstallsPageContent() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Installs Report {filteredInstalls.length > 0 && `(${filteredInstalls.length})`}
+                Managed Installs Report Generator {filteredInstalls.length > 0 && `(${filteredInstalls.length})`}
                 {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && installs.length > 0 && (
                   <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
                     (filtered)
@@ -431,11 +417,38 @@ function InstallsPageContent() {
               
               {/* Left Column: Error + Warning Stacked (1/3 width) */}
               <div className="space-y-4">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
-                  <ErrorStatsWidget events={events} devices={devices} />
+                {/* Errors Card */}
+                <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-4 border border-red-200 dark:border-red-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {devices.filter((d: any) => d.modules?.installs?.cimian?.items?.some((item: any) => item.currentStatus?.toLowerCase().includes('error') || item.currentStatus?.toLowerCase().includes('failed'))).length}
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300">Errors</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
-                  <WarningStatsWidget events={events} devices={devices} />
+                
+                {/* Warnings Card */}
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4 border border-yellow-200 dark:border-yellow-800">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                      <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                        {devices.filter((d: any) => d.modules?.installs?.cimian?.items?.some((item: any) => item.currentStatus?.toLowerCase().includes('warning') || item.currentStatus?.toLowerCase().includes('pending'))).length}
+                      </p>
+                      <p className="text-sm text-yellow-700 dark:text-yellow-300">Warnings</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -444,7 +457,7 @@ function InstallsPageContent() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Munki Versions
                 </h3>
-                <div className="h-42 overflow-y-auto space-y-2">
+                <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
                     console.log('[MUNKI WIDGET] Total devices:', devices?.length || 0)
                     
@@ -527,7 +540,7 @@ function InstallsPageContent() {
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Cimian Versions
                 </h3>
-                <div className="h-42 overflow-y-auto space-y-2">
+                <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
                     console.log('[CIMIAN WIDGET] Total devices:', devices?.length || 0)
                     
