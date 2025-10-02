@@ -3,30 +3,38 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-export async function GET() {
-  const API_BASE_URL = process.env.API_BASE_URL;
+// Simple in-memory cache with 5 minute TTL
+let cachedData: { devices: any[], timestamp: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-  if (!API_BASE_URL) {
-    return NextResponse.json({ error: 'API_BASE_URL not configured' }, { status: 500 });
+async function fetchAllDevicesWithModules(API_BASE_URL: string) {
+  // Check cache first
+  if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
+    console.log('[INSTALLS FILTERS] Using cached device data');
+    return cachedData.devices;
   }
 
-  try {
-    // Fetch all devices from FastAPI container
-    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
-      cache: 'no-store'
-    });
+  console.log('[INSTALLS FILTERS] Fetching fresh device data from API');
+  
+  // Fetch all devices from FastAPI container
+  const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+    cache: 'no-store'
+  });
 
-    if (!devicesResponse.ok) {
-      return NextResponse.json({ error: 'API fetch failed' }, { status: 500 });
-    }
+  if (!devicesResponse.ok) {
+    throw new Error('Failed to fetch devices list');
+  }
 
-    const devicesData = await devicesResponse.json();
-    const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
-    
-    console.log(`[INSTALLS FILTERS] Fetching detailed data for ${deviceList.length} devices...`);
-    
-    // Fetch detailed data for each device (to get installs module)
-    const devicePromises = deviceList.map(async (device: any) => {
+  const devicesData = await devicesResponse.json();
+  const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
+  
+  // Fetch detailed data in batches of 50 to avoid overwhelming the API
+  const BATCH_SIZE = 50;
+  const devices: any[] = [];
+  
+  for (let i = 0; i < deviceList.length; i += BATCH_SIZE) {
+    const batch = deviceList.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (device: any) => {
       try {
         const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
           cache: 'no-store'
@@ -38,14 +46,33 @@ export async function GET() {
         return null;
       }
     });
+    
+    const batchResults = await Promise.all(batchPromises);
+    devices.push(...batchResults.filter(d => d !== null));
+  }
 
-    const devices = (await Promise.all(devicePromises)).filter(d => d !== null);
+  // Cache the results
+  cachedData = {
+    devices,
+    timestamp: Date.now()
+  };
+
+  console.log(`[INSTALLS FILTERS] Cached ${devices.length} devices`);
+  return devices;
+}
+
+export async function GET() {
+  const API_BASE_URL = process.env.API_BASE_URL;
+
+  if (!API_BASE_URL) {
+    return NextResponse.json({ error: 'API_BASE_URL not configured' }, { status: 500 });
+  }
+
+  try {
+    const devices = await fetchAllDevicesWithModules(API_BASE_URL);
     
     const installsDevices = devices.filter(d => d.modules?.installs);
     const inventoryDevices = devices;
-    
-    console.log('[FILTERS] Installs devices:', installsDevices.length);
-    console.log('[FILTERS] Inventory devices:', inventoryDevices.length);
     
     const managed = new Set();
     const other = new Set();
@@ -60,7 +87,6 @@ export async function GET() {
       
       // Extract managed installs from Cimian items
       if (m.installs?.cimian?.items) {
-        console.log(`[FILTERS] Device ${device.serialNumber} has ${m.installs.cimian.items.length} Cimian items`);
         for (const item of m.installs.cimian.items) {
           const name = item.itemName || item.displayName || item.name;
           if (name) {
@@ -102,14 +128,6 @@ export async function GET() {
         if (inventory.fleet) fleets.add(inventory.fleet);
       }
     }
-    
-    console.log('[FILTERS] Extraction complete:', {
-      managed: managed.size,
-      usages: usages.size,
-      catalogs: catalogs.size,
-      rooms: rooms.size,
-      fleets: fleets.size
-    });
     
     return NextResponse.json({
       success: true,
