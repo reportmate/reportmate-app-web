@@ -3,14 +3,69 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
+// Shared cache with filters route (5 minute TTL)
+let cachedData: { devices: any[], timestamp: number } | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function fetchAllDevicesWithModules(API_BASE_URL: string) {
+  // Check cache first
+  if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
+    console.log('[INSTALLS DATA] Using cached device data');
+    return cachedData.devices;
+  }
+
+  console.log('[INSTALLS DATA] Fetching fresh device data from API');
+  
+  // Fetch all devices from FastAPI container
+  const listResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+    cache: 'no-store'
+  });
+
+  if (!listResponse.ok) {
+    throw new Error('Failed to fetch devices list');
+  }
+
+  const listData = await listResponse.json();
+  const deviceList = Array.isArray(listData.devices) ? listData.devices : [];
+
+  // Fetch detailed data in batches of 50 to avoid overwhelming the API
+  const BATCH_SIZE = 50;
+  const devices: any[] = [];
+  
+  for (let i = 0; i < deviceList.length; i += BATCH_SIZE) {
+    const batch = deviceList.slice(i, i + BATCH_SIZE);
+    const batchPromises = batch.map(async (device: any) => {
+      try {
+        const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
+          cache: 'no-store'
+        });
+        if (!detailResponse.ok) return null;
+        const detailData = await detailResponse.json();
+        return detailData.device || detailData;
+      } catch (error) {
+        return null;
+      }
+    });
+    
+    const batchResults = await Promise.all(batchPromises);
+    devices.push(...batchResults.filter(d => d !== null));
+  }
+
+  // Cache the results
+  cachedData = {
+    devices,
+    timestamp: Date.now()
+  };
+
+  console.log(`[INSTALLS DATA] Cached ${devices.length} devices`);
+  return devices;
+}
+
 /**
  * GET /api/devices/installs/data
  * 
  * Returns all devices with ONLY installs + inventory modules
- * This keeps the response lightweight for the installs report page
- * 
- * TODO: Create FastAPI endpoint /api/devices/installs that returns module-specific data
- * For now, we fetch from /api/devices (serial numbers only) then individual /api/device/{serial}
+ * Uses shared cache with filters route for performance
  */
 export async function GET() {
   const API_BASE_URL = process.env.API_BASE_URL;
@@ -20,46 +75,7 @@ export async function GET() {
   }
 
   try {
-    // Step 1: Get list of all device serial numbers
-    const listResponse = await fetch(`${API_BASE_URL}/api/devices`, {
-      cache: 'no-store'
-    });
-
-    if (!listResponse.ok) {
-      return NextResponse.json({ 
-        error: 'Failed to fetch device list from API',
-        status: listResponse.status 
-      }, { status: listResponse.status });
-    }
-
-    const listData = await listResponse.json();
-    // FastAPI returns: { devices: [], total: N, message: "..." }
-    const deviceList = Array.isArray(listData.devices) ? listData.devices : (Array.isArray(listData) ? listData : []);
-    
-    console.log(`[INSTALLS DATA] Fetching detailed data for ${deviceList.length} devices...`);
-
-    // Step 2: Fetch detailed data for each device (with installs module)
-    // TODO: This is inefficient - FastAPI should provide a bulk endpoint with module filtering
-    // Fetch ALL devices for complete inventory data
-    const devicesToFetch = deviceList;
-    
-    const devicePromises = devicesToFetch.map(async (device: any) => {
-      try {
-        const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
-          cache: 'no-store'
-        });
-        
-        if (!detailResponse.ok) return null;
-        
-        const detailData = await detailResponse.json();
-        return detailData.device || detailData;
-      } catch (error) {
-        console.error(`[INSTALLS DATA] Failed to fetch device ${device.serialNumber}`);
-        return null;
-      }
-    });
-
-    const devices = (await Promise.all(devicePromises)).filter(d => d !== null);
+    const devices = await fetchAllDevicesWithModules(API_BASE_URL);
 
     // Extract only installs + inventory modules from each device
     const installsData = devices.map((device: any) => {
@@ -103,8 +119,6 @@ export async function GET() {
     const devicesWithInstalls = installsData.filter((d: any) => 
       d.modules.installs?.cimian?.items?.length > 0
     );
-
-    console.log(`[INSTALLS DATA] Returning ${devicesWithInstalls.length} devices with installs data out of ${devices.length} total`);
 
     return NextResponse.json({
       success: true,
