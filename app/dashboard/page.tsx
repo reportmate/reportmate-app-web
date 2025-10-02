@@ -22,6 +22,7 @@ import { PerformanceMonitor } from "../../src/components/PerformanceMonitor"
 import { SignalRStatus } from "../../src/components/SignalRStatus"
 import { MemoryWarning } from "../../src/components/MemoryWarning"
 import { optimizeDevicesArray, optimizeEventForMemory, checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
+import { calculateDeviceStatus } from "../../src/lib/data-processing"
 
 // NEW CLEAN API FORMAT - Updated for FastAPI container response
 interface Device {
@@ -131,13 +132,16 @@ export default function Dashboard() {
                                `${osData.major || ''}.${osData.minor || ''}.${osData.patch || ''}`.replace(/^\.+|\.+$/g, '') ||
                                'Unknown'
               
+              // Calculate device status from lastSeen timestamp (frontend responsibility)
+              const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen)
+              
               // Create compatible device object
               const transformedDevice: Device = {
                 deviceId: apiDevice.deviceId,
                 serialNumber: apiDevice.serialNumber,
                 deviceName: apiDevice.deviceName,
                 lastSeen: apiDevice.lastSeen,
-                status: apiDevice.status,
+                status: calculatedStatus, // ✅ CALCULATED from lastSeen, not from API
                 // Compatibility fields extracted from modules
                 name: inventory.deviceName || apiDevice.deviceName || apiDevice.serialNumber,
                 assetTag: inventory.assetTag,

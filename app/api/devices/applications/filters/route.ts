@@ -163,7 +163,8 @@ export async function GET() {
 
     const devicesData = await devicesResponse.json()
     
-    if (!devicesData.success || !Array.isArray(devicesData.devices)) {
+    // FastAPI returns: { devices: [], total: N, message: "..." } - NO success field
+    if (!Array.isArray(devicesData.devices)) {
       console.error('[APPLICATIONS FILTERS API] Invalid Container Apps API response:', devicesData)
       throw new Error('Invalid Container Apps API response format')
     }

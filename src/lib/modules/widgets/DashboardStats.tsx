@@ -97,10 +97,14 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
 
 // Warning Events Widget - counts devices with warnings (but no errors)
 export const WarningStatsWidget: React.FC<{ events: any[], devices: any[] }> = ({ events, devices }) => {
+  // Ensure events and devices are arrays
+  const eventsArray = Array.isArray(events) ? events : []
+  const devicesArray = Array.isArray(devices) ? devices : []
+  
   // Count devices that have warnings but no errors
-  const devicesWithWarnings = devices.filter(device => {
+  const devicesWithWarnings = devicesArray.filter(device => {
     // Check device events using all possible device identifiers
-    const deviceEvents = events.filter(e => 
+    const deviceEvents = eventsArray.filter(e => 
       e.deviceId === device.deviceId || 
       e.deviceId === device.serialNumber ||
       e.device === device.serialNumber ||
@@ -131,10 +135,14 @@ export const WarningStatsWidget: React.FC<{ events: any[], devices: any[] }> = (
 
 // Error Events Widget - counts devices with errors (error takes priority)
 export const ErrorStatsWidget: React.FC<{ events: any[], devices: any[] }> = ({ events, devices }) => {
+  // Ensure events and devices are arrays
+  const eventsArray = Array.isArray(events) ? events : []
+  const devicesArray = Array.isArray(devices) ? devices : []
+  
   // Count devices that have errors
-  const devicesWithErrors = devices.filter(device => {
+  const devicesWithErrors = devicesArray.filter(device => {
     // Check device events using all possible device identifiers
-    const deviceEvents = events.filter(e => 
+    const deviceEvents = eventsArray.filter(e => 
       e.deviceId === device.deviceId || 
       e.deviceId === device.serialNumber ||
       e.device === device.serialNumber ||

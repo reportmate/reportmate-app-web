@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense, useMemo } from 'react'
 import Link from 'next/link'
 import { DevicePageNavigation } from '../../../src/components/navigation/DevicePageNavigation'
 import { formatRelativeTime } from '../../../src/lib/time'
+import { WarningStatsWidget, ErrorStatsWidget } from '../../../src/lib/modules/widgets/DashboardStats'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -59,6 +60,8 @@ function InstallsPageContent() {
   const [filtersLoading, setFiltersLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [events, setEvents] = useState<any[]>([])
+  const [devices, setDevices] = useState<any[]>([])
   
   // Filter state
   const [selectedInstalls, setSelectedInstalls] = useState<string[]>([])
@@ -231,8 +234,48 @@ function InstallsPageContent() {
     )
   }, [installs, searchQuery])
 
+  // Fetch events and devices for widgets
+  const fetchEventsAndDevices = async () => {
+    console.log('[INSTALLS PAGE] Starting to fetch events and devices...')
+    try {
+      const [eventsRes, devicesWithInstallsRes] = await Promise.all([
+        fetch('/api/events', { cache: 'no-store' }),
+        fetch('/api/devices/installs/data', { cache: 'no-store' })
+      ])
+      
+      console.log('[INSTALLS PAGE] Fetch complete. Events OK:', eventsRes.ok, 'Devices OK:', devicesWithInstallsRes.ok)
+      
+      if (eventsRes.ok) {
+        const eventsData = await eventsRes.json()
+        // Events API may return array directly or wrapped in object
+        const eventsArray = Array.isArray(eventsData) ? eventsData : (eventsData.events || [])
+        setEvents(eventsArray)
+        console.log('[INSTALLS PAGE] Loaded', eventsArray.length, 'events')
+      }
+      
+      if (devicesWithInstallsRes.ok) {
+        const installsData = await devicesWithInstallsRes.json()
+        // This endpoint returns { success, total, withInstalls, devices }
+        setDevices(installsData.devices || [])
+        console.log('[INSTALLS PAGE] Loaded', installsData.devices?.length || 0, 'devices with installs data')
+        
+        // Debug: Check Cimian versions
+        const cimianCount = (installsData.devices || []).filter((d: any) => d.modules?.installs?.cimian?.version).length
+        console.log('[INSTALLS PAGE] Devices with Cimian version:', cimianCount)
+        
+        if (cimianCount > 0) {
+          const sample = (installsData.devices || []).find((d: any) => d.modules?.installs?.cimian?.version)
+          console.log('[INSTALLS PAGE] Sample Cimian version:', sample?.modules?.installs?.cimian?.version)
+        }
+      }
+    } catch (error) {
+      console.error('[INSTALLS PAGE] Error fetching events/devices:', error)
+    }
+  }
+
   useEffect(() => {
     fetchFilterOptions()
+    fetchEventsAndDevices()
   }, [])
 
   return (
@@ -380,11 +423,200 @@ function InstallsPageContent() {
             </div>
           )}
 
-          {/* Overview Cards - Always Visible */}
+          {/* Top Cards - Always Visible */}
+          <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            
+            {/* Top Row: Error/Warning Stacked + Munki + Cimian */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+              
+              {/* Left Column: Error + Warning Stacked (1/3 width) */}
+              <div className="space-y-4">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+                  <ErrorStatsWidget events={events} devices={devices} />
+                </div>
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg overflow-hidden">
+                  <WarningStatsWidget events={events} devices={devices} />
+                </div>
+              </div>
+
+              {/* Middle: Munki Version Distribution (1/3 width) */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                  Munki Versions
+                </h3>
+                <div className="h-64 overflow-y-auto space-y-2">
+                  {(() => {
+                    console.log('[MUNKI WIDGET] Total devices:', devices?.length || 0)
+                    
+                    // Show loading state if no devices loaded yet
+                    if (!devices || devices.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          Loading...
+                        </div>
+                      )
+                    }
+                    
+                    const munkiDevices = (devices || []).filter((d: any) => {
+                      const hasMunki = d?.modules?.installs?.munki?.version
+                      return hasMunki
+                    })
+                    
+                    console.log('[MUNKI WIDGET] Devices with Munki:', munkiDevices.length)
+                    
+                    if (munkiDevices.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          No Munki installations found
+                        </div>
+                      )
+                    }
+                    
+                    const versionGroups = Object.entries(
+                      munkiDevices.reduce((acc: Record<string, { count: number; devices: any[] }>, device: any) => {
+                        const version = device.modules.installs.munki.version || 'Unknown'
+                        if (!acc[version]) {
+                          acc[version] = { count: 0, devices: [] }
+                        }
+                        acc[version].count++
+                        acc[version].devices.push(device)
+                        return acc
+                      }, {})
+                    ).sort(([,a], [,b]) => b.count - a.count)
+                    
+                    return versionGroups.map(([version, data]) => {
+                      const total = munkiDevices.length
+                      const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                      return (
+                        <div key={version}>
+                          <div className="flex items-center justify-between mb-1">
+                            <button
+                              onClick={() => {
+                                const deviceSerials = data.devices.map((d: any) => d.serialNumber)
+                                console.log('Generate report for Munki version:', version, deviceSerials)
+                              }}
+                              className="text-sm font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 truncate transition-colors"
+                            >
+                              {version}
+                            </button>
+                            <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                              {data.count} ({percentage}%)
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const deviceSerials = data.devices.map((d: any) => d.serialNumber)
+                              console.log('Generate report for Munki version:', version, deviceSerials)
+                            }}
+                            className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 hover:bg-blue-200 dark:hover:bg-blue-700 transition-colors cursor-pointer"
+                          >
+                            <div 
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </button>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+
+              {/* Right: Cimian Version Distribution (1/3 width) */}
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                  Cimian Versions
+                </h3>
+                <div className="h-64 overflow-y-auto space-y-2">
+                  {(() => {
+                    console.log('[CIMIAN WIDGET] Total devices:', devices?.length || 0)
+                    
+                    // Show loading state if no devices loaded yet
+                    if (!devices || devices.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          Loading...
+                        </div>
+                      )
+                    }
+                    
+                    const cimianDevices = (devices || []).filter((d: any) => {
+                      const hasCimian = d?.modules?.installs?.cimian?.version
+                      if (hasCimian) {
+                        console.log('[CIMIAN WIDGET] Found device with Cimian:', d.serialNumber, d.modules.installs.cimian.version)
+                      }
+                      return hasCimian
+                    })
+                    
+                    console.log('[CIMIAN WIDGET] Devices with Cimian:', cimianDevices.length)
+                    
+                    if (cimianDevices.length === 0) {
+                      return (
+                        <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                          No Cimian installations found
+                        </div>
+                      )
+                    }
+                    
+                    const versionGroups = Object.entries(
+                      cimianDevices.reduce((acc: Record<string, { count: number; devices: any[] }>, device: any) => {
+                        const version = device.modules.installs.cimian.version || 'Unknown'
+                        if (!acc[version]) {
+                          acc[version] = { count: 0, devices: [] }
+                        }
+                        acc[version].count++
+                        acc[version].devices.push(device)
+                        return acc
+                      }, {})
+                    ).sort(([,a], [,b]) => b.count - a.count)
+                    
+                    console.log('[CIMIAN WIDGET] Version groups:', versionGroups.length, 'versions')
+                    
+                    return versionGroups.map(([version, data]) => {
+                      const total = cimianDevices.length
+                      const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
+                      return (
+                        <div key={version}>
+                          <div className="flex items-center justify-between mb-1">
+                            <button
+                              onClick={() => {
+                                const deviceSerials = data.devices.map((d: any) => d.serialNumber)
+                                console.log('Generate report for Cimian version:', version, deviceSerials)
+                              }}
+                              className="text-sm font-medium text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400 truncate transition-colors"
+                            >
+                              {version}
+                            </button>
+                            <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                              {data.count} ({percentage}%)
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => {
+                              const deviceSerials = data.devices.map((d: any) => d.serialNumber)
+                              console.log('Generate report for Cimian version:', version, deviceSerials)
+                            }}
+                            className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 hover:bg-emerald-200 dark:hover:bg-emerald-700 transition-colors cursor-pointer"
+                          >
+                            <div 
+                              className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
+                              style={{ width: `${percentage}%` }}
+                            ></div>
+                          </button>
+                        </div>
+                      )
+                    })
+                  })()}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Overview Cards - Show only when report generated */}
           {installs.length > 0 && (
             <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
-              {/* Status Overview Cards */}
+              {/* Install Stats Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                 
                 {/* Total Installs */}
@@ -460,7 +692,7 @@ function InstallsPageContent() {
                 {/* Cimian/Munki Version Distribution */}
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    📦 Cimian/Munki Version Distribution
+                    Install Package Version Distribution
                   </h3>
                   <div className="space-y-3">
                     {Object.entries(
@@ -508,7 +740,7 @@ function InstallsPageContent() {
                 {/* Platform Distribution */}
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    💻 Platform Distribution
+                    Platform Distribution
                   </h3>
                   <div className="space-y-3">
                     {Object.entries(
@@ -526,7 +758,7 @@ function InstallsPageContent() {
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {platform === 'Macintosh' ? '🍎' : platform === 'Windows' ? '🪟' : '❓'} {platform}
+                                {platform}
                               </span>
                               <span className="text-sm text-gray-500 dark:text-gray-400">
                                 {count} ({percentage}%)
@@ -656,7 +888,7 @@ function InstallsPageContent() {
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                           }`}
                         >
-                          {platform === 'Macintosh' ? '🍎' : '🪟'} {platform}
+                          {platform}
                         </button>
                       ))}
                       {(!filterOptions.platforms || filterOptions.platforms.length === 0) && (
@@ -713,13 +945,8 @@ function InstallsPageContent() {
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Installs {selectedInstalls.length > 0 && `(${selectedInstalls.length} selected)`}
                     </h3>
-                    {(filterOptions.managedInstalls || []).length > 0 && (
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {(filterOptions.managedInstalls || []).length} managed • {(filterOptions.otherInstalls || []).length} unmanaged
-                      </span>
-                    )}
                   </div>
-                  <div className="h-32 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                  <div className="h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
                       
                       {/* Managed Installs */}
@@ -731,11 +958,11 @@ function InstallsPageContent() {
                           onClick={() => toggleInstall(install)}
                           className={`px-2 py-1 text-xs rounded-full border transition-colors ${
                             selectedInstalls.includes(install)
-                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900 dark:text-emerald-200 dark:border-emerald-600'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-800/50 dark:text-emerald-300 dark:border-emerald-600 dark:hover:bg-emerald-800'
+                              ? 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
                           }`}
                         >
-                          {install} ⭐
+                          {install}
                         </button>
                       ))}
                       
@@ -847,7 +1074,7 @@ function InstallsPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900 dark:text-white">
-                          {getDevicePlatform(install) === 'Macintosh' ? '🍎' : '🪟'} {getDevicePlatform(install)}
+                          {getDevicePlatform(install)}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
