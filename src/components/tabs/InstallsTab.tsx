@@ -380,11 +380,11 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
           </div>
         </div>
         {/* Last Run - Top Right */}
-        {(data?.config?.lastRun || effectiveDevice?.installs?.cimian?.sessions?.[0]?.endTime) && (
+        {(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time) && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Last Run</div>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCompactRelativeTime(data?.config?.lastRun || effectiveDevice?.installs?.cimian?.sessions?.[0]?.endTime || '')}
+              {formatCompactRelativeTime(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time || '')}
             </div>
           </div>
         )}
@@ -421,9 +421,9 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</div>
               <div className="flex justify-center">
                 <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
-                  {data?.config?.runType || 
-                   effectiveDevice?.installs?.cimian?.sessions?.[0]?.runType || 
-                   'Unknown'}
+                  {processedInstallsData?.config?.runType || 
+                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
+                   'Manual'}
                 </span>
               </div>
             </div>
@@ -451,7 +451,9 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Seen Timestamp</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
                 {(() => {
-                  const timestamp = data?.config?.lastRun || effectiveDevice?.installs?.cimian?.sessions?.[0]?.endTime
+                  const timestamp = processedInstallsData?.config?.lastRun || 
+                                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
+                                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.endTime
                   if (!timestamp) return 'Never'
                   
                   try {
