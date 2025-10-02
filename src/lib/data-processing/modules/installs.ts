@@ -780,76 +780,121 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
 
   console.log('[INSTALLS MODULE] ✅ Updated status counts after adding warnings/errors:', statusCounts)
 
-  // Extract run type and duration from latest COMPLETED session
+  // Extract run type and duration from latest session WITH ACTIVITY
+  // Prioritize sessions that actually did something (installs/updates/failures) over quick checkonly runs
   let latestRunType = 'Manual'  // Default to Manual instead of Unknown
   let latestDuration = 'Unknown'
   let latestDurationSeconds: number | undefined
   
   if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
-    // Find the most recent completed session (not running)
-    const completedSession = installs.recentSessions.find((session: any) => 
-      session.status === 'completed' && session.duration && session.duration !== '00:00:00'
+    // Find the most recent session with actual activity (completed or partial_failure with actions/failures)
+    const sessionWithActivity = installs.recentSessions.find((session: any) => 
+      (session.status === 'completed' || session.status === 'partial_failure') && 
+      (session.totalActions > 0 || session.packagesFailed > 0 || session.packagesInstalled > 0 || session.failures > 0 || session.installs > 0 || session.updates > 0)
     )
     
-    if (completedSession) {
-      latestRunType = completedSession.runType || 'Manual'
-      latestDuration = completedSession.duration || 'Unknown'
-      latestDurationSeconds = completedSession.duration_seconds
+    if (sessionWithActivity) {
+      latestRunType = sessionWithActivity.runType || 'Manual'
+      latestDuration = sessionWithActivity.duration || 'Unknown'
+      latestDurationSeconds = sessionWithActivity.duration_seconds
       
-      console.log('[INSTALLS MODULE] Using completed session data:', {
-        sessionId: completedSession.sessionId,
-        runType: completedSession.runType,
-        duration: completedSession.duration,
-        durationSeconds: completedSession.duration_seconds,
-        status: completedSession.status
+      console.log('[INSTALLS MODULE] Using session with activity:', {
+        sessionId: sessionWithActivity.sessionId,
+        runType: sessionWithActivity.runType,
+        duration: sessionWithActivity.duration,
+        durationSeconds: sessionWithActivity.duration_seconds,
+        status: sessionWithActivity.status,
+        totalActions: sessionWithActivity.totalActions,
+        packagesFailed: sessionWithActivity.packagesFailed
       })
     } else {
-      // Fallback to first session if no completed sessions found
-      const latestSession = installs.recentSessions[0]
-      latestRunType = latestSession.runType || 'Manual'
-      latestDuration = latestSession.duration || 'Unknown'
-      latestDurationSeconds = latestSession.duration_seconds
+      // Fallback to first completed session (even checkonly)
+      const completedSession = installs.recentSessions.find((session: any) => 
+        session.status === 'completed' && session.duration && session.duration !== '00:00:00'
+      )
       
-      console.log('[INSTALLS MODULE] Using latest session data (may be running):', {
-        sessionId: latestSession.sessionId,
-        runType: latestSession.runType,
-        duration: latestSession.duration,
-        durationSeconds: latestSession.duration_seconds,
-        status: latestSession.status
-      })
+      if (completedSession) {
+        latestRunType = completedSession.runType || 'Manual'
+        latestDuration = completedSession.duration || 'Unknown'
+        latestDurationSeconds = completedSession.duration_seconds
+        
+        console.log('[INSTALLS MODULE] Using completed session (no activity found):', {
+          sessionId: completedSession.sessionId,
+          runType: completedSession.runType,
+          duration: completedSession.duration,
+          durationSeconds: completedSession.duration_seconds,
+          status: completedSession.status
+        })
+      } else {
+        // Final fallback to first session
+        const latestSession = installs.recentSessions[0]
+        latestRunType = latestSession.runType || 'Manual'
+        latestDuration = latestSession.duration || 'Unknown'
+        latestDurationSeconds = latestSession.duration_seconds
+        
+        console.log('[INSTALLS MODULE] Using latest session data (fallback):', {
+          sessionId: latestSession.sessionId,
+          runType: latestSession.runType,
+          duration: latestSession.duration,
+          durationSeconds: latestSession.duration_seconds,
+          status: latestSession.status
+        })
+      }
     }
   }
   // Fallback to cimian.sessions if recentSessions is not available
   else if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    // Find the most recent completed session from cimian.sessions
-    const completedSession = installs.cimian.sessions.find((session: any) => 
-      session.status === 'completed' && session.duration_seconds > 0
+    // Find the most recent session with activity from cimian.sessions
+    const sessionWithActivity = installs.cimian.sessions.find((session: any) => 
+      (session.status === 'completed' || session.status === 'partial_failure') && 
+      (session.total_actions > 0 || session.packagesFailed > 0 || session.packagesInstalled > 0 || session.failures > 0 || session.installs > 0 || session.updates > 0) &&
+      session.duration_seconds > 0
     )
     
-    if (completedSession) {
-      latestRunType = completedSession.run_type || completedSession.runType || 'Manual'
-      latestDuration = completedSession.duration || 'Unknown'
-      latestDurationSeconds = completedSession.duration_seconds
+    if (sessionWithActivity) {
+      latestRunType = sessionWithActivity.run_type || sessionWithActivity.runType || 'Manual'
+      latestDuration = sessionWithActivity.duration || 'Unknown'
+      latestDurationSeconds = sessionWithActivity.duration_seconds
       
-      console.log('[INSTALLS MODULE] Using completed cimian session data:', {
-        sessionId: completedSession.session_id,
-        runType: completedSession.run_type || completedSession.runType,
-        durationSeconds: completedSession.duration_seconds,
-        status: completedSession.status
+      console.log('[INSTALLS MODULE] Using cimian session with activity:', {
+        sessionId: sessionWithActivity.session_id,
+        runType: sessionWithActivity.run_type || sessionWithActivity.runType,
+        durationSeconds: sessionWithActivity.duration_seconds,
+        status: sessionWithActivity.status,
+        totalActions: sessionWithActivity.total_actions,
+        packagesFailed: sessionWithActivity.packagesFailed
       })
     } else {
-      // Fallback to first cimian session if no completed sessions found
-      const latestSession = installs.cimian.sessions[0]
-      latestRunType = latestSession.run_type || latestSession.runType || 'Manual'
-      latestDuration = latestSession.duration || 'Unknown'
-      latestDurationSeconds = latestSession.duration_seconds
+      // Fallback to first cimian completed session
+      const completedSession = installs.cimian.sessions.find((session: any) => 
+        session.status === 'completed' && session.duration_seconds > 0
+      )
       
-      console.log('[INSTALLS MODULE] Using latest cimian session data (may be running):', {
-        sessionId: latestSession.session_id,
-        runType: latestSession.run_type || latestSession.runType,
-        durationSeconds: latestSession.duration_seconds,
-        status: latestSession.status
-      })
+      if (completedSession) {
+        latestRunType = completedSession.run_type || completedSession.runType || 'Manual'
+        latestDuration = completedSession.duration || 'Unknown'
+        latestDurationSeconds = completedSession.duration_seconds
+        
+        console.log('[INSTALLS MODULE] Using completed cimian session (no activity found):', {
+          sessionId: completedSession.session_id,
+          runType: completedSession.run_type || completedSession.runType,
+          durationSeconds: completedSession.duration_seconds,
+          status: completedSession.status
+        })
+      } else {
+        // Final fallback to first cimian session
+        const latestSession = installs.cimian.sessions[0]
+        latestRunType = latestSession.run_type || latestSession.runType || 'Manual'
+        latestDuration = latestSession.duration || 'Unknown'
+        latestDurationSeconds = latestSession.duration_seconds
+        
+        console.log('[INSTALLS MODULE] Using latest cimian session data (fallback):', {
+          sessionId: latestSession.session_id,
+          runType: latestSession.run_type || latestSession.runType,
+          durationSeconds: latestSession.duration_seconds,
+          status: latestSession.status
+        })
+      }
     }
   }
   
