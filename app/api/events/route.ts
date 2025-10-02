@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { getDeviceNames, getDeviceNamesFromCache } from '../../../lib/device-names';
 
 // Cache for API responses (30 second cache)
 let eventsCache: NormalizedEvent[] = []
@@ -182,24 +181,16 @@ export async function GET(request: Request) {
         const eventsArray = data.events || (Array.isArray(data) ? data : [])
         
         if (Array.isArray(eventsArray) && eventsArray.length > 0) {
-          // Extract device serials from events first
-          const eventDeviceSerials = eventsArray.map((event: RawEvent) => 
-            event.serialNumber || event.device || event.device_id || 'unknown'
-          ).filter(Boolean)
-          
-          // Get device names using shared utility (no HTTP calls)
-          await getDeviceNames(eventDeviceSerials)
-          const deviceNamesMap = getDeviceNamesFromCache(eventDeviceSerials)
-          
+          // FastAPI now includes device names with JOIN - no need to enrich here!
           const normalizedEvents = eventsArray.map((event: RawEvent): NormalizedEvent => {
             // Handle both Container Apps API and legacy Azure Functions field names
             const deviceSerial = event.serialNumber || event.device || event.device_id || 'unknown'
-            const deviceName = event.deviceName || deviceNamesMap[deviceSerial] || deviceSerial
+            const deviceName = event.deviceName || deviceSerial  // Already included from FastAPI JOIN
             
             return {
               id: event.id,
               device: deviceSerial,  // Keep original serial for compatibility
-              deviceName: deviceName,  // Add enriched device name
+              deviceName: deviceName,  // Device name from FastAPI (no additional lookup needed!)
               kind: event.eventType || event.kind || 'unknown',
               ts: event.timestamp || event.ts || new Date().toISOString(),
               message: event.message,  // Include user-friendly message from database
