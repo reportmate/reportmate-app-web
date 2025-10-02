@@ -70,29 +70,35 @@ function DevicesPageContent() {
         const devices = data.devices || []
         
         if (Array.isArray(devices) && devices.length > 0) {
-          // FIXED: Process devices with correct nested structure
-          const inventoryItems = devices.map((device: any) => ({
-            id: device.serialNumber || device.deviceId,
-            deviceId: device.deviceId,
-            // FIXED: Get deviceName from device.name (not nested in modules)
-            deviceName: device.name || device.serialNumber,
-            serialNumber: device.serialNumber,
-            lastSeen: device.lastSeen,
-            collectedAt: device.lastSeen, // Use lastSeen as collectedAt for /api/devices
-            assetTag: device.assetTag,
-            location: device.location,
-            usage: device.usage,
-            catalog: device.catalog,
-            computerName: device.name, // Use device name as computer name
-            domain: device.domain,
-            organizationalUnit: device.organizationalUnit,
-            manufacturer: device.manufacturer,
-            model: device.model,
-            uuid: device.uuid || device.deviceId,
-            department: device.department,
-            owner: device.owner,
-            raw: { status: device.status, ...device } // Include status and full device data
-          }))
+          // FIXED: Process devices with correct nested structure from modules.inventory
+          const inventoryItems = devices.map((device: any) => {
+            // Extract inventory data from modules (where it actually lives)
+            const inventory = device.modules?.inventory || {}
+            
+            return {
+              id: device.serialNumber || device.deviceId,
+              deviceId: device.deviceId,
+              // CRITICAL: Get deviceName from modules.inventory.deviceName
+              deviceName: inventory.deviceName || device.serialNumber,
+              serialNumber: device.serialNumber,
+              lastSeen: device.lastSeen,
+              collectedAt: device.lastSeen,
+              // Extract all inventory fields from modules.inventory
+              assetTag: inventory.assetTag,
+              location: inventory.location,
+              usage: inventory.usage,
+              catalog: inventory.catalog,
+              department: inventory.department,
+              owner: inventory.owner,
+              computerName: inventory.deviceName,
+              domain: inventory.domain,
+              organizationalUnit: inventory.organizationalUnit,
+              manufacturer: inventory.manufacturer,
+              model: inventory.model,
+              uuid: inventory.uuid || device.deviceId,
+              raw: { status: device.status, ...device }
+            }
+          })
           
           console.log('[DEVICES PAGE] Processed inventory items:', inventoryItems.length, 'First item:', inventoryItems[0])
           setInventory(inventoryItems)
