@@ -1,115 +1,128 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { Pool } from 'pg'
+import { NextResponse } from 'next/server'
 
-// Create PostgreSQL connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-})
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export async function GET(request: NextRequest) {
+export async function GET() {
+  const API_BASE_URL = process.env.API_BASE_URL;
+
+  if (!API_BASE_URL) {
+    return NextResponse.json({ error: 'API_BASE_URL not configured' }, { status: 500 });
+  }
+
   try {
-    console.log('🔍 Processing devices-installs-filters request (Next.js)')
+    // Fetch all devices from FastAPI container
+    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+      cache: 'no-store'
+    });
+
+    if (!devicesResponse.ok) {
+      return NextResponse.json({ error: 'API fetch failed' }, { status: 500 });
+    }
+
+    const devicesData = await devicesResponse.json();
+    const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
     
-    // Query 1: Get all Cimian install items from all devices
-    const cimianQuery = `
-      SELECT 
-        devices.serial_number,
-        jsonb_array_elements(installs.data->'cimian'->'items') as item
-      FROM installs 
-      JOIN devices ON installs.device_id = devices.device_id
-      WHERE installs.data->'cimian'->'items' IS NOT NULL
-    `
+    console.log(`[INSTALLS FILTERS] Fetching detailed data for ${deviceList.length} devices...`);
     
-    const cimianResult = await pool.query(cimianQuery)
-    console.log(`📦 Found ${cimianResult.rows.length} Cimian install records`)
+    // Fetch detailed data for each device (to get installs module)
+    const devicePromises = deviceList.map(async (device: any) => {
+      try {
+        const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
+          cache: 'no-store'
+        });
+        if (!detailResponse.ok) return null;
+        const detailData = await detailResponse.json();
+        return detailData.device || detailData;
+      } catch (error) {
+        return null;
+      }
+    });
+
+    const devices = (await Promise.all(devicePromises)).filter(d => d !== null);
     
-    // Extract managed install names (from Cimian)
-    const managedInstalls = new Set()
-    const devicesWithData = new Set()
+    const installsDevices = devices.filter(d => d.modules?.installs);
+    const inventoryDevices = devices;
     
-    for (const record of cimianResult.rows) {
-      const serialNumber = record.serial_number
-      const itemData = record.item
+    console.log('[FILTERS] Installs devices:', installsDevices.length);
+    console.log('[FILTERS] Inventory devices:', inventoryDevices.length);
+    
+    const managed = new Set();
+    const other = new Set();
+    const usages = new Set();
+    const catalogs = new Set();
+    const rooms = new Set();
+    const fleets = new Set();
+    
+    // Extract managed installs from devices WITH installs data
+    for (const device of installsDevices) {
+      const m = device.modules || {};
       
-      if (itemData && typeof itemData === 'object') {
-        // Extract install name - try multiple possible fields
-        const installName = (
-          itemData.itemName || 
-          itemData.displayName || 
-          itemData.name || 
-          itemData.id || ''
-        )
-        
-        if (installName && installName.trim()) {
-          managedInstalls.add(installName.trim())
-          devicesWithData.add(serialNumber)
+      // Extract managed installs from Cimian items
+      if (m.installs?.cimian?.items) {
+        console.log(`[FILTERS] Device ${device.serialNumber} has ${m.installs.cimian.items.length} Cimian items`);
+        for (const item of m.installs.cimian.items) {
+          const name = item.itemName || item.displayName || item.name;
+          if (name) {
+            managed.add(name.trim());
+          }
         }
       }
     }
     
-    // Query 2: Get all application names for comparison (unmanaged)
-    const applicationsQuery = `
-      SELECT DISTINCT
-        jsonb_array_elements_text(applications.data->'applications') as app_name
-      FROM applications 
-      JOIN devices ON applications.device_id = devices.device_id
-      WHERE applications.data->'applications' IS NOT NULL
-    `
-    
-    const appResult = await pool.query(applicationsQuery)
-    console.log(`🔧 Found ${appResult.rows.length} application records`)
-    
-    // Extract all application names
-    const allApplications = new Set()
-    for (const record of appResult.rows) {
-      const appName = record.app_name
-      if (appName && appName.trim()) {
-        allApplications.add(appName.trim())
+    // Extract inventory data from ALL devices
+    for (const device of inventoryDevices) {
+      const m = device.modules || {};
+      
+      // Parse inventory if it's PowerShell format
+      let inventory = m.inventory;
+      if (typeof inventory === 'string' && inventory.startsWith('@{')) {
+        try {
+          const jsonStr = inventory
+            .replace(/@\{/g, '{')
+            .replace(/\}/g, '}')
+            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)=/g, '"$1":')
+            .replace(/; /g, ', ')
+            .replace(/: ([^,}]+)/g, (match, value) => {
+              if (!value.trim().startsWith('"')) {
+                return `: "${value.trim()}"`;
+              }
+              return match;
+            });
+          inventory = JSON.parse(jsonStr);
+        } catch (e) {
+          // Silently skip parse errors
+        }
+      }
+      
+      if (inventory && typeof inventory === 'object') {
+        if (inventory.usage) usages.add(inventory.usage);
+        if (inventory.catalog) catalogs.add(inventory.catalog);
+        if (inventory.location) rooms.add(inventory.location);
+        if (inventory.fleet) fleets.add(inventory.fleet);
       }
     }
     
-    // Create unmanaged list (apps not in Cimian managed list)
-    const unmanagedInstalls = new Set([...allApplications].filter(app => !managedInstalls.has(app)))
-    
-    // Convert to sorted arrays
-    const managedList = Array.from(managedInstalls).sort()
-    const unmanagedList = Array.from(unmanagedInstalls).sort()
-    
-    // Device count query
-    const deviceCountResult = await pool.query('SELECT COUNT(DISTINCT device_id) FROM devices')
-    const totalDevices = deviceCountResult.rows[0]?.count || 0
-    
-    console.log('✅ Smart filtering complete:')
-    console.log(`   📱 Total devices: ${totalDevices}`)
-    console.log(`   📊 Devices with Cimian data: ${devicesWithData.size}`)
-    console.log(`   ✅ Managed installs: ${managedList.length}`)
-    console.log(`   ❌ Unmanaged installs: ${unmanagedList.length}`)
-    console.log(`   🔝 First 5 managed: ${managedList.slice(0, 5)}`)
+    console.log('[FILTERS] Extraction complete:', {
+      managed: managed.size,
+      usages: usages.size,
+      catalogs: catalogs.size,
+      rooms: rooms.size,
+      fleets: fleets.size
+    });
     
     return NextResponse.json({
       success: true,
-      managedInstalls: managedList,
-      unmanagedInstalls: unmanagedList,
-      devices: {
-        total: parseInt(totalDevices),
-        withCimianData: devicesWithData.size
-      },
-      summary: {
-        totalManagedInstalls: managedList.length,
-        totalUnmanagedInstalls: unmanagedList.length,
-        devicesWithData: devicesWithData.size
-      }
-    })
-    
+      managedInstalls: Array.from(managed).sort(),
+      otherInstalls: Array.from(other).sort(),
+      usages: Array.from(usages).sort(),
+      catalogs: Array.from(catalogs).sort(),
+      rooms: Array.from(rooms).sort(),
+      fleets: Array.from(fleets).sort(),
+      platforms: ['Windows', 'Macintosh'],
+      devicesWithData: inventoryDevices.length
+    });
   } catch (error) {
-    console.error('❌ Error in devices-installs-filters:', error)
-    return NextResponse.json(
-      {
-        success: false,
-        error: `Failed to get install filters: ${error instanceof Error ? error.message : 'Unknown error'}`
-      },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

@@ -8,6 +8,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
+import { calculateDeviceStatus } from "../../src/lib/data-processing"
 
 interface InventoryItem {
   id: string
@@ -34,6 +35,7 @@ function DevicesPageContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [usageFilter, setUsageFilter] = useState<string>('all')
   const [catalogFilter, setCatalogFilter] = useState<string>('all')
   const searchParams = useSearchParams()
@@ -44,6 +46,11 @@ function DevicesPageContent() {
       const urlSearch = searchParams.get('search')
       if (urlSearch) {
         setSearchQuery(urlSearch)
+      }
+      
+      const urlStatus = searchParams.get('status')
+      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
+        setStatusFilter(urlStatus.toLowerCase())
       }
       
       const urlUsage = searchParams.get('usage')
@@ -75,6 +82,9 @@ function DevicesPageContent() {
             // Extract inventory data from modules (where it actually lives)
             const inventory = device.modules?.inventory || {}
             
+            // Calculate status from lastSeen timestamp
+            const calculatedStatus = calculateDeviceStatus(device.lastSeen)
+            
             return {
               id: device.serialNumber || device.deviceId,
               deviceId: device.deviceId,
@@ -96,7 +106,7 @@ function DevicesPageContent() {
               manufacturer: inventory.manufacturer,
               model: inventory.model,
               uuid: inventory.uuid || device.deviceId,
-              raw: { status: device.status, ...device }
+              raw: { status: calculatedStatus, ...device }
             }
           })
           
@@ -134,7 +144,20 @@ function DevicesPageContent() {
       
       let filtered = inventory
       
-      // Apply usage filter first
+      // Apply status filter first
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(item => {
+          try {
+            const status = item.raw?.status?.toLowerCase()
+            return status === statusFilter
+          } catch (e) {
+            console.warn('Error checking item status:', item, e)
+            return false
+          }
+        })
+      }
+      
+      // Apply usage filter
       if (usageFilter !== 'all') {
         filtered = filtered.filter(item => {
           try {
@@ -267,6 +290,15 @@ function DevicesPageContent() {
       // Calculate counts from search-filtered results
       return {
         all: searchFiltered.length,
+        active: searchFiltered.filter(item => 
+          item.raw?.status?.toLowerCase() === 'active'
+        ).length,
+        stale: searchFiltered.filter(item => 
+          item.raw?.status?.toLowerCase() === 'stale'
+        ).length,
+        missing: searchFiltered.filter(item => 
+          item.raw?.status?.toLowerCase() === 'missing'
+        ).length,
         assigned: searchFiltered.filter(item => 
           item.usage?.toLowerCase() === 'assigned'
         ).length,
@@ -288,13 +320,13 @@ function DevicesPageContent() {
       }
     } catch (e) {
       console.error('Error calculating filter counts:', e)
-      return { all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
+      return { all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
     }
   }
 
   const baseCounts = getBaseCounts()
   const filterCounts = getFilterCounts()
-  const isFiltered = searchQuery.trim() || usageFilter !== 'all' || catalogFilter !== 'all'
+  const isFiltered = searchQuery.trim() || statusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all'
 
   if (loading) {
     return (
@@ -578,28 +610,87 @@ function DevicesPageContent() {
             
             {/* Filter Row */}
             <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
-              <nav className="flex flex-wrap gap-2">
+              <nav className="flex flex-wrap gap-2 items-center">
+                {/* Status Filters */}
+                {[
+                  { key: 'active', label: 'Active', count: filterCounts.active, type: 'status', colors: 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-600 dark:hover:bg-emerald-800' },
+                  { key: 'stale', label: 'Stale', count: filterCounts.stale, type: 'status', colors: 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-600 dark:hover:bg-amber-800' },
+                  { key: 'missing', label: 'Missing', count: filterCounts.missing, type: 'status', colors: 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-800' },
+                ].map((filter) => {
+                  const isActive = statusFilter === filter.key
+                  
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => setStatusFilter(statusFilter === filter.key ? 'all' : filter.key)}
+                      className={`${
+                        isActive
+                          ? filter.colors
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                    >
+                      <span className="hidden lg:inline">{filter.label}</span>
+                      <span className="lg:hidden">{filter.label}</span>
+                      <span className={`${
+                        isActive 
+                          ? 'bg-white/20 text-current'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                        {filter.count}
+                      </span>
+                    </button>
+                  )
+                })}
+                
+                {/* Separator */}
+                <div className="h-8 w-px bg-gray-300 dark:bg-gray-500"></div>
+                
+                {/* Usage Filters */}
                 {[
                   { key: 'assigned', label: 'Assigned', count: filterCounts.assigned, type: 'usage', colors: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800' },
                   { key: 'shared', label: 'Shared', count: filterCounts.shared, type: 'usage', colors: 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800' },
+                ].map((filter) => {
+                  const isActive = usageFilter === filter.key
+                  
+                  return (
+                    <button
+                      key={filter.key}
+                      onClick={() => setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)}
+                      className={`${
+                        isActive
+                          ? filter.colors
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                    >
+                      <span className="hidden lg:inline">{filter.label}</span>
+                      <span className="lg:hidden">{filter.label}</span>
+                      <span className={`${
+                        isActive 
+                          ? 'bg-white/20 text-current'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
+                        {filter.count}
+                      </span>
+                    </button>
+                  )
+                })}
+                
+                {/* Separator */}
+                <div className="h-8 w-px bg-gray-300 dark:bg-gray-500"></div>
+                
+                {/* Catalog Filters */}
+                {[
                   { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum, type: 'catalog', colors: 'bg-teal-100 text-teal-700 border-teal-300 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-600 dark:hover:bg-teal-800' },
                   { key: 'staff', label: 'Staff', count: filterCounts.staff, type: 'catalog', colors: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800' },
                   { key: 'faculty', label: 'Faculty', count: filterCounts.faculty, type: 'catalog', colors: 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800' },
                   { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk, type: 'catalog', colors: 'bg-cyan-100 text-cyan-700 border-cyan-300 hover:bg-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-600 dark:hover:bg-cyan-800' },
                 ].map((filter) => {
-                  const isActive = (filter.type === 'usage' && usageFilter === filter.key) ||
-                                 (filter.type === 'catalog' && catalogFilter === filter.key)
+                  const isActive = catalogFilter === filter.key
                   
                   return (
                     <button
                       key={filter.key}
-                      onClick={() => {
-                        if (filter.type === 'usage') {
-                          setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)
-                        } else {
-                          setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)
-                        }
-                      }}
+                      onClick={() => setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)}
                       className={`${
                         isActive
                           ? filter.colors
