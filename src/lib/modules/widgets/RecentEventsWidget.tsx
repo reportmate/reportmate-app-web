@@ -15,6 +15,8 @@ interface RecentEventsTableProps {
   mounted: boolean
   deviceNameMap: Record<string, string>
   isLoading?: boolean
+  loadingProgress?: { current: number, total: number }
+  loadingMessage?: string
 }
 
 // Helper function to detect module type from event
@@ -172,7 +174,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   lastUpdateTime, 
   mounted, 
   deviceNameMap,
-  isLoading = false
+  isLoading = false,
+  loadingProgress = { current: 0, total: 0 },
+  loadingMessage = ''
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
@@ -340,9 +344,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
       
       {events.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
+          <div className="text-center max-w-md mx-auto px-4">
             {isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? (
-              // Loading state
+              // Loading state with progress bar
               <>
                 <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -350,9 +354,36 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                   Loading events...
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                <p className="text-gray-600 dark:text-gray-400 mb-4">
                   Connecting to the event stream to retrieve latest activity.
                 </p>
+                {loadingProgress.total > 0 && (
+                  <div className="w-full space-y-2">
+                    {/* Progress Bar */}
+                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                      <div 
+                        className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                        style={{ 
+                          width: loadingProgress.total > 0
+                            ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                            : '0%'
+                        }}
+                      ></div>
+                    </div>
+                    
+                    {/* Progress Text */}
+                    <div className="flex items-center justify-center text-sm text-gray-600 dark:text-gray-400 space-x-1">
+                      <span className="font-medium">{loadingProgress.current} / {loadingProgress.total}</span>
+                      <span>•</span>
+                      <span>{Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete</span>
+                      {loadingMessage && (
+                        <>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">• {loadingMessage}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               // No events state

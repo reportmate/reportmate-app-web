@@ -1096,7 +1096,7 @@ function InstallsPageContent() {
                         {loadingProgress.total > 100 && <span className="ml-2">• {loadingProgress.total} devices</span>}
                       </>
                     )
-                    : 'First load may take 30-40 seconds • Subsequent loads are instant (5-min cache)'
+                    : 'First load may take 60-90 seconds'
                   }
                 </p>
               </div>
