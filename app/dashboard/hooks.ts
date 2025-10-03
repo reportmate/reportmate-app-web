@@ -17,6 +17,8 @@ export function useLiveEvents() {
   const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
 
   // IMMEDIATE LOGGING - this should show up right when hook is called
   console.log("🔥 useLiveEvents hook called!")
@@ -166,6 +168,7 @@ export function useLiveEvents() {
     
     let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
+    let progressInterval: NodeJS.Timeout | null = null
     let isActive = true // Track if component is still active
     
     console.log("Dashboard initialized - starting event polling")
@@ -186,6 +189,16 @@ export function useLiveEvents() {
               if (prev.length === 0) {
                 console.log("Loading initial events:", data.events.length)
                 setLastUpdateTime(new Date())
+                
+                // Clear progress interval and set to 100%
+                if (progressInterval) {
+                  clearInterval(progressInterval)
+                  progressInterval = null
+                }
+                const eventCount = data.events.length
+                setLoadingProgress({ current: eventCount, total: eventCount })
+                setLoadingMessage('Events loaded')
+                
                 return data.events.slice(-50).map(sanitizeEventForDisplay) // Show last 50 events
               }
               
@@ -212,6 +225,23 @@ export function useLiveEvents() {
         if (!isActive) return // Don't start if component unmounted
         
         setConnectionStatus("connecting")
+        
+        // Start progress simulation
+        const estimatedTotal = 50 // Expected number of events to load
+        let progress = 0
+        progressInterval = setInterval(() => {
+          if (progress < Math.floor(estimatedTotal * 0.85)) {
+            progress += 3 // Fast to 85%
+            setLoadingMessage('Connecting to event stream...')
+          } else if (progress < Math.floor(estimatedTotal * 0.95)) {
+            progress += 1 // Medium to 95%
+            setLoadingMessage('Negotiating connection...')
+          } else if (progress < Math.floor(estimatedTotal * 0.995)) {
+            progress += 0.5 // Slow to 99.5%
+            setLoadingMessage('Loading events...')
+          }
+          setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
+        }, 200)
         
         // Check if SignalR is enabled
         const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
@@ -302,6 +332,12 @@ export function useLiveEvents() {
         setConnectionStatus("connected")
         setLastUpdateTime(new Date())
         
+        // Clear progress interval on successful connection
+        if (progressInterval) {
+          clearInterval(progressInterval)
+          progressInterval = null
+        }
+        
         // Also fetch initial events via polling to get any missed events
         fetchLocalEvents()
         
@@ -353,6 +389,12 @@ export function useLiveEvents() {
         pollingInterval = null
       }
       
+      // Cleanup progress interval
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
+      
       console.log("Dashboard hooks cleanup completed")
     }
   }, []) // Empty dependency array to run only once
@@ -362,6 +404,8 @@ export function useLiveEvents() {
     connectionStatus,
     lastUpdateTime,
     mounted,
+    loadingProgress,
+    loadingMessage,
     addEvent: (event: FleetEvent) => {
       setEvents(prev => [event, ...prev].slice(-50)) // Reduced from 100 to 50 events
       setLastUpdateTime(new Date())

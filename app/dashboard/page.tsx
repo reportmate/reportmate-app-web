@@ -81,7 +81,7 @@ interface Device {
 
 export default function Dashboard() {
   const componentId = useComponentTracker('Dashboard')
-  const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
+  const { events, connectionStatus, lastUpdateTime, mounted, loadingProgress, loadingMessage } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
@@ -729,6 +729,9 @@ export default function Dashboard() {
                 lastUpdateTime={lastUpdateTime}
                 mounted={mounted}
                 deviceNameMap={deviceNameMap}
+                isLoading={connectionStatus === 'connecting' && events.length === 0}
+                loadingProgress={loadingProgress}
+                loadingMessage={loadingMessage}
               />
             </ErrorBoundary>
 

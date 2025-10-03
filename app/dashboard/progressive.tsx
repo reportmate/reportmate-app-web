@@ -29,7 +29,7 @@ import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget
 
 export default function ProgressiveDashboard() {
   const componentId = useComponentTracker('ProgressiveDashboard')
-  const { events, connectionStatus, lastUpdateTime, mounted } = useLiveEvents()
+  const { events, connectionStatus, lastUpdateTime, mounted, loadingProgress, loadingMessage } = useLiveEvents()
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
   
@@ -205,6 +205,9 @@ export default function ProgressiveDashboard() {
                 lastUpdateTime={lastUpdateTime}
                 mounted={mounted}
                 deviceNameMap={deviceNameMap}
+                isLoading={connectionStatus === 'connecting' && events.length === 0}
+                loadingProgress={loadingProgress}
+                loadingMessage={loadingMessage}
               />
             </ErrorBoundary>
 
