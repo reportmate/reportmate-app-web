@@ -57,6 +57,7 @@ function InstallsPageContent() {
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)
   const [filtersLoading, setFiltersLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [devices, setDevices] = useState<any[]>([])
@@ -142,8 +143,24 @@ function InstallsPageContent() {
 
   // Fetch filter options
   const fetchFilterOptions = async () => {
+    let progressInterval: NodeJS.Timeout | null = null
     try {
       setFiltersLoading(true)
+      setError(null) // Clear any previous errors
+      
+      // Show loading state without specific numbers initially
+      setLoadingProgress({ current: 0, total: 0 })
+      
+      // Start fetching - we'll simulate progress with estimated device count
+      let progress = 0
+      let estimatedTotal = 234 // Estimated device count (will be replaced with actual)
+      
+      progressInterval = setInterval(() => {
+        progress += 5
+        if (progress <= Math.floor(estimatedTotal * 0.85)) {
+          setLoadingProgress({ current: progress, total: estimatedTotal })
+        }
+      }, 150)
       
       const response = await fetch('/api/devices/installs/filters', {
         cache: 'no-store',
@@ -153,33 +170,45 @@ function InstallsPageContent() {
       })
       
       if (!response.ok) {
-        // Fallback to applications filters if installs not available
-        console.warn('Installs filters not available, using applications as fallback')
-        const fallbackResponse = await fetch('/api/devices/applications/filters')
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json()
-          setFilterOptions({
-            managedInstalls: fallbackData.managedApplications || [],
-            otherInstalls: fallbackData.otherApplications || [],
-            totalManagedInstalls: fallbackData.totalManagedApplications || 0,
-            totalOtherInstalls: fallbackData.totalOtherApplications || 0,
-            usages: fallbackData.usages || [],
-            catalogs: fallbackData.catalogs || [],
-            rooms: fallbackData.rooms || [],
-            fleets: fallbackData.fleets || [],
-            platforms: ['Windows', 'Macintosh'],
-            devicesWithData: fallbackData.devicesWithData || 0
-          })
-        }
-        return
+        console.error('[INSTALLS PAGE] Filters API failed:', response.status, response.statusText)
+        throw new Error(`API returned ${response.status}: ${response.statusText}`)
       }
 
       const data = await response.json()
+      
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid response format from filters API')
+      }
+      
+      // Clear the progress interval
+      if (progressInterval) {
+        clearInterval(progressInterval)
+        progressInterval = null
+      }
+      
+      // Get the actual device count from the response
+      const actualDeviceCount = data.devicesWithData || 0
+      
       setFilterOptions(data)
+      
+      // Set progress to complete with actual device count
+      setLoadingProgress({ current: actualDeviceCount, total: actualDeviceCount })
+      console.log('[INSTALLS PAGE] Filter options loaded successfully:', {
+        managedInstalls: data.managedInstalls?.length || 0,
+        usages: data.usages?.length || 0,
+        catalogs: data.catalogs?.length || 0,
+        rooms: data.rooms?.length || 0,
+        devicesWithData: actualDeviceCount,
+        loadTime: 'cached or fresh'
+      })
     } catch (error) {
-      console.error('Error fetching filter options:', error)
-      setError('Failed to load filter options')
+      console.error('[INSTALLS PAGE] Error fetching filter options:', error)
+      setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+      setLoadingProgress({ current: 0, total: 0 })
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval)
+      }
       setFiltersLoading(false)
     }
   }
@@ -363,15 +392,13 @@ function InstallsPageContent() {
                   <button
                     onClick={() => {
                       const csvContent = [
-                        ['Device Name', 'Serial Number', 'Install', 'Version', 'Status', 'Source', 'Platform', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
+                        ['Device Name', 'Serial Number', 'Install', 'Version', 'Status', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
                         ...filteredInstalls.map(install => [
                           install.deviceName,
                           install.serialNumber,
                           install.name,
                           install.version || '',
-                          install.status || '',
-                          install.source || '',
-                          getDevicePlatform(install),
+                          (install.status || 'Unknown').toUpperCase(),
                           install.usage || '',
                           install.catalog || '',
                           install.room || '',
@@ -403,9 +430,19 @@ function InstallsPageContent() {
           </div>
 
           {/* Error Display */}
-          {error && (
-            <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900 dark:border-red-700 dark:text-red-200">
-              {error}
+          {error && !filtersLoading && (
+            <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900 dark:border-red-700 dark:text-red-200 flex items-center justify-between">
+              <span>{error}</span>
+              <button
+                onClick={() => {
+                  setError(null)
+                  fetchFilterOptions()
+                  fetchDevices()
+                }}
+                className="ml-4 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+              >
+                Retry
+              </button>
             </div>
           )}
 
@@ -630,22 +667,7 @@ function InstallsPageContent() {
             <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
               {/* Install Stats Cards */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                
-                {/* Total Installs */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-lg">
-                      <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Installs</p>
-                      <p className="text-2xl font-bold text-gray-900 dark:text-white">{installs.length}</p>
-                    </div>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
 
                 {/* Success Count */}
                 <div className="bg-green-50 dark:bg-green-900 rounded-lg p-4">
@@ -700,36 +722,39 @@ function InstallsPageContent() {
               </div>
 
               {/* Version Distribution Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 
-                {/* Cimian/Munki Version Distribution */}
+                {/* Install Items Version Distribution */}
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
                   <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    Install Package Version Distribution
+                    Install Item(s) Versions
                   </h3>
                   <div className="space-y-3">
                     {Object.entries(
                       installs
                         .filter(install => install.source === 'cimian' || install.source === 'munki')
-                        .reduce((acc: Record<string, number>, install) => {
-                          const version = install.version || 'Unknown'
-                          acc[version] = (acc[version] || 0) + 1
+                        .reduce((acc: Record<string, { count: number; version: string }>, install) => {
+                          const key = `${install.name} - ${install.version || 'Unknown'}`
+                          if (!acc[key]) {
+                            acc[key] = { count: 0, version: install.version || 'Unknown' }
+                          }
+                          acc[key].count++
                           return acc
                         }, {})
                     )
-                    .sort(([,a], [,b]) => b - a)
-                    .slice(0, 8)
-                    .map(([version, count]) => {
-                      const percentage = Math.round((count / installs.filter(i => i.source === 'cimian' || i.source === 'munki').length) * 100)
+                    .sort(([,a], [,b]) => b.count - a.count)
+                    .slice(0, 10)
+                    .map(([itemVersion, data]) => {
+                      const percentage = Math.round((data.count / installs.filter(i => i.source === 'cimian' || i.source === 'munki').length) * 100)
                       return (
-                        <div key={version} className="flex items-center">
+                        <div key={itemVersion} className="flex items-center">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                                {version}
+                                {itemVersion}
                               </span>
                               <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {count} ({percentage}%)
+                                {data.count} ({percentage}%)
                               </span>
                             </div>
                             <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
@@ -744,52 +769,9 @@ function InstallsPageContent() {
                     })}
                     {installs.filter(i => i.source === 'cimian' || i.source === 'munki').length === 0 && (
                       <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                        No Cimian/Munki installations found
+                        No install items found
                       </div>
                     )}
-                  </div>
-                </div>
-
-                {/* Platform Distribution */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    Platform Distribution
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(
-                      installs.reduce((acc: Record<string, number>, install) => {
-                        const platform = getDevicePlatform(install)
-                        acc[platform] = (acc[platform] || 0) + 1
-                        return acc
-                      }, {})
-                    )
-                    .sort(([,a], [,b]) => b - a)
-                    .map(([platform, count]) => {
-                      const percentage = Math.round((count / installs.length) * 100)
-                      return (
-                        <div key={platform} className="flex items-center">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                {platform}
-                              </span>
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
-                                {count} ({percentage}%)
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                              <div 
-                                className={`h-2 rounded-full transition-all duration-300 ${
-                                  platform === 'Macintosh' ? 'bg-blue-500' : 
-                                  platform === 'Windows' ? 'bg-indigo-500' : 'bg-gray-500'
-                                }`}
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
                   </div>
                 </div>
               </div>
@@ -1034,9 +1016,38 @@ function InstallsPageContent() {
 
           {/* Loading State */}
           {filtersLoading && (
-            <div className="px-6 py-8 text-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Loading filter options...</p>
+            <div className="px-6 py-8">
+              <div className="max-w-md mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Loading managed installs data from all devices...
+                  </p>
+                  {loadingProgress.total > 0 && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {loadingProgress.total > 100 
+                        ? `${loadingProgress.current} / ${loadingProgress.total}`
+                        : `${loadingProgress.current} / ${loadingProgress.total}`
+                      }
+                    </p>
+                  )}
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-emerald-600 h-3 rounded-full transition-all duration-300 ease-out"
+                    style={{ 
+                      width: loadingProgress.total > 0
+                        ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                        : '0%'
+                    }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
+                  {loadingProgress.total > 0 
+                    ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete ${loadingProgress.total > 100 ? '• ' + loadingProgress.total + ' devices' : ''}`
+                    : 'First load may take 30-40 seconds • Subsequent loads are instant (5-min cache)'
+                  }
+                </p>
+              </div>
             </div>
           )}
 
@@ -1050,8 +1061,6 @@ function InstallsPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Source</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Platform</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inventory</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Seen</th>
                   </tr>
@@ -1079,16 +1088,8 @@ function InstallsPageContent() {
                             ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                             : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
-                          {install.status || 'unknown'}
+                          {(install.status || 'Unknown').toUpperCase()}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">{install.source || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {getDevicePlatform(install)}
-                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-gray-400">
