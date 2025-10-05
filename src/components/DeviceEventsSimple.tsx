@@ -336,7 +336,36 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           }
         }
         
-        // Handle new structure with modules_processed
+        // Handle new structure with modules_processed (array format from Windows client)
+        if (Array.isArray(payloadObj.modules_processed) && payloadObj.modules_processed.length > 0) {
+          const modules = payloadObj.modules_processed as string[]
+          const capitalizedModules = modules.map(mod => 
+            mod.charAt(0).toUpperCase() + mod.slice(1)
+          )
+          
+          if (modules.length === 1) {
+            return `${capitalizedModules[0]} data reported`
+          } else {
+            return `${capitalizedModules.join(', ')} data reported`
+          }
+        }
+        
+        // Also check metadata.enabledModules (Windows client format)
+        const metadata = payloadObj.metadata as any
+        if (metadata?.enabledModules && Array.isArray(metadata.enabledModules)) {
+          const modules = metadata.enabledModules as string[]
+          const capitalizedModules = modules.map(mod => 
+            mod.charAt(0).toUpperCase() + mod.slice(1)
+          )
+          
+          if (modules.length === 1) {
+            return `${capitalizedModules[0]} data reported`
+          } else {
+            return `${capitalizedModules.join(', ')} data reported`
+          }
+        }
+        
+        // Legacy format with modules_processed as number
         if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
           const modulesProcessed = payloadObj.modules_processed
           if (modulesProcessed === 1) {
