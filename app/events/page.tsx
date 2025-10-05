@@ -142,7 +142,36 @@ const safeDisplayPayload = (payload: EventPayload | string | null | undefined): 
         }
       }
       
-      // Check for new structure with modules_processed
+      // Check for new structure with modules_processed (array format from Windows client)
+      if (Array.isArray(payload.modules_processed) && payload.modules_processed.length > 0) {
+        const modules = payload.modules_processed as string[]
+        const capitalizedModules = modules.map(mod => 
+          mod.charAt(0).toUpperCase() + mod.slice(1)
+        )
+        
+        if (modules.length === 1) {
+          return `${capitalizedModules[0]} data reported`
+        } else {
+          return `${capitalizedModules.join(', ')} data reported`
+        }
+      }
+      
+      // Also check metadata.enabledModules (Windows client format)
+      const metadata = payload.metadata as any
+      if (metadata?.enabledModules && Array.isArray(metadata.enabledModules)) {
+        const modules = metadata.enabledModules as string[]
+        const capitalizedModules = modules.map(mod => 
+          mod.charAt(0).toUpperCase() + mod.slice(1)
+        )
+        
+        if (modules.length === 1) {
+          return `${capitalizedModules[0]} data reported`
+        } else {
+          return `${capitalizedModules.join(', ')} data reported`
+        }
+      }
+      
+      // Legacy format with modules_processed as number
       if (payload.modules_processed && typeof payload.modules_processed === 'number') {
         const parts = []
         // Simplify collection type to just "report" format
