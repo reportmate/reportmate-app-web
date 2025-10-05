@@ -56,8 +56,17 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       // Mark all related events as processed
       relatedEvents.forEach(e => processed.add(e.id))
 
+      // Generate numeric bundle ID: use the highest (most recent) event ID + 1
+      // This ensures bundles have sequential numeric IDs like regular events
+      const numericIds = relatedEvents
+        .map(e => parseInt(e.id))
+        .filter(id => !isNaN(id))
+      const bundleId = numericIds.length > 0 
+        ? String(Math.max(...numericIds) + 1)
+        : `bundle-${event.device}-${eventTime}` // Fallback if no numeric IDs
+
       bundled.push({
-        id: `bundle-${event.device}-${eventTime}`,
+        id: bundleId,
         device: event.device,
         kind: primaryKind,
         ts: event.ts, // Use the primary event's timestamp
@@ -126,7 +135,9 @@ function createBundleMessage(events: FleetEvent[], kinds: string[]): string {
   // Check if these are module data collection events
   const moduleEvents = events.filter(event => {
     const message = event.message || formatPayloadPreview(event.payload)
-    return message.includes('module reported data') || message.includes('modules reported data')
+    return message.includes('data reported') || 
+           message.includes('module reported data') || 
+           message.includes('modules reported data')
   })
 
   if (moduleEvents.length === events.length) {
@@ -134,25 +145,70 @@ function createBundleMessage(events: FleetEvent[], kinds: string[]): string {
     const moduleNames = new Set<string>()
     
     events.forEach(event => {
-      const message = event.message || formatPayloadPreview(event.payload)
-      // Extract module names from messages like "Hardware module reported data"
-      const matches = message.match(/^(\w+) module reported data$/i)
-      if (matches) {
-        moduleNames.add(matches[1])
+      const payloadObj = event.payload as any
+      
+      // Try to extract module names from payload first (most reliable)
+      if (Array.isArray(payloadObj?.modules_processed)) {
+        payloadObj.modules_processed.forEach((mod: string) => moduleNames.add(mod))
+      } else if (Array.isArray(payloadObj?.metadata?.enabledModules)) {
+        payloadObj.metadata.enabledModules.forEach((mod: string) => moduleNames.add(mod))
+      } else {
+        // Fallback to extracting from message
+        const message = event.message || formatPayloadPreview(event.payload)
+        const matches = message.match(/^(\w+)(?:,\s*(\w+))?(?:,\s*(\w+))?\s+data reported$/i)
+        if (matches) {
+          for (let i = 1; i <= 3; i++) {
+            if (matches[i]) moduleNames.add(matches[i])
+          }
+        } else {
+          // Try pattern: "Hardware module reported data"
+          const singleMatch = message.match(/^(\w+)\s+(?:module\s+)?(?:reported|data)/i)
+          if (singleMatch) {
+            moduleNames.add(singleMatch[1])
+          }
+        }
       }
     })
     
-    const moduleArray = Array.from(moduleNames)
+    const moduleArray = Array.from(moduleNames).map(mod => 
+      mod.charAt(0).toUpperCase() + mod.slice(1)
+    )
+    
     if (moduleArray.length === 1) {
-      return `${moduleArray[0]} module data collection`
+      return `${moduleArray[0]} data reported`
     } else if (moduleArray.length <= 3) {
-      return `${moduleArray.join(', ')} modules data collection`
+      return `${moduleArray.join(', ')} data reported`
     } else {
-      return `${moduleArray.length} modules data collection completed`
+      return `${moduleArray.length} modules data reported`
     }
   }
 
-  // For mixed event types, create a summary
+  // For mixed event types, try to extract module info even if not pure data collection
+  const moduleNames = new Set<string>()
+  events.forEach(event => {
+    const payloadObj = event.payload as any
+    if (Array.isArray(payloadObj?.modules_processed)) {
+      payloadObj.modules_processed.forEach((mod: string) => moduleNames.add(mod))
+    } else if (Array.isArray(payloadObj?.metadata?.enabledModules)) {
+      payloadObj.metadata.enabledModules.forEach((mod: string) => moduleNames.add(mod))
+    }
+  })
+  
+  // If we found module names, use them even for mixed events
+  if (moduleNames.size > 0) {
+    const moduleArray = Array.from(moduleNames).map(mod => 
+      mod.charAt(0).toUpperCase() + mod.slice(1)
+    )
+    if (moduleArray.length === 1) {
+      return `${moduleArray[0]} data reported`
+    } else if (moduleArray.length <= 3) {
+      return `${moduleArray.join(', ')} data reported`
+    } else {
+      return `${moduleArray.length} modules data reported`
+    }
+  }
+  
+  // For mixed event types without module info, create a summary
   const parts: string[] = []
   
   if (kindCounts.error) {
@@ -202,6 +258,21 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
     }
 
     // **PRIORITY 3: Handle modules_processed structure (data collection events)**
+    // Check if modules_processed is an array (new format from Windows client)
+    if (Array.isArray(payloadObj.modules_processed) && payloadObj.modules_processed.length > 0) {
+      const modules = payloadObj.modules_processed as string[]
+      const capitalizedModules = modules.map(module => 
+        module.charAt(0).toUpperCase() + module.slice(1)
+      )
+      
+      if (modules.length === 1) {
+        return `${capitalizedModules[0]} data reported`
+      } else {
+        return `${capitalizedModules.join(', ')} data reported`
+      }
+    }
+    
+    // Handle legacy format where modules_processed is a number
     if (payloadObj.modules_processed && typeof payloadObj.modules_processed === 'number') {
       const moduleCount = payloadObj.modules_processed
       const enabledModules = payloadObj.enabled_modules
@@ -209,18 +280,32 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
       if (Array.isArray(enabledModules) && enabledModules.length > 0) {
         if (moduleCount === 1) {
           const capitalizedModule = enabledModules[0].charAt(0).toUpperCase() + enabledModules[0].slice(1)
-          return `${capitalizedModule} module reported data`
+          return `${capitalizedModule} data reported`
         } else if (moduleCount <= 3) {
           const capitalizedModules = enabledModules.slice(0, moduleCount).map(module => 
             module.charAt(0).toUpperCase() + module.slice(1)
           )
-          return `${capitalizedModules.join(', ')} modules reported data`
+          return `${capitalizedModules.join(', ')} data reported`
         } else {
-          return `All ${moduleCount} modules reported data`
+          return `All ${moduleCount} modules data reported`
         }
       }
       
-      return `${moduleCount} modules reported data`
+      return `${moduleCount} modules data reported`
+    }
+    
+    // Also check metadata.enabledModules (Windows client format)
+    if (payloadObj.metadata?.enabledModules && Array.isArray(payloadObj.metadata.enabledModules)) {
+      const modules = payloadObj.metadata.enabledModules as string[]
+      const capitalizedModules = modules.map(module => 
+        module.charAt(0).toUpperCase() + module.slice(1)
+      )
+      
+      if (modules.length === 1) {
+        return `${capitalizedModules[0]} data reported`
+      } else {
+        return `${capitalizedModules.join(', ')} data reported`
+      }
     }
 
     // **PRIORITY 4: Handle moduleCount structure (older format)**
