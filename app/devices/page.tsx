@@ -9,6 +9,7 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
+import { CopyButton } from "../../src/components/ui/CopyButton"
 
 interface InventoryItem {
   id: string
@@ -642,8 +643,10 @@ function DevicesPageContent() {
                   )
                 })}
                 
-                {/* Separator */}
-                <div className="h-8 w-px bg-gray-300 dark:bg-gray-500"></div>
+                {/* Separator - Status/Usage */}
+                <div className="flex items-center px-2">
+                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
+                </div>
                 
                 {/* Usage Filters */}
                 {[
@@ -675,8 +678,10 @@ function DevicesPageContent() {
                   )
                 })}
                 
-                {/* Separator */}
-                <div className="h-8 w-px bg-gray-300 dark:bg-gray-500"></div>
+                {/* Separator - Usage/Catalog */}
+                <div className="flex items-center px-2">
+                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
+                </div>
                 
                 {/* Catalog Filters */}
                 {[
@@ -771,13 +776,19 @@ function DevicesPageContent() {
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white font-mono">
-                          {item.assetTag || '-'}
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-gray-900 dark:text-white font-mono">
+                            {item.assetTag || '-'}
+                          </div>
+                          {item.assetTag && <CopyButton value={item.assetTag} />}
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white font-mono">
-                          {item.serialNumber}
+                        <div className="flex items-center gap-2">
+                          <div className="text-sm text-gray-900 dark:text-white font-mono">
+                            {item.serialNumber}
+                          </div>
+                          <CopyButton value={item.serialNumber} />
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">

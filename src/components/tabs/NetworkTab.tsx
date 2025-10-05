@@ -6,6 +6,7 @@
 import React, { useState } from 'react'
 import { NetworkTable } from '../tables/NetworkTable'
 import { extractNetwork } from '../../lib/data-processing/modules/network'
+import { CopyButton } from '../ui/CopyButton'
 
 interface NetworkTabProps {
   device: any
