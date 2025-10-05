@@ -7,8 +7,9 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
+import { WarningStatsWidget, ErrorStatsWidget, type InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
+import { getInstallStatsSafe } from "../../src/api/stats"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
@@ -86,6 +87,8 @@ export default function Dashboard() {
   const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
+  const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
+  const [installStatsLoading, setInstallStatsLoading] = useState(true)
   
   // NEW API FORMAT DEVICE FETCH: Transform clean FastAPI format for dashboard compatibility
   useEffect(() => {
@@ -604,6 +607,30 @@ export default function Dashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // Fetch aggregated install statistics from API (fast, accurate)
+  useEffect(() => {
+    async function fetchInstallStats() {
+      try {
+        console.log('[DASHBOARD] Fetching install statistics...')
+        setInstallStatsLoading(true)
+        const stats = await getInstallStatsSafe()
+        console.log('[DASHBOARD] Install stats received:', stats)
+        setInstallStats(stats)
+      } catch (error) {
+        console.error('[DASHBOARD] Failed to load install stats:', error)
+        setInstallStats({ devicesWithErrors: 0, devicesWithWarnings: 0 })
+      } finally {
+        setInstallStatsLoading(false)
+      }
+    }
+    
+    fetchInstallStats()
+    
+    // Refresh stats every 2 minutes to keep reasonably current
+    const interval = setInterval(fetchInstallStats, 120000)
+    return () => clearInterval(interval)
+  }, [])
+
   // Debug: Log devices state changes (DISABLED - causes memory issues)
   useEffect(() => {
     // Only log basic info in development and limit frequency
@@ -708,8 +735,8 @@ export default function Dashboard() {
             {/* Error and Warning Stats Cards */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
               <div className="grid grid-cols-1 gap-4">
-                <ErrorStatsWidget events={events} devices={devices} />
-                <WarningStatsWidget events={events} devices={devices} />
+                <ErrorStatsWidget installStats={installStats ?? undefined} isLoading={installStatsLoading} />
+                <WarningStatsWidget installStats={installStats ?? undefined} isLoading={installStatsLoading} />
               </div>
             </ErrorBoundary>
 
