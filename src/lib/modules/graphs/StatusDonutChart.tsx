@@ -79,14 +79,35 @@ const processStatusData = (devices: Device[]): StatusData[] => {
     statusCounts[status] = (statusCounts[status] || 0) + 1
   })
 
+  // Define the desired order (only these 3 statuses are used)
+  const statusOrder = ['active', 'stale', 'missing']
+
   // Convert to array with percentages
-  return Object.entries(statusCounts).map(([status, count]) => ({
+  const statusArray = Object.entries(statusCounts).map(([status, count]) => ({
     status,
     count,
     percentage: Math.round((count / devices.length) * 100),
     color: STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.color || '#6b7280',
     displayName: STATUS_CONFIG[status as keyof typeof STATUS_CONFIG]?.displayName || status
-  })).sort((a, b) => b.count - a.count) // Sort by count descending
+  }))
+
+  // Sort by predefined order (active, stale, missing, then others)
+  return statusArray.sort((a, b) => {
+    const indexA = statusOrder.indexOf(a.status)
+    const indexB = statusOrder.indexOf(b.status)
+    
+    // If both are in the order array, sort by order
+    if (indexA !== -1 && indexB !== -1) {
+      return indexA - indexB
+    }
+    
+    // If only one is in the order array, prioritize it
+    if (indexA !== -1) return -1
+    if (indexB !== -1) return 1
+    
+    // If neither is in the order array, sort by count descending
+    return b.count - a.count
+  })
 }
 
 export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loading }) => {
