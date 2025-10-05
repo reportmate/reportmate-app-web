@@ -342,116 +342,104 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
         </div>
       </Link>
       
-      {events.length === 0 ? (
+      {events.length === 0 && (isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting') ? (
+        // Loading skeleton - show table structure with skeleton rows
+        <div className="flex-1 overflow-hidden">
+          <div className="overflow-x-auto overlay-scrollbar h-full">
+            <table className="w-full table-fixed min-w-full">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                <tr>
+                  <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Device
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
+                    Message
+                  </th>
+                  <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Time
+                  </th>
+                </tr>
+              </thead>
+            </table>
+            <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
+              <table className="w-full table-fixed min-w-full">
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {[...Array(10)].map((_, index) => (
+                    <tr key={index} className="animate-pulse">
+                      <td className="w-20 px-3 py-2.5">
+                        <div className="flex items-center justify-center">
+                          <div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                        </div>
+                      </td>
+                      <td className="w-56 px-3 py-2.5">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                      </td>
+                      <td className="px-3 py-2.5 hidden md:table-cell">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+                      </td>
+                      <td className="w-44 px-3 py-2.5">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          {loadingProgress.total > 0 && (
+            <div className="absolute bottom-0 left-0 right-0 px-6 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+              <div className="w-full space-y-1.5">
+                {/* Progress Bar */}
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                    style={{ 
+                      width: loadingProgress.total > 0
+                        ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                        : '0%'
+                    }}
+                  ></div>
+                </div>
+                {/* Progress Text */}
+                <div className="flex items-center justify-center text-xs text-gray-600 dark:text-gray-400 space-x-1">
+                  <span className="font-medium">{loadingProgress.current} / {loadingProgress.total}</span>
+                  <span>•</span>
+                  <span>{Math.round((loadingProgress.current / loadingProgress.total) * 100)}%</span>
+                  {loadingMessage && (
+                    <>
+                      <span>•</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium">{loadingMessage}</span>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : events.length === 0 ? (
+        // Empty state - only show if truly no events and not loading
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center max-w-md mx-auto px-4">
-            {isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? (
-              // Loading state with progress bar
-              <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  Loading events...
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Connecting to the event stream to retrieve latest activity.
-                </p>
-                {loadingProgress.total > 0 && (
-                  <div className="w-full space-y-2">
-                    {/* Progress Bar */}
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                      <div 
-                        className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
-                        style={{ 
-                          width: loadingProgress.total > 0
-                            ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
-                            : '0%'
-                        }}
-                      ></div>
-                    </div>
-                    
-                    {/* Progress Text */}
-                    <div className="flex items-center justify-center text-sm text-gray-600 dark:text-gray-400 space-x-1">
-                      <span className="font-medium">{loadingProgress.current} / {loadingProgress.total}</span>
-                      <span>•</span>
-                      <span>{Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete</span>
-                      {loadingMessage && (
-                        <>
-                          <span className="text-blue-600 dark:text-blue-400 font-medium">• {loadingMessage}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              // No events state
-              <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
-                  <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-2 2m0 0l-2-2m2 2v6" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  No events yet
-                </h3>
-                <p className="text-gray-600 dark:text-gray-400 mb-6">
-                  Waiting for fleet events to arrive. Send a test event to get started.
-                </p>
-              </>
-            )}
+            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2M4 13h2m13-8l-2 2m0 0l-2-2m2 2v6" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              No events yet
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400">
+              Waiting for fleet activity
+            </p>
           </div>
         </div>
       ) : (
         <div className="flex-1 overflow-hidden">
-          {isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting' ? (
-            // Loading skeleton
-            <div className="overflow-x-auto overlay-scrollbar h-full">
-              <table className="w-full table-fixed min-w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
-                  <tr>
-                    <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Device
-                    </th>
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
-                      Message
-                    </th>
-                    <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Time
-                    </th>
-                  </tr>
-                </thead>
-              </table>
-              <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
-                <table className="w-full table-fixed min-w-full">
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {[...Array(8)].map((_, index) => (
-                      <tr key={index} className="animate-pulse">
-                        <td className="w-20 px-3 py-2.5">
-                          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded-full w-12"></div>
-                        </td>
-                        <td className="w-56 px-3 py-2.5">
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
-                        </td>
-                        <td className="px-3 py-2.5 hidden md:table-cell">
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
-                        </td>
-                        <td className="w-44 px-3 py-2.5">
-                          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : (
-            // Bundled events table
-            <div className="overflow-x-auto overlay-scrollbar h-full">
+          {/* Bundled events table */}
+          <div className="overflow-x-auto overlay-scrollbar h-full">
               <table className="w-full table-fixed min-w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                   <tr>
@@ -519,7 +507,6 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 </table>
               </div>
             </div>
-          )}
         </div>
       )}
     </div>
