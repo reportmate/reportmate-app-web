@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { CopyButton } from './ui/CopyButton';
 
 interface EventDto {
   id: string;
@@ -79,27 +80,6 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
       })
     }
   }
-
-  // Helper function to copy payload to clipboard
-  const copyToClipboard = async (text: string, eventId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedEventId(eventId);
-      // Reset the copied state after 2 seconds
-      setTimeout(() => setCopiedEventId(null), 2000);
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopiedEventId(eventId);
-      setTimeout(() => setCopiedEventId(null), 2000);
-    }
-  };
 
   // Helper function to format full payload for display
   const formatFullPayload = (payload: any): string => {
@@ -212,15 +192,10 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
                     {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
                   </h4>
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        const payloadToShow = fullPayloads[ev.id] || ev.raw
-                        copyToClipboard(formatFullPayload(payloadToShow), ev.id)
-                      }}
-                      className="px-3 py-1 text-xs bg-gray-600 text-white rounded hover:bg-gray-700"
-                    >
-                      {copiedEventId === ev.id ? '✓ Copied' : 'Copy'}
-                    </button>
+                    <CopyButton 
+                      value={formatFullPayload(fullPayloads[ev.id] || ev.raw)}
+                      size="md"
+                    />
                   </div>
                 </div>
                 <div className="relative">

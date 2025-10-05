@@ -10,6 +10,7 @@ import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
+import { CopyButton } from "../../src/components/ui/CopyButton"
 
 // Helper function to get circular status icons (from RecentEventsWidget)
 const getStatusIcon = (kind: string) => {
@@ -619,27 +620,6 @@ function EventsPageContent() {
     }
   }
 
-  // Helper function to copy payload to clipboard
-  const copyToClipboard = async (text: string, eventId: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedEventId(eventId);
-      // Reset the copied state after 2 seconds
-      setTimeout(() => setCopiedEventId(null), 2000);
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error);
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
-      setCopiedEventId(eventId);
-      setTimeout(() => setCopiedEventId(null), 2000);
-    }
-  };
-
   const getStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'error': 
@@ -1097,32 +1077,12 @@ function EventsPageContent() {
                                           {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
                                         </h4>
                                       </div>
-                                      <button
-                                        onClick={() => {
-                                          const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
-                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                            'No payload available')
-                                          copyToClipboard(formatFullPayload(payloadToShow), event.id)
-                                        }}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
-                                        title="Copy payload to clipboard"
-                                      >
-                                        {copiedEventId === event.id ? (
-                                          <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            Copied!
-                                          </>
-                                        ) : (
-                                          <>
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                                            </svg>
-                                            Copy
-                                          </>
-                                        )}
-                                      </button>
+                                      <CopyButton 
+                                        value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                          { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                          'No payload available'))}
+                                        size="md"
+                                      />
                                     </div>
                                     {loadingPayloads.has(event.id) ? (
                                       <div className="flex items-center justify-center py-8">
@@ -1431,17 +1391,12 @@ function EventsPageContent() {
                                           #{event.id}
                                         </span>
                                       </div>
-                                      <button
-                                        onClick={() => {
-                                          const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
-                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                            'No payload available')
-                                          copyToClipboard(formatFullPayload(payloadToShow), event.id)
-                                        }}
-                                        className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                                      >
-                                        {copiedEventId === event.id ? 'Copied!' : 'Copy'}
-                                      </button>
+                                      <CopyButton 
+                                        value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                          { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                          'No payload available'))}
+                                        size="md"
+                                      />
                                     </div>
                                     <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 overflow-auto">
                                       <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
@@ -1648,17 +1603,12 @@ function EventsPageContent() {
                               Raw Payload
                             </h4>
                           </div>
-                          <button
-                            onClick={() => {
-                              const payloadToShow = fullPayloads[event.id] || (event.isBundle ? 
-                                { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                'No payload available')
-                              copyToClipboard(formatFullPayload(payloadToShow), event.id)
-                            }}
-                            className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                          >
-                            {copiedEventId === event.id ? 'Copied!' : 'Copy'}
-                          </button>
+                          <CopyButton 
+                            value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                              { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                              'No payload available'))}
+                            size="md"
+                          />
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto max-h-64">
                           <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">

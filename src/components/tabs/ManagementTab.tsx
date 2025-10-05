@@ -7,6 +7,7 @@
 import React, { useState } from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
+import { CopyButton } from '../ui/CopyButton'
 
 interface ManagementTabProps {
   device: Record<string, unknown>
@@ -35,35 +36,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     mdmEnrollment: management?.mdmEnrollment?.isEnrolled
   })
 
-  // Copy to clipboard function
-  const copyToClipboard = async (text: string, fieldName: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedField(fieldName)
-      setTimeout(() => setCopiedField(null), 2000)
-    } catch (error) {
-      console.error('Failed to copy to clipboard:', error)
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea')
-      textArea.value = text
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-999999px'
-      textArea.style.top = '-999999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
-      
-      try {
-        document.execCommand('copy')
-        setCopiedField(fieldName)
-        setTimeout(() => setCopiedField(null), 2000)
-      } catch (fallbackErr) {
-        console.error('Fallback copy failed:', fallbackErr)
-      } finally {
-        document.body.removeChild(textArea)
-      }
-    }
-  }
+
 
   if (!management) {
     return (
@@ -210,21 +183,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
                         {management.deviceDetails.intuneDeviceId}
                       </span>
-                      <button
-                        onClick={() => copyToClipboard(management.deviceDetails!.intuneDeviceId!, 'intuneId')}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-                        title={copiedField === 'intuneId' ? 'Copied!' : 'Copy Intune ID to clipboard'}
-                      >
-                        {copiedField === 'intuneId' ? (
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </button>
+                      <CopyButton value={management.deviceDetails.intuneDeviceId} />
                     </div>
                   </div>
                 )}
@@ -237,21 +196,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
                         {management.deviceDetails.entraObjectId}
                       </span>
-                      <button
-                        onClick={() => copyToClipboard(management.deviceDetails!.entraObjectId!, 'objectId')}
-                        className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
-                        title={copiedField === 'objectId' ? 'Copied!' : 'Copy Object ID to clipboard'}
-                      >
-                        {copiedField === 'objectId' ? (
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                          </svg>
-                        )}
-                      </button>
+                      <CopyButton value={management.deviceDetails.entraObjectId} />
                     </div>
                   </div>
                 )}

@@ -39,10 +39,10 @@ export function VersionDisplay() {
     }
   }
 
-  const copyContainerInfo = async () => {
-    if (!versionInfo) return
+  const getContainerInfoText = () => {
+    if (!versionInfo) return ''
     
-    const containerInfo = `Container Info:
+    return `Container Info:
 Version: ${versionInfo.version}
 Build ID: ${versionInfo.buildId}
 Image Tag: ${versionInfo.imageTag}
@@ -50,23 +50,6 @@ Node Version: ${versionInfo.nodeVersion}
 Platform: ${versionInfo.platform}/${versionInfo.arch}
 Built: ${new Date(versionInfo.buildTime).toISOString()}
 Timestamp: ${new Date().toISOString()}`
-
-    try {
-      await navigator.clipboard.writeText(containerInfo)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch (error) {
-      console.warn('Failed to copy to clipboard:', error)
-      // Fallback for older browsers
-      const textArea = document.createElement('textarea')
-      textArea.value = containerInfo
-      document.body.appendChild(textArea)
-      textArea.select()
-      document.execCommand('copy')
-      document.body.removeChild(textArea)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    }
   }
 
   if (isLoading) {
@@ -94,15 +77,13 @@ Timestamp: ${new Date().toISOString()}`
 
   return (
     <div 
-      className="relative flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+      className="relative flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 cursor-default transition-colors"
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
-      onClick={copyContainerInfo}
-      title="Click to copy container info for debugging"
     >
       <div className="flex items-center gap-1">
-        <div className={`w-2 h-2 rounded-full ${copied ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-        <span>{copied ? 'Copied!' : `v${formattedDisplayVersion}`}</span>
+        <div className={`w-2 h-2 rounded-full bg-green-500`}></div>
+        <span>{`v${formattedDisplayVersion}`}</span>
       </div>
       
       {showTooltip && versionInfo && (
