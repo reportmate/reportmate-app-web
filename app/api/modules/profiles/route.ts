@@ -3,47 +3,60 @@ import { NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+/**
+ * Profiles API Route - Proxy to FastAPI
+ * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
+ */
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
     const timestamp = new Date().toISOString()
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Pool } = require('pg')
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL })
-
-    const result = await pool.query(`
-      SELECT 
-        p.device_id, d.name as device_name, d.serial_number, d.last_seen,
-        p.data, p.collected_at
-      FROM profiles p
-      JOIN devices d ON p.device_id = d.id
-      ORDER BY p.updated_at DESC LIMIT $1
-    `, [limit])
+    const { searchParams } = new URL(request.url)
     
-    const profilesData = result.rows.map((row: any) => {
-      const data = row.data || {}
-      return {
-        id: row.device_id,
-        deviceId: row.device_id,
-        deviceName: row.device_name || 'Unknown Device',
-        serialNumber: row.serial_number,
-        lastSeen: row.last_seen,
-        collectedAt: row.collected_at,
-        profiles: data.profiles || [],
-        totalProfiles: data.profiles?.length || 0,
-        systemProfiles: data.profiles?.filter((p: any) => p.scope === 'system').length || 0,
-        userProfiles: data.profiles?.filter((p: any) => p.scope === 'user').length || 0,
-        raw: data
+    console.log(`[PROFILES PROXY] ${timestamp} - Forwarding to FastAPI`)
+    
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+    if (!API_BASE_URL) {
+      throw new Error('API_BASE_URL not configured')
+    }
+    
+    const deviceId = searchParams.get('deviceId') || searchParams.get('serial')
+    if (!deviceId) {
+      throw new Error('deviceId or serial parameter required')
+    }
+    
+    const fastApiUrl = `${API_BASE_URL}/api/device/${deviceId}`
+    console.log(`[PROFILES PROXY] Calling: ${fastApiUrl}`)
+    
+    const response = await fetch(fastApiUrl, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store'
+    })
+    
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`FastAPI returned ${response.status}: ${errorText}`)
+    }
+    
+    const data = await response.json()
+    const profiles = data.device?.modules?.profiles || []
+    
+    console.log(`[PROFILES PROXY] Received profiles data`)
+    
+    return NextResponse.json(profiles, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'X-Fetched-At': timestamp,
+        'X-Data-Source': 'fastapi-proxy'
       }
     })
     
-    return NextResponse.json(profilesData, {
-      headers: { 'X-Fetched-At': timestamp, 'X-Data-Source': 'local-database' }
-    })
-    
   } catch (error) {
-    console.error('[PROFILES API] Error:', error)
-    return NextResponse.json({ error: 'Failed to fetch profiles data' }, { status: 500 })
+    console.error('[PROFILES PROXY] Error:', error)
+    return NextResponse.json({
+      error: 'Failed to fetch profiles',
+      details: error instanceof Error ? error.message : String(error),
+      timestamp: new Date().toISOString()
+    }, { status: 500 })
   }
 }
