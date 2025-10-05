@@ -676,36 +676,46 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         warnings: []
       }
 
-      // For failed packages (Error/Failed status), show ONLY the most recent failure
-      // No historical data, no session filtering - just latest failure state
-      if (finalStatus === 'Error' && item.recentAttempts && Array.isArray(item.recentAttempts) && item.recentAttempts.length > 0) {
-        // Get the most recent failed attempt (last in array)
-        const latestFailure = item.recentAttempts
-          .filter((attempt: any) => attempt.status === 'Failed' || attempt.status === 'Error')
-          .slice(-1)[0] // Get the last (most recent) failure
-          
-        if (latestFailure) {
-          const errorMessage = item.hasInstallLoop 
-            ? `Installation loop detected`
-            : `Installation failed`
-            
-          packageInfo.errors?.push({
-            id: `${item.id || item.name}-latest-error`,
-            message: errorMessage,
-            timestamp: latestFailure.timestamp,
-            code: item.hasInstallLoop ? 'INSTALL_LOOP' : (latestFailure.errorCode || 'ERROR'),
-            package: item.name || item.displayName,
-            context: { 
-              runType: latestFailure.runType || 'manual'
-            }
-          })
-          
-          console.log('[INSTALLS MODULE] ✅ Added latest error for failed package:', {
-            packageName: item.name,
-            sessionId: latestFailure.session_id,
-            timestamp: latestFailure.timestamp
-          })
-        }
+      // CRITICAL FIX: Use lastError and lastWarning fields from Cimian (added in Windows client version 2025.10.03.1427)
+      // These fields contain the actual error/warning messages from the MDM system
+      if (item.lastError && item.lastError.trim() !== '') {
+        packageInfo.errors?.push({
+          id: `${item.id || item.name}-last-error`,
+          message: item.lastError,
+          timestamp: item.lastUpdate || item.lastAttemptTime || new Date().toISOString(),
+          code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'ERROR',
+          package: item.name || item.displayName,
+          context: { 
+            runType: 'manual'
+          }
+        })
+        
+        console.log('[INSTALLS MODULE] ✅ Added lastError for package:', {
+          packageName: item.name,
+          error: item.lastError,
+          timestamp: item.lastUpdate,
+          failureCount: item.failureCount
+        })
+      }
+      
+      if (item.lastWarning && item.lastWarning.trim() !== '') {
+        packageInfo.warnings?.push({
+          id: `${item.id || item.name}-last-warning`,
+          message: item.lastWarning,
+          timestamp: item.lastUpdate || item.lastAttemptTime || new Date().toISOString(),
+          code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'WARNING',
+          package: item.name || item.displayName,
+          context: { 
+            runType: 'manual'
+          }
+        })
+        
+        console.log('[INSTALLS MODULE] ✅ Added lastWarning for package:', {
+          packageName: item.name,
+          warning: item.lastWarning,
+          timestamp: item.lastUpdate,
+          warningCount: item.warningCount
+        })
       }
 
       // Note: No longer adding generic errors based on failureCount 
