@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
+import { CopyButton } from "../../../src/components/ui/CopyButton"
 
 interface Management {
   id: string
@@ -53,7 +54,7 @@ function ManagementPageContent() {
         console.log('🚀 Fetching management data using optimized bulk API...')
         
         // Use the new bulk management API - single call instead of multiple individual calls
-        const response = await fetch('/api/devices/management', {
+        const response = await fetch('/api/modules/management', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
@@ -248,10 +249,10 @@ function ManagementPageContent() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Provider</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Enrollment Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Enrollment Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48">Device</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40">Provider</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Enrollment Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32">Enrollment Type</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Intune ID</th>
                 </tr>
               </thead>
@@ -276,9 +277,12 @@ function ManagementPageContent() {
                           href={`/device/${mgmt.deviceId}`}
                           className="flex items-center hover:text-yellow-600 dark:hover:text-yellow-400"
                         >
-                          <div>
+                          <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{mgmt.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{mgmt.serialNumber}</div>
+                            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 font-mono">
+                              <span>{mgmt.serialNumber}</span>
+                              <CopyButton value={mgmt.serialNumber} size="sm" />
+                            </div>
                           </div>
                         </Link>
                       </td>
@@ -308,8 +312,11 @@ function ManagementPageContent() {
                         {mgmt.enrollmentType}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        <div className="max-w-48 truncate font-mono text-xs" title={mgmt.intuneId}>
-                          {mgmt.intuneId}
+                        <div className="flex items-center gap-2 font-mono text-xs">
+                          <span className="break-all">{mgmt.intuneId}</span>
+                          {mgmt.intuneId && mgmt.intuneId !== 'N/A' && (
+                            <CopyButton value={mgmt.intuneId} size="sm" />
+                          )}
                         </div>
                       </td>
                     </tr>
