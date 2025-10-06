@@ -86,10 +86,16 @@ function ManagementPageContent() {
     fetchManagement()
   }, [])
 
-  // Get unique providers
+  // Get unique providers with counts
   const providers = Array.from(new Set(
     management.map(m => m.provider).filter(Boolean)
   )).sort()
+
+  // Calculate provider counts
+  const providerCounts = providers.reduce((acc, provider) => {
+    acc[provider] = management.filter(m => m.provider === provider).length
+    return acc
+  }, {} as Record<string, number>)
 
   // Filter management
   const filteredManagement = management.filter(m => {
@@ -215,18 +221,6 @@ function ManagementPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Provider Filter */}
-                <select
-                  value={providerFilter}
-                  onChange={(e) => setProviderFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                >
-                  <option value="all">All Providers</option>
-                  {providers.map(provider => (
-                    <option key={provider} value={provider}>{provider}</option>
-                  ))}
-                </select>
-                
                 {/* Search */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -245,6 +239,46 @@ function ManagementPageContent() {
               </div>
             </div>
           </div>
+          
+          {/* Provider Filter Buttons */}
+          {providers.length > 0 && (
+            <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
+              <nav className="flex flex-wrap gap-2 items-center">
+                {providers.map((provider) => {
+                  const isActive = providerFilter === provider
+                  const count = providerCounts[provider] || 0
+                  
+                  // Provider-specific colors
+                  const colors = provider === 'Microsoft Intune'
+                    ? 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800'
+                    : provider === 'Apple'
+                    ? 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-800'
+                    : 'bg-purple-100 text-purple-700 border-purple-300 hover:bg-purple-200 dark:bg-purple-900 dark:text-purple-300 dark:border-purple-600 dark:hover:bg-purple-800'
+                  
+                  return (
+                    <button
+                      key={provider}
+                      onClick={() => setProviderFilter(providerFilter === provider ? 'all' : provider)}
+                      className={`${
+                        isActive
+                          ? colors
+                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                    >
+                      <span>{provider}</span>
+                      <span className={`${
+                        isActive 
+                          ? 'bg-white/20 text-current'
+                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
+                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium`}>
+                        {count}
+                      </span>
+                    </button>
+                  )
+                })}
+              </nav>
+            </div>
+          )}
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
