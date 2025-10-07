@@ -85,7 +85,9 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
       }
       
       const data = await response.json()
-      setDevices(data)
+      // FastAPI returns { devices: [...], total: ..., message: ... }
+      // Extract the devices array
+      setDevices(Array.isArray(data) ? data : (data.devices || []))
     } catch (err) {
       console.error('Error fetching devices:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch devices')

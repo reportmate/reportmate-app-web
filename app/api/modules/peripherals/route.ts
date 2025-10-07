@@ -7,30 +7,22 @@ export const revalidate = 0
  * Peripherals API Route - Proxy to FastAPI
  * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    const { searchParams } = new URL(request.url)
+    console.log(`[PERIPHERALS API] ${timestamp} - Fetching bulk peripherals data from FastAPI`)
     
-    console.log(`[PERIPHERALS PROXY] ${timestamp} - Forwarding to FastAPI`)
-    
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+    const API_BASE_URL = process.env.API_BASE_URL
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL not configured')
     }
     
-    const deviceId = searchParams.get('deviceId') || searchParams.get('serial')
-    if (!deviceId) {
-      throw new Error('deviceId or serial parameter required')
-    }
-    
-    const fastApiUrl = `${API_BASE_URL}/api/device/${deviceId}`
-    console.log(`[PERIPHERALS PROXY] Calling: ${fastApiUrl}`)
+    const fastApiUrl = `${API_BASE_URL}/api/devices/peripherals`
+    console.log(`[PERIPHERALS API] Calling: ${fastApiUrl}`)
     
     const response = await fetch(fastApiUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store'
+      headers: { 'Content-Type': 'application/json' }
     })
     
     if (!response.ok) {
@@ -38,24 +30,20 @@ export async function GET(request: Request) {
       throw new Error(`FastAPI returned ${response.status}: ${errorText}`)
     }
     
-    const data = await response.json()
-    const peripherals = {
-      displays: data.device?.modules?.displays || [],
-      printers: data.device?.modules?.printers || []
-    }
+    const peripheralsData = await response.json()
     
-    console.log(`[PERIPHERALS PROXY] Received peripherals data`)
+    console.log(`[PERIPHERALS API] Received ${Array.isArray(peripheralsData) ? peripheralsData.length : 0} devices with peripherals data`)
     
-    return NextResponse.json(peripherals, {
+    return NextResponse.json(peripheralsData, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'X-Fetched-At': timestamp,
-        'X-Data-Source': 'fastapi-proxy'
+        'X-Data-Source': 'fastapi-bulk-peripherals'
       }
     })
     
   } catch (error) {
-    console.error('[PERIPHERALS PROXY] Error:', error)
+    console.error('[PERIPHERALS API] Error:', error)
     return NextResponse.json({
       error: 'Failed to fetch peripherals',
       details: error instanceof Error ? error.message : String(error),

@@ -256,18 +256,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
             </div>
           </div>
         </div>
-        
-        {/* Hardware UUID - Single row at bottom */}
-        {(inventory.uuid || device.deviceId) && (
-          <div>
-            <Stat 
-              label="Hardware UUID" 
-              value={inventory.uuid || device.deviceId} 
-              isMono 
-              showCopyButton
-            />
-          </div>
-        )}
       </div>
     </StatBlock>
   )
