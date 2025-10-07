@@ -40,7 +40,7 @@ export function extractInstalls(modules: any): InstallsData {
     const installsModule = modules.installs
 
     // Handle PowerShell object format from Azure Functions API
-    let cimian = installsModule.cimian
+    const cimian = installsModule.cimian
     if (typeof cimian === 'string' && cimian.startsWith('@{')) {
       // Parse PowerShell object format - this is a temporary workaround
       // The real fix should be in the Azure Functions API to return proper JSON
@@ -206,7 +206,7 @@ export function extractInstalls(modules: any): InstallsData {
 
     // Handle cache status data
     if (installsModule.cacheStatus) {
-      let cacheStatus = installsModule.cacheStatus
+      const cacheStatus = installsModule.cacheStatus
       if (typeof cacheStatus === 'string' && cacheStatus.startsWith('@{')) {
         // Extract cache size from PowerShell format
         const cacheSizeMatch = cacheStatus.match(/cache_size_mb=([^;]+);/)

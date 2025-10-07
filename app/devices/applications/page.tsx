@@ -1094,7 +1094,7 @@ function ApplicationsPageContent() {
                       )}
                       {filteredApplicationNames.length === 0 && searchQuery && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          No applications match "{searchQuery}"
+                          No applications match &quot;{searchQuery}&quot;
                         </span>
                       )}
                     </div>

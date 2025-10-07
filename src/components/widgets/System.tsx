@@ -76,11 +76,6 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
             />          
             
             <Stat 
-              label="Version" 
-              value={operatingSystem?.version || 'Unknown'} 
-            />
-
-            <Stat 
               label="Display Version" 
               value={operatingSystem?.displayVersion || 'Unknown'} 
             />

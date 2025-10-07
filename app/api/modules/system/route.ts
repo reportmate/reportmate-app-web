@@ -18,9 +18,9 @@ export async function GET(request: Request) {
       }, { status: 500 })
     }
     
-    // NO LOCAL DATABASE: Call FastAPI container directly
+    // Call FastAPI bulk endpoint
     try {
-      const url = `${apiBaseUrl}/api/modules/system?limit=${limit}`
+      const url = `${apiBaseUrl}/api/devices/system`
       console.log(`[SYSTEM API] ${timestamp} - Calling FastAPI: ${url}`)
       
       const response = await fetch(url, {

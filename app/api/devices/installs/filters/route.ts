@@ -129,6 +129,43 @@ export async function GET() {
       }
     }
     
+    // Return BOTH filter options AND device data to avoid duplicate API calls
+    const devicesWithInstalls = installsDevices.map((device: any) => {
+      const m = device.modules || {};
+      
+      // Parse inventory if it's PowerShell format
+      let inventory = m.inventory;
+      if (typeof inventory === 'string' && inventory.startsWith('@{')) {
+        try {
+          const jsonStr = inventory
+            .replace(/@\{/g, '{')
+            .replace(/\}/g, '}')
+            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)=/g, '"$1":')
+            .replace(/; /g, ', ')
+            .replace(/: ([^,}]+)/g, (match, value) => {
+              if (!value.trim().startsWith('"')) {
+                return `: "${value.trim()}"`;
+              }
+              return match;
+            });
+          inventory = JSON.parse(jsonStr);
+        } catch (e) {
+          // Silently skip parse errors
+        }
+      }
+
+      return {
+        serialNumber: device.serialNumber,
+        deviceId: device.deviceId,
+        deviceName: device.deviceName,
+        lastSeen: device.lastSeen,
+        modules: {
+          installs: m.installs || null,
+          inventory: inventory || null
+        }
+      };
+    });
+
     return NextResponse.json({
       success: true,
       managedInstalls: Array.from(managed).sort(),
@@ -138,7 +175,9 @@ export async function GET() {
       rooms: Array.from(rooms).sort(),
       fleets: Array.from(fleets).sort(),
       platforms: ['Windows', 'Macintosh'],
-      devicesWithData: inventoryDevices.length
+      devicesWithData: inventoryDevices.length,
+      // Include device data to avoid second API call
+      devices: devicesWithInstalls
     });
   } catch (error) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });

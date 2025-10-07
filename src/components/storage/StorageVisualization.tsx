@@ -258,6 +258,14 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
     device.capacity > 0 && device.rootDirectories && device.rootDirectories.length > 0
   )
 
+  // Apply sorting only (no promotion needed since ProgramData is now its own root directory)
+  // Must be before early return to satisfy React Hooks rules
+  const selectedDevice = validDevices[selectedDeviceIndex] || null
+  const sortedDirectories = useMemo(() => {
+    if (!selectedDevice) return []
+    return selectedDevice.rootDirectories.sort((a, b) => b.size - a.size)
+  }, [selectedDevice])
+
   if (validDevices.length === 0) {
     return (
       <div className="text-center py-8">
@@ -267,13 +275,6 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
       </div>
     )
   }
-
-  const selectedDevice = validDevices[selectedDeviceIndex]
-  
-  // Apply sorting only (no promotion needed since ProgramData is now its own root directory)
-  const sortedDirectories = useMemo(() => {
-    return selectedDevice.rootDirectories.sort((a, b) => b.size - a.size)
-  }, [selectedDevice.rootDirectories])
 
   const handleToggleExpanded = (path: string) => {
     const newExpandedPaths = new Set(expandedPaths)
