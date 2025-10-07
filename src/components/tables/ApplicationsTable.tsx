@@ -200,7 +200,7 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               {filteredApps.length === 0 && searchTerm ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                    No applications found matching "{searchTerm}"
+                    No applications found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
               ) : (

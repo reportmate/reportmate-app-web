@@ -9,6 +9,8 @@ import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { mapDeviceData, type ProcessedDeviceInfo, type DeviceStatus } from "../../../src/lib/data-processing"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
+// Import SMART loading hook (V2 - parallel loading)
+import { useSmartDeviceLoading } from "../../../src/hooks/useSmartDeviceLoading"
 // Import modular data processors
 import { extractInstalls, type InstallsInfo } from "../../../src/lib/data-processing/modules/installs"
 import { extractHardware, type HardwareInfo } from "../../../src/lib/data-processing/modules/hardware"
@@ -33,6 +35,7 @@ import {
   PeripheralsTab
 } from "../../../src/components/tabs"
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
+import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
 
 // Overflow Tabs Dropdown Component
 interface OverflowTabsDropdownProps {
@@ -466,6 +469,21 @@ export default function DeviceDetailPage() {
   const router = useRouter()
   const deviceId = params.deviceId as string
   
+  // 🚀 SMART DEVICE LOADING V2 - InfoTab fast, then parallel background loading
+  const {
+    deviceInfo,
+    infoLoading,
+    infoError,
+    moduleStates,
+    allModulesLoaded,
+    requestModule,
+    isModuleLoaded,
+    isModuleLoading,
+    isModuleError,
+    getModuleData,
+    getModuleError
+  } = useSmartDeviceLoading(deviceId)
+  
   // Get initial tab from hash
   const getInitialTab = (): TabType => {
     if (typeof window !== 'undefined' && window.location.hash) {
@@ -499,28 +517,11 @@ export default function DeviceDetailPage() {
       return () => window.removeEventListener('hashchange', handleHashChange)
     }
   }, [])
-  const [events, setEvents] = useState<FleetEvent[]>([])
-  const [device, setDevice] = useState<any>(null)
-  const [loading, setLoading] = useState(true) // Start with loading true to prevent flash
-  const [error, setError] = useState<string | null>(null)
+  // UI State
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
   const tabsContainerRef = useRef<HTMLElement>(null)
-  const [isResolving, setIsResolving] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
-  const [initializing, setInitializing] = useState(true) // Track initial loading state
-  const [minimumLoadTime, setMinimumLoadTime] = useState(false) // Ensure minimum load time
-  
-  // Processed component data using modular types
-  const [processedData, setProcessedData] = useState<{
-    applications?: ApplicationInfo
-    hardware?: HardwareInfo
-    network?: NetworkInfo
-    security?: SecurityInfo
-    system?: SystemInfo
-    events?: EventsInfo
-    installs?: InstallsInfo
-    profiles?: ProfilesInfo
-  }>({});
+  const [isResolving, setIsResolving] = useState(false)
   
   // Helper function to get accent color classes for tabs
   const getTabAccentColors = (accentColor: string, isActive: boolean) => {
@@ -756,51 +757,23 @@ export default function DeviceDetailPage() {
     )
   }
 
-  const handleTabChange = (tabId: TabType) => {
+  // 🎯 Tab change handler with on-demand module loading
+  const handleTabChange = async (tabId: TabType) => {
     setActiveTab(tabId)
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', `#${tabId}`)
     }
+    
+    // Request module if not already loaded (on-demand loading)
+    if (tabId !== 'info' && !isModuleLoaded(tabId)) {
+      console.log(`[SMART LOAD] 🎯 On-demand loading for tab: ${tabId}`)
+      try {
+        await requestModule(tabId)
+      } catch (error) {
+        console.error(`[SMART LOAD] ❌ On-demand load failed for ${tabId}:`, error)
+      }
+    }
   }
-  
-  // Minimum loading time to prevent flash
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setMinimumLoadTime(true)
-    }, 300) // Show loading for at least 300ms to prevent flash
-    
-    return () => clearTimeout(timer)
-  }, [])
-  
-  // Compute installs data for InstallsTab
-  const computedInstallsData = useMemo(() => {
-    console.log('🔄 Computing installs data:', {
-      hasDeviceInfo: !!device,
-      hasInstallsModule: !!device?.modules?.installs,
-      hasProcessedInstalls: !!device?.installs,
-      deviceInfoKeys: device ? Object.keys(device) : [],
-      deviceId: device?.deviceId,
-      serialNumber: device?.serialNumber
-    })
-    
-    if (!device?.modules?.installs && !device?.installs) {
-      return undefined
-    }
-    
-    // Check if we already have processed installs data
-    if (device.installs) {
-      console.log('✅ Using already processed installs data')
-      return device.installs
-    }
-    
-    // Otherwise, extract from raw module - FIXED: pass full modules, not just installs
-    if (device.modules?.installs) {
-      console.log('🔧 Extracting installs from raw modules')
-      return extractInstalls(device.modules)  // CRITICAL FIX: Pass full modules
-    }
-    
-    return undefined
-  }, [device?.modules?.installs, device?.installs])
   
   // Device identifier resolution effect
   useEffect(() => {
@@ -810,13 +783,11 @@ export default function DeviceDetailPage() {
       
       if (identifierType === 'serialNumber') {
         setIsResolving(false)
-        setInitializing(false) // Clear initializing flag for serial numbers
         return // This is already a serial number, no need to resolve
       }
       
       // This is a UUID or Asset Tag, we need to resolve it
       setIsResolving(true)
-      setInitializing(false) // Clear initializing since we're now resolving
       
       try {
         const result = await resolveDeviceIdentifier(deviceId)
@@ -826,234 +797,25 @@ export default function DeviceDetailPage() {
           router.replace(`/device/${encodeURIComponent(result.serialNumber)}`)
           return
         } else {
-          // Add a slight delay before showing error to prevent flash
-          setTimeout(() => {
-            setError(`Device not found for ${identifierType}: ${deviceId}`)
-            setLoading(false)
-            setIsResolving(false)
-          }, 100)
+          // Device not found
+          setIsResolving(false)
           return
         }
       } catch (error) {
         console.error('[DEVICE DETAIL] Error resolving device identifier:', error)
-        // Add a slight delay before showing error to prevent flash
-        setTimeout(() => {
-          setError(`Failed to resolve device identifier: ${error}`)
-          setLoading(false)
-          setIsResolving(false)
-        }, 100)
+        setIsResolving(false)
         return
       }
     }
     
     resolveAndRedirect()
   }, [deviceId, router])
-  
-  useEffect(() => {
-    console.log('[DEVICE PAGE] 🚀 FETCH DEVICE DATA USEEFFECT TRIGGERED:', {
-      deviceId,
-      initializing,
-      isResolving,
-      identifierType: identifyDeviceIdentifierType(deviceId)
-    });
-    
-    // Don't fetch device data if we're still initializing or resolving the identifier
-    if (initializing || isResolving) {
-      console.log('[DEVICE PAGE] ⏸️ Skipping fetch - still initializing or resolving');
-      return
-    }
-    
-    // Only fetch if this is a serial number, asset tag, or device name (resolved identifiers will redirect)
-    const identifierType = identifyDeviceIdentifierType(deviceId)
-    console.log('[DEVICE PAGE] 🔍 Device ID type check:', {
-      deviceId,
-      identifierType,
-      shouldFetch: identifierType === 'serialNumber' || identifierType === 'assetTag' || identifierType === 'deviceName'
-    });
-    
-    if (identifierType !== 'serialNumber' && identifierType !== 'assetTag' && identifierType !== 'deviceName') {
-      console.log('[DEVICE PAGE] ⏸️ Skipping fetch - identifier type not supported for direct fetch');
-      return // Let the resolution effect handle this
-    }
-    
-    const fetchDeviceData = async () => {
-      try {
-        setLoading(true)
-        
-        // Fetch device info from Next.js API route
-        const deviceResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}`)
-        
-        if (!deviceResponse.ok) {
-          if (deviceResponse.status === 404) {
-            // Add a slight delay before showing 404 error to prevent flash
-            setTimeout(() => setError('Device not found'), 100)
-            return
-          } else if (deviceResponse.status === 500) {
-            setTimeout(() => setError('Server error - please try refreshing the page'), 100)
-            return
-          }
-          throw new Error(`Failed to fetch device information (${deviceResponse.status}: ${deviceResponse.statusText})`)
-        }
-        
-        let deviceData
-        try {
-          deviceData = await deviceResponse.json()
-        } catch (jsonError) {
-          console.error('Failed to parse device response JSON:', jsonError)
-          setTimeout(() => setError('Invalid response from server'), 100)
-          return
-        }
-        
-        if (deviceData.success && deviceData.device) {
-          // Use the proper modular device mapper
-          console.log('[DEVICE PAGE] About to call mapDeviceData with:', {
-            hasDevice: !!deviceData.device,
-            deviceKeys: deviceData.device ? Object.keys(deviceData.device) : [],
-            hasModules: !!deviceData.device?.modules,
-            moduleKeys: deviceData.device?.modules ? Object.keys(deviceData.device.modules) : []
-          });
-          
-          try {
-            const processedDevice = mapDeviceData(deviceData.device);
-            console.log('[DEVICE PAGE] mapDeviceData returned:', {
-              hasProcessedDevice: !!processedDevice,
-              processedDeviceKeys: processedDevice ? Object.keys(processedDevice) : [],
-              hasInstalls: !!processedDevice?.installs,
-              hasModules: !!processedDevice?.modules
-            });
-            
-            // Set the processed device data
-            setDevice(processedDevice);
-            console.log('[DEVICE PAGE] setDeviceInfo called successfully');
-          } catch (mapError) {
-            console.error('[DEVICE PAGE] mapDeviceData failed:', mapError);
-            setTimeout(() => setError(`Failed to process device data: ${mapError}`), 100)
-            return
-          }
-        } else {
-          console.error('Invalid device data structure:', deviceData)
-          setTimeout(() => setError('Invalid device data received'), 100)
-          return
-        }
-        
-        // Fetch events separately from the new device events endpoint
-        try {
-          const eventsResponse = await fetch(`/api/device/${encodeURIComponent(deviceId)}/events`)
-          
-          if (eventsResponse.ok) {
-            let eventsData
-            try {
-              eventsData = await eventsResponse.json()
-            } catch (jsonError) {
-              console.error('Failed to parse events response JSON:', jsonError)
-              setEvents([])
-              return
-            }
-            
-            if (eventsData.success && eventsData.events) {
-              setEvents(eventsData.events)
-              
-              // Find the most recent event timestamp from this device's events
-              if (eventsData.events.length > 0) {
-                const mostRecentEventTime = eventsData.events.reduce((latest: string, event: any) => {
-                  const eventTime = event.ts || event.timestamp || event.created_at
-                  
-                  if (!eventTime) return latest
-                  
-                  if (!latest) return eventTime
-                  
-                  // Compare timestamps and return the more recent one
-                  return new Date(eventTime) > new Date(latest) ? eventTime : latest
-                }, '')
-                
-                // Update the processed device info with the most recent event time
-                if (mostRecentEventTime) {
-                  // Update both the directDevice and processedDevice
-                  if (typeof mapDeviceData === 'function') {
-                    try {
-                      const processedDevice = mapDeviceData(deviceData.device)
-                      // Override the lastSeen with the most recent event time
-                      processedDevice.lastSeen = mostRecentEventTime
-                      processedDevice.lastEventTime = mostRecentEventTime
-                      setDevice(processedDevice)
-                    } catch (mappingError) {
-                      console.error('Error in mapDeviceData during lastSeen update:', mappingError)
-                      // Fallback: update direct device
-                      setDevice((prev: any) => prev ? {
-                        ...prev,
-                        lastSeen: mostRecentEventTime,
-                        lastEventTime: mostRecentEventTime
-                      } : prev)
-                    }
-                  } else {
-                    // Update direct device
-                    setDevice((prev: any) => prev ? {
-                      ...prev,
-                      lastSeen: mostRecentEventTime,
-                      lastEventTime: mostRecentEventTime
-                    } : prev)
-                  }
-                }
-              }
-              
-              // Use modular events processing
-              const eventsModularData = extractEvents(deviceData.device?.modules || {}, eventsData.events)
-              setProcessedData(prev => ({
-                ...prev,
-                events: eventsModularData
-              }))
-            }
-          } else {
-            console.warn('Failed to fetch events for device:', deviceId)
-            // Set empty events array
-            setEvents([])
-          }
-        } catch (eventsError) {
-          console.warn('Error fetching events:', eventsError)
-          setEvents([])
-        }
-        
-      } catch (error) {
-        console.error('Failed to fetch device data:', error)
-        // Add a slight delay before showing error to prevent flash
-        setTimeout(() => setError((error as Error).message), 100)
-      } finally {
-        setLoading(false)
-      }
-    }
-    
-    fetchDeviceData()
-  }, [deviceId, isResolving, initializing]) // Force re-execution when initializing or isResolving changes
 
-  // Process device info from API response using the modular mapper
-  const deviceInfo = useMemo(() => {
-    if (!device) {
-      return {
-        name: 'Unknown Device',
-        serialNumber: deviceId,
-        deviceId: '',
-        lastSeen: '',
-        status: 'unknown' as DeviceStatus,
-        totalEvents: 0,
-        lastEventTime: ''
-      } as ProcessedDeviceInfo
-    }
-
-    // Use the proper modular device mapper
-    const processedDevice = mapDeviceData(device)
-    
-    console.log('🔍 DEVICE INFO DEBUG:', {
-      name: processedDevice.name,
-      serialNumber: processedDevice.serialNumber,
-      hasModules: !!processedDevice.modules,
-      hasInventory: !!processedDevice.inventory
-    })
-    
-    return processedDevice
-  }, [device, deviceId])
+  // NOTE: Old data fetching useEffect REMOVED
+  // Progressive loading hook handles all data fetching now
 
   // Early returns AFTER all useEffects are defined
-  if (loading || isResolving || initializing || !minimumLoadTime) {
+  if (infoLoading || isResolving) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <DeviceDetailSkeleton />
@@ -1061,47 +823,37 @@ export default function DeviceDetailPage() {
     )
   }
   
-  if (error || !deviceInfo) {
-    // Only show error if we're not in initial states and minimum load time has passed
-    if (!initializing && !isResolving && !loading && minimumLoadTime) {
-      return (
-        <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-              <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              {error === 'Device not found' ? 'Device Not Found' : 'Error Loading Device'}
-            </h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
-              {error === 'Device not found' 
-                ? `The device "${deviceId}" could not be found.` 
-                : error?.includes('resolve') || error?.includes('UUID') || error?.includes('Asset Tag')
-                  ? `${error} You can access devices using their serial number, UUID, or asset tag.`
-                  : `Failed to load device information: ${error}`}
-            </p>
-            <Link
-              href="/devices"
-              className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-            >
-              ← Back to Devices
-            </Link>
+  if (infoError || !deviceInfo) {
+    // Show error if info fetch failed
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+            <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
           </div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            {infoError === 'Device not found' ? 'Device Not Found' : 'Error Loading Device'}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            {infoError === 'Device not found' 
+              ? `The device "${deviceId}" could not be found.` 
+              : `Failed to load device information: ${infoError}`}
+          </p>
+          <Link
+            href="/devices"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+          >
+            ← Back to Devices
+          </Link>
         </div>
-      )
-    } else {
-      // Still in loading state, show skeleton
-      return (
-        <div className="min-h-screen bg-gray-50 dark:bg-black">
-          <DeviceDetailSkeleton />
-        </div>
-      )
-    }
+      </div>
+    )
   }
 
-  const _getStatusColor = (status: string) => {
+  // Helper function for status colors
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
       case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
@@ -1319,6 +1071,17 @@ export default function DeviceDetailPage() {
                     </>
                   )}
                 </button>
+                
+                {/* Subtle loading indicator when background modules are loading */}
+                {!allModulesLoaded && (
+                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span>Loading modules...</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1393,38 +1156,234 @@ export default function DeviceDetailPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Info Tab - Always loaded fast */}
         <div className={activeTab === 'info' ? 'block' : 'hidden'}>
           <InfoTab device={deviceInfo} />
         </div>
+
+        {/* Installs Tab - Progressive loading */}
         <div className={activeTab === 'installs' ? 'block' : 'hidden'}>
-          <InstallsTab device={deviceInfo} data={computedInstallsData} />
+          {isModuleLoading('installs') ? (
+            <ModuleLoadingState 
+              moduleName="installs" 
+              state="loading" 
+              icon="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              accentColor="emerald"
+            />
+          ) : isModuleError('installs') ? (
+            <ModuleLoadingState 
+              moduleName="installs" 
+              state="error" 
+              error={getModuleError('installs')}
+              icon="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              accentColor="emerald"
+              onRetry={() => requestModule('installs')}
+            />
+          ) : isModuleLoaded('installs') ? (
+            <InstallsTab device={deviceInfo} data={getModuleData('installs')} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="installs" 
+              state="loading" 
+              icon="M12 6v6m0 0v6m0-6h6m-6 0H6"
+              accentColor="emerald"
+            />
+          )}
         </div>
+
+        {/* Profiles Tab - Progressive loading */}
         <div className={activeTab === 'profiles' ? 'block' : 'hidden'}>
-          <ProfilesTab device={deviceInfo} data={processedData.profiles} />
+          {isModuleLoading('profiles') ? (
+            <ModuleLoadingState 
+              moduleName="profiles" 
+              state="loading" 
+              icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              accentColor="indigo"
+            />
+          ) : isModuleError('profiles') ? (
+            <ModuleLoadingState 
+              moduleName="profiles" 
+              state="error" 
+              error={getModuleError('profiles')}
+              icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              accentColor="indigo"
+              onRetry={() => requestModule('profiles')}
+            />
+          ) : isModuleLoaded('profiles') ? (
+            <ProfilesTab device={deviceInfo} data={getModuleData('profiles')} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="profiles" 
+              state="loading" 
+              icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+              accentColor="indigo"
+            />
+          )}
         </div>
+
+        {/* Applications Tab - Progressive loading */}
         <div className={activeTab === 'applications' ? 'block' : 'hidden'}>
-          <ApplicationsTab device={deviceInfo} data={undefined} />
+          {isModuleLoading('applications') ? (
+            <ModuleLoadingState 
+              moduleName="applications" 
+              state="loading" 
+              icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+              accentColor="blue"
+            />
+          ) : isModuleError('applications') ? (
+            <ModuleLoadingState 
+              moduleName="applications" 
+              state="error" 
+              error={getModuleError('applications')}
+              icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+              accentColor="blue"
+              onRetry={() => requestModule('applications')}
+            />
+          ) : isModuleLoaded('applications') ? (
+            <ApplicationsTab device={deviceInfo} data={getModuleData('applications')} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="applications" 
+              state="loading" 
+              icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
+              accentColor="blue"
+            />
+          )}
         </div>
+
+        {/* Management Tab - Already in info, just display */}
         <div className={activeTab === 'management' ? 'block' : 'hidden'}>
           <ManagementTab device={deviceInfo as unknown as Record<string, unknown>} />
         </div>
+
+        {/* System Tab - Progressive loading */}
         <div className={activeTab === 'system' ? 'block' : 'hidden'}>
-          <SystemTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} data={processedData.system as unknown as Record<string, unknown>} />
+          {isModuleLoading('system') ? (
+            <ModuleLoadingState 
+              moduleName="system" 
+              state="loading" 
+              icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              accentColor="purple"
+            />
+          ) : isModuleError('system') ? (
+            <ModuleLoadingState 
+              moduleName="system" 
+              state="error" 
+              error={getModuleError('system')}
+              icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              accentColor="purple"
+              onRetry={() => requestModule('system')}
+            />
+          ) : isModuleLoaded('system') ? (
+            <SystemTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} data={getModuleData('system') as unknown as Record<string, unknown>} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="system" 
+              state="loading" 
+              icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+              accentColor="purple"
+            />
+          )}
         </div>
+
+        {/* Hardware Tab - Already in info, just display */}
         <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
           <HardwareTab device={deviceInfo as any} />
         </div>
+
+        {/* Network Tab - Progressive loading */}
         <div className={activeTab === 'network' ? 'block' : 'hidden'}>
-          <NetworkTab device={deviceInfo} data={processedData.network} />
+          {isModuleLoading('network') ? (
+            <ModuleLoadingState 
+              moduleName="network" 
+              state="loading" 
+              icon="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
+              accentColor="teal"
+            />
+          ) : isModuleError('network') ? (
+            <ModuleLoadingState 
+              moduleName="network" 
+              state="error" 
+              error={getModuleError('network')}
+              icon="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
+              accentColor="teal"
+              onRetry={() => requestModule('network')}
+            />
+          ) : isModuleLoaded('network') ? (
+            <NetworkTab device={deviceInfo} data={getModuleData('network')} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="network" 
+              state="loading" 
+              icon="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
+              accentColor="teal"
+            />
+          )}
         </div>
+
+        {/* Security Tab - Progressive loading */}
         <div className={activeTab === 'security' ? 'block' : 'hidden'}>
-          <SecurityTab device={deviceInfo} data={processedData.security} />
+          {isModuleLoading('security') ? (
+            <ModuleLoadingState 
+              moduleName="security" 
+              state="loading" 
+              icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              accentColor="red"
+            />
+          ) : isModuleError('security') ? (
+            <ModuleLoadingState 
+              moduleName="security" 
+              state="error" 
+              error={getModuleError('security')}
+              icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              accentColor="red"
+              onRetry={() => requestModule('security')}
+            />
+          ) : isModuleLoaded('security') ? (
+            <SecurityTab device={deviceInfo} data={getModuleData('security')} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="security" 
+              state="loading" 
+              icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
+              accentColor="red"
+            />
+          )}
         </div>
+
+        {/* Peripherals Tab - Already in info, just display */}
         <div className={activeTab === 'peripherals' ? 'block' : 'hidden'}>
           <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
         </div>
+
+        {/* Events Tab - Progressive loading */}
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
-          <EventsTab device={deviceInfo as any} events={events} data={processedData.events as unknown as Record<string, unknown>} />
+          {isModuleLoading('events') ? (
+            <ModuleLoadingState 
+              moduleName="events" 
+              state="loading" 
+              icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              accentColor="monochrome"
+            />
+          ) : isModuleError('events') ? (
+            <ModuleLoadingState 
+              moduleName="events" 
+              state="error" 
+              error={getModuleError('events')}
+              icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              accentColor="monochrome"
+              onRetry={() => requestModule('events')}
+            />
+          ) : isModuleLoaded('events') ? (
+            <EventsTab device={deviceInfo as any} events={Array.isArray(getModuleData('events')) ? getModuleData('events') : []} data={getModuleData('events') as unknown as Record<string, unknown>} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="events" 
+              state="loading" 
+              icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              accentColor="monochrome"
+            />
+          )}
         </div>
       </div>
     </div>

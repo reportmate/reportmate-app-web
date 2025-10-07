@@ -37,8 +37,13 @@ interface HardwareData {
 }
 
 interface DeviceWithHardware {
+  deviceId?: string;
   modules?: {
     hardware?: HardwareData;
+    inventory?: {
+      uuid?: string;
+      [key: string]: unknown;
+    };
   };
   hardware?: HardwareData;
   [key: string]: unknown;
@@ -216,9 +221,19 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             {safeString(hardwareData.model) || 'Unknown'}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Manufacturer</div>
-          <div className="text-sm text-gray-900 dark:text-white font-medium">
-            {safeString(hardwareData.manufacturer) || 'Unknown Manufacturer'}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Manufacturer</div>
+              <div className="text-sm text-gray-900 dark:text-white font-medium">
+                {safeString(hardwareData.manufacturer) || 'Unknown Manufacturer'}
+              </div>
+            </div>
+            <div>
+              <div className="text-sm text-gray-500 dark:text-gray-400">Hardware UUID</div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono">
+                {device?.modules?.inventory?.uuid || device?.deviceId || 'Unknown'}
+              </div>
+            </div>
           </div>
         </div>
 

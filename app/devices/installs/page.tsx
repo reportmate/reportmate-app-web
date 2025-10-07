@@ -154,7 +154,7 @@ function InstallsPageContent() {
       
       // Start fetching - we'll simulate progress with estimated device count
       let progress = 0
-      let estimatedTotal = 234 // Estimated device count (will be replaced with actual)
+      const estimatedTotal = 234 // Estimated device count (will be replaced with actual)
       
       progressInterval = setInterval(() => {
         // Progress quickly to 85%, then slow down dramatically, but keep moving
@@ -200,6 +200,21 @@ function InstallsPageContent() {
       
       setFilterOptions(data)
       
+      // Extract device data from same response (no second API call needed)
+      if (data.devices && Array.isArray(data.devices)) {
+        setDevices(data.devices)
+        console.log('[INSTALLS PAGE] Loaded', data.devices.length, 'devices with installs data from single API call')
+        
+        // Debug: Check Cimian versions
+        const cimianCount = data.devices.filter((d: any) => d.modules?.installs?.cimian?.version).length
+        console.log('[INSTALLS PAGE] Devices with Cimian version:', cimianCount)
+        
+        if (cimianCount > 0) {
+          const sample = data.devices.find((d: any) => d.modules?.installs?.cimian?.version)
+          console.log('[INSTALLS PAGE] Sample Cimian version:', sample?.modules?.installs?.cimian?.version)
+        }
+      }
+      
       // Set progress to complete with actual device count
       setLoadingMessage('Complete!')
       setLoadingProgress({ current: actualDeviceCount, total: actualDeviceCount })
@@ -209,6 +224,7 @@ function InstallsPageContent() {
         catalogs: data.catalogs?.length || 0,
         rooms: data.rooms?.length || 0,
         devicesWithData: actualDeviceCount,
+        devicesLoaded: data.devices?.length || 0,
         loadTime: 'cached or fresh'
       })
     } catch (error) {
@@ -271,36 +287,8 @@ function InstallsPageContent() {
     )
   }, [installs, searchQuery])
 
-  // Fetch devices for widgets
-  const fetchDevices = async () => {
-    try {
-      const devicesWithInstallsRes = await fetch('/api/devices/installs/data', { cache: 'no-store' })
-      
-      console.log('[INSTALLS PAGE] Fetch complete. Devices OK:', devicesWithInstallsRes.ok)
-      
-      if (devicesWithInstallsRes.ok) {
-        const installsData = await devicesWithInstallsRes.json()
-        // This endpoint returns { success, total, withInstalls, devices }
-        setDevices(installsData.devices || [])
-        console.log('[INSTALLS PAGE] Loaded', installsData.devices?.length || 0, 'devices with installs data')
-        
-        // Debug: Check Cimian versions
-        const cimianCount = (installsData.devices || []).filter((d: any) => d.modules?.installs?.cimian?.version).length
-        console.log('[INSTALLS PAGE] Devices with Cimian version:', cimianCount)
-        
-        if (cimianCount > 0) {
-          const sample = (installsData.devices || []).find((d: any) => d.modules?.installs?.cimian?.version)
-          console.log('[INSTALLS PAGE] Sample Cimian version:', sample?.modules?.installs?.cimian?.version)
-        }
-      }
-    } catch (error) {
-      console.error('[INSTALLS PAGE] Error fetching events/devices:', error)
-    }
-  }
-
   useEffect(() => {
     fetchFilterOptions()
-    fetchDevices()
   }, [])
 
   return (
@@ -447,7 +435,6 @@ function InstallsPageContent() {
                 onClick={() => {
                   setError(null)
                   fetchFilterOptions()
-                  fetchDevices()
                 }}
                 className="ml-4 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
               >
@@ -1173,7 +1160,7 @@ function InstallsPageContent() {
               Generate Your Installs Report
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              Select managed installs from the filter clouds above and click "Generate Report" to view installation data across your devices.
+              Select managed installs from the filter clouds above and click &quot;Generate Report&quot; to view installation data across your devices.
             </p>
           </div>
           )}

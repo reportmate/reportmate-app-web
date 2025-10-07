@@ -260,6 +260,22 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     })
 
     networkInfo.interfaces = physicalInterfaces
+    
+    // FALLBACK: If no activeConnection data, use first active interface
+    if (!network.activeConnection && physicalInterfaces.length > 0) {
+      const activeInterface = physicalInterfaces.find((iface: NetworkInterface) => iface.isActive)
+      if (activeInterface) {
+        console.log('[NETWORK MODULE] Using first active interface as fallback for active connection:', activeInterface.name)
+        networkInfo.ipAddress = networkInfo.ipAddress || activeInterface.ipAddress
+        networkInfo.macAddress = networkInfo.macAddress || activeInterface.macAddress
+        networkInfo.interfaceName = networkInfo.interfaceName || activeInterface.friendlyName || activeInterface.name
+        networkInfo.connectionType = networkInfo.connectionType || activeInterface.type
+        // Extract wireless protocol for display (e.g., "WiFi 6")
+        if (activeInterface.wirelessProtocol) {
+          networkInfo.connectionType = activeInterface.wirelessProtocol
+        }
+      }
+    }
   }
 
   // Extract WiFi networks
@@ -309,6 +325,11 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     } else {
       networkInfo.dnsAddress = networkInfo.hostname
     }
+  }
+  
+  // FALLBACK: If no dnsAddress and we have DNS servers, use the first DNS server
+  if (!networkInfo.dnsAddress && networkInfo.activeDnsServers && networkInfo.activeDnsServers.length > 0) {
+    networkInfo.dnsAddress = networkInfo.activeDnsServers[0]
   }
 
   console.log('[NETWORK MODULE] Network info extracted:', {

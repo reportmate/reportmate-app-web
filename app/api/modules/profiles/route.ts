@@ -7,30 +7,22 @@ export const revalidate = 0
  * Profiles API Route - Proxy to FastAPI
  * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
  */
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    const { searchParams } = new URL(request.url)
+    console.log(`[PROFILES API] ${timestamp} - Fetching bulk profiles data from FastAPI`)
     
-    console.log(`[PROFILES PROXY] ${timestamp} - Forwarding to FastAPI`)
-    
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
+    const API_BASE_URL = process.env.API_BASE_URL
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL not configured')
     }
     
-    const deviceId = searchParams.get('deviceId') || searchParams.get('serial')
-    if (!deviceId) {
-      throw new Error('deviceId or serial parameter required')
-    }
-    
-    const fastApiUrl = `${API_BASE_URL}/api/device/${deviceId}`
-    console.log(`[PROFILES PROXY] Calling: ${fastApiUrl}`)
+    const fastApiUrl = `${API_BASE_URL}/api/devices/profiles`
+    console.log(`[PROFILES API] Calling: ${fastApiUrl}`)
     
     const response = await fetch(fastApiUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store'
+      headers: { 'Content-Type': 'application/json' }
     })
     
     if (!response.ok) {
@@ -38,16 +30,15 @@ export async function GET(request: Request) {
       throw new Error(`FastAPI returned ${response.status}: ${errorText}`)
     }
     
-    const data = await response.json()
-    const profiles = data.device?.modules?.profiles || []
+    const profilesData = await response.json()
     
-    console.log(`[PROFILES PROXY] Received profiles data`)
+    console.log(`[PROFILES API] Received ${Array.isArray(profilesData) ? profilesData.length : 0} devices with profiles data`)
     
-    return NextResponse.json(profiles, {
+    return NextResponse.json(profilesData, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'X-Fetched-At': timestamp,
-        'X-Data-Source': 'fastapi-proxy'
+        'X-Data-Source': 'fastapi-bulk-profiles'
       }
     })
     

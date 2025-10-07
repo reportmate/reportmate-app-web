@@ -103,12 +103,18 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
   )
 }
 
-// Warning Events Widget - uses aggregated install stats from API
+// Warning Events Widget - calculates from device data (SAME LOGIC as /devices/installs)
 export const WarningStatsWidget: React.FC<{ 
-  installStats?: InstallStatsData
+  devices?: any[]
   isLoading?: boolean
-}> = ({ installStats, isLoading = false }) => {
-  const warningCount = installStats?.devicesWithWarnings ?? null
+}> = ({ devices, isLoading = false }) => {
+  // Calculate warnings using EXACT SAME LOGIC as /devices/installs page
+  const warningCount = devices ? devices.filter((d: any) => 
+    d.modules?.installs?.cimian?.items?.some((item: any) => 
+      item.currentStatus?.toLowerCase().includes('warning') || 
+      item.currentStatus?.toLowerCase().includes('pending')
+    )
+  ).length : null
   
   // Show "-" in gray while loading (matching /devices/installs behavior)
   if (isLoading || warningCount === null) {
@@ -146,12 +152,18 @@ export const WarningStatsWidget: React.FC<{
   )
 }
 
-// Error Events Widget - uses aggregated install stats from API
+// Error Events Widget - calculates from device data (SAME LOGIC as /devices/installs)
 export const ErrorStatsWidget: React.FC<{ 
-  installStats?: InstallStatsData
+  devices?: any[]
   isLoading?: boolean
-}> = ({ installStats, isLoading = false }) => {
-  const errorCount = installStats?.devicesWithErrors ?? null
+}> = ({ devices, isLoading = false }) => {
+  // Calculate errors using EXACT SAME LOGIC as /devices/installs page
+  const errorCount = devices ? devices.filter((d: any) => 
+    d.modules?.installs?.cimian?.items?.some((item: any) => 
+      item.currentStatus?.toLowerCase().includes('error') || 
+      item.currentStatus?.toLowerCase().includes('failed')
+    )
+  ).length : null
   
   // Show "-" in gray while loading (matching /devices/installs behavior)
   if (isLoading || errorCount === null) {

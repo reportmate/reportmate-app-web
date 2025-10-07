@@ -6,16 +6,16 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[NETWORK API] ${timestamp} - Fetching network data from Azure Functions`)
+    console.log(`[NETWORK API] ${timestamp} - Fetching network data from FastAPI`)
     
-    // Fetch from Azure Functions API - use dedicated network endpoint
+    // Fetch from FastAPI - use dedicated bulk network endpoint
     const apiBaseUrl = process.env.API_BASE_URL;
     
     if (!apiBaseUrl) {
       return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
     }
     
-    const response = await fetch(`${apiBaseUrl}/api/network`, {
+    const response = await fetch(`${apiBaseUrl}/api/devices/network`, {
       headers: {
         'Cache-Control': 'no-cache',
       }
@@ -26,14 +26,14 @@ export async function GET() {
     }
     
     const networkData = await response.json()
-    console.log(`[NETWORK API] ${timestamp} - Azure Functions returned ${Array.isArray(networkData) ? networkData.length : 0} network records`)
+    console.log(`[NETWORK API] ${timestamp} - FastAPI returned ${Array.isArray(networkData) ? networkData.length : 0} network records`)
     
-    // If we got an array, it's already in the correct format from Azure Functions
+    // If we got an array, it's already in the correct format from FastAPI
     if (Array.isArray(networkData)) {
       return NextResponse.json(networkData, {
         headers: { 
           'X-Fetched-At': timestamp, 
-          'X-Data-Source': 'azure-functions-network',
+          'X-Data-Source': 'fastapi-devices-network',
           'X-Records-Count': String(networkData.length)
         }
       })
@@ -44,7 +44,7 @@ export async function GET() {
     return NextResponse.json([], {
       headers: { 
         'X-Fetched-At': timestamp, 
-        'X-Data-Source': 'azure-functions-network-empty',
+        'X-Data-Source': 'fastapi-devices-network-empty',
         'X-Records-Count': '0'
       }
     })

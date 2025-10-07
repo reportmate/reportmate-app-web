@@ -19,9 +19,9 @@ export async function GET(request: Request) {
       }, { status: 500 })
     }
     
-    // NO LOCAL FALLBACK: Call FastAPI container directly
+    // Call FastAPI bulk endpoint
     try {
-      const url = `${apiBaseUrl}/api/modules/security?limit=${limit}`
+      const url = `${apiBaseUrl}/api/devices/security`
       console.log(`[SECURITY API] ${timestamp} - Calling FastAPI: ${url}`)
       
       const response = await fetch(url, {
