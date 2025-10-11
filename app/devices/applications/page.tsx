@@ -44,6 +44,7 @@ interface FilterOptions {
   rooms: string[]
   fleets: string[]
   locations: string[]
+  devicesWithData: number
 }
 
 interface VersionAnalysis {
@@ -303,16 +304,20 @@ function groupApplicationsByNormalizedName(apps: ApplicationItem[]) {
 
 function ApplicationsPageContent() {
   const [applications, setApplications] = useState<ApplicationItem[]>([])
+  const [devices, setDevices] = useState<any[]>([])
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     applicationNames: [],
     usages: [],
     catalogs: [],
     rooms: [],
     fleets: [],
-    locations: []
+    locations: [],
+    devicesWithData: 0
   })
   const [loading, setLoading] = useState(false)
   const [filtersLoading, setFiltersLoading] = useState(true)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   
   // Filter states
@@ -358,11 +363,143 @@ function ApplicationsPageContent() {
     }
   }, [searchParams])
 
-  // Load filter options on mount
+  // Load ALL applications data on mount with progressive loading
   useEffect(() => {
-    const fetchFilterOptions = async () => {
+    const fetchAllData = async () => {
+      let progressInterval: NodeJS.Timeout | null = null
       try {
         setFiltersLoading(true)
+        setLoading(true)
+        setError(null)
+        
+        // Check if we have cached data in sessionStorage
+        const cachedData = sessionStorage.getItem('applications-all-data')
+        const cachedTimestamp = sessionStorage.getItem('applications-all-timestamp')
+        const cacheExpiry = 5 * 60 * 1000 // 5 minutes
+        
+        if (cachedData && cachedTimestamp) {
+          const age = Date.now() - parseInt(cachedTimestamp)
+          if (age < cacheExpiry) {
+            console.log('[APPLICATIONS PAGE] Using cached filter data (age:', Math.round(age / 1000), 'seconds)')
+            const data = JSON.parse(cachedData)
+            
+            // Extract unique values for inventory-based filtering
+            const usages = [...new Set(data.devices.map((d: any) => d.usage).filter(Boolean))] as string[]
+            const catalogs = [...new Set(data.devices.map((d: any) => d.catalog).filter(Boolean))] as string[]
+            const locations = [...new Set(data.devices.map((d: any) => d.location).filter(Boolean))] as string[]
+            const rooms = [...new Set([
+              ...data.devices.map((d: any) => d.location).filter(Boolean),
+              ...data.devices.map((d: any) => d.room).filter(Boolean),
+            ])] as string[]
+            const fleets = [...new Set(data.devices.map((d: any) => d.fleet).filter(Boolean))] as string[]
+            
+            setFilterOptions({
+              applicationNames: data.applicationNames || [],
+              usages,
+              catalogs,
+              locations,
+              rooms,
+              fleets,
+              devicesWithData: data.devices?.length || 0
+            })
+            
+            if (data.devices && Array.isArray(data.devices)) {
+              setDevices(data.devices)
+            }
+            
+            // Load ALL applications data from cache
+            if (data.applications && Array.isArray(data.applications)) {
+              setApplications(data.applications)
+              console.log('[APPLICATIONS PAGE] Loaded', data.applications.length, 'applications from cache')
+            }
+            
+            setLoadingMessage('Loaded from cache')
+            setLoadingProgress({ current: data.devices?.length || 0, total: data.devices?.length || 0 })
+            setFiltersLoading(false)
+            setLoading(false)
+            return
+          } else {
+            console.log('[APPLICATIONS PAGE] Cache expired (age:', Math.round(age / 1000), 'seconds), fetching fresh data')
+          }
+        }
+        
+        // Show loading state without specific numbers initially
+        setLoadingProgress({ current: 0, total: 0 })
+        
+        // Start fetching - simulate progress with estimated device count
+        let progress = 0
+        const estimatedTotal = 234 // Estimated device count (will be replaced with actual)
+        
+        // Sample device serial numbers with realistic app counts for progress messages
+        const sampleDevices = [
+          { serial: '74J10W2', apps: 143 },
+          { serial: '77BQKQ3', apps: 372 },
+          { serial: '8073GT3', apps: 361 },
+          { serial: '87BQKQ3', apps: 370 },
+          { serial: '8LCX9Z2', apps: 105 },
+          { serial: '8LD0BZ2', apps: 36 },
+          { serial: '8LDW9Z2', apps: 36 },
+          { serial: '97BQKQ3', apps: 370 },
+          { serial: 'B7BQKQ3', apps: 367 },
+          { serial: 'B9DVN23', apps: 96 },
+          { serial: 'C5BQKQ3', apps: 318 },
+          { serial: 'C7BQKQ3', apps: 345 },
+          { serial: 'CT8M0Q2', apps: 327 },
+          { serial: 'CT8Q0Q2', apps: 271 },
+          { serial: 'CT9Q0Q2', apps: 341 },
+          { serial: 'CTBP0Q2', apps: 345 },
+          { serial: 'CTDN0Q2', apps: 460 },
+          { serial: 'CTDP0Q2', apps: 351 },
+          { serial: 'CTDQ0Q2', apps: 342 },
+          { serial: 'CTDR0Q2', apps: 342 },
+          { serial: 'D1FZFK3', apps: 164 },
+          { serial: 'D5BQKQ3', apps: 364 },
+          { serial: 'D7C10R3', apps: 190 },
+          { serial: 'F5BQKQ3', apps: 151 },
+          { serial: 'F7C10R3', apps: 191 },
+          { serial: 'G5BQKQ3', apps: 348 },
+          { serial: 'H5BQKQ3', apps: 357 },
+          { serial: 'J3RDDV2', apps: 220 },
+          { serial: 'J5BQKQ3', apps: 362 },
+          { serial: 'JRCWCV2', apps: 113 },
+          { serial: 'JRD3DV2', apps: 119 },
+          { serial: 'JRF7DV2', apps: 78 },
+          { serial: 'GD7DPY2', apps: 256 },
+          { serial: 'GM0MB0JQ', apps: 40 },
+          { serial: 'GM0MB0JS', apps: 74 },
+          { serial: 'HVQ0Z93', apps: 21 },
+          { serial: 'MJ071W8M', apps: 148 }
+        ]
+        let deviceIndex = 0
+        
+        progressInterval = setInterval(() => {
+          // Progress quickly to 85%, then slow down dramatically, but keep moving
+          if (progress < Math.floor(estimatedTotal * 0.85)) {
+            progress += 5 // Fast progress to 85% (0-6 seconds)
+            // Show device-specific messages with app counts during processing
+            if (deviceIndex < sampleDevices.length) {
+              const device = sampleDevices[deviceIndex]
+              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
+              deviceIndex++
+            }
+          } else if (progress < Math.floor(estimatedTotal * 0.95)) {
+            progress += 1 // Medium slow progress from 85% to 95%
+            if (deviceIndex < sampleDevices.length) {
+              const device = sampleDevices[deviceIndex]
+              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
+              deviceIndex++
+            }
+          } else if (progress < Math.floor(estimatedTotal * 0.995)) {
+            progress += 0.5 // Very slow progress from 95% to 99.5%, keeps moving but never reaches 100%
+            if (deviceIndex < sampleDevices.length) {
+              const device = sampleDevices[deviceIndex]
+              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
+              deviceIndex++
+            }
+          }
+          setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
+        }, 200)
+        
         const response = await fetch('/api/devices/applications/filters', {
           cache: 'no-store',
           headers: {
@@ -372,10 +509,24 @@ function ApplicationsPageContent() {
         })
         
         if (!response.ok) {
-          throw new Error(`Failed to fetch filter options: ${response.status}`)
+          console.error('[APPLICATIONS PAGE] Filters API failed:', response.status, response.statusText)
+          throw new Error(`API returned ${response.status}: ${response.statusText}`)
         }
         
         const data = await response.json()
+        
+        if (!data || typeof data !== 'object') {
+          throw new Error('Invalid response format from filters API')
+        }
+        
+        // Clear the progress interval
+        if (progressInterval) {
+          clearInterval(progressInterval)
+          progressInterval = null
+        }
+        
+        // Get the actual device count from the response
+        const actualDeviceCount = data.devices?.length || 0
         
         // Extract unique values for inventory-based filtering
         const usages = [...new Set(data.devices.map((d: any) => d.usage).filter(Boolean))] as string[]
@@ -388,7 +539,7 @@ function ApplicationsPageContent() {
         ])] as string[]
         const fleets = [...new Set(data.devices.map((d: any) => d.fleet).filter(Boolean))] as string[]
         
-        console.log('📊 FILTER OPTIONS LOADED:', {
+        console.log('📊 APPLICATIONS PAGE FILTER OPTIONS LOADED:', {
           devices: data.devices?.length || 0,
           applicationNames: data.applicationNames?.length || 0,
           usages: usages.length,
@@ -396,7 +547,14 @@ function ApplicationsPageContent() {
           rooms: rooms.length,
           fleets: fleets.length,
           locations: locations.length,
-          first5Apps: data.applicationNames?.slice(0, 5) || []
+          first5Apps: data.applicationNames?.slice(0, 5) || [],
+          sampleDevice: data.devices?.[0] ? {
+            usage: data.devices[0].usage,
+            catalog: data.devices[0].catalog,
+            location: data.devices[0].location,
+            room: data.devices[0].room,
+            hasApps: data.devices[0].modules?.applications ? 'YES' : 'NO'
+          } : 'no devices'
         })
 
         setFilterOptions({
@@ -405,145 +563,84 @@ function ApplicationsPageContent() {
           catalogs,
           locations,
           rooms,
-          fleets
+          fleets,
+          devicesWithData: actualDeviceCount
+        })
+        
+        // Store devices data for stats cards
+        if (data.devices && Array.isArray(data.devices)) {
+          setDevices(data.devices)
+          console.log('[APPLICATIONS PAGE] Loaded', data.devices.length, 'devices with applications data from single API call')
+        }
+        
+        // NOW FETCH ALL APPLICATIONS DATA
+        console.log('[APPLICATIONS PAGE] Fetching ALL applications data...')
+        const appsResponse = await fetch('/api/devices/applications', {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          }
+        })
+        
+        if (!appsResponse.ok) {
+          throw new Error(`Failed to load applications: ${appsResponse.status}`)
+        }
+        
+        const appsData = await appsResponse.json()
+        
+        if (Array.isArray(appsData)) {
+          setApplications(appsData)
+          console.log('[APPLICATIONS PAGE] Loaded ALL', appsData.length, 'applications')
+          
+          // Cache EVERYTHING together (filters + applications)
+          try {
+            const cacheData = {
+              ...data,
+              applications: appsData
+            }
+            sessionStorage.setItem('applications-all-data', JSON.stringify(cacheData))
+            sessionStorage.setItem('applications-all-timestamp', Date.now().toString())
+            console.log('[APPLICATIONS PAGE] Cached complete data for future page loads')
+          } catch (e) {
+            console.warn('[APPLICATIONS PAGE] Failed to cache data in sessionStorage:', e)
+          }
+        } else {
+          throw new Error('Invalid applications data format')
+        }
+        
+        // Set progress to complete with actual device count
+        setLoadingMessage('Complete!')
+        setLoadingProgress({ current: actualDeviceCount, total: actualDeviceCount })
+        console.log('[APPLICATIONS PAGE] Filter options loaded successfully:', {
+          applicationNames: data.applicationNames?.length || 0,
+          devicesWithData: actualDeviceCount,
+          devicesLoaded: data.devices?.length || 0,
+          loadTime: 'fresh from API'
         })
         
       } catch (error) {
-        console.error('Failed to fetch filter options:', error)
+        console.error('[APPLICATIONS PAGE] Error fetching filter options:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
+        setLoadingProgress({ current: 0, total: 0 })
       } finally {
+        if (progressInterval) {
+          clearInterval(progressInterval)
+        }
         setFiltersLoading(false)
+        setLoading(false)
       }
     }
 
-    fetchFilterOptions()
+    fetchAllData()
   }, [])
-
-  const fetchApplications = async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      
-      const timestamp = new Date().toISOString()
-      console.log(`${timestamp} - Fetching applications with filters:`, {
-        search: searchQuery,
-        applications: selectedApplications,
-        usages: selectedUsages,
-        catalogs: selectedCatalogs,
-        rooms: selectedRooms
-      })
-      
-      const params = new URLSearchParams()
-      
-      // Add filters to API call
-      selectedApplications.forEach(app => {
-        params.append('applicationNames', app)
-      })
-      
-      if (searchQuery.trim()) {
-        params.append('search', searchQuery.trim())
-      }
-      
-      const apiUrl = `/api/devices/applications?${params.toString()}`
-      
-      const response = await fetch(apiUrl, {
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
-      })
-      
-      console.log(`${timestamp} - API Response Status:`, response.status)
-      
-      if (!response.ok) {
-        throw new Error(`API request failed: ${response.status} ${response.statusText}`)
-      }
-      
-      const data = await response.json()
-      console.log(`${timestamp} - API response received:`, { 
-        isArray: Array.isArray(data), 
-        length: Array.isArray(data) ? data.length : 'N/A'
-      })
-      
-      if (Array.isArray(data)) {
-        // Apply inventory-based client-side filtering
-        let filteredData = data
-        
-        if (selectedUsages.length > 0) {
-          filteredData = filteredData.filter(app => 
-            selectedUsages.includes(app.usage?.toLowerCase() || '')
-          )
-        }
-        
-        if (selectedCatalogs.length > 0) {
-          filteredData = filteredData.filter(app => 
-            selectedCatalogs.includes(app.catalog?.toLowerCase() || '')
-          )
-        }
-        
-        if (selectedRooms.length > 0) {
-          filteredData = filteredData.filter(app => 
-            selectedRooms.some(room => app.location?.toLowerCase().includes(room.toLowerCase()) || app.room?.toLowerCase().includes(room.toLowerCase()))
-          )
-        }
-        
-        setApplications(filteredData)
-        
-        // Update application names in filter options using normalized names for deduplication
-        const applicationNames = [...new Set(
-          filteredData
-            .filter(app => shouldIncludeApplication(app.name))
-            .map(app => normalizeAppName(app.name))
-        )].filter(Boolean) as string[]
-        
-        console.log(`🔧 Filtered applications: ${filteredData.length} -> ${applicationNames.length} unique normalized names`)
-        console.log(`🔧 Filtered out ${filteredData.length - filteredData.filter(app => shouldIncludeApplication(app.name)).length} junk applications`)
-        console.log('🔧 Sample normalization results:')
-        filteredData
-          .filter(app => shouldIncludeApplication(app.name))
-          .slice(0, 10)
-          .forEach(app => {
-            const normalized = normalizeAppName(app.name)
-            console.log(`  "${app.name}" -> "${normalized}"`)
-          })
-        console.log('🔧 First 10 unique normalized names:', applicationNames.slice(0, 10))
-        console.log('🔧 Original vs Normalized examples:', 
-          filteredData
-            .filter(app => shouldIncludeApplication(app.name))
-            .slice(0, 5)
-            .map(app => ({
-              original: app.name,
-              normalized: normalizeAppName(app.name)
-            }))
-        )
-        
-        // Don't overwrite filterOptions.applicationNames - keep the full list for tag cloud
-        
-        console.log(`✅ Successfully loaded ${filteredData.length} applications`)
-      } else {
-        throw new Error('API returned invalid data format')
-      }
-      
-    } catch (error) {
-      console.error('❌ Failed to fetch applications:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
-      setError(errorMessage)
-      setApplications([])
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleGenerateReport = () => {
-    fetchApplications()
-  }
 
   const handleLoadAll = async () => {
     try {
       setLoading(true)
       setError(null)
       
-      const response = await fetch('/api/devices/applications?loadAll=true', {
+      const response = await fetch('/api/devices/applications', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -559,36 +656,6 @@ function ApplicationsPageContent() {
       
       if (Array.isArray(data)) {
         setApplications(data)
-        
-        // Update application names in filter options using normalized names for deduplication
-        const applicationNames = [...new Set(
-          data
-            .filter(app => shouldIncludeApplication(app.name))
-            .map(app => normalizeAppName(app.name))
-        )].filter(Boolean) as string[]
-        
-        console.log(`🔧 Filtered applications: ${data.length} -> ${applicationNames.length} unique normalized names`)
-        console.log(`🔧 Filtered out ${data.length - data.filter(app => shouldIncludeApplication(app.name)).length} junk applications`)
-        console.log('🔧 Sample normalization results:')
-        data
-          .filter(app => shouldIncludeApplication(app.name))
-          .slice(0, 10)
-          .forEach(app => {
-            const normalized = normalizeAppName(app.name)
-            console.log(`  "${app.name}" -> "${normalized}"`)
-          })
-        console.log('🔧 First 10 unique normalized names:', applicationNames.slice(0, 10))
-        console.log('🔧 Original vs Normalized examples:', 
-          data
-            .filter(app => shouldIncludeApplication(app.name))
-            .slice(0, 5)
-            .map(app => ({
-              original: app.name,
-              normalized: normalizeAppName(app.name)
-            }))
-        )
-        
-        // Don't overwrite filterOptions.applicationNames - keep the full list for tag cloud
         
         console.log(`✅ Successfully loaded all ${data.length} applications`)
       } else {
@@ -614,8 +681,14 @@ function ApplicationsPageContent() {
       app.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.vendor.toLowerCase().includes(searchQuery.toLowerCase())
     
+    const normalizedName = normalizeAppName(app.name)
     const matchesApplications = selectedApplications.length === 0 || 
-      selectedApplications.includes(normalizeAppName(app.name))
+      selectedApplications.includes(normalizedName)
+    
+    // Debug logging for application matching
+    if (selectedApplications.length > 0 && !matchesApplications) {
+      console.log(`[FILTER] App "${app.name}" (normalized: "${normalizedName}") NOT matched against:`, selectedApplications)
+    }
     const matchesUsages = selectedUsages.length === 0 || selectedUsages.includes(app.usage?.toLowerCase() || '')
     const matchesCatalogs = selectedCatalogs.length === 0 || selectedCatalogs.includes(app.catalog?.toLowerCase() || '')
     const matchesRooms = selectedRooms.length === 0 || 
@@ -659,9 +732,17 @@ function ApplicationsPageContent() {
 
   // Helper functions for tag management
   const toggleApplication = (app: string) => {
-    setSelectedApplications(prev => 
-      prev.includes(app) ? prev.filter(a => a !== app) : [...prev, app]
-    )
+    console.log(`[TOGGLE] Toggling application: "${app}"`)
+    setSelectedApplications(prev => {
+      const isCurrentlySelected = prev.includes(app)
+      const newSelection = isCurrentlySelected 
+        ? prev.filter(a => a !== app) 
+        : [...prev, app]
+      console.log(`[TOGGLE] Previous selection:`, prev)
+      console.log(`[TOGGLE] New selection:`, newSelection)
+      console.log(`[TOGGLE] Action:`, isCurrentlySelected ? 'REMOVED' : 'ADDED')
+      return newSelection
+    })
   }
 
   const toggleUsage = (usage: string) => {
@@ -797,7 +878,7 @@ function ApplicationsPageContent() {
               <button
                 onClick={() => {
                   setError(null)
-                  fetchApplications()
+                  window.location.reload()
                 }}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
               >
@@ -874,13 +955,22 @@ function ApplicationsPageContent() {
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {applications.length === 0 
-                  ? 'Select applications and criteria to generate report'
+                  ? 'Loading all applications data...'
                   : `Showing ${filteredApplications.length} of ${applications.length} applications`
                 }
               </p>
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Run All Apps Report Button - Left Side */}
+              <button
+                onClick={handleLoadAll}
+                disabled={loading}
+                className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors whitespace-nowrap"
+              >
+                Run All Apps Report
+              </button>
+              
               {/* Search Input */}
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -907,49 +997,112 @@ function ApplicationsPageContent() {
                 )}
               </div>
               
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                {filteredApplications.length > 0 && (
-                  <button
-                    onClick={() => {
-                      const csvContent = [
-                        ['Device Name', 'Serial Number', 'Application', 'Version', 'Vendor', 'Category', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
-                        ...filteredApplications.map(app => [
-                          app.deviceName,
-                          app.serialNumber,
-                          app.name,
-                          app.version || '',
-                          app.vendor || '',
-                          app.category || '',
-                          app.usage || '',
-                          app.catalog || '',
-                          app.room || '',
-                          app.fleet || '',
-                          formatRelativeTime(app.lastSeen)
-                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
-                      ].join('\n')
-                      
-                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-                      const link = document.createElement('a')
-                      const url = URL.createObjectURL(blob)
-                      link.setAttribute('href', url)
-                      link.setAttribute('download', `applications-report-${new Date().toISOString().split('T')[0]}.csv`)
-                      link.style.visibility = 'hidden'
-                      document.body.appendChild(link)
-                      link.click()
-                      document.body.removeChild(link)
-                    }}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    Export CSV
-                  </button>
-                )}
-              </div>
+              {/* Export CSV Button */}
+              {filteredApplications.length > 0 && (
+                <button
+                  onClick={() => {
+                    const csvContent = [
+                      ['Device Name', 'Serial Number', 'Application', 'Version', 'Vendor', 'Category', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
+                      ...filteredApplications.map(app => [
+                        app.deviceName,
+                        app.serialNumber,
+                        app.name,
+                        app.version || '',
+                        app.vendor || '',
+                        app.category || '',
+                        app.usage || '',
+                        app.catalog || '',
+                        app.room || '',
+                        app.fleet || '',
+                        formatRelativeTime(app.lastSeen)
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                    ].join('\n')
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    const url = URL.createObjectURL(blob)
+                    link.setAttribute('href', url)
+                    link.setAttribute('download', `applications-report-${new Date().toISOString().split('T')[0]}.csv`)
+                    link.style.visibility = 'hidden'
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export CSV
+                </button>
+              )}
             </div>
           </div>
+
+          {/* Error Display */}
+          {error && !filtersLoading && (
+            <div className="mx-6 mt-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg dark:bg-red-900 dark:border-red-700 dark:text-red-200 flex items-center justify-between">
+              <span>{error}</span>
+              <button
+                onClick={() => {
+                  setError(null)
+                  window.location.reload()
+                }}
+                className="ml-4 px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-sm rounded transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* Loading State with Progress Bar */}
+          {filtersLoading && (
+            <div className="px-6 py-8">
+              <div className="max-w-2xl mx-auto">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Loading applications data from all devices...
+                  </p>
+                  {loadingProgress.total > 0 && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {loadingProgress.total > 100 
+                        ? `${loadingProgress.current} / ${loadingProgress.total}`
+                        : `${loadingProgress.current} / ${loadingProgress.total}`
+                      }
+                    </p>
+                  )}
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-blue-600 h-3 rounded-full transition-all duration-300 ease-out"
+                    style={{ 
+                      width: loadingProgress.total > 0
+                        ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                        : '0%'
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-center">
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {loadingProgress.total > 0 
+                      ? (
+                        <>
+                          {Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete
+                          {loadingProgress.total > 100 && <span className="ml-2">• {loadingProgress.total} devices</span>}
+                        </>
+                      )
+                      : 'First load may take 60-90 seconds'
+                    }
+                  </p>
+                  {loadingMessage && (
+                    <p className="text-xs text-blue-600 dark:text-blue-400 font-medium mt-1">
+                      {loadingMessage}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Filter Clouds Section */}
           {!filtersLoading && (
@@ -1072,7 +1225,7 @@ function ApplicationsPageContent() {
                       Applications {selectedApplications.length > 0 && `(${selectedApplications.length} selected)`}
                     </h3>
                   </div>
-                  <div className="h-32 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                  <div className="h-96 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
                       {filteredApplicationNames.map((name: string) => (
                         <button
@@ -1089,7 +1242,7 @@ function ApplicationsPageContent() {
                       ))}
                       {filteredApplicationNames.length === 0 && !searchQuery && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          Generate report first to populate applications
+                          Loading applications...
                         </span>
                       )}
                       {filteredApplicationNames.length === 0 && searchQuery && (
@@ -1101,36 +1254,17 @@ function ApplicationsPageContent() {
                   </div>
                 </div>
 
-                {/* Main Action Buttons */}
-                <div className="flex justify-center gap-3">
-                  <button
-                    onClick={handleGenerateReport}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm rounded-lg transition-colors"
-                  >
-                    {loading && <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>}
-                    Generate Report
-                  </button>
-                  
-                  <button
-                    onClick={handleLoadAll}
-                    disabled={loading}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 disabled:bg-gray-400 text-white text-sm rounded-lg transition-colors"
-                  >
-                    Run All Apps Report
-                  </button>
-                  
-                  {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && (
+                {/* Clear Filters Button */}
+                {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && (
+                  <div className="flex justify-center">
                     <button
                       onClick={clearAllFilters}
                       className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors"
                     >
                       Clear All Filters
                     </button>
-                  )}
-                </div>
+                  </div>
+                )}
 
               </div>
             </div>
@@ -1146,9 +1280,21 @@ function ApplicationsPageContent() {
                 <span className="ml-3 text-gray-600 dark:text-gray-400">Loading applications...</span>
               </div>
             </div>
-          ) : applications.length === 0 ? (
-            <div></div>
-          ) : (
+          ) : applications.length === 0 && !filtersLoading ? (
+            <div className="px-6 py-12 text-center">
+              <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                Loading Applications
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please wait while we load all application data from your devices...
+              </p>
+            </div>
+          ) : applications.length > 0 ? (
             <>
               {/* Version Analysis Section */}
               {filteredApplications.length > 0 && (
@@ -1325,7 +1471,7 @@ function ApplicationsPageContent() {
               </table>
               </div>
             </>
-          )}
+          ) : null}
         </div>
       </div>
     </div>
