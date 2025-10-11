@@ -171,9 +171,9 @@ export async function GET() {
 
     console.log(`[APPLICATIONS FILTERS API] Successfully fetched ${devicesData.devices.length} devices from Container Apps API`)
 
-    // Process a limited number of devices to avoid timeouts
-    const devicesToProcess = devicesData.devices.slice(0, 20) // Process first 20 devices for now
-    console.log(`[APPLICATIONS FILTERS API] Processing first ${devicesToProcess.length} devices for application data`)
+    // Process ALL devices to get complete filter data
+    const devicesToProcess = devicesData.devices // Process ALL devices
+    console.log(`[APPLICATIONS FILTERS API] Processing ${devicesToProcess.length} devices for application data`)
 
     // Process devices and extract application data by calling individual device endpoints
     const devices = []
@@ -211,15 +211,33 @@ export async function GET() {
 
         const device = deviceData.device
 
-        // Extract device info
+        // Extract device info WITH full modules data (needed for stats cards)
         const deviceInfo = {
           id: device.deviceId || device.device_id || device.id,
           name: device.modules?.inventory?.deviceName || device.modules?.inventory?.computerName || device.deviceName || device.serial_number || deviceBasic.serialNumber || 'Unknown Device',
           serialNumber: device.serialNumber || deviceBasic.serialNumber,
           usage: device.modules?.inventory?.usage || '',
           catalog: device.modules?.inventory?.catalog || '',
-          location: device.modules?.inventory?.location || ''
+          location: device.modules?.inventory?.location || '',
+          room: device.modules?.inventory?.location || '', // Use location as room
+          fleet: '', // Fleet not implemented yet - leave empty
+          modules: {
+            applications: device.modules?.applications || null,
+            inventory: device.modules?.inventory || null
+          }
         }
+        
+        // Debug log for first few devices to verify data
+        if (devices.length < 3) {
+          console.log(`[APPLICATIONS FILTERS API] Device ${devices.length + 1}:`, {
+            serial: deviceInfo.serialNumber,
+            usage: deviceInfo.usage,
+            catalog: deviceInfo.catalog,
+            location: deviceInfo.location,
+            appsCount: device.modules?.applications?.installedApplications?.length || 0
+          })
+        }
+        
         devices.push(deviceInfo)
 
         // Extract applications data - applications are at device.modules.applications.installedApplications
@@ -253,6 +271,13 @@ export async function GET() {
       }
     }
 
+    // Extract inventory filter values from devices array
+    const usages = [...new Set(devices.map(d => d.usage).filter(Boolean))]
+    const catalogs = [...new Set(devices.map(d => d.catalog).filter(Boolean))]
+    const locations = [...new Set(devices.map(d => d.location).filter(Boolean))]
+    const rooms = [...new Set(devices.map(d => d.room).filter(Boolean))]
+    const fleets = [...new Set(devices.map(d => d.fleet).filter(Boolean))]
+    
     const filterOptions = {
       devices,
       applicationNames: Array.from(normalizedAppNames).sort(),
@@ -262,11 +287,21 @@ export async function GET() {
     }
 
     console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Generated filter options from Container Apps API:`, {
-      devices: devices.length,
+      devicesProcessed: devices.length,
       originalAppNames: applicationNames.size,
       normalizedAppNames: filterOptions.applicationNames.length,
       publishers: filterOptions.publishers.length,
-      categories: filterOptions.categories.length
+      categories: filterOptions.categories.length,
+      inventoryFilters: {
+        usages: usages.length,
+        catalogs: catalogs.length,
+        locations: locations.length,
+        rooms: rooms.length,
+        fleets: fleets.length
+      },
+      sampleUsages: usages.slice(0, 5),
+      sampleCatalogs: catalogs.slice(0, 5),
+      sampleLocations: locations.slice(0, 5)
     })
     
     return NextResponse.json(filterOptions, {
