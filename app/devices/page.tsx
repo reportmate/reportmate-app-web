@@ -18,6 +18,7 @@ interface InventoryItem {
   serialNumber: string
   lastSeen: string
   collectedAt: string
+  createdAt?: string
   assetTag?: string
   location?: string
   usage?: string
@@ -39,6 +40,8 @@ function DevicesPageContent() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [usageFilter, setUsageFilter] = useState<string>('all')
   const [catalogFilter, setCatalogFilter] = useState<string>('all')
+  const [sortColumn, setSortColumn] = useState<string>('deviceName')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const searchParams = useSearchParams()
 
   // Initialize search query and filters from URL parameters
@@ -94,6 +97,7 @@ function DevicesPageContent() {
               serialNumber: device.serialNumber,
               lastSeen: device.lastSeen,
               collectedAt: device.lastSeen,
+              createdAt: device.createdAt,  // Registration date from API
               // Extract all inventory fields from modules.inventory
               assetTag: inventory.assetTag,
               location: inventory.location,
@@ -216,15 +220,74 @@ function DevicesPageContent() {
         return unique
       }, [])
       
-      console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items`)
-      console.log('🔍 Sample filtered item:', uniqueFiltered[0])
+      // Apply sorting
+      const sorted = [...uniqueFiltered].sort((a, b) => {
+        let aValue: any
+        let bValue: any
+        
+        switch (sortColumn) {
+          case 'deviceName':
+            aValue = a.deviceName?.toLowerCase() || ''
+            bValue = b.deviceName?.toLowerCase() || ''
+            break
+          case 'assetTag':
+            aValue = a.assetTag?.toLowerCase() || ''
+            bValue = b.assetTag?.toLowerCase() || ''
+            break
+          case 'serialNumber':
+            aValue = a.serialNumber?.toLowerCase() || ''
+            bValue = b.serialNumber?.toLowerCase() || ''
+            break
+          case 'usage':
+            aValue = a.usage?.toLowerCase() || ''
+            bValue = b.usage?.toLowerCase() || ''
+            break
+          case 'catalog':
+            aValue = a.catalog?.toLowerCase() || ''
+            bValue = b.catalog?.toLowerCase() || ''
+            break
+          case 'location':
+            aValue = a.location?.toLowerCase() || ''
+            bValue = b.location?.toLowerCase() || ''
+            break
+          case 'createdAt':
+            aValue = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            bValue = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            break
+          case 'status':
+            aValue = a.raw?.status?.toLowerCase() || ''
+            bValue = b.raw?.status?.toLowerCase() || ''
+            break
+          default:
+            return 0
+        }
+        
+        if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+        if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      })
       
-      return uniqueFiltered
+      console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items, sorted: ${sorted.length} items`)
+      console.log('🔍 Sample filtered item:', sorted[0])
+      
+      return sorted
     } catch (e) {
       console.error('Error in filteredInventory:', e)
       return []
     }
   })()
+  
+  // Handle column header click for sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // New column, default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
   // Calculate base counts (without filters) for reference
   const getBaseCounts = () => {
@@ -722,32 +785,115 @@ function DevicesPageContent() {
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Device Name
+                      <button
+                        onClick={() => handleSort('deviceName')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Device Name
+                        {sortColumn === 'deviceName' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Asset Tag
+                      <button
+                        onClick={() => handleSort('assetTag')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Asset Tag
+                        {sortColumn === 'assetTag' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Serial Number
+                      <button
+                        onClick={() => handleSort('serialNumber')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Serial Number
+                        {sortColumn === 'serialNumber' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Usage
+                      <button
+                        onClick={() => handleSort('usage')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Usage
+                        {sortColumn === 'usage' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Catalog
+                      <button
+                        onClick={() => handleSort('catalog')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Catalog
+                        {sortColumn === 'catalog' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Location
+                      <button
+                        onClick={() => handleSort('location')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Location
+                        {sortColumn === 'location' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
+                    </th>
+                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36">
+                      <button
+                        onClick={() => handleSort('createdAt')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Registered
+                        {sortColumn === 'createdAt' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Status
+                      <button
+                        onClick={() => handleSort('status')}
+                        className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
+                      >
+                        Status
+                        {sortColumn === 'status' && (
+                          <span className="text-gray-400">
+                            {sortDirection === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </button>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredInventory.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                      <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                         <div className="flex flex-col items-center justify-center">
                           <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -826,6 +972,11 @@ function DevicesPageContent() {
                       <td className="px-4 lg:px-6 py-4">
                         <div className="text-sm text-gray-900 dark:text-white">
                           {item.location || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 lg:px-6 py-4 w-36">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {item.createdAt ? formatRelativeTime(item.createdAt) : '-'}
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
