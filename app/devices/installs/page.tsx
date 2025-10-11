@@ -149,6 +149,32 @@ function InstallsPageContent() {
       setFiltersLoading(true)
       setError(null) // Clear any previous errors
       
+      // Check if we have cached data in sessionStorage
+      const cachedData = sessionStorage.getItem('installs-filter-options')
+      const cachedTimestamp = sessionStorage.getItem('installs-filter-timestamp')
+      const cacheExpiry = 5 * 60 * 1000 // 5 minutes
+      
+      if (cachedData && cachedTimestamp) {
+        const age = Date.now() - parseInt(cachedTimestamp)
+        if (age < cacheExpiry) {
+          console.log('[INSTALLS PAGE] Using cached filter data (age:', Math.round(age / 1000), 'seconds)')
+          const data = JSON.parse(cachedData)
+          
+          setFilterOptions(data)
+          
+          if (data.devices && Array.isArray(data.devices)) {
+            setDevices(data.devices)
+          }
+          
+          setLoadingMessage('Loaded from cache')
+          setLoadingProgress({ current: data.devicesWithData || 0, total: data.devicesWithData || 0 })
+          setFiltersLoading(false)
+          return
+        } else {
+          console.log('[INSTALLS PAGE] Cache expired (age:', Math.round(age / 1000), 'seconds), fetching fresh data')
+        }
+      }
+      
       // Show loading state without specific numbers initially
       setLoadingProgress({ current: 0, total: 0 })
       
@@ -215,6 +241,15 @@ function InstallsPageContent() {
         }
       }
       
+      // Cache the data in sessionStorage for 5 minutes
+      try {
+        sessionStorage.setItem('installs-filter-options', JSON.stringify(data))
+        sessionStorage.setItem('installs-filter-timestamp', Date.now().toString())
+        console.log('[INSTALLS PAGE] Cached filter data for future page loads')
+      } catch (e) {
+        console.warn('[INSTALLS PAGE] Failed to cache data in sessionStorage:', e)
+      }
+      
       // Set progress to complete with actual device count
       setLoadingMessage('Complete!')
       setLoadingProgress({ current: actualDeviceCount, total: actualDeviceCount })
@@ -225,7 +260,7 @@ function InstallsPageContent() {
         rooms: data.rooms?.length || 0,
         devicesWithData: actualDeviceCount,
         devicesLoaded: data.devices?.length || 0,
-        loadTime: 'cached or fresh'
+        loadTime: 'fresh from API'
       })
     } catch (error) {
       console.error('[INSTALLS PAGE] Error fetching filter options:', error)
