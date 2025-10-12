@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 // import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
 
 // const prisma = new PrismaClient();
 
@@ -35,70 +34,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   */
 }
 
-async function getBusinessUnits(req: NextApiRequest, res: NextApiResponse) {
-  /*
-  const businessUnits = await prisma.businessUnit.findMany({
-    include: {
-      machineGroups: {
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          _count: {
-            select: {
-              devices: true
-            }
-          }
-        }
-      },
-      businessUnitUsers: true,
-      businessUnitGroups: true,
-      _count: {
-        select: {
-          machineGroups: true
-        }
-      }
-    },
-    orderBy: {
-      name: 'asc'
-    }
-  });
-
-  return res.status(200).json(businessUnits);
-  */
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}
-
-async function createBusinessUnit(req: NextApiRequest, res: NextApiResponse) {
-  /*
-  const { name, description } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ error: 'Business unit name is required' });
-  }
-
-  // Check if business unit already exists
-  const existing = await prisma.businessUnit.findUnique({
-    where: { name }
-  });
-
-  if (existing) {
-    return res.status(409).json({ error: 'Business unit with this name already exists' });
-  }
-
-  const businessUnit = await prisma.businessUnit.create({
-    data: {
-      name,
-      description
-    },
-    include: {
-      machineGroups: true,
-      businessUnitUsers: true,
-      businessUnitGroups: true
-    }
-  });
-
-  return res.status(201).json(businessUnit);
-  */
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}

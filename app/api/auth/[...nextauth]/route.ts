@@ -37,7 +37,7 @@ const authOptions: NextAuthOptions = {
   },
   useSecureCookies: true,
   callbacks: {
-    async signIn({ user, account, profile, email, credentials }) {
+    async signIn() {
       // Always allow sign in - let NextAuth handle any issues
       return true
     },
@@ -62,7 +62,7 @@ const authOptions: NextAuthOptions = {
           return urlObj.toString()
         }
         return url
-      } catch (e) {
+      } catch {
         return correctBaseUrl
       }
     }

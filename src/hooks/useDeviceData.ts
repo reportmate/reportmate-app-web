@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 
 interface Device {
   deviceId: string
@@ -70,7 +70,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
   const [moduleLoading, setModuleLoading] = useState(includeModuleData)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchDevices = async () => {
+  const fetchDevices = useCallback(async () => {
     try {
       const response = await fetch('/api/devices', {
         cache: 'no-store',
@@ -94,9 +94,9 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
     } finally {
       setDevicesLoading(false)
     }
-  }
+  }, [])
 
-  const fetchModuleData = async () => {
+  const fetchModuleData = useCallback(async () => {
     if (!includeModuleData || !moduleType) {
       setModuleLoading(false)
       return
@@ -123,7 +123,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
     } finally {
       setModuleLoading(false)
     }
-  }
+  }, [includeModuleData, moduleType])
 
   const refetch = async () => {
     setDevicesLoading(true)
@@ -141,7 +141,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
   useEffect(() => {
     fetchDevices()
     fetchModuleData()
-  }, [includeModuleData, moduleType])
+  }, [fetchDevices, fetchModuleData])
 
   return {
     devices,

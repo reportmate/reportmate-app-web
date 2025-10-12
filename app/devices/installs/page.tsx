@@ -39,20 +39,6 @@ interface InstallRecord {
   raw?: any
 }
 
-// Helper function to get device platform
-function getDevicePlatform(install: InstallRecord): string {
-  if (install.platform) return install.platform
-  
-  if (install.raw?.system?.operatingSystem?.platform === 'Windows NT') {
-    return 'Windows'
-  } else if (install.raw?.system?.operatingSystem?.platform === 'Darwin') {
-    return 'Macintosh'
-  }
-  
-  // Fallback based on other indicators
-  return install.raw?.system?.operatingSystem?.name?.includes('Windows') ? 'Windows' : 'Unknown'
-}
-
 function InstallsPageContent() {
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)

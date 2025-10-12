@@ -15,7 +15,7 @@ let applicationsCache: {
 applicationsCache.data = null
 applicationsCache.timestamp = 0
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const timestamp = new Date().toISOString()
   console.log(`[APPLICATIONS API] ${timestamp} - Applications data requested`)
 

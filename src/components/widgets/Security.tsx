@@ -127,21 +127,6 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
     return { status: 'Unknown', details: 'Unknown' }
   }
 
-  const getTPMDetails = () => {
-    if (!isWindows || !security?.tpm) return null
-    
-    const isPresent = security.tpm.isPresent
-    const isEnabled = security.tpm.isEnabled
-    const isActivated = security.tpm.isActivated
-    
-    const isActive = isPresent && isEnabled && isActivated
-    
-    return {
-      status: isActive ? 'Enabled' : 'Disabled',
-      details: isActive ? 'Enabled' : 'Disabled'
-    }
-  }
-
   const getFirewallDetails = () => {
     if (!security?.firewall) return { status: 'Unknown', details: 'Unknown' }
     
@@ -170,7 +155,6 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
 
   const antivirusInfo = getAntivirusDetails()
   const encryptionInfo = getEncryptionDetails()
-  const tpmInfo = getTPMDetails()
   const firewallInfo = getFirewallDetails()
 
   return (
