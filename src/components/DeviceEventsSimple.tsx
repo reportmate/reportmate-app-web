@@ -74,7 +74,6 @@ const formatTimestamp = (ts?: string): string => {
 export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
   const eventsPerPage = 10;
@@ -94,18 +93,6 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const currentEvents = filteredEvents.slice(startIndex, endIndex);
 
   // Helper function to format JSON for display with NO truncation
-  const formatPayload = (raw: Record<string, unknown> | string): string => {
-    if (typeof raw === 'string') {
-      return raw;
-    }
-    
-    try {
-      return JSON.stringify(raw, null, 2);
-    } catch {
-      return `Error formatting payload: ${String(raw)}`;
-    }
-  };
-
   // Function to fetch full payload lazily from dedicated endpoint
   const fetchFullPayload = async (eventId: string) => {
     if (fullPayloads[eventId] || loadingPayloads.has(eventId)) {
@@ -265,7 +252,8 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       }
       
       return JSON.stringify(payload, null, 2)
-    } catch (error) {
+    } catch (_error) {
+      console.error('[DEVICE EVENTS SIMPLE] Failed to format payload for display:', _error)
       return 'Error formatting payload: ' + String(payload)
     }
   }

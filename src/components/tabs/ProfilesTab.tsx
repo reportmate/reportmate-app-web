@@ -86,7 +86,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   }, []);
 
   // Process profiles data from the modular device structure
-  const profilesModuleData = extractProfiles(device)
+  const profilesModuleData = useMemo(() => extractProfiles(device), [device])
   
   // Check if we have profiles data - prioritize data prop, then processed device data
   const hasProfilesData = data?.profiles?.length > 0 ||
@@ -123,67 +123,75 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   });
 
   // Prioritize data prop, then processed device data, then fallback to raw module data
-  let profiles: ProfileInfo[] = []
-  if (data?.profiles?.length > 0) {
-    console.log('✅ Using data prop (processedData.profiles)');
-    profiles = ensureProfilesArray(data.profiles)
-  } else if (profilesModuleData?.profiles?.length > 0) {
-    console.log('✅ Using processed profiles data');
-    profiles = ensureProfilesArray(profilesModuleData.profiles)
-  } else if (device?.modules?.profiles?.intunePolicies?.length > 0) {
-    console.log('⚠️ Falling back to raw module intunePolicies data (camelCase)');
-    const intunePolicies = ensureProfilesArray(device.modules.profiles.intunePolicies)
-    profiles = intunePolicies.map((policy: any) => ({
-      id: policy.policyId || 'unknown',
-      displayName: policy.policyName || 'Unknown Policy',
-      uuid: policy.policyId || 'unknown',
-      type: 'Device' as const,
-      installDate: policy.assignedDate || policy.lastSync || '',
-      organization: 'Microsoft Intune',
-      description: policy.policyType || '',
-      payloads: policy.settings || [],
-      isRemovable: policy.enforcementState !== 'Enforced',
-      hasRemovalPasscode: false,
-      isEncrypted: false
-    }))
-  } else if (device?.modules?.profiles?.ConfigurationProfiles) {
-    console.log('⚠️ Falling back to raw module ConfigurationProfiles data (PascalCase)');
-    const configurationProfiles = ensureProfilesArray(device.modules.profiles.ConfigurationProfiles)
-    profiles = configurationProfiles.map((profile: any) => ({
-      ...profile,
-      displayName: profile.Name || profile.name || 'Unknown',
-      uuid: profile.id || profile.identifier || 'unknown',
-      type: 'Device' as const,
-      isRemovable: true,
-      hasRemovalPasscode: false,
-      isEncrypted: false
-    }))
-  } else if (device?.modules?.profiles?.IntunePolicies) {
-    console.log('⚠️ Falling back to raw module IntunePolicies data (PascalCase)');
-    const intunePolicies = ensureProfilesArray(device.modules.profiles.IntunePolicies)
-    profiles = intunePolicies.map((policy: any) => ({
-      id: policy.PolicyId || 'unknown',
-      displayName: policy.PolicyName || 'Unknown Policy',
-      uuid: policy.PolicyId || 'unknown',
-      type: 'Device' as const,
-      installDate: policy.AssignedDate || policy.LastSync || '',
-      organization: 'Microsoft Intune',
-      description: policy.PolicyType || '',
-      payloads: policy.Settings || [],
-      isRemovable: policy.EnforcementState !== 'Enforced',
-      hasRemovalPasscode: false,
-      isEncrypted: false
-    }))
-  } else if (device?.profiles) {
-    console.log('⚠️ Falling back to device.profiles');
-    profiles = ensureProfilesArray(device.profiles)
-  } else {
-    console.log('❌ No profiles data found');
-    profiles = []
-  }
+  const profiles = useMemo(() => {
+    if (data?.profiles?.length > 0) {
+      console.log('✅ Using data prop (processedData.profiles)')
+      return ensureProfilesArray(data.profiles)
+    }
 
-  const deviceProfiles = profiles.filter((p: ProfileInfo) => p.type === 'Device')
-  const userProfiles = profiles.filter((p: ProfileInfo) => p.type === 'User')
+    if (profilesModuleData?.profiles?.length > 0) {
+      console.log('✅ Using processed profiles data')
+      return ensureProfilesArray(profilesModuleData.profiles)
+    }
+
+    if (device?.modules?.profiles?.intunePolicies?.length > 0) {
+      console.log('⚠️ Falling back to raw module intunePolicies data (camelCase)')
+      const intunePolicies = ensureProfilesArray(device.modules.profiles.intunePolicies)
+      return intunePolicies.map((policy: any) => ({
+        id: policy.policyId || 'unknown',
+        displayName: policy.policyName || 'Unknown Policy',
+        uuid: policy.policyId || 'unknown',
+        type: 'Device' as const,
+        installDate: policy.assignedDate || policy.lastSync || '',
+        organization: 'Microsoft Intune',
+        description: policy.policyType || '',
+        payloads: policy.settings || [],
+        isRemovable: policy.enforcementState !== 'Enforced',
+        hasRemovalPasscode: false,
+        isEncrypted: false
+      }))
+    }
+
+    if (device?.modules?.profiles?.ConfigurationProfiles) {
+      console.log('⚠️ Falling back to raw module ConfigurationProfiles data (PascalCase)')
+      const configurationProfiles = ensureProfilesArray(device.modules.profiles.ConfigurationProfiles)
+      return configurationProfiles.map((profile: any) => ({
+        ...profile,
+        displayName: profile.Name || profile.name || 'Unknown',
+        uuid: profile.id || profile.identifier || 'unknown',
+        type: 'Device' as const,
+        isRemovable: true,
+        hasRemovalPasscode: false,
+        isEncrypted: false
+      }))
+    }
+
+    if (device?.modules?.profiles?.IntunePolicies) {
+      console.log('⚠️ Falling back to raw module IntunePolicies data (PascalCase)')
+      const intunePolicies = ensureProfilesArray(device.modules.profiles.IntunePolicies)
+      return intunePolicies.map((policy: any) => ({
+        id: policy.PolicyId || 'unknown',
+        displayName: policy.PolicyName || 'Unknown Policy',
+        uuid: policy.PolicyId || 'unknown',
+        type: 'Device' as const,
+        installDate: policy.AssignedDate || policy.LastSync || '',
+        organization: 'Microsoft Intune',
+        description: policy.PolicyType || '',
+        payloads: policy.Settings || [],
+        isRemovable: policy.EnforcementState !== 'Enforced',
+        hasRemovalPasscode: false,
+        isEncrypted: false
+      }))
+    }
+
+    if (device?.profiles) {
+      console.log('⚠️ Falling back to device.profiles')
+      return ensureProfilesArray(device.profiles)
+    }
+
+    console.log('❌ No profiles data found')
+    return []
+  }, [data, device, profilesModuleData])
 
   // Filter profiles based on search term
   const filteredProfiles = useMemo(() => {    
@@ -209,19 +217,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
   }, [profiles, searchTerm]);
 
   // Helper function to safely format payload details
-  const formatPayloadDetails = (payloads: ProfileInfo['payloads']) => {
-    if (!payloads || payloads.length === 0) return 'No payload details';
-    
-    try {
-      return payloads.map((payload, index) => {
-        const key = payload.type || payload.displayName || payload.name || `payload-${index}`;
-        const value = payload.value || payload.description || '';
-        return `${key}: ${value}`;
-      }).join(', ');
-    } catch (error) {
-      return 'Error loading payload details';
-    }
-  };
+  
 
   if (!hasProfilesData || profiles.length === 0) {
     return (

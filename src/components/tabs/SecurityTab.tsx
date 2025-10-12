@@ -4,13 +4,11 @@
  */
 
 import React from 'react'
-import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { Lock, Fingerprint, Cpu } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
-  data?: any
 }
 
 const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, label: string }) => {
@@ -39,7 +37,7 @@ const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, lab
   )
 }
 
-export const SecurityTab: React.FC<SecurityTabProps> = ({ device, data }) => {
+export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   // Get security data from the new modular structure
   const rawSecurity = device?.modules?.security || device?.security
 

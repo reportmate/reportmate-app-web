@@ -19,7 +19,6 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
-  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
 
   const toggleExpanded = (eventId: string) => {
     const isOpening = expanded !== eventId;
@@ -87,7 +86,8 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
       if (!payload) return 'No payload'
       if (typeof payload === 'string') return payload
       return JSON.stringify(payload, null, 2)
-    } catch (error) {
+    } catch (_error) {
+      console.error('[DEVICE EVENTS] Failed to format payload for display:', _error)
       return 'Error formatting payload: ' + String(payload)
     }
   }

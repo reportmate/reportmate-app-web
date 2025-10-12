@@ -285,26 +285,8 @@ function shouldIncludeApplication(appName: string): boolean {
   return !excludePatterns.some(pattern => pattern.test(trimmed))
 }
 
-// Group applications by normalized name
-function groupApplicationsByNormalizedName(apps: ApplicationItem[]) {
-  const grouped = new Map<string, ApplicationItem[]>()
-  
-  apps.forEach(app => {
-    if (shouldIncludeApplication(app.name)) {
-      const normalized = normalizeAppName(app.name)
-      if (!grouped.has(normalized)) {
-        grouped.set(normalized, [])
-      }
-      grouped.get(normalized)!.push(app)
-    }
-  })
-  
-  return grouped
-}
-
 function ApplicationsPageContent() {
   const [applications, setApplications] = useState<ApplicationItem[]>([])
-  const [devices, setDevices] = useState<any[]>([])
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     applicationNames: [],
     usages: [],
@@ -402,10 +384,6 @@ function ApplicationsPageContent() {
               fleets,
               devicesWithData: data.devices?.length || 0
             })
-            
-            if (data.devices && Array.isArray(data.devices)) {
-              setDevices(data.devices)
-            }
             
             // Load ALL applications data from cache
             if (data.applications && Array.isArray(data.applications)) {
@@ -568,11 +546,6 @@ function ApplicationsPageContent() {
         })
         
         // Store devices data for stats cards
-        if (data.devices && Array.isArray(data.devices)) {
-          setDevices(data.devices)
-          console.log('[APPLICATIONS PAGE] Loaded', data.devices.length, 'devices with applications data from single API call')
-        }
-        
         // NOW FETCH ALL APPLICATIONS DATA
         console.log('[APPLICATIONS PAGE] Fetching ALL applications data...')
         const appsResponse = await fetch('/api/devices/applications', {
@@ -713,20 +686,6 @@ function ApplicationsPageContent() {
     return matchesSearch && matchesApplications && matchesUsages && matchesCatalogs && matchesRooms && matchesFleets && matchesVersions
   })
 
-  // Calculate filter counts
-  const getFilterCounts = () => {
-    return {
-      all: applications.length,
-      assigned: applications.filter(app => app.usage?.toLowerCase() === 'assigned').length,
-      shared: applications.filter(app => app.usage?.toLowerCase() === 'shared').length,
-      curriculum: applications.filter(app => app.catalog?.toLowerCase() === 'curriculum').length,
-      staff: applications.filter(app => app.catalog?.toLowerCase() === 'staff').length,
-      faculty: applications.filter(app => app.catalog?.toLowerCase() === 'faculty').length,
-      kiosk: applications.filter(app => app.catalog?.toLowerCase() === 'kiosk').length,
-    }
-  }
-
-  const filterCounts = getFilterCounts()
   const hasActiveFilters = selectedApplications.length > 0 || searchQuery.trim() || 
                           selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0
 
@@ -791,28 +750,10 @@ function ApplicationsPageContent() {
 
   // Filter applications dropdown based on search and sort by popularity
   const filteredApplicationNames = useMemo(() => {
-    // Debug: Check what data we're working with
-    console.log('🔍 DEBUGGING filteredApplicationNames:', {
-      'filterOptions.applicationNames.length': filterOptions.applicationNames.length,
-      'applications.length': applications.length,
-      'searchQuery': searchQuery,
-      'selectedApplications': selectedApplications,
-      'first10FilterOptions': filterOptions.applicationNames.slice(0, 10)
-    })
-
     // Since filterOptions.applicationNames are already normalized, just filter by search
     const result = filterOptions.applicationNames
       .filter(name => name.toLowerCase().includes(searchQuery.toLowerCase()))
       .sort() // Alphabetical sort since we don't have counts without applications data
-    
-    // Debug logging
-    console.log('🏷️ TAG CLOUD DATA:', {
-      filterOptionsApps: filterOptions.applicationNames.length,
-      searchQuery: searchQuery,
-      filteredResults: result.length,
-      first10Results: result.slice(0, 10)
-    })
-    
     return result
   }, [filterOptions.applicationNames, searchQuery])
 

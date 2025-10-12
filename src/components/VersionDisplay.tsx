@@ -16,7 +16,6 @@ export function VersionDisplay() {
   const [versionInfo, setVersionInfo] = useState<VersionInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     fetchVersionInfo()
@@ -37,19 +36,6 @@ export function VersionDisplay() {
     } finally {
       setIsLoading(false)
     }
-  }
-
-  const getContainerInfoText = () => {
-    if (!versionInfo) return ''
-    
-    return `Container Info:
-Version: ${versionInfo.version}
-Build ID: ${versionInfo.buildId}
-Image Tag: ${versionInfo.imageTag}
-Node Version: ${versionInfo.nodeVersion}
-Platform: ${versionInfo.platform}/${versionInfo.arch}
-Built: ${new Date(versionInfo.buildTime).toISOString()}
-Timestamp: ${new Date().toISOString()}`
   }
 
   if (isLoading) {

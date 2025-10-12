@@ -42,7 +42,11 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
         if (!detailResponse.ok) return null;
         const detailData = await detailResponse.json();
         return detailData.device || detailData;
-      } catch (error) {
+      } catch (fetchError) {
+        console.warn('[INSTALLS DATA] Failed to fetch device details', {
+          serial: device.serialNumber,
+          error: fetchError instanceof Error ? fetchError.message : fetchError
+        });
         return null;
       }
     });
@@ -97,8 +101,8 @@ export async function GET() {
               return match;
             });
           inventory = JSON.parse(jsonStr);
-        } catch (e) {
-          console.error('[INSTALLS DATA] Failed to parse inventory for device', device.serialNumber);
+        } catch (parseError) {
+          console.error('[INSTALLS DATA] Failed to parse inventory for device', device.serialNumber, parseError);
         }
       }
 

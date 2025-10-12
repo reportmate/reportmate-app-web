@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react'
-import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from '../widgets/shared'
+import { StatBlock, Stat, StatusBadge, Icons, WidgetColors } from '../widgets/shared'
 
 // Interface definitions for all peripheral device types
 interface DisplayDevice {
@@ -167,10 +167,9 @@ interface Device {
 
 interface PeripheralsTabProps {
   device: Device
-  data?: any
 }
 
-export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) => {
+export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
   const [activeSection, setActiveSection] = useState<string>('all')
 
   // STANDARDIZED: Access peripherals data only from nested modules structure
@@ -874,6 +873,37 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
     </div>
   )
 
+  const sectionRenderers: Record<string, () => React.ReactNode> = {
+    displays: renderDisplaysSection,
+    printers: renderPrintersSection,
+    usb: renderUsbSection,
+    input: renderInputSection,
+    audio: renderAudioSection,
+    bluetooth: renderBluetoothSection,
+    cameras: renderCamerasSection,
+    storage: renderStorageSection
+  }
+
+  const renderActiveSectionContent = () => {
+    if (activeSection === 'all') {
+      return (
+        <>
+          {displayDevices.length > 0 && renderDisplaysSection()}
+          {printerDevices.length > 0 && renderPrintersSection()}
+          {usbDevices.length > 0 && renderUsbSection()}
+          {inputDevices.length > 0 && renderInputSection()}
+          {audioDevices.length > 0 && renderAudioSection()}
+          {bluetoothDevices.length > 0 && renderBluetoothSection()}
+          {cameraDevices.length > 0 && renderCamerasSection()}
+          {storageDevices.length > 0 && renderStorageSection()}
+        </>
+      )
+    }
+
+    const renderer = sectionRenderers[activeSection]
+    return renderer ? renderer() : null
+  }
+
   // Combine all peripheral devices into a single table data structure
   const getAllPeripheralDevices = () => {
     const allDevices: Array<{
@@ -1108,6 +1138,11 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
         </div>
       </div>
 
+        {/* Detailed Section Views */}
+        <div className="space-y-6">
+          {renderActiveSectionContent()}
+        </div>
+
       {/* Combined Peripheral Devices Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1233,6 +1268,7 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
       </div>
     </div>
   )
+
 }
 
 export default PeripheralsTab

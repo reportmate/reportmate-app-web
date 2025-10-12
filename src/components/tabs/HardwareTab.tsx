@@ -12,6 +12,13 @@ interface HardwareData {
   memory?: {
     totalPhysical?: unknown;
     availablePhysical?: unknown;
+    modules?: Array<{
+      type?: unknown;
+      manufacturer?: unknown;
+      capacity?: unknown;
+      speed?: unknown;
+      location?: unknown;
+    }>;
   };
   processor?: {
     architecture?: unknown;
@@ -21,6 +28,10 @@ interface HardwareData {
   };
   battery?: {
     cycleCount?: unknown;
+    chargePercent?: unknown;
+    health?: unknown;
+    isCharging?: unknown;
+    estimatedRuntime?: unknown;
   };
   graphics?: {
     name?: unknown;
@@ -171,13 +182,30 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   )
   const totalStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) || 0
   const freeStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.freeSpace || 0), 0) || 0
-  const usedStorage = totalStorage - freeStorage
-  const storageUsagePercent = totalStorage > 0 ? Math.round((usedStorage / totalStorage) * 100) : 0
-
   const totalMemory = safeNumber(hardwareData.memory?.totalPhysical) || 0
   const availableMemory = safeNumber(hardwareData.memory?.availablePhysical) || 0
   const usedMemory = totalMemory - availableMemory
   const memoryUsagePercent = totalMemory > 0 ? Math.round((usedMemory / totalMemory) * 100) : 0
+  const processorArchitecture = safeString(hardwareData.processor?.architecture)
+  const graphicsName = safeString(hardwareData.graphics?.name)
+  const graphicsManufacturer = safeString(hardwareData.graphics?.manufacturer)
+  const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize)
+  const npuName = safeString(hardwareData.npu?.name)
+  const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
+  const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits) || safeNumber(hardwareData.npu?.compute_units)
+  const memoryModule = hardwareData.memory?.modules?.[0]
+  const memoryModuleType = safeString(memoryModule?.type)
+  const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
+  const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount)
+  const batteryChargePercent = safeNumber(hardwareData.battery?.chargePercent)
+  const batteryHealth = safeString(hardwareData.battery?.health)
+  const batteryIsCharging = Boolean(hardwareData.battery?.isCharging)
+  const batteryEstimatedRuntime = typeof hardwareData.battery?.estimatedRuntime === 'string'
+    ? hardwareData.battery.estimatedRuntime
+    : ''
+  const hasBattery = Boolean(hardwareData.battery)
+  const hasBatteryCycleCount = batteryCycleCount > 0
+  const batteryRuntimeDisplay = batteryEstimatedRuntime ? formatRuntime(batteryEstimatedRuntime) : 'Unknown'
 
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 Bytes'
@@ -202,12 +230,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <p className="text-base text-gray-600 dark:text-gray-400">System hardware specifications and components</p>
           </div>
         </div>
-        {/* Architecture - Top Right */}
-        {hardwareData.processor?.architecture && (
+  {/* Architecture - Top Right */}
+  {processorArchitecture && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Architecture</div>
             <div className="text-2xl font-bold text-orange-600 dark:text-orange-400 max-w-xs truncate">
-              {safeString(hardwareData.processor.architecture)}
+              {processorArchitecture}
             </div>
           </div>
         )}
@@ -250,14 +278,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
         {/* Battery or Memory Usage */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
-          {hardwareData.battery ? (
+          {hasBattery ? (
             <>
               <div className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-                {hardwareData.battery.cycleCount || 'N/A'}
+                {hasBatteryCycleCount ? batteryCycleCount : 'N/A'}
               </div>
               <div className="text-base text-gray-500 dark:text-gray-400">Battery Cycles</div>
               <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                {hardwareData.battery.cycleCount ? `${Math.round((hardwareData.battery.cycleCount / 1000) * 100)}% of 1000 max` : 'Battery info unavailable'}
+                {hasBatteryCycleCount
+                  ? `${Math.round((batteryCycleCount / 1000) * 100)}% of 1000 max`
+                  : 'Battery info unavailable'}
               </div>
             </>
           ) : (
@@ -302,9 +332,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <div className="font-semibold text-lg text-purple-600 dark:text-purple-400">GPU</div>
               </div>
             </div>
-            <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.graphics?.name || 'Unknown'}</div>
+            <div className="text-gray-600 dark:text-gray-400 mb-2">{graphicsName}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {hardwareData.graphics?.manufacturer} • {hardwareData.graphics?.memorySize}GB VRAM
+              {graphicsManufacturer} • {graphicsMemorySize ? `${graphicsMemorySize}GB VRAM` : 'Unknown VRAM'}
             </div>
           </div>
           
@@ -316,9 +346,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   <div className="font-semibold text-lg text-blue-600 dark:text-blue-400">NPU</div>
                 </div>
               </div>
-              <div className="text-gray-600 dark:text-gray-400 mb-2">{hardwareData.npu.name || 'Unknown'}</div>
+              <div className="text-gray-600 dark:text-gray-400 mb-2">{npuName}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {hardwareData.npu.manufacturer} • {hardwareData.npu.computeUnits || hardwareData.npu.compute_units || 0} TOPS
+                {npuManufacturer} • {npuComputeUnits ? `${npuComputeUnits} TOPS` : 'Unknown TOPS'}
               </div>
             </div>
           )}
@@ -333,7 +363,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{formatBytes(totalMemory)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {hardwareData.memory?.modules?.[0]?.type || 'Unknown'} • {hardwareData.memory?.modules?.[0]?.manufacturer || 'Unknown'}
+              {memoryModuleType} • {memoryModuleManufacturer}
             </div>
           </div>
           
@@ -361,10 +391,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 </div>
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">
-                {hardwareData.battery.chargePercent}% • {hardwareData.battery.health}
+                {`${Math.round(batteryChargePercent)}% • ${batteryHealth}`}
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {hardwareData.battery.cycleCount} cycles • {hardwareData.battery.isCharging ? 'Charging' : 'Not charging'}
+                {`${batteryCycleCount} cycles • ${batteryIsCharging ? 'Charging' : 'Not charging'}`}
               </div>
             </div>
           )}
@@ -400,13 +430,13 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <tr>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      hardwareData.battery.isCharging ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      batteryIsCharging ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
                       'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
                       <div className={`w-2 h-2 rounded-full mr-1.5 ${
-                        hardwareData.battery.isCharging ? 'bg-green-400' : 'bg-gray-400'
+                        batteryIsCharging ? 'bg-green-400' : 'bg-gray-400'
                       }`}></div>
-                      {hardwareData.battery.isCharging ? 'Charging' : 'Not Charging'}
+                      {batteryIsCharging ? 'Charging' : 'Not Charging'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
@@ -414,31 +444,31 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <div className="w-16 bg-gray-200 dark:bg-gray-700 rounded-full h-2 mr-2">
                         <div 
                           className={`h-2 rounded-full ${
-                            (hardwareData.battery.chargePercent || 0) >= 80 ? 'bg-green-500' :
-                            (hardwareData.battery.chargePercent || 0) >= 20 ? 'bg-yellow-500' :
+                            batteryChargePercent >= 80 ? 'bg-green-500' :
+                            batteryChargePercent >= 20 ? 'bg-yellow-500' :
                             'bg-red-500'
                           }`}
-                          style={{ width: `${Math.min(hardwareData.battery.chargePercent || 0, 100)}%` }}
+                          style={{ width: `${Math.min(Math.max(batteryChargePercent, 0), 100)}%` }}
                         ></div>
                       </div>
-                      <span className="text-sm font-medium">{hardwareData.battery.chargePercent || 0}%</span>
+                      <span className="text-sm font-medium">{Math.round(batteryChargePercent)}%</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      hardwareData.battery.health === 'Good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                      hardwareData.battery.health === 'Fair' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                      hardwareData.battery.health === 'Poor' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                      batteryHealth === 'Good' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                      batteryHealth === 'Fair' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                      batteryHealth === 'Poor' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                       'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                     }`}>
-                      {hardwareData.battery.health || 'Unknown'}
+                      {batteryHealth}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    {hardwareData.battery.cycleCount || 0} cycles
+                    {batteryCycleCount} cycles
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
-                    {hardwareData.battery.estimatedRuntime ? formatRuntime(hardwareData.battery.estimatedRuntime) : 'Unknown'}
+                    {batteryRuntimeDisplay}
                   </td>
                 </tr>
               </tbody>

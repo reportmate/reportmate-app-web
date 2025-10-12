@@ -2,8 +2,9 @@
 
 import { getProviders, signIn, getSession } from 'next-auth/react'
 import { useEffect, useState, Suspense } from 'react'
+import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getProviderDisplayName, getProviderIconConfig, getErrorMessage } from '@/lib/auth-client'
+import { getProviderDisplayName, getProviderIconConfig } from '@/lib/auth-client'
 
 interface Provider {
   id: string
@@ -136,10 +137,13 @@ function SignInContent() {
         <div>
           {/* ReportMate Logo - Large and Prominent */}
           <div className="flex justify-center mb-8">
-            <img 
-              src="/reportmate-logo.png" 
-              alt="ReportMate" 
+            <Image
+              src="/reportmate-logo.png"
+              alt="ReportMate"
+              width={240}
+              height={96}
               className="h-24 w-auto dark:brightness-0 dark:invert"
+              priority
             />
           </div>
           

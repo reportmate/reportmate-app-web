@@ -24,8 +24,8 @@ function getVersionInfo() {
         if (fs.existsSync(buildIdPath)) {
           buildId = fs.readFileSync(buildIdPath, 'utf8').trim()
         }
-      } catch (e) {
-        // Ignore error, keep unknown
+      } catch (readBuildIdError) {
+        console.debug('Version API: could not read BUILD_ID', readBuildIdError)
       }
     }
     
@@ -38,8 +38,8 @@ function getVersionInfo() {
           const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf8'))
           version = packageJson.version || 'unknown'
         }
-      } catch (e) {
-        // Ignore error, keep unknown
+      } catch (readPackageError) {
+        console.debug('Version API: could not read package.json', readPackageError)
       }
     }
     
@@ -66,7 +66,7 @@ function getVersionInfo() {
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const versionInfo = getVersionInfo()
     
