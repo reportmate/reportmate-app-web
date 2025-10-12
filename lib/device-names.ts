@@ -8,7 +8,7 @@ let deviceNamesCache: Map<string, string> = new Map()
 let cacheTimestamp: number = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
-export async function getDeviceNames(requestedSerials: string[] = []): Promise<Map<string, string>> {
+export async function getDeviceNames(_requestedSerials: string[] = []): Promise<Map<string, string>> {
   const now = Date.now()
   
   // Check cache first

@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
 import { 
@@ -340,61 +339,6 @@ function HardwarePageContent() {
     sampleHardware: hardware[0],
     processedHardwareSample: processedHardware[0]
   })
-  
-  // Search for the ARM64 device specifically
-  const targetDevice = hardware.find(h => h.serialNumber === '0F33V9G25083HJ')
-  const targetDeviceInMainAPI = devices.find(d => d.serialNumber === '0F33V9G25083HJ')
-  if (targetDevice) {
-    console.log('[DEVICE FOUND] 0F33V9G25083HJ hardware record:', targetDevice)
-  } else {
-    const allHardwareSerials = hardware.map(h => h.serialNumber || h.deviceId);
-    const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
-    
-    // Device 0F33V9G25083HJ not in hardware array
-    // Total hardware devices checked
-    console.log('[HARDWARE SERIALS] Sample serials:', allHardwareSerials.slice(0, 20));
-    
-    // Check for partial matches in hardware
-    const partialHardwareMatches = allHardwareSerials.filter(serial => 
-      serial && (serial.includes('0F33') || serial.includes('V9G2') || serial.includes('5083'))
-    );
-    if (partialHardwareMatches.length > 0) {
-      console.log('[PARTIAL MATCH] Found potential matches in hardware:', partialHardwareMatches);
-    }
-  }
-  if (targetDeviceInMainAPI) {
-    // Device 0F33V9G25083HJ found in devices API
-  } else {
-    const allDeviceSerials = devices.map(d => d.serialNumber || d.deviceId);
-    
-    // Device 0F33V9G25083HJ not found in devices API
-    // Total devices and sample serials checked
-    
-    // Check for partial matches in main API
-    const partialDeviceMatches = allDeviceSerials.filter(serial => 
-      serial && (serial.includes('0F33') || serial.includes('V9G2') || serial.includes('5083'))
-    );
-    if (partialDeviceMatches.length > 0) {
-      console.log('[PARTIAL MATCH] Found potential matches in devices:', partialDeviceMatches);
-    }
-  }
-
-  // Get unique processor families for filter
-  const processorFamilies = Array.from(new Set(
-    processedHardware.map(h => {
-      let processorStr = ''
-      if (typeof h.processor === 'string') {
-        processorStr = h.processor.toLowerCase()
-      } else if (typeof h.processor === 'object' && h.processor) {
-        processorStr = ((h.processor as any).name || (h.processor as any).model || '').toLowerCase()
-      }
-      
-      if (processorStr.includes('intel')) return 'Intel'
-      if (processorStr.includes('amd')) return 'AMD'
-      if (processorStr.includes('apple')) return 'Apple'
-      return 'Other'
-    })
-  )).sort()
 
   // Helper function to get memory range for a device
   const getMemoryRange = (memory: any): string => {
@@ -555,50 +499,6 @@ function HardwarePageContent() {
 
     return 'Unknown Processor'
   }
-
-  // Helper function to simplify processor name
-  const simplifyProcessorName = (processorName: string): string => {
-    const name = processorName.toLowerCase()
-    
-    // Intel processors
-    if (name.includes('intel')) {
-      if (name.includes('core i9')) return 'Intel Core i9'
-      if (name.includes('core i7')) return 'Intel Core i7'
-      if (name.includes('core i5')) return 'Intel Core i5'
-      if (name.includes('core i3')) return 'Intel Core i3'
-      if (name.includes('xeon')) return 'Intel Xeon'
-      if (name.includes('pentium')) return 'Intel Pentium'
-      if (name.includes('celeron')) return 'Intel Celeron'
-      return 'Intel Other'
-    }
-    
-    // AMD processors
-    if (name.includes('amd')) {
-      if (name.includes('ryzen 9')) return 'AMD Ryzen 9'
-      if (name.includes('ryzen 7')) return 'AMD Ryzen 7'
-      if (name.includes('ryzen 5')) return 'AMD Ryzen 5'
-      if (name.includes('ryzen 3')) return 'AMD Ryzen 3'
-      if (name.includes('epyc')) return 'AMD EPYC'
-      if (name.includes('threadripper')) return 'AMD Threadripper'
-      return 'AMD Other'
-    }
-    
-    // Apple processors
-    if (name.includes('apple') || name.includes('m1') || name.includes('m2') || name.includes('m3')) {
-      if (name.includes('m3')) return 'Apple M3'
-      if (name.includes('m2')) return 'Apple M2'
-      if (name.includes('m1')) return 'Apple M1'
-      return 'Apple Silicon'
-    }
-    
-    // Qualcomm processors
-    if (name.includes('qualcomm') || name.includes('snapdragon')) {
-      return 'Qualcomm Snapdragon'
-    }
-    
-    return processorName
-  }
-
   // Helper function to get graphics name
   const getGraphicsName = (device: any): string => {
     // Try modules.hardware.graphics first (prioritized path)
@@ -638,60 +538,6 @@ function HardwarePageContent() {
 
     return 'Unknown Graphics'
   }
-
-  // Helper function to simplify graphics name
-  const simplifyGraphicsName = (graphicsName: string): string => {
-    const name = graphicsName.toLowerCase()
-    
-    // NVIDIA graphics
-    if (name.includes('nvidia') || name.includes('geforce') || name.includes('quadro') || name.includes('rtx') || name.includes('gtx')) {
-      if (name.includes('rtx 40')) return 'NVIDIA RTX 40 Series'
-      if (name.includes('rtx 30')) return 'NVIDIA RTX 30 Series'
-      if (name.includes('rtx 20')) return 'NVIDIA RTX 20 Series'
-      if (name.includes('rtx')) return 'NVIDIA RTX Other'
-      if (name.includes('gtx 16')) return 'NVIDIA GTX 16 Series'
-      if (name.includes('gtx 10')) return 'NVIDIA GTX 10 Series'
-      if (name.includes('gtx')) return 'NVIDIA GTX Other'
-      if (name.includes('quadro')) return 'NVIDIA Quadro'
-      return 'NVIDIA Other'
-    }
-    
-    // AMD/ATI graphics
-    if (name.includes('amd') || name.includes('radeon') || name.includes('ati')) {
-      if (name.includes('rx 7000')) return 'AMD RX 7000 Series'
-      if (name.includes('rx 6000')) return 'AMD RX 6000 Series'
-      if (name.includes('rx 5000')) return 'AMD RX 5000 Series'
-      if (name.includes('rx')) return 'AMD RX Other'
-      if (name.includes('vega')) return 'AMD Vega'
-      return 'AMD Other'
-    }
-    
-    // Intel graphics
-    if (name.includes('intel')) {
-      if (name.includes('arc')) return 'Intel Arc'
-      if (name.includes('iris xe')) return 'Intel Iris Xe'
-      if (name.includes('iris')) return 'Intel Iris'
-      if (name.includes('uhd')) return 'Intel UHD Graphics'
-      if (name.includes('hd graphics')) return 'Intel HD Graphics'
-      return 'Intel Integrated'
-    }
-    
-    // Apple graphics
-    if (name.includes('apple') || name.includes('m1') || name.includes('m2') || name.includes('m3')) {
-      if (name.includes('m3')) return 'Apple M3 GPU'
-      if (name.includes('m2')) return 'Apple M2 GPU'
-      if (name.includes('m1')) return 'Apple M1 GPU'
-      return 'Apple GPU'
-    }
-    
-    // Qualcomm graphics
-    if (name.includes('qualcomm') || name.includes('adreno')) {
-      return 'Qualcomm Adreno'
-    }
-    
-    return graphicsName
-  }
-
   // Filter hardware
   const filteredHardware = processedHardware.filter(h => {
     // Existing processor filter

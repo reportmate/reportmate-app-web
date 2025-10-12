@@ -7,7 +7,7 @@
 // Force dynamic rendering and disable caching for security
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
@@ -28,9 +28,8 @@ import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 
 export default function ProgressiveDashboard() {
-  const componentId = useComponentTracker('ProgressiveDashboard')
+  useComponentTracker('ProgressiveDashboard')
   const { events, connectionStatus, lastUpdateTime, mounted, loadingProgress, loadingMessage } = useLiveEvents()
-  const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
   
   // State for FAST devices list that loads immediately (inventory only)
@@ -39,7 +38,6 @@ export default function ProgressiveDashboard() {
   
   // State for ALL devices data with system info (loads in background)
   const [allDevices, setAllDevices] = useState<any[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true)
 
   console.log('[PROGRESSIVE DASHBOARD] Fast devices:', fastDevices.length, 'All devices:', allDevices.length)
 
@@ -82,11 +80,9 @@ export default function ProgressiveDashboard() {
           console.log(`[PROGRESSIVE DASHBOARD] Loaded ALL ${devices.length} devices with system data`)
           
           setAllDevices(devices)
-          setDevicesLoading(false)
         }
       } catch (error) {
         console.error('[PROGRESSIVE DASHBOARD] Error loading all devices data:', error)
-        setDevicesLoading(false)
       }
     }
 
@@ -101,14 +97,30 @@ export default function ProgressiveDashboard() {
     return () => clearInterval(interval)
   }, [])
 
+  // Use the best available device data: ALL devices if loaded, otherwise FAST devices
+  const displayDevices = allDevices.length > 0 ? allDevices : fastDevices
+
+  const deviceNameMap = useMemo(() => {
+    const map: Record<string, string> = {}
+    displayDevices.forEach(device => {
+      const name = device?.modules?.inventory?.deviceName || device?.name || device?.deviceName || device?.serialNumber
+      const serial = device?.serialNumber
+      const deviceId = device?.deviceId
+      const assetTag = device?.modules?.inventory?.assetTag || device?.assetTag
+
+      if (name) {
+        if (serial) map[serial] = name
+        if (deviceId && deviceId !== serial) map[deviceId] = name
+        if (assetTag) map[assetTag] = name
+      }
+    })
+    return map
+  }, [displayDevices])
+
   // Show skeleton only while FAST devices are loading (<3 seconds)
   if (fastLoading) {
     return <DashboardSkeleton />
   }
-
-  // Use the best available device data: ALL devices if loaded, otherwise FAST devices
-  const displayDevices = allDevices.length > 0 ? allDevices : fastDevices
-  const isUsingFastData = allDevices.length === 0
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
@@ -184,8 +196,8 @@ export default function ProgressiveDashboard() {
             {/* Error and Warning Stats - ORIGINAL DESIGN */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
               <div className="grid grid-cols-1 gap-4">
-                <ErrorStatsWidget events={events} devices={displayDevices} />
-                <WarningStatsWidget events={events} devices={displayDevices} />
+                <ErrorStatsWidget devices={displayDevices} />
+                <WarningStatsWidget devices={displayDevices} />
               </div>
             </ErrorBoundary>
 

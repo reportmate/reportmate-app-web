@@ -12,6 +12,8 @@ import { DevicePageNavigation } from "../../src/components/navigation/DevicePage
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 
+const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
+
 // Helper function to get circular status icons (from RecentEventsWidget)
 const getStatusIcon = (kind: string) => {
   switch (kind.toLowerCase()) {
@@ -71,17 +73,6 @@ const getStatusIcon = (kind: string) => {
 // Use FleetEvent type directly instead of empty interface
 type Event = FleetEvent
 
-// Interface for payload data
-interface EventPayload {
-  summary?: string;
-  message?: string;
-  moduleCount?: number;
-  modules?: string[] | Record<string, unknown>;
-  modules_processed?: number;
-  collection_type?: string;
-  [key: string]: unknown;
-}
-
 // Helper function to get event message - uses shared bundling utilities
 const getEventMessage = (event: BundledEvent): string => {
   if (event.isBundle) {
@@ -98,127 +89,6 @@ const getEventMessage = (event: BundledEvent): string => {
   return formatPayloadPreview(originalEvent.payload);
 }
 
-// Helper function to safely display payload
-const safeDisplayPayload = (payload: EventPayload | string | null | undefined): string => {
-  try {
-    if (!payload) return 'No payload'
-    
-    // Handle string payloads first
-    if (typeof payload === 'string') {
-      return payload.length > 100 ? payload.substring(0, 100) + '...' : payload
-    }
-    
-    // Now handle object payloads
-    if (typeof payload === 'object') {
-      // **PRIORITY 1: Look for direct message field (ReportMate events)**
-      if (payload.message && typeof payload.message === 'string') {
-        const message = payload.message
-        return message.length > 150 ? message.substring(0, 150) + '...' : message
-      }
-      
-      // Handle summarized payloads (from our new API structure)
-      if (payload.summary) {
-        return payload.summary
-      }
-      
-      // Handle module count payloads
-      if (payload.moduleCount && payload.modules && Array.isArray(payload.modules)) {
-        if (payload.moduleCount === 1) {
-          return `Reported ${payload.modules[0]} module data`
-        } else if (payload.moduleCount <= 3) {
-          return `Reported ${payload.modules.join(', ')} modules data`
-        } else {
-          return `Reported ${payload.moduleCount} modules data`
-        }
-      }
-      // Check if this is a full device report (contains multiple modules)
-      if (payload.modules && typeof payload.modules === 'object') {
-        const moduleCount = Object.keys(payload.modules).length
-        const moduleNames = Object.keys(payload.modules).slice(0, 3)
-        
-        if (moduleCount > 3) {
-          return `Reported ${moduleCount} modules data (${moduleNames.join(', ')}, +${moduleCount - 3} more)`
-        } else {
-          return `Reported ${moduleNames.join(', ')} module${moduleCount > 1 ? 's' : ''} data`
-        }
-      }
-      
-      // Check for new structure with modules_processed (array format from Windows client)
-      if (Array.isArray(payload.modules_processed) && payload.modules_processed.length > 0) {
-        const modules = payload.modules_processed as string[]
-        const capitalizedModules = modules.map(mod => 
-          mod.charAt(0).toUpperCase() + mod.slice(1)
-        )
-        
-        if (modules.length === 1) {
-          return `${capitalizedModules[0]} data reported`
-        } else {
-          return `${capitalizedModules.join(', ')} data reported`
-        }
-      }
-      
-      // Also check metadata.enabledModules (Windows client format)
-      const metadata = payload.metadata as any
-      if (metadata?.enabledModules && Array.isArray(metadata.enabledModules)) {
-        const modules = metadata.enabledModules as string[]
-        const capitalizedModules = modules.map(mod => 
-          mod.charAt(0).toUpperCase() + mod.slice(1)
-        )
-        
-        if (modules.length === 1) {
-          return `${capitalizedModules[0]} data reported`
-        } else {
-          return `${capitalizedModules.join(', ')} data reported`
-        }
-      }
-      
-      // Legacy format with modules_processed as number
-      if (payload.modules_processed && typeof payload.modules_processed === 'number') {
-        const parts = []
-        // Simplify collection type to just "report" format
-        if (payload.collection_type) {
-          const reportType = payload.collection_type.toLowerCase() === 'full' ? 'Full report' : `${payload.collection_type} report`
-          parts.push(reportType)
-        }
-        if (payload.modules_processed) parts.push(`${payload.modules_processed} modules`)
-        // Remove client version from the display
-        
-        return parts.length > 0 ? parts.join(' • ') : `Data collection completed`
-      }
-      
-      // Check for common event types
-      if (payload.component || payload.moduleType || payload.clientVersion) {
-        const parts = []
-        if (payload.message) parts.push(payload.message)
-        if (payload.component) parts.push(`Component: ${payload.component}`)
-        if (payload.moduleType) parts.push(`Module: ${payload.moduleType}`)
-        if (payload.clientVersion) parts.push(`Client: ${payload.clientVersion}`)
-        
-        const summary = parts.join(' • ')
-        return summary.length > 100 ? summary.substring(0, 100) + '...' : summary
-      }
-      
-      // Fallback for complex objects - show a more descriptive summary
-      const keys = Object.keys(payload)
-      if (keys.length === 0) return 'Empty payload'
-      if (keys.length > 5) {
-        return `System event (${keys.length} properties): ${keys.slice(0, 3).join(', ')}...`
-      }
-      
-      // Try to stringify, but with strict size limit
-      const stringified = JSON.stringify(payload)
-      if (stringified.length > 150) {
-        return `Complex data (${stringified.length} chars) - Properties: ${keys.slice(0, 3).join(', ')}...`
-      }
-      return stringified.substring(0, 150)
-    }
-    
-    return String(payload).substring(0, 100)
-  } catch (_error) {
-    return 'Complex payload (non-serializable)'
-  }
-}
-
 function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -227,7 +97,6 @@ function EventsPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
-  const [copiedEventId, setCopiedEventId] = useState<string | null>(null)
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [inventoryMap, setInventoryMap] = useState<Record<string, { deviceName: string; serialNumber: string; assetTag?: string }>>({})
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
@@ -252,8 +121,6 @@ function EventsPageContent() {
   const EVENTS_PER_PAGE = 100  // 100 events per page for /events page
   
   // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
-
   // Bundle events using the shared bundling logic
   const bundledEvents: BundledEvent[] = useMemo(() => {
     if (!events.length) return []
@@ -399,7 +266,7 @@ function EventsPageContent() {
               setTotalEvents(offset + filteredEvents.length)
             } else {
               // Estimate total (this will be corrected when we reach the end)
-              setTotalEvents(Math.max(totalEvents, offset + EVENTS_PER_PAGE + 1))
+              setTotalEvents((prev) => Math.max(prev, offset + EVENTS_PER_PAGE + 1))
             }
           }
         } else {
@@ -446,8 +313,6 @@ function EventsPageContent() {
 
   // Calculate pagination for filtered events (client-side pagination on current page)
   const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
-  const startIndex = 0 // Always show from start since we're paginating server-side
-  const endIndex = filteredEvents.length
   const currentEvents = filteredEvents // Show all filtered events from current server page
 
   // Calculate actual total pages based on total events and whether we're filtering
@@ -488,6 +353,7 @@ function EventsPageContent() {
       
       return JSON.stringify(payload, null, 2)
     } catch (error) {
+      console.error('Failed to format payload for display:', error)
       return 'Error formatting payload: ' + String(payload)
     }
   }
@@ -977,7 +843,6 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const statusConfig = getStatusConfig(event.kind)
                       const isExpanded = expandedEvent === event.id
                       
                       return (
@@ -1301,7 +1166,6 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const statusConfig = getStatusConfig(event.kind)
                       const isExpanded = expandedEvent === event.id
                       
                       return (
@@ -1500,7 +1364,6 @@ function EventsPageContent() {
                 </div>
               ) : (
                 currentEvents.map((event) => {
-                const statusConfig = getStatusConfig(event.kind)
                 const isExpanded = expandedEvent === event.id
                 
                 return (

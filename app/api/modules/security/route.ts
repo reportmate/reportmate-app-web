@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     
     // Call FastAPI bulk endpoint
     try {
-      const url = `${apiBaseUrl}/api/devices/security`
+  const url = `${apiBaseUrl}/api/devices/security?limit=${limit}`
       console.log(`[SECURITY API] ${timestamp} - Calling FastAPI: ${url}`)
       
       const response = await fetch(url, {

@@ -7,7 +7,7 @@
   function getStoredTheme() {
     try {
       return localStorage.getItem('reportmate-theme') || localStorage.getItem('theme');
-    } catch (e) {
+    } catch (_error) {
       return null;
     }
   }

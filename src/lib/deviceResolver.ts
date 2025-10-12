@@ -5,12 +5,6 @@
  * No more brittle regex patterns that can crash pages.
  */
 
-interface DeviceIdentifiers {
-  deviceId: string      // UUID
-  serialNumber: string  // Serial Number (canonical identifier)
-  assetTag?: string    // Asset Tag
-}
-
 interface DeviceResolutionResult {
   found: boolean
   serialNumber?: string
@@ -97,7 +91,7 @@ export async function resolveDeviceIdentifier(identifier: string): Promise<Devic
 /**
  * Server-side version of the resolver for use in API routes
  */
-export async function resolveDeviceIdentifierServer(identifier: string, apiBaseUrl: string): Promise<DeviceResolutionResult> {
+export async function resolveDeviceIdentifierServer(identifier: string): Promise<DeviceResolutionResult> {
   const identifierType = identifyDeviceIdentifierType(identifier)
   console.log(`[DEVICE RESOLVER SERVER] Resolving ${identifierType}: ${identifier}`)
   

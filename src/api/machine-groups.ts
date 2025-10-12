@@ -35,14 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   */
 }
 
-async function getMachineGroups(req: NextApiRequest, res: NextApiResponse) {
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}
-
-async function createMachineGroup(req: NextApiRequest, res: NextApiResponse) {
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}
-
 /**
  * Generate a random passphrase in GUID format (similar to MunkiReport)
  */

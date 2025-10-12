@@ -124,7 +124,7 @@ export async function GET(request: Request) {
               return match;
             });
           parsedInventory = JSON.parse(jsonStr);
-        } catch (e) {
+        } catch {
           // Keep original if parse fails
         }
       }

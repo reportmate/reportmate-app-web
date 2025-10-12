@@ -91,7 +91,7 @@ export function ThemeProvider({
       }
     }
 
-    const appliedTheme = applyTheme(theme)
+  applyTheme(theme)
 
     // Edge-specific workaround: Periodic system theme check
     let edgeWorkaroundInterval: NodeJS.Timeout | null = null

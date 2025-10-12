@@ -22,6 +22,8 @@ export interface ModuleStatus {
   loadedAt?: Date
 }
 
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers']
+
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (processed and ready for InfoTab)
   const [deviceInfo, setDeviceInfo] = useState<any>(null)
@@ -31,12 +33,11 @@ export function useSmartDeviceLoading(deviceId: string) {
   // Module loading states
   const [moduleStates, setModuleStates] = useState<Record<string, ModuleStatus>>({})
   const [allModulesLoaded, setAllModulesLoaded] = useState(false)
+  const moduleStatesRef = useRef<Record<string, ModuleStatus>>({})
   
-  // Track which modules are in InfoTab (already loaded)
-  const infoModules = useRef(new Set(['inventory', 'system', 'hardware', 'management', 'security', 'network']))
-  
-  // Remaining modules to load in background
-  const backgroundModules = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers']
+  useEffect(() => {
+    moduleStatesRef.current = moduleStates
+  }, [moduleStates])
   
   /**
    * Load InfoTab data - FAST
@@ -116,7 +117,7 @@ export function useSmartDeviceLoading(deviceId: string) {
    * Load remaining modules in PARALLEL once InfoTab is ready
    */
   useEffect(() => {
-    if (!deviceInfo || infoLoading) return
+    if (!deviceInfo || infoLoading || allModulesLoaded) return
     
     let cancelled = false
     
@@ -124,9 +125,9 @@ export function useSmartDeviceLoading(deviceId: string) {
       console.log(`[SMART LOAD] 📦 Loading background modules in PARALLEL`)
       
       // Load ALL remaining modules at once (browser will handle parallelization)
-      const promises = backgroundModules.map(async (moduleName) => {
+      const promises = BACKGROUND_MODULES.map(async (moduleName) => {
         // Skip if already loaded
-        if (moduleStates[moduleName]?.state === 'loaded') {
+        if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
           return
         }
         
@@ -214,7 +215,7 @@ export function useSmartDeviceLoading(deviceId: string) {
     return () => {
       cancelled = true
     }
-  }, [deviceInfo, infoLoading, deviceId])
+  }, [deviceInfo, infoLoading, deviceId, allModulesLoaded])
   
   /**
    * On-demand module loading (if user clicks tab before background load completes)

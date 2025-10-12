@@ -155,7 +155,6 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const isEnrolled = management.mdmEnrollment?.isEnrolled || false
   const provider = management.mdmEnrollment?.provider
   const enrollmentType = management.mdmEnrollment?.enrollmentType
-  const tenantName = management.tenantDetails?.tenantName
   const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
 

@@ -3,24 +3,13 @@
 // Force dynamic rendering and disable caching for dynamic device page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, useMemo } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
-import { mapDeviceData, type ProcessedDeviceInfo, type DeviceStatus } from "../../../src/lib/data-processing"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
 // Import SMART loading hook (V2 - parallel loading)
 import { useSmartDeviceLoading } from "../../../src/hooks/useSmartDeviceLoading"
-// Import modular data processors
-import { extractInstalls, type InstallsInfo } from "../../../src/lib/data-processing/modules/installs"
-import { extractHardware, type HardwareInfo } from "../../../src/lib/data-processing/modules/hardware"
-import { extractNetwork, type NetworkInfo } from "../../../src/lib/data-processing/modules/network"
-import { extractSecurity, type SecurityInfo } from "../../../src/lib/data-processing/modules/security"
-import { extractSystem, type SystemInfo } from "../../../src/lib/data-processing/modules/system"
-import { extractApplications, type ApplicationInfo } from "../../../src/lib/data-processing/modules/applications"
-import { extractPeripherals, type PeripheralInfo } from "../../../src/lib/data-processing/modules/peripherals"
-import { extractEvents, type EventsInfo } from "../../../src/lib/data-processing/modules/events"
-import { extractProfiles, type ProfilesInfo } from "../../../src/lib/data-processing/modules/profiles"
 import { 
   InfoTab,
   InstallsTab,
@@ -223,230 +212,6 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
   )
 }
 
-interface FleetEvent {
-  id: string
-  device: string
-  kind: string
-  ts: string
-  payload: Record<string, unknown>
-  [key: string]: unknown
-}
-
-interface _DeviceInfo {
-  id: string
-  deviceId?: string
-  name: string
-  model?: string
-  os?: string
-  platform?: string
-  lastSeen: string
-  status: 'active' | 'stale' | 'warning' | 'error'
-  uptime?: string
-  location?: string
-  serialNumber?: string
-  assetTag?: string
-  ipAddress?: string
-  macAddress?: string
-  totalEvents: number
-  lastEventTime: string
-  // Hardware properties (direct properties, not nested)
-  processor?: string
-  processorSpeed?: string
-  cores?: number
-  memory?: string
-  availableRAM?: string
-  memorySlots?: string
-  storage?: string
-  availableStorage?: string
-  storageType?: string
-  graphics?: string
-  vram?: string
-  resolution?: string
-  architecture?: string
-  diskUtilization?: number
-  memoryUtilization?: number
-  cpuUtilization?: number
-  temperature?: number
-  batteryLevel?: number
-  bootTime?: string
-  network?: {
-    hostname: string
-    connectionType: string
-    ssid?: string | null
-    signalStrength?: string | null
-    service?: string
-    status?: number
-    ethernet?: string
-    clientid?: string
-    ipv4conf?: string
-    ipv4ip?: string
-    ipv4mask?: string
-    ipv4router?: string
-    ipv6conf?: string
-    ipv6ip?: string
-    ipv6prefixlen?: number
-    ipv6router?: string
-    ipv4dns?: string
-    vlans?: string
-    activemtu?: number
-    validmturange?: string
-    currentmedia?: string
-    activemedia?: string
-    searchdomain?: string
-    externalip?: string
-    location?: string
-    airdrop_channel?: string
-    airdrop_supported?: boolean
-    wow_supported?: boolean
-    supported_channels?: string
-    supported_phymodes?: string
-    wireless_card_type?: string
-    country_code?: string
-    firmware_version?: string
-    wireless_locale?: string
-  }
-  software?: {
-    buildVersion: string
-    bootROMVersion: string
-    smartStatus: string
-    encryptionStatus: string
-  }
-  security?: {
-    gatekeeper?: string
-    sip?: string
-    ssh_groups?: string
-    ssh_users?: string
-    ard_groups?: string
-    root_user?: string
-    ard_users?: string
-    firmwarepw?: string
-    firewall_state?: string
-    skel_state?: string
-    t2_secureboot?: string
-    t2_externalboot?: string
-    activation_lock?: string
-    filevault_status?: boolean
-    filevault_users?: string
-    as_security_mode?: string
-  }
-  // Platform-specific security features (from API)
-  securityFeatures?: {
-    // Mac-specific
-    filevault?: { enabled: boolean; status: string }
-    firewall?: { enabled: boolean; status: string }
-    gatekeeper?: { enabled: boolean; status: string }
-    sip?: { enabled: boolean; status: string }
-    xprotect?: { enabled: boolean; status: string }
-    automaticUpdates?: { enabled: boolean; status: string }
-    // Windows-specific
-    bitlocker?: { enabled: boolean; status: string }
-    windowsDefender?: { enabled: boolean; status: string }
-    uac?: { enabled: boolean; status: string }
-    windowsUpdates?: { enabled: boolean; status: string }
-    smartScreen?: { enabled: boolean; status: string }
-    tpm?: { enabled: boolean; status: string; version?: string }
-    // Cross-platform
-    edr?: { installed: boolean; name: string | null; status: string; version: string | null }
-  }
-  applications?: {
-    totalApps: number
-    installedApps: ApplicationInfo[]
-  }
-  management?: {
-    enrolled: boolean
-    enrolled_via_dep: boolean
-    server_url?: string | null
-    user_approved?: boolean
-    organization?: string | null
-    department?: string | null
-    vendor?: string | null
-    profiles?: Array<{
-      id: string
-      name: string
-      description: string
-      type: string
-      status: string
-      lastModified: string
-    }>
-    restrictions?: {
-      app_installation?: string
-      camera_disabled?: boolean
-      screen_recording_disabled?: boolean
-      system_preferences_disabled?: boolean
-      touch_id_disabled?: boolean
-      siri_disabled?: boolean
-    }
-    apps?: Array<{
-      id: string
-      name: string
-      bundleId: string
-      status: string
-      source: string
-      lastUpdate: string
-    }>
-  }
-  managedInstalls?: {
-    totalPackages: number
-    installed: number
-    pending: number
-    failed: number
-    lastUpdate: string
-    config?: {
-      type: 'munki' | 'cimian'
-      version: string
-      softwareRepoURL: string
-      appleCatalogURL?: string | null
-      manifest: string
-      localOnlyManifest?: string | null
-      runType: string
-      lastRun: string
-      duration: string
-    }
-    messages?: {
-      errors: Array<{
-        id: string
-        timestamp: string
-        package: string
-        message: string
-        details: string
-      }>
-      warnings: Array<{
-        id: string
-        timestamp: string
-        package: string
-        message: string
-        details: string
-      }>
-    }
-    packages: ManagedPackage[]
-  }
-  inventory?: {
-    deviceName?: string
-    usage?: string
-    catalog?: string
-    department?: string
-    location?: string
-    assetTag?: string
-    serialNumber?: string
-    uuid?: string
-  }
-}
-
-interface ManagedPackage {
-  id: string
-  name: string
-  displayName: string
-  version: string
-  installedVersion?: string
-  size?: number
-  type: 'munki' | 'cimian'
-  status: 'installed' | 'pending_install' | 'pending_removal' | 'install_failed' | 'install_succeeded' | 'uninstalled' | 'uninstall_failed' | 'removed' | 'Pending Update' | 'Installed' | 'Failed'
-  lastUpdate: string
-  description?: string
-  publisher?: string
-  category?: string
-}
-
 type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'peripherals' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string; accentColor: string }[] = [
@@ -474,7 +239,6 @@ export default function DeviceDetailPage() {
     deviceInfo,
     infoLoading,
     infoError,
-    moduleStates,
     allModulesLoaded,
     requestModule,
     isModuleLoaded,
@@ -497,26 +261,6 @@ export default function DeviceDetailPage() {
   
   const [activeTab, setActiveTab] = useState<TabType>(getInitialTab())
   
-  // CRITICAL FIX: Handle hash changes after component mounts (client-side)
-  useEffect(() => {
-    const handleHashChange = () => {
-      if (typeof window !== 'undefined') {
-        const hash = window.location.hash.replace('#', '') as TabType
-        if (hash && tabs.some(tab => tab.id === hash) && hash !== activeTab) {
-          setActiveTab(hash)
-        }
-      }
-    }
-    
-    // Check hash immediately on mount
-    handleHashChange()
-    
-    // Listen for hash changes
-    if (typeof window !== 'undefined') {
-      window.addEventListener('hashchange', handleHashChange)
-      return () => window.removeEventListener('hashchange', handleHashChange)
-    }
-  }, [])
   // UI State
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
   const tabsContainerRef = useRef<HTMLElement>(null)
@@ -625,7 +369,7 @@ export default function DeviceDetailPage() {
       window.addEventListener('hashchange', handleHashChange)
       return () => window.removeEventListener('hashchange', handleHashChange)
     }
-  }, [])
+  }, [activeTab])
 
   // Dynamic overflow detection based on container width
   useEffect(() => {
@@ -850,16 +594,6 @@ export default function DeviceDetailPage() {
         </div>
       </div>
     )
-  }
-
-  // Helper function for status colors
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'active': return 'text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900'
-      case 'warning': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-900'
-      case 'error': return 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900'
-      default: return 'text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-800'
-    }
   }
 
   const _getEventStatusConfig = (kind: string) => {
@@ -1340,7 +1074,7 @@ export default function DeviceDetailPage() {
               onRetry={() => requestModule('security')}
             />
           ) : isModuleLoaded('security') ? (
-            <SecurityTab device={deviceInfo} data={getModuleData('security')} />
+            <SecurityTab device={deviceInfo} />
           ) : (
             <ModuleLoadingState 
               moduleName="security" 

@@ -432,28 +432,6 @@ export function mapStatusToEventType(status: StandardInstallStatus): 'success' |
 }
 
 /**
- * Format item size from bytes to human readable format
- */
-function formatItemSize(sizeBytes?: string): string {
-  if (!sizeBytes || sizeBytes === '0') return '';
-  
-  const bytes = parseInt(sizeBytes, 10);
-  if (isNaN(bytes) || bytes === 0) return '';
-  
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  let size = bytes;
-  let unitIndex = 0;
-  
-  while (size >= 1024 && unitIndex < units.length - 1) {
-    size /= 1024;
-    unitIndex++;
-  }
-  
-  const formatted = unitIndex === 0 ? size.toString() : size.toFixed(1);
-  return `${formatted} ${units[unitIndex]}`;
-}
-
-/**
  * Get the latest attempt timestamp from recentAttempts array
  * Returns the timestamp from the most recent attempt, or fallback to lastSeenInSession
  */

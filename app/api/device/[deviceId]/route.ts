@@ -1,6 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import path from 'path'
-import fs from 'fs'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -88,34 +86,8 @@ function convertPowerShellObjects(obj: unknown, parentKey?: string, originalObj?
 }
 
 // Type definitions
-interface RecentAttempt {
-  version?: string;
-  status?: string;
-  result?: string;
-  installedVersion?: string;
-  timestamp?: string;
-  [key: string]: unknown;
-}
-
-interface InstallPackage {
-  name: string;
-  displayName?: string;
-  version?: string;
-  status?: string;
-  lastAttemptStatus?: string;
-  installedVersion?: string;
-  recentAttempts?: RecentAttempt[];
-  [key: string]: unknown;
-}
-
-interface InstallsModule {
-  cimian?: unknown;
-  recentInstalls?: InstallPackage[];
-  [key: string]: unknown;
-}
-
 export async function GET(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
   try {

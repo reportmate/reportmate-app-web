@@ -42,7 +42,7 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
         if (!detailResponse.ok) return null;
         const detailData = await detailResponse.json();
         return detailData.device || detailData;
-      } catch (error) {
+      } catch {
         return null;
       }
     });
@@ -69,13 +69,12 @@ export async function GET() {
   }
 
   try {
-    const devices = await fetchAllDevicesWithModules(API_BASE_URL);
+  const devices = await fetchAllDevicesWithModules(API_BASE_URL);
     
     const installsDevices = devices.filter(d => d.modules?.installs);
     const inventoryDevices = devices;
     
     const managed = new Set();
-    const other = new Set();
     const usages = new Set();
     const catalogs = new Set();
     const rooms = new Set();
@@ -116,7 +115,7 @@ export async function GET() {
               return match;
             });
           inventory = JSON.parse(jsonStr);
-        } catch (e) {
+        } catch {
           // Silently skip parse errors
         }
       }
@@ -149,7 +148,7 @@ export async function GET() {
               return match;
             });
           inventory = JSON.parse(jsonStr);
-        } catch (e) {
+        } catch {
           // Silently skip parse errors
         }
       }
@@ -169,7 +168,7 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       managedInstalls: Array.from(managed).sort(),
-      otherInstalls: Array.from(other).sort(),
+  otherInstalls: [],
       usages: Array.from(usages).sort(),
       catalogs: Array.from(catalogs).sort(),
       rooms: Array.from(rooms).sort(),
@@ -180,6 +179,7 @@ export async function GET() {
       devices: devicesWithInstalls
     });
   } catch (error) {
+    console.error('[INSTALLS FILTERS] Failed to build filter payload', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

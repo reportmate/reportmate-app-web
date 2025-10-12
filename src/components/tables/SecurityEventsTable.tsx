@@ -70,13 +70,6 @@ export const SecurityEventsTable: React.FC<SecurityEventsTableProps> = ({ data }
     }
   };
 
-  // Group events by level for statistics
-  const eventStats = events.reduce((acc, event) => {
-    const level = event.level.toLowerCase();
-    acc[level] = (acc[level] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
   if (!events || events.length === 0) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">

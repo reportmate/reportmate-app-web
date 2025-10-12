@@ -391,6 +391,7 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
     }
     
   } catch (_error) {
+    console.error('[EVENT BUNDLING] Failed to generate payload summary:', _error)
     return 'Event data (parsing error)'
   }
 }

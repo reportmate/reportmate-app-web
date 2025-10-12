@@ -103,7 +103,7 @@ class MemoryManager {
   // Cleanup all resources
   cleanup() {
     // Clear all intervals
-    this.intervals.forEach((interval, key) => {
+    this.intervals.forEach((interval, _key) => {
       clearInterval(interval)
     })
     this.intervals.clear()
@@ -141,10 +141,11 @@ export function useComponentTracker(componentName: string) {
   const manager = MemoryManager.getInstance()
 
   React.useEffect(() => {
-    manager.trackComponent(componentName, instanceId.current, true)
+    const id = instanceId.current
+    manager.trackComponent(componentName, id, true)
     
     return () => {
-      manager.trackComponent(componentName, instanceId.current, false)
+      manager.trackComponent(componentName, id, false)
     }
   }, [componentName, manager])
 
@@ -161,16 +162,17 @@ export function useManagedInterval(
   const keyRef = React.useRef(key || `interval-${Date.now()}-${Math.random()}`)
 
   React.useEffect(() => {
+    const intervalKey = keyRef.current
     if (delay !== null) {
       const interval = setInterval(callback, delay)
-      manager.registerInterval(keyRef.current, interval)
+      manager.registerInterval(intervalKey, interval)
       
       return () => {
-        manager.clearInterval(keyRef.current)
+        manager.clearInterval(intervalKey)
       }
     }
     return () => {
-      manager.clearInterval(keyRef.current)
+      manager.clearInterval(intervalKey)
     }
   }, [callback, delay, manager])
 }

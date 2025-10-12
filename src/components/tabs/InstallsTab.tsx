@@ -101,7 +101,7 @@ const formatDuration = (durationSeconds: number | string): string => {
   return formatted
 }
 
-export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
+export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data }) => {
   const params = useParams()
   const [selfFetchedDevice, setSelfFetchedDevice] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)

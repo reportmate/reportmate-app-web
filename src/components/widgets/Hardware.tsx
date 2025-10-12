@@ -94,20 +94,6 @@ interface HardwareWidgetProps {
   device: Device
 }
 
-// Helper function to safely render unknown values as a string
-const safeString = (value: unknown): string => {
-  if (value === null || value === undefined) return 'Unknown'
-  if (typeof value === 'object') {
-    // If it's an object, try to extract meaningful properties
-    const obj = value as Record<string, unknown>;
-    if (obj.name) return String(obj.name)
-    if (obj.value) return String(obj.value)
-    // Otherwise, just return a placeholder instead of trying to render the object
-    return 'Complex Value'
-  }
-  return String(value)
-}
-
 // Helper function specifically for processor objects
 const safeProcessorString = (processor: string | ProcessorInfo | unknown): string => {
   if (!processor) return 'Unknown'
@@ -132,9 +118,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   // Get hardware data from modules first, then fallback to device properties
   const hardwareModule = device.modules?.hardware
   const legacyHardware = device.modules?.hardware || {}
-  
-  // Get inventory data for Hardware UUID
-  const inventory = device.modules?.inventory || {}
   
   console.log('[HardwareWidget] Debug data access:', {
     deviceId: device.id,

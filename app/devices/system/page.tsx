@@ -208,13 +208,12 @@ function formatUptime(seconds: number): string {
 function SystemPageContent() {
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [systems, setSystems] = useState<SystemDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [platformFilter, setPlatformFilter] = useState('all')
 
   // Use the new hook to get both devices data (with inventory) and system module data
-  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading } = useDeviceData({
+  const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
     includeModuleData: true,
     moduleType: 'system'
   })

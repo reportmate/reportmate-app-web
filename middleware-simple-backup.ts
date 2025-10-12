@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export default async function middleware(request: NextRequest) {
+export default async function middleware(_request: NextRequest) {
   console.log('[MIDDLEWARE] Simple bypass for all requests')
   return NextResponse.next()
 }

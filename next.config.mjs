@@ -20,6 +20,23 @@ export default {
   ...(process.env.DOCKER_BUILD ? {} : {
     outputFileTracingRoot: "C:\\Users\\rchristiansen\\DevOps\\ReportMate",
   }),
+
+  webpackDevMiddleware: (config) => {
+    config.watchOptions = {
+      ...config.watchOptions,
+      ignored: [
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/.next/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/coverage/**'
+      ],
+      poll: false,
+    }
+
+    return config
+  },
   
   // Simplified webpack configuration
   webpack: (config, { isServer }) => {

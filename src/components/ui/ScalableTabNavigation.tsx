@@ -8,7 +8,7 @@
  * 4. More dropdown for overflow
  */
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState } from 'react'
 
 export interface TabItem {
   id: string
@@ -34,7 +34,6 @@ export const ScalableTabNavigation: React.FC<ScalableTabNavigationProps> = ({
   maxVisibleTabs = 8
 }) => {
   const [showOverflow, setShowOverflow] = useState(false)
-  const navRef = useRef<HTMLElement>(null)
 
   // Icon-only with hover labels (current implementation)
   if (layout === 'icon-hover') {

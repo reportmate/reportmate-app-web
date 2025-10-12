@@ -206,12 +206,6 @@ export const SECURITY_FEATURES = {
   unknown: [] as const,
 } as const;
 
-type SecurityFeature = {
-  key: string;
-  label: string;
-  priority: number;
-};
-
 // Extract and normalize security data based on platform
 export const extractPlatformSecurityData = (device: any): PlatformSecurityData => {
   const platform = detectPlatform(device);
@@ -295,7 +289,7 @@ export const extractPlatformSecurityData = (device: any): PlatformSecurityData =
 };
 
 // Get security status with appropriate color coding
-export const getSecurityStatus = (feature: any, platform: string) => {
+export const getSecurityStatus = (feature: any) => {
   if (!feature) {
     return { status: 'Unknown', color: 'text-gray-600 dark:text-gray-400', type: 'warning' as const };
   }

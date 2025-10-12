@@ -7,6 +7,8 @@ import React, { useMemo } from 'react'
 import DeviceEventsSimple from '../DeviceEventsSimple'
 import { bundleEvents, type FleetEvent } from '../../lib/eventBundling'
 
+const VALID_EVENT_KINDS: ReadonlyArray<string> = ['info', 'error', 'warning', 'success']
+
 interface EventData {
   id?: string;
   name?: string;
@@ -40,17 +42,15 @@ interface EventsTabProps {
 }
 
 export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
-  // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success']
-
   // Process running on the system that could generate events
   const processes = device?.processes || []
   const services = device?.services || []
   
   // Filter events to only include valid categories
-  const filteredEvents = events?.filter(event => 
-    event.kind && VALID_EVENT_KINDS.includes(event.kind.toLowerCase())
-  ) || []
+  const filteredEvents = useMemo(() => {
+    if (!events) return []
+    return events.filter(event => event.kind && VALID_EVENT_KINDS.includes(event.kind.toLowerCase()))
+  }, [events])
   
   // Apply intelligent event bundling
   const bundledEvents = useMemo(() => {
@@ -238,12 +238,11 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
           <p className="text-sm text-gray-600 dark:text-gray-400">Latest device activity and events</p>
         </div>
         <div className="p-6">
-          <DeviceEventsSimple events={bundledEvents.map(event => {
-            return {
-              id: event.id,
-              name: event.message, // Use the bundled/smart message
-              message: event.message,
-              raw: event.isBundle ? 
+          <DeviceEventsSimple events={bundledEvents.map(event => ({
+            id: event.id,
+            name: event.message ?? event.kind ?? 'Event', // Ensure a non-empty string name
+            message: event.message,
+            raw: event.isBundle ? 
                 { 
                   bundledEvents: event.eventIds,
                   count: event.count,
@@ -251,12 +250,11 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
                   isBundle: true 
                 } : 
                 {},
-              kind: event.kind,
-              ts: event.ts,
-              count: event.count,
-              isBundle: event.isBundle
-            };
-          })} />
+            kind: event.kind,
+            ts: event.ts,
+            count: event.count,
+            isBundle: event.isBundle
+          }))} />
         </div>
       </div>
     </div>

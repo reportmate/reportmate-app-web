@@ -67,10 +67,12 @@ export function useProgressiveModuleLoading(
   const loadModule = useCallback(async (moduleName: string): Promise<any> => {
     // Check current state using functional update to avoid stale closure
     let shouldLoad = true
+    let existingData: any = null
     setModuleStates(prev => {
       if (prev[moduleName]?.state === 'loaded' || prev[moduleName]?.state === 'loading') {
         console.log(`[PROGRESSIVE] Module '${moduleName}' already ${prev[moduleName].state}`)
         shouldLoad = false
+        existingData = prev[moduleName]?.data ?? null
         return prev // No change
       }
       
@@ -83,9 +85,8 @@ export function useProgressiveModuleLoading(
     })
     
     if (!shouldLoad) {
-      // Return existing data
-      const existing = moduleStates[moduleName]
-      return existing?.data
+      // Return existing data captured during state check
+      return existingData
     }
     
     // Mark as requested
@@ -167,6 +168,7 @@ export function useProgressiveModuleLoading(
           loadNextInQueue()
         }, 100)
       } catch (error) {
+        console.error(`[PROGRESSIVE] ❌ Background load failed for module '${nextModule}':`, error)
         // Continue to next module even if this one fails
         isBackgroundLoading.current = false
         loadNextInQueue()
@@ -279,8 +281,7 @@ export function useProgressiveModuleLoading(
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deviceId]) // Only re-run when deviceId changes
+  }, [deviceId, loadNextInQueue])
   
   return {
     // Device metadata

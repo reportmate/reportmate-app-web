@@ -61,6 +61,7 @@ export function formatExactTime(timestamp: string): string {
     
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   } catch (_error) {
+    console.error('[TIME UTIL] Failed to format timestamp:', _error)
     return 'Invalid Date'
   }
 }

@@ -4,7 +4,7 @@
  * Based on the rich Management widget with enhanced tab layout
  */
 
-import React, { useState } from 'react'
+import React from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
@@ -16,7 +16,6 @@ interface ManagementTabProps {
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Access management data from modular structure or fallback to device level
   const rawManagement = (device as any).modules?.management || (device as any).management
-  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)
@@ -70,11 +69,9 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const isEnrolled = management.mdmEnrollment?.isEnrolled || false
   const provider = management.mdmEnrollment?.provider
   const enrollmentType = management.mdmEnrollment?.enrollmentType
-  const deviceStatus = management.deviceState?.status
   const tenantName = management.tenantDetails?.tenantName
   const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
-  const certificateCount = management.metadata?.Certificates?.length || 0
 
   // Helper functions
   const formatExpiryDate = (dateString?: string) => {
@@ -89,10 +86,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     } catch {
       return dateString
     }
-  }
-
-  const getConnectionStatusColor = (status: boolean) => {
-    return status ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
   }
 
   return (

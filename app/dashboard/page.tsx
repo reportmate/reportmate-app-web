@@ -19,9 +19,8 @@ import { DevicePageNavigation } from "../../src/components/navigation/DevicePage
 import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
 import { useComponentTracker, memoryManager } from "../../src/lib/memory-utils"
 import { PerformanceMonitor } from "../../src/components/PerformanceMonitor"
-import { SignalRStatus } from "../../src/components/SignalRStatus"
 import { MemoryWarning } from "../../src/components/MemoryWarning"
-import { optimizeDevicesArray, optimizeEventForMemory, checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
+import { checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 
 // NEW CLEAN API FORMAT - Updated for FastAPI container response
@@ -80,7 +79,7 @@ interface Device {
 // Reuse the live events hook from the original dashboard
 
 export default function Dashboard() {
-  const componentId = useComponentTracker('Dashboard')
+  useComponentTracker('Dashboard')
   const { events, connectionStatus, lastUpdateTime, mounted, loadingProgress, loadingMessage } = useLiveEvents()
   const [devices, setDevices] = useState<Device[]>([])
   const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
@@ -282,7 +281,7 @@ export default function Dashboard() {
             }
           }
           return null
-        } catch (error) {
+        } catch {
           return null
         }
       })

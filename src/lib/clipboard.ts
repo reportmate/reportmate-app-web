@@ -61,12 +61,14 @@ async function legacyCopyToClipboard(text: string): Promise<ClipboardResult> {
         } else {
           resolve({ success: false, error: 'Copy command failed' })
         }
-      } catch (execError) {
+      } catch (_execError) {
+        console.warn('Legacy clipboard copy command not supported', _execError)
         resolve({ success: false, error: 'Copy command not supported' })
       } finally {
         document.body.removeChild(textArea)
       }
-    } catch (error) {
+    } catch (_error) {
+      console.error('Legacy clipboard method failed to execute', _error)
       resolve({ success: false, error: 'Legacy copy method failed' })
     }
   })

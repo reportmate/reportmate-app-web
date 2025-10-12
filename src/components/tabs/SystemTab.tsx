@@ -42,10 +42,10 @@ interface SystemTabProps {
   data?: Record<string, unknown>
 }
 
-export const SystemTab: React.FC<SystemTabProps> = ({ device, data }) => {
+export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => {
   // Process system data using the centralized data processing function
   const systemTabData = extractSystem(device)
-  const { services, environment, updates, scheduledTasks, runningServices, operatingSystem } = systemTabData
+  const { services, environment, updates, scheduledTasks, runningServices } = systemTabData
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')

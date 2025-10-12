@@ -5,12 +5,6 @@ let eventsCache: NormalizedEvent[] = []
 let eventsCacheTimestamp: number = 0
 const EVENTS_CACHE_DURATION = 30 * 1000 // 30 seconds
 
-// DISABLED - Always use cloud infrastructure only
-async function getEventsFromDatabase(limit = 100) {
-  console.error('[EVENTS API] DATABASE FALLBACK DISABLED - Use cloud infrastructure only')
-  throw new Error('Database fallback is disabled - use cloud infrastructure only')
-}
-
 interface RawEvent {
   id: string
   // Container Apps API fields (new)
@@ -61,15 +55,15 @@ export async function GET(request: Request) {
     if (startDateParam) {
       try {
         validStartDate = new Date(startDateParam).toISOString()
-      } catch (e) {
-        console.warn('[EVENTS API] Invalid startDate parameter:', startDateParam)
+      } catch (parseError) {
+        console.warn('[EVENTS API] Invalid startDate parameter:', startDateParam, parseError)
       }
     }
     if (endDateParam) {
       try {
         validEndDate = new Date(endDateParam).toISOString()
-      } catch (e) {
-        console.warn('[EVENTS API] Invalid endDate parameter:', endDateParam)
+      } catch (parseError) {
+        console.warn('[EVENTS API] Invalid endDate parameter:', endDateParam, parseError)
       }
     }
     

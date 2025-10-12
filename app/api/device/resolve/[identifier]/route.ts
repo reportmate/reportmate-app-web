@@ -13,19 +13,8 @@ export async function GET(
     const { identifier } = await params
     console.log('[DEVICE RESOLVE API] Resolving identifier:', identifier)
 
-    // Get API base URL from environment
-    const apiBaseUrl = process.env.API_BASE_URL
-    
-    if (!apiBaseUrl) {
-      console.error('[DEVICE RESOLVE API] API_BASE_URL environment variable not configured')
-      return NextResponse.json({
-        error: 'API configuration error',
-        details: 'API_BASE_URL environment variable not configured'
-      }, { status: 500 })
-    }
-    
     // Resolve the identifier
-    const result = await resolveDeviceIdentifierServer(identifier, apiBaseUrl)
+    const result = await resolveDeviceIdentifierServer(identifier)
     
     if (result.found && result.serialNumber) {
       return NextResponse.json({

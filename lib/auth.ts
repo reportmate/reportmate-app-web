@@ -155,7 +155,7 @@ export const authOptions: NextAuthOptions = {
   useSecureCookies: process.env.NODE_ENV === 'production',
 
   callbacks: {
-    async signIn({ user, account, profile }) {
+  async signIn({ user, account, profile: _profile }) {
       console.log('[AUTH] Sign in callback:', { 
         userEmail: user?.email,
         provider: account?.provider,
@@ -180,7 +180,7 @@ export const authOptions: NextAuthOptions = {
 
       // Email verification check for certain providers
       if (config.requireEmailVerification && account?.provider === AUTH_PROVIDERS.GOOGLE) {
-        return (profile as any)?.email_verified === true
+        return (_profile as any)?.email_verified === true
       }
 
       console.log('[AUTH] Sign in successful for:', user.email)
@@ -250,15 +250,15 @@ export const authOptions: NextAuthOptions = {
           return correctedUrl
         }
         return url
-      } catch (e) {
-        console.log(`[NextAuth Redirect] Invalid URL ${url}, redirecting to ${correctBaseUrl}`)
+      } catch (_error) {
+        console.error(`[NextAuth Redirect] Invalid URL ${url}, redirecting to ${correctBaseUrl}`, _error)
         return correctBaseUrl
       }
     }
   },
 
   events: {
-    async signIn({ user, account, profile }) {
+  async signIn({ user, account, profile: _profile }) {
       console.log(`[AUTH] User signed in: ${user.email} via ${account?.provider}`)
     },
     

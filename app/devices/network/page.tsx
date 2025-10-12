@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { formatRelativeTime } from "../../../src/lib/time"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
 import { Copy } from "lucide-react"
@@ -132,7 +131,7 @@ function NetworkPageContent() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text)
-    } catch (err) {
+    } catch {
       // Fallback for older browsers
       const textArea = document.createElement('textarea')
       textArea.value = text
@@ -159,23 +158,6 @@ function NetworkPageContent() {
     const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
     return ips.find(ip => ipv4Pattern.test(ip));
   };
-
-  const getActiveInterface = (interfaces: any[]) => {
-    if (!interfaces || !Array.isArray(interfaces)) return null;
-    return interfaces.find((iface: any) => 
-      iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected'
-    );
-  }
-
-  const getInterfaceType = (iface: any) => {
-    if (!iface?.type) return 'Unknown'
-    const type = iface.type.toLowerCase()
-    if (type.includes('ethernet') || type.includes('wired')) return 'Ethernet'
-    if (type.includes('wireless') || type.includes('802.11') || type.includes('wifi')) return 'Wi-Fi'
-    if (type.includes('bluetooth')) return 'Bluetooth'
-    if (type.includes('loopback')) return 'Loopback'
-    return 'Other'
-  }
 
   if (loading) {
     return (
@@ -413,7 +395,6 @@ function NetworkPageContent() {
                   </tr>
                 ) : (
                   filteredNetworkDevices.map((networkDevice: NetworkDevice & { networkInfo: any }) => {
-                    const activeInterface = getActiveInterface(networkDevice.networkInfo.interfaces)
                     const ipv4Address = getIPv4Address(networkDevice.networkInfo.ipAddress)
                     
                     return (

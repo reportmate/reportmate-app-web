@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 // import { PrismaClient } from '@prisma/client';
-import crypto from 'crypto';
 
 // const prisma = new PrismaClient();
 
@@ -17,14 +16,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   return res.status(503).json({ error: 'Machine Group API temporarily unavailable' });
 }
 
-async function getMachineGroup(id: number, res: NextApiResponse) {
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}
-
-async function updateMachineGroup(id: number, req: NextApiRequest, res: NextApiResponse) {
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}
-
-async function deleteMachineGroup(id: number, res: NextApiResponse) {
-  return res.status(503).json({ error: 'Temporarily disabled' });
-}

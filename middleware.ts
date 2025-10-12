@@ -43,7 +43,7 @@ function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' |
 }
 
 // Device resolution for middleware - direct API call, no Next.js dependency
-async function resolveDeviceInMiddleware(identifier: string, request: NextRequest): Promise<string | null> {
+async function resolveDeviceInMiddleware(identifier: string, _request: NextRequest): Promise<string | null> {
   const identifierType = identifyDeviceIdentifierType(identifier)
   
   // Only resolve asset tags and device names, not UUIDs or serial numbers

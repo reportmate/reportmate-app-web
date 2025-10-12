@@ -232,7 +232,7 @@ const DirectoryTreeItem: React.FC<{
       {/* Subdirectories */}
       {isExpanded && canExpand && (
         <div className="border-l-2 border-gray-200 dark:border-gray-700 ml-2">
-          {sortedSubdirectories.map((subdir, index) => (
+          {sortedSubdirectories.map((subdir) => (
             <DirectoryTreeItem
               key={subdir.path}
               directory={subdir}

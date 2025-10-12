@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
 import { useAuthProvider } from '@/hooks/useAuth'
-import Link from 'next/link'
 
 export default function UserMenu() {
   const { data: session } = useSession()
@@ -48,10 +49,12 @@ export default function UserMenu() {
         className="flex items-center space-x-3 text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
       >
         {session.user.image ? (
-          <img
+          <Image
             className="h-8 w-8 rounded-full"
             src={session.user.image}
             alt={session.user.name || 'User avatar'}
+            width={32}
+            height={32}
           />
         ) : (
           <div className="h-8 w-8 rounded-full bg-gray-300 flex items-center justify-center">
@@ -85,10 +88,12 @@ export default function UserMenu() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex items-center space-x-3">
                   {session.user.image ? (
-                    <img
+                    <Image
                       className="h-10 w-10 rounded-full"
                       src={session.user.image}
                       alt={session.user.name || 'User avatar'}
+                      width={40}
+                      height={40}
                     />
                   ) : (
                     <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">

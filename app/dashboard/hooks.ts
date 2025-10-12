@@ -35,29 +35,44 @@ export function useLiveEvents() {
     setLastUpdateTime(new Date())
   }, [])
 
-  // Helper function to sanitize events for safe display
-  const sanitizeEventForDisplay = (event: unknown): FleetEvent => {
-    try {
-      const eventObj = event as Record<string, unknown>
-      return {
-        id: String(eventObj.id || `event-${Date.now()}`),
-        device: String(eventObj.device || 'unknown'),
-        kind: String(eventObj.kind || 'info'),
-        ts: String(eventObj.ts || new Date().toISOString()),
-        message: eventObj.message ? String(eventObj.message) : undefined, // PRESERVE message field from database
-        payload: sanitizePayloadForDisplay(eventObj.payload)
-      }
-    } catch (error) {
-      console.error("Error sanitizing event:", error)
-      return {
-        id: `error-${Date.now()}`,
-        device: 'unknown',
-        kind: 'error',
-        ts: new Date().toISOString(),
-        payload: { message: 'Error processing event', error: String(error) }
+  // Helper function to create safe payload for display with strict limits
+  const createSafeDisplayPayload = useCallback((obj: unknown, depth = 0): Record<string, unknown> | string | unknown => {
+    const maxDepth = 1 // Keep reduced max depth for display
+
+    if (depth > maxDepth) {
+      return '[Max depth reached]'
+    }
+
+    if (obj === null || obj === undefined) {
+      return obj
+    }
+
+    if (typeof obj !== 'object') {
+      const str = String(obj)
+      return str.length > 30 ? str.substring(0, 30) + '...' : str // Reduced from 50 to 30
+    }
+
+    if (Array.isArray(obj)) {
+      // Only show first item for display and limit array size
+      return obj.slice(0, 1).map(item => createSafeDisplayPayload(item, depth + 1))
+    }
+
+    // For objects, be very selective about what we include
+    const result: Record<string, unknown> = {}
+    const objRecord = obj as Record<string, unknown>
+    const keys = Object.keys(objRecord).slice(0, 2) // Reduced from 3 to 2 keys max
+
+    for (const key of keys) {
+      if (key.length > 15) continue // Reduced from 20, skip long keys
+      try {
+        result[key] = createSafeDisplayPayload(objRecord[key], depth + 1)
+      } catch {
+        result[key] = '[Error]'
       }
     }
-  }
+
+    return result
+  }, [])
 
   // Helper function to sanitize payload for safe display
   const sanitizePayloadForDisplay = useCallback((payload: unknown): Record<string, unknown> => {
@@ -121,46 +136,31 @@ export function useLiveEvents() {
         hasCircularRefs: true
       }
     }
-  }, [])
+  }, [createSafeDisplayPayload])
 
-  // Helper function to create safe payload for display with strict limits
-  const createSafeDisplayPayload = useCallback((obj: unknown, depth = 0): Record<string, unknown> | string | unknown => {
-    const maxDepth = 1 // Keep reduced max depth for display
-    
-    if (depth > maxDepth) {
-      return '[Max depth reached]'
-    }
-    
-    if (obj === null || obj === undefined) {
-      return obj
-    }
-    
-    if (typeof obj !== 'object') {
-      const str = String(obj)
-      return str.length > 30 ? str.substring(0, 30) + '...' : str // Reduced from 50 to 30
-    }
-    
-    if (Array.isArray(obj)) {
-      // Only show first item for display and limit array size
-      return obj.slice(0, 1).map(item => createSafeDisplayPayload(item, depth + 1))
-    }
-    
-    // For objects, be very selective about what we include
-    const result: Record<string, unknown> = {}
-    const objRecord = obj as Record<string, unknown>
-    const keys = Object.keys(objRecord).slice(0, 2) // Reduced from 3 to 2 keys max
-    
-    for (const key of keys) {
-      if (key.length > 15) continue // Reduced from 20, skip long keys
-      try {
-        result[key] = createSafeDisplayPayload(objRecord[key], depth + 1)
-      } catch {
-        result[key] = '[Error]'
+  // Helper function to sanitize events for safe display
+  const sanitizeEventForDisplay = useCallback((event: unknown): FleetEvent => {
+    try {
+      const eventObj = event as Record<string, unknown>
+      return {
+        id: String(eventObj.id || `event-${Date.now()}`),
+        device: String(eventObj.device || 'unknown'),
+        kind: String(eventObj.kind || 'info'),
+        ts: String(eventObj.ts || new Date().toISOString()),
+        message: eventObj.message ? String(eventObj.message) : undefined, // PRESERVE message field from database
+        payload: sanitizePayloadForDisplay(eventObj.payload)
+      }
+    } catch (error) {
+      console.error("Error sanitizing event:", error)
+      return {
+        id: `error-${Date.now()}`,
+        device: 'unknown',
+        kind: 'error',
+        ts: new Date().toISOString(),
+        payload: { message: 'Error processing event', error: String(error) }
       }
     }
-    
-    return result
-  }, [])
+  }, [sanitizePayloadForDisplay])
 
   // Main effect to start connection and polling
   useEffect(() => {
@@ -397,7 +397,7 @@ export function useLiveEvents() {
       
       console.log("Dashboard hooks cleanup completed")
     }
-  }, []) // Empty dependency array to run only once
+  }, [sanitizeEventForDisplay])
 
   return { 
     events, 
