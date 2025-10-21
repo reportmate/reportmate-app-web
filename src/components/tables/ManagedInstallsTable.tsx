@@ -28,8 +28,17 @@ interface ManagedInstallsTableProps {
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warning' | 'error' | 'removed'>('all');
-  const [expandedErrors, setExpandedErrors] = useState(false);
-  const [expandedWarnings, setExpandedWarnings] = useState(false);
+  const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
+
+  const togglePackageExpansion = (packageId: string) => {
+    const newExpandedIds = new Set(expandedPackageIds);
+    if (newExpandedIds.has(packageId)) {
+      newExpandedIds.delete(packageId);
+    } else {
+      newExpandedIds.add(packageId);
+    }
+    setExpandedPackageIds(newExpandedIds);
+  };
 
   // Debug the data being passed to the table
   console.log('🔍 [MANAGED INSTALLS TABLE] Received data:', {
@@ -165,159 +174,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     <div className="space-y-6">
       {/* Full Width Packages Table */}
       <div className="space-y-4">
-        {/* Error and Warning Messages - Above Packages Table Only */}
-        {data.messages && ((data.messages.errors?.length > 0) || (data.messages.warnings?.length > 0)) && (
-          <div className="space-y-4">
-              {/* Errors Section */}
-              {data.messages.errors?.length > 0 && (
-                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                  <div 
-                    className="p-4 cursor-pointer select-none"
-                    onClick={() => setExpandedErrors(!expandedErrors)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-5 h-5 text-red-600 dark:text-red-400 mr-3">
-                          <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <h3 className="text-sm font-semibold text-red-800 dark:text-red-200">
-                          {data.messages.errors?.length || 0} Error{(data.messages.errors?.length || 0) !== 1 ? 's' : ''} Detected
-                        </h3>
-                      </div>
-                      <div className="flex items-center text-red-600 dark:text-red-400">
-                        <span className="text-xs mr-2">Click to {expandedErrors ? 'collapse' : 'expand'}</span>
-                        <svg 
-                          className={`w-4 h-4 transition-transform duration-200 ${expandedErrors ? 'rotate-180' : ''}`} 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    {/* Preview - show first error when collapsed */}
-                    {!expandedErrors && data.messages.errors?.length > 0 && (
-                      <div className="mt-2 text-sm text-red-700 dark:text-red-300">
-                        <span className="font-medium">{data.messages.errors?.[0]?.package}:</span> {data.messages.errors?.[0]?.message}
-                        {(data.messages.errors?.length || 0) > 1 && (
-                          <span className="ml-2 text-red-600 dark:text-red-400 font-medium">
-                            +{(data.messages.errors?.length || 0) - 1} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Expanded Content */}
-                  {expandedErrors && (
-                    <div className="border-t border-red-200 dark:border-red-800 p-4 bg-red-25 dark:bg-red-900/10">
-                      <div className="space-y-4">
-                        {data.messages.errors.map((error: ErrorMessage) => {
-                          return (
-                            <div key={error.id || `error-${Date.now()}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
-                              <div className="flex items-start justify-between mb-3">
-                                <span className="text-sm font-semibold text-red-800 dark:text-red-200">
-                                  {error.package || 'System'}
-                                </span>
-                                {error.timestamp && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(error.timestamp).toLocaleString()}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <p className="text-sm text-red-700 dark:text-red-300">
-                                {error.message}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {/* Warnings Section */}
-              {data.messages.warnings?.length > 0 && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-                  <div 
-                    className="p-4 cursor-pointer select-none"
-                    onClick={() => setExpandedWarnings(!expandedWarnings)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <div className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-3">
-                          <svg fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                        <h3 className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
-                          {data.messages.warnings?.length || 0} Warning{(data.messages.warnings?.length || 0) !== 1 ? 's' : ''} Detected
-                        </h3>
-                      </div>
-                      <div className="flex items-center text-yellow-600 dark:text-yellow-400">
-                        <span className="text-xs mr-2">Click to {expandedWarnings ? 'collapse' : 'expand'}</span>
-                        <svg 
-                          className={`w-4 h-4 transition-transform duration-200 ${expandedWarnings ? 'rotate-180' : ''}`} 
-                          fill="none" 
-                          stroke="currentColor" 
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </div>
-                    </div>
-                    
-                    {/* Preview - show first warning when collapsed */}
-                    {!expandedWarnings && data.messages.warnings?.length > 0 && (
-                      <div className="mt-2 text-sm text-yellow-700 dark:text-yellow-300">
-                        <span className="font-medium">{data.messages.warnings?.[0]?.package}:</span> {data.messages.warnings?.[0]?.message}
-                        {(data.messages.warnings?.length || 0) > 1 && (
-                          <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-medium">
-                            +{(data.messages.warnings?.length || 0) - 1} more
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Expanded Content */}
-                  {expandedWarnings && (
-                    <div className="border-t border-yellow-200 dark:border-yellow-800 p-4 bg-yellow-25 dark:bg-yellow-900/10">
-                      <div className="space-y-4">
-                        {data.messages.warnings.map((warning: WarningMessage) => {
-                          return (
-                            <div key={warning.id || `warning-${Date.now()}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
-                              <div className="flex items-start justify-between mb-3">
-                                <span className="text-sm font-semibold text-yellow-800 dark:text-yellow-200">
-                                  {warning.package || 'System'}
-                                </span>
-                                {warning.timestamp && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                                    {new Date(warning.timestamp).toLocaleString()}
-                                  </span>
-                                )}
-                              </div>
-                              
-                              <p className="text-sm text-yellow-700 dark:text-yellow-300">
-                                {warning.message}
-                              </p>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-          
           {/* Packages Table */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -452,36 +308,132 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     </tr>
                   ) : (
                     // Show packages when available
-                    [...filteredPackages].sort((a, b) => 
-                      (a.displayName || a.name).localeCompare(b.displayName || b.name)
-                    ).map((pkg) => (
-                      <tr key={pkg.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{pkg.displayName || pkg.name || 'Unknown Package'}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {pkg.version || 'Unknown'}
-                            {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400">
-                                {pkg.installedVersion} installed
-                              </div>
+                    <>
+                      {[...filteredPackages].sort((a, b) => 
+                        (a.displayName || a.name).localeCompare(b.displayName || b.name)
+                      ).map((pkg) => {
+                        const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
+                        const isExpanded = expandedPackageIds.has(pkg.id);
+                        
+                        return (
+                          <React.Fragment key={pkg.id}>
+                            {/* Main Package Row */}
+                            <tr 
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasErrorsOrWarnings ? 'cursor-pointer' : ''}`}
+                              onClick={() => hasErrorsOrWarnings && togglePackageExpansion(pkg.id)}
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {pkg.displayName || pkg.name || 'Unknown Package'}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="text-sm text-gray-900 dark:text-white">
+                                  {pkg.version || 'Unknown'}
+                                  {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                                      {pkg.installedVersion} installed
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
+                                  {getStatusDisplay(pkg.status || 'Unknown')}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                {formatItemSize(pkg.itemSize) || ''}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                <div className="flex items-center justify-between">
+                                  <span>{pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}</span>
+                                  {hasErrorsOrWarnings && (
+                                    <svg 
+                                      className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200 ml-2 ${isExpanded ? 'rotate-90' : ''}`}
+                                      fill="none" 
+                                      stroke="currentColor" 
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+
+                            {/* Expandable Error/Warning Details Row */}
+                            {isExpanded && hasErrorsOrWarnings && (
+                              <tr className="bg-gray-50 dark:bg-gray-900">
+                                <td colSpan={5} className="px-6 py-4">
+                                  <div className="space-y-3">
+                                    {/* Errors Section */}
+                                    {pkg.errors && pkg.errors.length > 0 && (
+                                      <div className="space-y-2">
+                                        {pkg.errors.map((error: ErrorMessage, idx: number) => (
+                                          <div key={error.id || `error-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
+                                            <div className="flex items-start justify-between mb-2">
+                                              {error.code && (
+                                                <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                                  {error.code}
+                                                </span>
+                                              )}
+                                              {error.timestamp && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {new Date(error.timestamp).toLocaleString()}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-sm text-red-700 dark:text-red-300">
+                                              {error.message}
+                                            </p>
+                                            {error.details && (
+                                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                {error.details}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+
+                                    {/* Warnings Section */}
+                                    {pkg.warnings && pkg.warnings.length > 0 && (
+                                      <div className="space-y-2">
+                                        {pkg.warnings.map((warning: WarningMessage, idx: number) => (
+                                          <div key={warning.id || `warning-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                                            <div className="flex items-start justify-between mb-2">
+                                              {warning.code && (
+                                                <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
+                                                  {warning.code}
+                                                </span>
+                                              )}
+                                              {warning.timestamp && (
+                                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                  {new Date(warning.timestamp).toLocaleString()}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                              {warning.message}
+                                            </p>
+                                            {warning.details && (
+                                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                {warning.details}
+                                              </p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
-                            {getStatusDisplay(pkg.status || 'Unknown')}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {formatItemSize(pkg.itemSize) || ''}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                          {pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}
-                        </td>
-                      </tr>
-                    ))
+                          </React.Fragment>
+                        );
+                      })}
+                    </>
                   )}
                 </tbody>
               </table>

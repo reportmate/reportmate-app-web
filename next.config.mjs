@@ -11,35 +11,18 @@ export default {
   // Enable standalone output for Docker
   output: 'standalone',
   
+  // Ensure API routes are included in standalone build
+  outputFileTracingIncludes: {
+    '/api/**/*': ['./app/api/**/*'],
+  },
+  
   // Set hostname for custom domain support
   env: {
     HOSTNAME: '0.0.0.0',
   },
   
-  // Set explicit output file tracing root - conditional for Docker
-  ...(process.env.DOCKER_BUILD ? {} : {
-    outputFileTracingRoot: "C:\\Users\\rchristiansen\\DevOps\\ReportMate",
-  }),
-
-  webpackDevMiddleware: (config) => {
-    config.watchOptions = {
-      ...config.watchOptions,
-      ignored: [
-        '**/node_modules/**',
-        '**/.git/**',
-        '**/.next/**',
-        '**/dist/**',
-        '**/build/**',
-        '**/coverage/**'
-      ],
-      poll: false,
-    }
-
-    return config
-  },
-  
   // Simplified webpack configuration
-  webpack: (config, { isServer }) => {
+  webpack: (config, { isServer, dev }) => {
     if (isServer) {
       config.externals = [...(config.externals || []), 'canvas', 'jsdom']
     }
@@ -49,6 +32,22 @@ export default {
       fs: false,
       net: false,
       tls: false,
+    }
+    
+    // Watch options for development
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/dist/**',
+          '**/build/**',
+          '**/coverage/**'
+        ],
+        poll: false,
+      }
     }
     
     return config

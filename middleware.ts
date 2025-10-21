@@ -4,12 +4,11 @@ import { getToken } from 'next-auth/jwt'
 
 // Define routes that should not trigger auto-redirect
 const publicRoutes = [
-  '/api/auth',
-  '/api/devices',       // Devices data endpoint for dashboard charts
-  '/api/device',        // Individual device endpoint  
-  '/api/transmission',  // Device data transmission endpoint
+  '/api/auth',          // NextAuth authentication endpoints
+  '/api/transmission',  // Device data transmission endpoint (client authentication via passphrase)
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
+  '/api/version',       // Build/version metadata endpoint for status widgets
   '/auth',
   '/_next',
   '/favicon.ico',

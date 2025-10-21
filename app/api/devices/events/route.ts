@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -8,6 +9,15 @@ export const revalidate = 0
  * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
  */
 export async function GET(request: Request) {
+  // CRITICAL: Check authentication
+  const session = await getServerSession()
+  if (!session) {
+    return NextResponse.json({ 
+      error: 'Unauthorized',
+      details: 'Authentication required'
+    }, { status: 401 })
+  }
+
   try {
     const timestamp = new Date().toISOString()
     const { searchParams } = new URL(request.url)

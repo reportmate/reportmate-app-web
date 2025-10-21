@@ -58,20 +58,6 @@ interface OSVersionBarChartProps {
 
 // Helper function to process OS versions
 const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
-  console.log(`[OSVersionBarChart ${osType}] Processing ${devices.length} devices`)
-  
-  // Debug: log sample device structures
-  if (devices.length > 0) {
-    console.log(`[OSVersionBarChart ${osType}] Sample device structure:`, {
-      deviceId: devices[0].deviceId,
-      hasModules: !!devices[0].modules,
-      hasSystemModule: !!devices[0].modules?.system,
-      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
-      legacyOs: devices[0].os,
-      modulesKeys: devices[0].modules ? Object.keys(devices[0].modules) : []
-    })
-  }
-  
   if (devices.length === 0) {
     return []
   }
@@ -123,20 +109,6 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
     const _osDisplayVersion = osInfo?.displayVersion || ''
     const _osBuild = osInfo?.build || ''
     
-    console.log(`[processOSVersions ${osType}] Processing device:`, {
-      deviceName: device.name,
-      serialNumber: device.serialNumber,
-      detectedPlatform: detectPlatformFromSerial(device),
-      platform: device.platform,
-      osString,
-      osInfo: osInfo ? {
-        name: osInfo.name,
-        version: osInfo.version,
-        build: osInfo.build,
-        featureUpdate: osInfo.featureUpdate
-      } : 'NO_OS_INFO'
-    })
-    
     if (osType === 'macOS') {
       // macOS detection and parsing
       const osLower = osString.toLowerCase()
@@ -158,7 +130,6 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
         } else {
           // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
           // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
-          console.log(`[processOSVersions macOS] SKIPPING device without real OS info: ${device.name} (${device.serialNumber})`)
           return // Skip this device entirely
         }
         
@@ -187,27 +158,11 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           // Get feature update from the featureUpdate field
           const featureUpdate = osInfo.featureUpdate || device.modules?.system?.operatingSystem?.featureUpdate || '0'
           
-          console.log(`[processOSVersions Windows] Version processing:`, {
-            deviceName: device.name,
-            windowsVersion,
-            build,
-            featureUpdate,
-            versionParts,
-            osInfoName: osInfo.name,
-            osInfoVersion: osInfo.version
-          })
-          
           // Create full version string: "11.0.26100.4652.0"
           groupingKey = `${windowsVersion}.0.${build}.${featureUpdate}`
           
           // Create display version: "11.26100.4652.0" (without the .0 after Windows version)
           displayVersion = `${windowsVersion}.${build}.${featureUpdate}`
-          
-          console.log(`[processOSVersions Windows] Generated versions:`, {
-            groupingKey,
-            displayVersion
-          })
-          
         } else if (osInfo?.name && osInfo?.build) {
           // Fallback: use build directly if version parsing fails
           const nameMatch = osInfo.name.match(/Windows\s+(\d+)/)
@@ -226,7 +181,6 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
         } else {
           // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
           // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
-          console.log(`[processOSVersions Windows] SKIPPING device without real OS info: ${device.name} (${device.serialNumber})`)
           return // Skip this device entirely
         }
         
@@ -341,24 +295,6 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   const [localLoading, setLocalLoading] = useState(true)
   
   // Add debugging for props at component entry
-  console.log(`[OSVersionBarChart ${osType}] === COMPONENT ENTRY DEBUG ===`)
-  console.log(`[OSVersionBarChart ${osType}] Props received:`, {
-    devicesCount: devices.length,
-    loading,
-    osType,
-    firstDeviceDebug: devices[0] ? {
-      name: devices[0].name,
-      os: devices[0].os,
-      serialNumber: devices[0].serialNumber,
-      hasModules: !!devices[0].modules,
-      moduleKeys: devices[0].modules ? Object.keys(devices[0].modules) : [],
-      hasSystemModule: !!devices[0].modules?.system,
-      systemModuleKeys: devices[0].modules?.system ? Object.keys(devices[0].modules.system) : [],
-      hasOperatingSystem: !!devices[0].modules?.system?.operatingSystem,
-      operatingSystemData: devices[0].modules?.system?.operatingSystem
-    } : 'NO_DEVICES'
-  })
-  
   // Fetch devices directly if not provided via props
   useEffect(() => {
     const fetchDevices = async () => {
@@ -366,11 +302,9 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
       // Don't fetch if we already have devices from props
       if (devices.length === 0 && loading) {
         try {
-          console.log(`[OSVersionBarChart ${osType}] Fetching devices with OS data from fast API`)
           const response = await fetch('/api/devices?includeOSVersions=true')
           if (response.ok) {
             const data = await response.json()
-            console.log(`[OSVersionBarChart ${osType}] Got ${data.devices?.length || 0} devices with OS data from fast API`)
             setLocalDevices(data.devices || [])
           }
         } catch (error) {
@@ -401,24 +335,6 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
   }
 
   const versionData = processOSVersions(effectiveDevices, osType)
-  
-  // Debug logging
-  console.log(`[OSVersionBarChart ${osType}] Processing ${effectiveDevices.length} devices`)
-  effectiveDevices.forEach((device, index) => {
-    if (index < 3) { // Only log first 3 devices to avoid spam
-      console.log(`[OSVersionBarChart ${osType}] Device ${index}:`, {
-        name: device.name,
-        serialNumber: device.serialNumber,
-        os: device.os,
-        modules: device.modules ? {
-          system: device.modules.system ? {
-            operatingSystem: device.modules.system.operatingSystem
-          } : 'NO_SYSTEM_MODULE'
-        } : 'NO_MODULES'
-      })
-    }
-  })
-  console.log(`[OSVersionBarChart ${osType}] Processed version data:`, versionData)
   
   if (versionData.length === 0) {
     return (

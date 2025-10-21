@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -90,6 +91,15 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
+  // CRITICAL: Check authentication
+  const session = await getServerSession()
+  if (!session) {
+    return NextResponse.json({ 
+      error: 'Unauthorized',
+      details: 'Authentication required'
+    }, { status: 401 })
+  }
+
   try {
     const { deviceId } = await params
     console.log('[DEVICE API] 🚀 Starting API call for device:', deviceId)
