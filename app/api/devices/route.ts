@@ -39,11 +39,16 @@ export async function GET(request: NextRequest) {
     const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
     console.log('[DEVICES API] Fetching from FastAPI:', devicesUrl)
     
+    // Get managed identity principal ID from Azure Container Apps
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    
     const response = await fetch(devicesUrl, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
+        'User-Agent': 'ReportMate-Frontend/1.0',
+        // Azure Managed Identity authentication for internal Azure-to-Azure calls
+        ...(managedIdentityId && { 'X-MS-CLIENT-PRINCIPAL-ID': managedIdentityId })
       }
     })
 
