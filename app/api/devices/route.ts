@@ -1,13 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
+  // CRITICAL: Check authentication
+  const session = await getServerSession()
+  if (!session) {
+    console.log('[DEVICES API] Unauthorized access attempt')
+    return NextResponse.json({
+      error: 'Unauthorized',
+      details: 'Authentication required',
+      timestamp
+    }, { status: 401 })
+  }
+  
   try {
-    console.log('[DEVICES API] Calling FastAPI directly for devices data...')
+    console.log('[DEVICES API] Authenticated user accessing devices data:', session.user?.email)
 
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -21,8 +33,10 @@ export async function GET(_request: NextRequest) {
     }
 
     console.log('[DEVICES API] Using FastAPI base URL:', apiBaseUrl)
-    
-    const devicesUrl = `${apiBaseUrl}/api/devices`
+
+    const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
+    const queryString = incomingParams.toString()
+    const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
     console.log('[DEVICES API] Fetching from FastAPI:', devicesUrl)
     
     const response = await fetch(devicesUrl, {

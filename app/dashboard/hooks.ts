@@ -362,12 +362,12 @@ export function useLiveEvents() {
       // Fetch events immediately
       fetchLocalEvents()
       
-      // Poll every 10 seconds (increased from 5 to reduce load)
+      // Poll every 30 seconds to reduce browser workload
       pollingInterval = setInterval(() => {
         if (isActive) {
           fetchLocalEvents()
         }
-      }, 10000)
+      }, 30000)
     }
 
     startConnection()

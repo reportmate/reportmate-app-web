@@ -132,20 +132,6 @@ const getUsage = (device: Device): string => {
 
 // Process platform distribution data
 const processPlatformData = (devices: Device[], filters?: any): PlatformStats[] => {
-  console.log('[PlatformDistributionChart] processPlatformData: Processing', devices.length, 'devices')
-  
-  // DEBUG: Log first few devices to see their structure
-  if (devices.length > 0) {
-    console.log('[PlatformDistributionChart] First 3 devices:', devices.slice(0, 3).map(d => ({
-      deviceId: d.deviceId,
-      name: d.name,
-      platform: d.platform,
-      hasModules: !!d.modules,
-      hasSystemModule: !!d.modules?.system,
-      hasOperatingSystem: !!d.modules?.system?.operatingSystem
-    })))
-  }
-  
   let filteredDevices = devices
 
   // Apply filters

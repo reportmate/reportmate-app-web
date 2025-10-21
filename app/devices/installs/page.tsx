@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useMemo } from 'react'
+import { useState, useEffect, Suspense, useMemo, useCallback } from 'react'
 import Link from 'next/link'
 import { DevicePageNavigation } from '../../../src/components/navigation/DevicePageNavigation'
 import { formatRelativeTime } from '../../../src/lib/time'
@@ -129,7 +129,7 @@ function InstallsPageContent() {
   }
 
   // Fetch filter options
-  const fetchFilterOptions = async () => {
+  const fetchFilterOptions = useCallback(async () => {
     let progressInterval: NodeJS.Timeout | null = null
     try {
       setFiltersLoading(true)
@@ -258,7 +258,7 @@ function InstallsPageContent() {
       }
       setFiltersLoading(false)
     }
-  }
+  }, [])
 
   // Generate report function
   const handleGenerateReport = async () => {
@@ -310,7 +310,7 @@ function InstallsPageContent() {
 
   useEffect(() => {
     fetchFilterOptions()
-  }, [])
+  }, [fetchFilterOptions])
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -950,35 +950,30 @@ function InstallsPageContent() {
 
                 </div>
 
-                {/* Room Filter Cloud - Full Width */}
+                {/* Room Filter Cloud - Full Width with Dynamic Height */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Room {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
                     </h3>
                   </div>
-                  <div className="h-20 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
                       {(filterOptions.rooms || [])
                         .filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .slice(0, 200).map(room => (
+                        .map(room => (
                         <button
                           key={room}
                           onClick={() => toggleRoom(room)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedRooms.includes(room)
-                              ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
+                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                           }`}
                         >
                           {room}
                         </button>
                       ))}
-                      {(filterOptions.rooms || []).filter(room => room.toLowerCase().includes(searchQuery.toLowerCase())).length > 200 && (
-                        <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          +{(filterOptions.rooms || []).filter(room => room.toLowerCase().includes(searchQuery.toLowerCase())).length - 200} more (search to filter)
-                        </span>
-                      )}
                       {(!filterOptions.rooms || filterOptions.rooms.length === 0) && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
                           No room data available
@@ -988,26 +983,26 @@ function InstallsPageContent() {
                   </div>
                 </div>
 
-                {/* Installs Filter Cloud - SMART FILTERING */}
+                {/* Installs Filter Cloud - Dynamic Height showing ALL installs */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Installs {selectedInstalls.length > 0 && `(${selectedInstalls.length} selected)`}
                     </h3>
                   </div>
-                  <div className="h-64 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
                       
-                      {/* Managed Installs */}
+                      {/* Managed Installs - Show ALL */}
                       {(filterOptions.managedInstalls || [])
                         .filter((name: string) => name.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .slice(0, 100).map((install: string) => (
+                        .map((install: string) => (
                         <button
                           key={install}
                           onClick={() => toggleInstall(install)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedInstalls.includes(install)
-                              ? 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
                           }`}
                         >
@@ -1015,16 +1010,16 @@ function InstallsPageContent() {
                         </button>
                       ))}
                       
-                      {/* Other Installs */}
+                      {/* Other Installs - Show ALL */}
                       {(filterOptions.otherInstalls || [])
                         .filter((name: string) => name.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .slice(0, 100).map((install: string) => (
+                        .map((install: string) => (
                         <button
                           key={install}
                           onClick={() => toggleInstall(install)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedInstalls.includes(install)
-                              ? 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600'
+                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
                           }`}
                         >

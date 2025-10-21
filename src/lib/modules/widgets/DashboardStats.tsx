@@ -107,16 +107,21 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
 export const WarningStatsWidget: React.FC<{ 
   devices?: any[]
   isLoading?: boolean
-}> = ({ devices, isLoading = false }) => {
-  // Calculate warnings using EXACT SAME LOGIC as /devices/installs page
-  const warningCount = devices ? devices.filter((d: any) => 
-    d.modules?.installs?.cimian?.items?.some((item: any) => 
-      item.currentStatus?.toLowerCase().includes('warning') || 
-      item.currentStatus?.toLowerCase().includes('pending')
-    )
-  ).length : null
-  
-  // Show "-" in gray while loading (matching /devices/installs behavior)
+  installStats?: InstallStatsData | null
+}> = ({ devices, isLoading = false, installStats }) => {
+  let warningCount: number | null = null
+
+  if (installStats) {
+    warningCount = installStats.devicesWithWarnings ?? 0
+  } else if (devices) {
+    warningCount = devices.filter((d: any) => 
+      d.modules?.installs?.cimian?.items?.some((item: any) => 
+        item.currentStatus?.toLowerCase().includes('warning') || 
+        item.currentStatus?.toLowerCase().includes('pending')
+      )
+    ).length
+  }
+
   if (isLoading || warningCount === null) {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -156,16 +161,21 @@ export const WarningStatsWidget: React.FC<{
 export const ErrorStatsWidget: React.FC<{ 
   devices?: any[]
   isLoading?: boolean
-}> = ({ devices, isLoading = false }) => {
-  // Calculate errors using EXACT SAME LOGIC as /devices/installs page
-  const errorCount = devices ? devices.filter((d: any) => 
-    d.modules?.installs?.cimian?.items?.some((item: any) => 
-      item.currentStatus?.toLowerCase().includes('error') || 
-      item.currentStatus?.toLowerCase().includes('failed')
-    )
-  ).length : null
-  
-  // Show "-" in gray while loading (matching /devices/installs behavior)
+  installStats?: InstallStatsData | null
+}> = ({ devices, isLoading = false, installStats }) => {
+  let errorCount: number | null = null
+
+  if (installStats) {
+    errorCount = installStats.devicesWithErrors ?? 0
+  } else if (devices) {
+    errorCount = devices.filter((d: any) => 
+      d.modules?.installs?.cimian?.items?.some((item: any) => 
+        item.currentStatus?.toLowerCase().includes('error') || 
+        item.currentStatus?.toLowerCase().includes('failed')
+      )
+    ).length
+  }
+
   if (isLoading || errorCount === null) {
     return (
       <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">

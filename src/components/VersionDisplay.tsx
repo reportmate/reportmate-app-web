@@ -47,7 +47,20 @@ export function VersionDisplay() {
     )
   }
 
-  const displayVersion = versionInfo?.version || '20250911054209-16416de'
+  const defaultVersion = process.env.NEXT_PUBLIC_VERSION ?? process.env.NEXT_PUBLIC_BUILD_ID ?? 'unknown'
+  const displayVersion = versionInfo?.version || defaultVersion
+
+  const defaultBuildId = process.env.NEXT_PUBLIC_BUILD_ID ?? 'unknown'
+  const defaultBuildTime = process.env.NEXT_PUBLIC_BUILD_TIME ?? 'unknown'
+  const resolvedVersionInfo = versionInfo ?? {
+    version: displayVersion,
+    buildId: defaultBuildId,
+    buildTime: defaultBuildTime,
+    imageTag: `reportmateacr.azurecr.io/reportmate:${displayVersion}`,
+    nodeVersion: 'vUnknown',
+    platform: 'unknown',
+    arch: 'unknown'
+  }
 
   // Format version for display: 20250911054209-16416de -> 2025.09.11.054209-16416de
   const formatVersionForDisplay = (version: string): string => {
@@ -72,7 +85,7 @@ export function VersionDisplay() {
         <span>{`v${formattedDisplayVersion}`}</span>
       </div>
       
-      {showTooltip && versionInfo && (
+      {showTooltip && (
         <div className="absolute top-full right-0 mt-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-50 min-w-48">
           <div className="text-xs space-y-1">
             <div className="font-semibold text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700 pb-1 mb-2 flex items-center justify-between">
@@ -81,30 +94,32 @@ export function VersionDisplay() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Tag:</span>
-              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.version}</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">{resolvedVersionInfo.version}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Commit:</span>
-              <span className="text-gray-900 dark:text-white font-mono text-xs">{versionInfo.buildId.slice(0, 8)}</span>
+              <span className="text-gray-900 dark:text-white font-mono text-xs">{resolvedVersionInfo.buildId.slice(0, 8)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Registry:</span>
               <span className="text-gray-900 dark:text-white font-mono text-xs">
-                {versionInfo.imageTag.includes('/') ? versionInfo.imageTag.split('/')[0] : 'local'}
+                {resolvedVersionInfo.imageTag.includes('/') ? resolvedVersionInfo.imageTag.split('/')[0] : 'local'}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Node:</span>
-              <span className="text-gray-900 dark:text-white font-mono">{versionInfo.nodeVersion}</span>
+              <span className="text-gray-900 dark:text-white font-mono">{resolvedVersionInfo.nodeVersion}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Platform:</span>
-              <span className="text-gray-900 dark:text-white font-mono">{versionInfo.platform}/{versionInfo.arch}</span>
+              <span className="text-gray-900 dark:text-white font-mono">{resolvedVersionInfo.platform}/{resolvedVersionInfo.arch}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Built:</span>
               <span className="text-gray-900 dark:text-white text-xs">
-                {new Date(versionInfo.buildTime).toLocaleString('sv-SE').replace('T', ' ')}
+                {resolvedVersionInfo.buildTime !== 'unknown'
+                  ? new Date(resolvedVersionInfo.buildTime).toLocaleString('sv-SE').replace('T', ' ')
+                  : 'unknown'}
               </span>
             </div>
           </div>
