@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -144,6 +145,15 @@ function shouldIncludeApplication(appName: string): boolean {
 const CONTAINER_APPS_API_BASE = process.env.CONTAINER_APPS_API_BASE || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
 
 export async function GET() {
+  // CRITICAL: Check authentication
+  const session = await getServerSession()
+  if (!session) {
+    return NextResponse.json({ 
+      error: 'Unauthorized',
+      details: 'Authentication required'
+    }, { status: 401 })
+  }
+
   try {
     const timestamp = new Date().toISOString()
     console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching filter options from Container Apps API`)

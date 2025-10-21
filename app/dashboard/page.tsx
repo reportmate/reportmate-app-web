@@ -7,7 +7,7 @@ import { useEffect, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
-import { WarningStatsWidget, ErrorStatsWidget } from "../../src/lib/modules/widgets/DashboardStats"
+import { WarningStatsWidget, ErrorStatsWidget, InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
 import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
@@ -23,6 +23,17 @@ import { MemoryWarning } from "../../src/components/MemoryWarning"
 import { checkMemoryUsage, triggerMemoryCleanup } from "../../src/lib/memory-optimization"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 
+interface InventorySummary {
+  deviceName?: string
+  assetTag?: string
+  serialNumber?: string
+  location?: string
+  department?: string
+  usage?: string
+  catalog?: string
+  owner?: string
+}
+
 // NEW CLEAN API FORMAT - Updated for FastAPI container response
 interface Device {
   deviceId: string      // Internal UUID (unique)
@@ -36,25 +47,15 @@ interface Device {
   assetTag?: string     // Will be extracted from inventory module
   location?: string     // Will be extracted from inventory module
   department?: string   // Will be extracted from inventory module
+  usage?: string
+  catalog?: string
+  owner?: string
   platform?: string     // Will be derived from system.operatingSystem
   os?: string           // Will be derived from system.operatingSystem
   // Clean modular structure from new API
+  inventory?: InventorySummary
   modules?: {
-    inventory?: {
-      uuid?: string
-      owner?: string
-      usage?: string
-      catalog?: string
-      version?: string
-      assetTag?: string
-      deviceId?: string
-      location?: string
-      moduleId?: string
-      department?: string
-      deviceName?: string
-      collectedAt?: string
-      serialNumber?: string
-    }
+    inventory?: InventorySummary
     system?: {
       operatingSystem?: {
         name?: string
@@ -71,8 +72,8 @@ interface Device {
     }
   }
   // Legacy fields for compatibility with existing widgets
-  totalEvents: number   // Required for widgets
-  lastEventTime: string // Required for widgets
+  totalEvents?: number   // Optional aggregated metrics
+  lastEventTime?: string // Optional aggregated metrics
   createdAt?: string
 }
 
@@ -85,133 +86,115 @@ export default function Dashboard() {
   const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
   const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
   const [, setTimeUpdateCounter] = useState(0)
-  const [devicesWithInstalls, setDevicesWithInstalls] = useState<any[]>([])
-  const [installsLoading, setInstallsLoading] = useState(true)
+  const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
+  const [installStatsLoading, setInstallStatsLoading] = useState(true)
   
   // NEW API FORMAT DEVICE FETCH: Transform clean FastAPI format for dashboard compatibility
   useEffect(() => {
-    const fetchDevicesWithTransformation = async () => {
+    let aborted = false
+
+    const fetchDevicesSummary = async () => {
       try {
-        console.log('[DASHBOARD] Fetching from new clean API format')
         setDevicesLoading(true)
-        
-        const response = await fetch('/api/devices')
-        console.log('[DASHBOARD] API response:', response.status, response.ok)
-        
-        if (response.ok) {
-          const data = await response.json()
-          console.log('[DASHBOARD] API data received:', {
-            hasDevices: !!data.devices,
-            deviceCount: data.devices?.length || 0,
-            total: data.total,
-            isArray: Array.isArray(data.devices),
-            dataKeys: Object.keys(data),
-            firstDevice: data.devices?.[0] ? {
-              serialNumber: data.devices[0].serialNumber,
-              deviceName: data.devices[0].deviceName,
-              hasInventory: !!data.devices[0].modules?.inventory,
-              hasSystem: !!data.devices[0].modules?.system,
-              inventoryDeviceName: data.devices[0].modules?.inventory?.deviceName,
-              systemOS: data.devices[0].modules?.system?.operatingSystem?.name
-            } : null
-          })
-          
-          if (Array.isArray(data.devices)) {
-            // Transform new API format to dashboard-compatible format
-            const transformedDevices = data.devices.map((apiDevice: any) => {
-              const inventory = apiDevice.modules?.inventory || {}
-              const system = apiDevice.modules?.system || {}
-              const osData = system.operatingSystem || {}
-              
-              // Extract platform from OS data
-              const platform = osData.name?.toLowerCase().includes('windows') ? 'Windows' : 
-                              osData.name?.toLowerCase().includes('macos') ? 'macOS' :
-                              osData.name?.toLowerCase().includes('mac') ? 'macOS' : 'Unknown'
-              
-              // Extract OS version
-              const osVersion = osData.displayVersion || osData.version || 
-                               `${osData.major || ''}.${osData.minor || ''}.${osData.patch || ''}`.replace(/^\.+|\.+$/g, '') ||
-                               'Unknown'
-              
-              // Calculate device status from lastSeen timestamp (frontend responsibility)
-              const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen)
-              
-              // Create compatible device object
-              const transformedDevice: Device = {
-                deviceId: apiDevice.deviceId,
-                serialNumber: apiDevice.serialNumber,
-                deviceName: apiDevice.deviceName,
-                lastSeen: apiDevice.lastSeen,
-                status: calculatedStatus, // ✅ CALCULATED from lastSeen, not from API
-                // Compatibility fields extracted from modules
-                name: inventory.deviceName || apiDevice.deviceName || apiDevice.serialNumber,
-                assetTag: inventory.assetTag,
-                location: inventory.location,
-                department: inventory.department,
-                platform: platform,
-                os: osVersion,
-                // Preserve modules for detailed views
-                modules: apiDevice.modules,
-                // Default values for legacy compatibility
-                totalEvents: 0,
-                lastEventTime: apiDevice.lastSeen,
-                // Registration date from API
-                createdAt: apiDevice.createdAt
-              }
-              
-              return transformedDevice
-            })
-            
-            console.log('[DASHBOARD] Transformed devices:', {
-              count: transformedDevices.length,
-              firstTransformed: transformedDevices[0] ? {
-                name: transformedDevices[0].name,
-                serialNumber: transformedDevices[0].serialNumber,
-                platform: transformedDevices[0].platform,
-                assetTag: transformedDevices[0].assetTag,
-                status: transformedDevices[0].status
-              } : null
-            })
-            
-            console.log('[DASHBOARD] About to call setDevices with', transformedDevices.length, 'devices')
-            setDevices(transformedDevices)
-            console.log('[DASHBOARD] setDevices called - component should re-render now')
-            
-            // Create device name map for events
-            const nameMap: Record<string, string> = {}
-            transformedDevices.forEach((device: Device) => {
-              if (device.serialNumber && device.name) {
-                nameMap[device.serialNumber] = device.name
-                if (device.deviceId && device.deviceId !== device.serialNumber) {
-                  nameMap[device.deviceId] = device.name
-                }
-                if (device.assetTag) {
-                  nameMap[device.assetTag] = device.name
-                }
-              }
-            })
-            setDeviceNameMap(nameMap)
-            
-            // Fetch additional OS data for enhanced charts (sample from first 20)
-            fetchOSDataForCharts(transformedDevices.slice(0, 20))
-            
-          } else {
-            console.warn('[DASHBOARD] Invalid devices array in response')
-            setDevices([])
+        const response = await fetch('/api/devices', { cache: 'no-store' })
+
+        if (!response.ok) {
+          throw new Error(`Failed to load devices: ${response.status}`)
+        }
+
+        const data = await response.json()
+        const rawDevices: any[] = Array.isArray(data?.devices)
+          ? data.devices
+          : Array.isArray(data)
+            ? data
+            : []
+
+        const transformedDevices: Device[] = rawDevices.map((apiDevice: any) => {
+          const inventory = apiDevice.inventory || apiDevice.modules?.inventory || {}
+          const systemOS = apiDevice.modules?.system?.operatingSystem || {}
+          const deviceName = inventory.deviceName || apiDevice.deviceName || apiDevice.serialNumber
+          const assetTag = inventory.assetTag || apiDevice.assetTag
+          const platform = apiDevice.platform || (systemOS.name?.toLowerCase().includes('windows')
+            ? 'Windows'
+            : systemOS.name?.toLowerCase().includes('mac')
+              ? 'macOS'
+              : 'Unknown')
+          const osVersion = apiDevice.osVersion || systemOS.displayVersion || systemOS.version || apiDevice.os || 'Unknown'
+          const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen)
+
+          const modules: Device['modules'] = {}
+          if (Object.keys(inventory).length > 0) {
+            modules.inventory = inventory
           }
-        } else {
-          console.error('[DASHBOARD] API error:', response.status, response.statusText)
+          if (Object.keys(systemOS).length > 0) {
+            modules.system = { operatingSystem: systemOS }
+          }
+
+          const device: Device = {
+            deviceId: apiDevice.deviceId,
+            serialNumber: apiDevice.serialNumber,
+            deviceName,
+            lastSeen: apiDevice.lastSeen,
+            status: calculatedStatus,
+            name: deviceName,
+            assetTag,
+            location: inventory.location || apiDevice.location,
+            department: inventory.department || apiDevice.department,
+            usage: inventory.usage || apiDevice.usage,
+            catalog: inventory.catalog || apiDevice.catalog,
+            owner: inventory.owner || apiDevice.owner,
+            platform,
+            os: osVersion,
+            modules: modules && Object.keys(modules).length > 0 ? modules : undefined,
+            inventory: Object.keys(inventory).length > 0 ? inventory : undefined,
+            totalEvents: apiDevice.totalEvents ?? 0,
+            lastEventTime: apiDevice.lastEventTime ?? apiDevice.lastSeen,
+            createdAt: apiDevice.createdAt ?? apiDevice.registrationDate,
+          }
+
+          return device
+        })
+
+        if (aborted) {
+          return
+        }
+
+        transformedDevices.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime())
+        setDevices(transformedDevices)
+
+        const nameMap: Record<string, string> = {}
+        transformedDevices.forEach((device) => {
+          if (device.serialNumber) {
+            nameMap[device.serialNumber] = device.name
+          }
+          if (device.deviceId && device.deviceId !== device.serialNumber) {
+            nameMap[device.deviceId] = device.name
+          }
+          if (device.assetTag) {
+            nameMap[device.assetTag] = device.name
+          }
+        })
+        setDeviceNameMap(nameMap)
+
+        // Enrich a small sample for OS charts without loading entire fleet data
+        fetchOSDataForCharts(transformedDevices.slice(0, 20))
+      } catch (error) {
+        if (!aborted) {
+          console.error('[DASHBOARD] Device summary fetch failed:', error)
           setDevices([])
         }
-      } catch (error) {
-        console.error('[DASHBOARD] Fetch error:', error)
-        setDevices([])
       } finally {
-        setDevicesLoading(false)
+        if (!aborted) {
+          setDevicesLoading(false)
+        }
       }
     }
-    
-    fetchDevicesWithTransformation()
+
+    fetchDevicesSummary()
+
+    return () => {
+      aborted = true
+    }
   }, [])
 
   // Debug current state
@@ -254,7 +237,7 @@ export default function Dashboard() {
       const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
       
       // Get first 20 devices for sampling
-      const sampleDevices = devices.slice(0, 20)
+  const sampleDevices = devices.slice(0, 10)
       
       const osPromises = sampleDevices.map(async (device: Device) => {
         try {
@@ -607,51 +590,38 @@ export default function Dashboard() {
 
   // Fetch devices with installs data (matching /devices/installs logic)
   useEffect(() => {
-    async function fetchDevicesWithInstallsData() {
+    let aborted = false
+
+    const fetchInstallStatistics = async () => {
       try {
-        console.log('[DASHBOARD] Fetching devices with installs data...')
-        setInstallsLoading(true)
-        
-        // Use same endpoint as /devices/installs page for consistency
-        const response = await fetch('/api/devices/installs/data', { cache: 'no-store' })
-        
-        if (response.ok) {
-          const data = await response.json()
-          const devicesData = data.devices || []
-          setDevicesWithInstalls(devicesData)
-          
-          console.log('[DASHBOARD] Loaded', devicesData.length, 'devices with installs data')
-          
-          // Calculate error/warning counts (EXACT SAME LOGIC as /devices/installs)
-          const errorCount = devicesData.filter((d: any) => 
-            d.modules?.installs?.cimian?.items?.some((item: any) => 
-              item.currentStatus?.toLowerCase().includes('error') || 
-              item.currentStatus?.toLowerCase().includes('failed')
-            )
-          ).length
-          
-          const warningCount = devicesData.filter((d: any) => 
-            d.modules?.installs?.cimian?.items?.some((item: any) => 
-              item.currentStatus?.toLowerCase().includes('warning') || 
-              item.currentStatus?.toLowerCase().includes('pending')
-            )
-          ).length
-          
-          console.log('[DASHBOARD] Calculated stats:', { errorCount, warningCount })
+        setInstallStatsLoading(true)
+        const response = await fetch('/api/stats/installs', { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error(`Failed to load install stats: ${response.status}`)
+        }
+        const data = (await response.json()) as InstallStatsData
+        if (!aborted) {
+          setInstallStats(data)
         }
       } catch (error) {
-        console.error('[DASHBOARD] Failed to load installs data:', error)
-        setDevicesWithInstalls([])
+        if (!aborted) {
+          console.error('[DASHBOARD] Failed to load install stats:', error)
+          setInstallStats(null)
+        }
       } finally {
-        setInstallsLoading(false)
+        if (!aborted) {
+          setInstallStatsLoading(false)
+        }
       }
     }
-    
-    fetchDevicesWithInstallsData()
-    
-    // Refresh every 5 minutes (cached on backend)
-    const interval = setInterval(fetchDevicesWithInstallsData, 300000)
-    return () => clearInterval(interval)
+
+    fetchInstallStatistics()
+    const interval = setInterval(fetchInstallStatistics, 300000)
+
+    return () => {
+      aborted = true
+      clearInterval(interval)
+    }
   }, [])
 
   // Debug: Log devices state changes (DISABLED - causes memory issues)
@@ -758,8 +728,8 @@ export default function Dashboard() {
             {/* Error and Warning Stats Cards */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
               <div className="grid grid-cols-1 gap-4">
-                <ErrorStatsWidget devices={devicesWithInstalls} isLoading={installsLoading} />
-                <WarningStatsWidget devices={devicesWithInstalls} isLoading={installsLoading} />
+                <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} />
+                <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} />
               </div>
             </ErrorBoundary>
 

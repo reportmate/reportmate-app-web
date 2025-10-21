@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 export async function GET(request: Request) {
+  // CRITICAL: Check authentication
+  const session = await getServerSession()
+  if (!session) {
+    return NextResponse.json({ 
+      error: 'Unauthorized',
+      details: 'Authentication required'
+    }, { status: 401 })
+  }
+
   const API_BASE_URL = process.env.API_BASE_URL;
 
   if (!API_BASE_URL) {
