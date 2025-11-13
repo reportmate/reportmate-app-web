@@ -96,7 +96,12 @@ export async function GET(request: Request) {
     console.log(`[INSTALLS API] ${timestamp} - Fetching installs data using optimized endpoint`);
     
     // Use the dedicated installs data endpoint (already optimized with batching)
-    const dataResponse = await fetch(`http://localhost:3000/api/devices/installs/data`, {
+    // Get the request URL to construct internal API call
+    const requestUrl = new URL(request.url);
+    const dataUrl = `${requestUrl.protocol}//${requestUrl.host}/api/devices/installs/data`;
+    console.log(`[INSTALLS API] Calling internal data endpoint: ${dataUrl}`);
+    
+    const dataResponse = await fetch(dataUrl, {
       cache: 'no-store'
     });
 
