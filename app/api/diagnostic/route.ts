@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server'
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     console.log('[DIAGNOSTIC] Testing both APIs from server side')
     
+    // Get the base URL from the request
+    const requestUrl = new URL(request.url);
+    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+    
     // Test devices API
-    const devicesResponse = await fetch('http://localhost:3000/api/devices', {
+    const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
       cache: 'no-store'
     })
     const devicesData = await devicesResponse.json()
     
     // Test events API
-    const eventsResponse = await fetch('http://localhost:3000/api/events?limit=5', {
+    const eventsResponse = await fetch(`${baseUrl}/api/events?limit=5`, {
       cache: 'no-store'
     })
     const eventsData = await eventsResponse.json()
