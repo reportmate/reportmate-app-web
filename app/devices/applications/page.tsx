@@ -315,6 +315,9 @@ function ApplicationsPageContent() {
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
   
+  // Track last applied filters to detect changes
+  const [lastAppliedFilters, setLastAppliedFilters] = useState<string>('')
+  
   const searchParams = useSearchParams()
 
   // Initialize search query and filters from URL parameters
@@ -557,6 +560,7 @@ function ApplicationsPageContent() {
       setLoading(true)
       setError(null)
       setFiltersExpanded(false) // Collapse filters when generating report
+      setSearchQuery('') // Clear search field when generating report
       
       console.log('[APPLICATIONS PAGE] Loading applications with current selections...')
       console.log('Selections:', {
@@ -626,6 +630,17 @@ function ApplicationsPageContent() {
         setLoadingProgress({ current: estimatedDevices, total: estimatedDevices })
         setLoadingMessage('Complete!')
         console.log(`✅ Successfully loaded ${data.length} applications matching selections`)
+        
+        // Save current filter state as last applied
+        const currentFilters = JSON.stringify({
+          applications: selectedApplications,
+          usages: selectedUsages,
+          catalogs: selectedCatalogs,
+          locations: selectedLocations,
+          rooms: selectedRooms,
+          fleets: selectedFleets
+        })
+        setLastAppliedFilters(currentFilters)
       } else {
         throw new Error('Invalid data format')
       }
@@ -650,9 +665,15 @@ function ApplicationsPageContent() {
       app.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.vendor.toLowerCase().includes(searchQuery.toLowerCase())
     
-    // Note: Skip application name filtering here because API already filtered by applicationNames
-    // The data returned from API already matches selectedApplications
-    // Only apply inventory selections client-side (usage, catalog, location, etc.)
+    // CRITICAL: The API returns ALL apps that match the selected normalized names
+    // BUT the frontend displays both the normalized name AND the full name
+    // We need to filter client-side so only apps matching the EXACT normalized name show
+    // Example: When "Toon Boom Harmony" is selected:
+    //   - "Toon Boom Harmony 24 Premium" normalizes to "Toon Boom Harmony" ✓ show
+    //   - "Harmony CXP" normalizes to "Harmony CXP" ✗ don't show
+    const normalizedAppName = normalizeAppName(app.name)
+    const matchesApplicationName = selectedApplications.length === 0 || 
+      selectedApplications.includes(normalizedAppName)
     
     const matchesUsages = selectedUsages.length === 0 || selectedUsages.includes(app.usage?.toLowerCase() || '')
     const matchesCatalogs = selectedCatalogs.length === 0 || selectedCatalogs.includes(app.catalog?.toLowerCase() || '')
@@ -676,7 +697,7 @@ function ApplicationsPageContent() {
         }
       })
     
-    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesVersions
+    return matchesSearch && matchesApplicationName && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesVersions
   })
 
   // Sort filtered applications
@@ -811,16 +832,20 @@ function ApplicationsPageContent() {
     return result
   }, [filterOptions.applicationNames, searchQuery])
 
-  // Version analysis - group by application name and version
+  // Version analysis - group by NORMALIZED application name and version
   const versionAnalysis = useMemo(() => {
     const analysis: VersionAnalysis = {}
     
     filteredApplications.forEach(app => {
-      if (!analysis[app.name]) {
-        analysis[app.name] = {}
+      // Use normalized name as the key (same as what's in filterOptions.applicationNames)
+      const normalizedName = normalizeAppName(app.name)
+      if (!normalizedName) return // Skip if normalization results in empty string
+      
+      if (!analysis[normalizedName]) {
+        analysis[normalizedName] = {}
       }
       const version = app.version || 'Unknown'
-      analysis[app.name][version] = (analysis[app.name][version] || 0) + 1
+      analysis[normalizedName][version] = (analysis[normalizedName][version] || 0) + 1
     })
     
     return analysis
@@ -963,7 +988,7 @@ function ApplicationsPageContent() {
                 {loading && (
                   <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Loading applications...</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Generating report...</span>
                   </div>
                 )}
 
@@ -983,7 +1008,19 @@ function ApplicationsPageContent() {
                     onClick={handleLoadAll}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
                   >
-                    Generate Report
+                    {(() => {
+                      // Check if filters have changed since last generation
+                      const currentFilters = JSON.stringify({
+                        applications: selectedApplications,
+                        usages: selectedUsages,
+                        catalogs: selectedCatalogs,
+                        locations: selectedLocations,
+                        rooms: selectedRooms,
+                        fleets: selectedFleets
+                      })
+                      const filtersChanged = lastAppliedFilters && lastAppliedFilters !== currentFilters
+                      return filtersChanged ? 'Update Report' : 'Generate Report'
+                    })()}
                   </button>
                 )}
 
@@ -997,32 +1034,6 @@ function ApplicationsPageContent() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Reset Report
-                  </button>
-                )}
-              </div>
-              
-              {/* Search Input */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search applications..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
                   </button>
                 )}
               </div>
@@ -1066,6 +1077,32 @@ function ApplicationsPageContent() {
                   Export CSV
                 </button>
               )}
+              
+              {/* Search Input */}
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search applications..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1341,7 +1378,33 @@ function ApplicationsPageContent() {
                         </h4>
                         <div className="space-y-2">
                           {Object.entries(versions)
-                            .sort(([,a], [,b]) => b - a) // Sort by count descending
+                            .sort(([versionA], [versionB]) => {
+                              // Sort by version number (descending - newest first)
+                              // Handle 'Unknown' versions by putting them at the bottom
+                              if (versionA === 'Unknown') return 1
+                              if (versionB === 'Unknown') return -1
+                              
+                              // Parse version numbers for proper sorting
+                              const parseVersion = (v: string) => {
+                                const parts = v.split('.').map(p => {
+                                  const num = parseInt(p.replace(/[^\d]/g, ''), 10)
+                                  return isNaN(num) ? 0 : num
+                                })
+                                return parts
+                              }
+                              
+                              const partsA = parseVersion(versionA)
+                              const partsB = parseVersion(versionB)
+                              
+                              // Compare each part of the version number
+                              for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
+                                const a = partsA[i] || 0
+                                const b = partsB[i] || 0
+                                if (a !== b) return b - a // Descending order (newest first)
+                              }
+                              
+                              return 0
+                            })
                             .map(([version, count]) => (
                             <div key={version} className="flex items-center justify-between">
                               <button 
@@ -1498,7 +1561,7 @@ function ApplicationsPageContent() {
                         <td className="px-4 lg:px-6 py-4">
                           <div className="min-w-0">
                             <div className="font-medium text-gray-900 dark:text-white truncate">
-                              {app.name}
+                              {normalizeAppName(app.name) || app.name}
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
                               {app.architecture !== 'Unknown' && app.architecture}
