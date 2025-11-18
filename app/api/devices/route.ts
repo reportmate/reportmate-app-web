@@ -7,20 +7,26 @@ export const revalidate = 0
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
-  // CRITICAL: Check authentication
-  const session = await getServerSession()
-  if (!session) {
-    console.log('[DEVICES API] Unauthorized access attempt')
-    return NextResponse.json({
-      error: 'Unauthorized',
-      details: 'Authentication required',
-      timestamp
-    }, { status: 401 })
-  }
+  // LOCALHOST BYPASS: Skip auth check for local development
+  const isLocalhost = request.headers.get('host')?.includes('localhost')
   
-  try {
+  // Check authentication (skip for localhost)
+  if (!isLocalhost) {
+    const session = await getServerSession()
+    if (!session) {
+      console.log('[DEVICES API] Unauthorized access attempt')
+      return NextResponse.json({
+        error: 'Unauthorized',
+        details: 'Authentication required',
+        timestamp
+      }, { status: 401 })
+    }
     console.log('[DEVICES API] Authenticated user accessing devices data:', session.user?.email)
+  } else {
+    console.log('[DEVICES API] Localhost bypass - no auth required')
+  }
 
+  try {
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
@@ -42,14 +48,21 @@ export async function GET(request: NextRequest) {
     // Get managed identity principal ID from Azure Container Apps
     const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
     
+    // For localhost, use passphrase authentication
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'ReportMate-Frontend/1.0'
+    }
+    
+    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    } else if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+    
     const response = await fetch(devicesUrl, {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0',
-        // Azure Managed Identity authentication for internal Azure-to-Azure calls
-        ...(managedIdentityId && { 'X-MS-CLIENT-PRINCIPAL-ID': managedIdentityId })
-      }
+      headers
     })
 
     if (!response.ok) {
