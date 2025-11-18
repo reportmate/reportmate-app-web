@@ -144,22 +144,37 @@ function shouldIncludeApplication(appName: string): boolean {
 // Container Apps API configuration
 const CONTAINER_APPS_API_BASE = process.env.CONTAINER_APPS_API_BASE || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
 
-export async function GET() {
-  // CRITICAL: Check authentication
-  const session = await getServerSession()
-  if (!session) {
-    return NextResponse.json({ 
-      error: 'Unauthorized',
-      details: 'Authentication required'
-    }, { status: 401 })
+export async function GET(request: Request) {
+  // LOCALHOST BYPASS: Skip auth check for local development
+  const isLocalhost = request.headers.get('host')?.includes('localhost')
+  
+  // CRITICAL: Check authentication (skip for localhost)
+  if (!isLocalhost) {
+    const session = await getServerSession()
+    if (!session) {
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Authentication required'
+      }, { status: 401 })
+    }
   }
 
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching filter options from Container Apps API`)
+    const { headers } = request
+    const host = headers.get('host') || ''
+    const isLocalDev = host.includes('localhost')
+    
+    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching applications from FastAPI bulk endpoint (localhost: ${isLocalDev})`)
 
-    // Fetch all devices from Container Apps API
-    const devicesResponse = await fetch(`${CONTAINER_APPS_API_BASE}/api/devices`, {
+    // PERFORMANCE FIX: Use FastAPI bulk applications endpoint instead of fetching each device individually
+    // This reduces 234 sequential API calls to just 2 calls (devices + applications)
+    
+    // Determine base URL: Full URL for localhost (fetch requires absolute URLs), absolute FastAPI URL for production
+    const baseUrl = isLocalDev ? `http://${host}` : CONTAINER_APPS_API_BASE
+    
+    // 1. Fetch devices for inventory metadata
+    const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -167,138 +182,156 @@ export async function GET() {
     })
 
     if (!devicesResponse.ok) {
-      console.error('[APPLICATIONS FILTERS API] Container Apps API devices request failed:', devicesResponse.status, devicesResponse.statusText)
-      throw new Error(`Container Apps API request failed: ${devicesResponse.status}`)
+      console.error('[APPLICATIONS FILTERS API] Failed to fetch devices:', devicesResponse.status, devicesResponse.statusText)
+      throw new Error(`Failed to fetch devices: ${devicesResponse.status}`)
     }
 
     const devicesData = await devicesResponse.json()
     
-    // FastAPI returns: { devices: [], total: N, message: "..." } - NO success field
     if (!Array.isArray(devicesData.devices)) {
-      console.error('[APPLICATIONS FILTERS API] Invalid Container Apps API response:', devicesData)
-      throw new Error('Invalid Container Apps API response format')
+      console.error('[APPLICATIONS FILTERS API] Invalid devices response:', devicesData)
+      throw new Error('Invalid devices response format')
     }
 
-    console.log(`[APPLICATIONS FILTERS API] Successfully fetched ${devicesData.devices.length} devices from Container Apps API`)
+    console.log(`[APPLICATIONS FILTERS API] Fetched ${devicesData.devices.length} devices`)
 
-    // Process ALL devices to get complete filter data
-    const devicesToProcess = devicesData.devices // Process ALL devices
-    console.log(`[APPLICATIONS FILTERS API] Processing ${devicesToProcess.length} devices for application data`)
+    // 2. Fetch ALL applications using bulk endpoint (much faster than 234 individual calls)
+    const applicationsResponse = await fetch(`${baseUrl}/api/devices/applications?loadAll=true`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    })
 
-    // Process devices and extract application data by calling individual device endpoints
-    const devices = []
+    if (!applicationsResponse.ok) {
+      console.error('[APPLICATIONS FILTERS API] Failed to fetch applications:', applicationsResponse.status, applicationsResponse.statusText)
+      throw new Error(`Failed to fetch applications: ${applicationsResponse.status}`)
+    }
+
+    const applicationsData = await applicationsResponse.json()
+    
+    if (!Array.isArray(applicationsData)) {
+      console.error('[APPLICATIONS FILTERS API] Invalid applications response:', applicationsData)
+      throw new Error('Invalid applications response format')
+    }
+
+    console.log(`[APPLICATIONS FILTERS API] Fetched ${applicationsData.length} applications from bulk endpoint`)
+
+    // Build devices array with inventory metadata AND group applications by device
+    const devicesMap = new Map()
+    const deviceAppsCount = new Map() // Track app count per device
+    
+    for (const device of devicesData.devices) {
+      if (!device.serialNumber || device.serialNumber.includes('TEST-') || device.serialNumber === 'localhost') {
+        continue
+      }
+
+      devicesMap.set(device.serialNumber, {
+        id: device.deviceId || device.serial_number,
+        name: device.deviceName || device.name || device.serialNumber,
+        serialNumber: device.serialNumber,
+        usage: device.usage || '',
+        catalog: device.catalog || '',
+        location: device.location || '',
+        room: device.location || '',
+        fleet: '',
+        modules: {
+          applications: { installedApplications: [] }, // Will populate from bulk data
+          inventory: device.inventory || null
+        }
+      })
+      deviceAppsCount.set(device.serialNumber, 0)
+    }
+
+    // Process bulk applications and group by device
     const applicationNames = new Set<string>()
     const normalizedAppNames = new Set<string>()
     const publishers = new Set<string>()
     const categories = new Set<string>()
+    
+    // Collect inventory filters from applications data
+    const usagesSet = new Set<string>()
+    const catalogsSet = new Set<string>()
+    const locationsSet = new Set<string>()
+    const roomsSet = new Set<string>()
+    const fleetsSet = new Set<string>()
 
-    for (const deviceBasic of devicesToProcess) {
-      // Skip test devices
-      if (!deviceBasic.serialNumber || deviceBasic.serialNumber.includes('TEST-') || deviceBasic.serialNumber === 'localhost') {
-        continue
+    for (const app of applicationsData) {
+      const deviceSerial = app.serialNumber
+      if (!deviceSerial) continue
+      
+      // Extract inventory filters from application data
+      if (app.usage) usagesSet.add(app.usage)
+      if (app.catalog) catalogsSet.add(app.catalog)
+      if (app.location) locationsSet.add(app.location)
+      if (app.location) roomsSet.add(app.location) // Room is typically stored in location field
+
+      // Add to device's applications array (reconstruct raw format from bulk data)
+      const device = devicesMap.get(deviceSerial)
+      if (device) {
+        // Convert bulk app format back to raw module format for consistency
+        const rawApp = app.raw || {
+          name: app.name,
+          displayName: app.name,
+          version: app.version,
+          publisher: app.publisher,
+          vendor: app.vendor,
+          category: app.category,
+          installDate: app.installDate,
+          size: app.size,
+          path: app.path,
+          architecture: app.architecture,
+          bundleId: app.bundleId
+        }
+        device.modules.applications.installedApplications.push(rawApp)
+        deviceAppsCount.set(deviceSerial, deviceAppsCount.get(deviceSerial)! + 1)
       }
 
-      try {
-        // Fetch full device data including modules
-        const deviceResponse = await fetch(`${CONTAINER_APPS_API_BASE}/api/device/${deviceBasic.serialNumber}`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        })
-
-        if (!deviceResponse.ok) {
-          console.log(`[APPLICATIONS FILTERS API] Failed to fetch device ${deviceBasic.serialNumber}: ${deviceResponse.status}`)
-          continue
+      // Extract filter values
+      const appName = app.name || app.displayName
+      if (appName && shouldIncludeApplication(appName)) {
+        applicationNames.add(appName)
+        const normalized = normalizeAppName(appName)
+        if (normalized) {
+          normalizedAppNames.add(normalized)
         }
-
-        const deviceData = await deviceResponse.json()
-        
-        if (!deviceData.success || !deviceData.device) {
-          console.log(`[APPLICATIONS FILTERS API] Invalid device response for ${deviceBasic.serialNumber}`)
-          continue
-        }
-
-        const device = deviceData.device
-
-        // Extract device info WITH full modules data (needed for stats cards)
-        const deviceInfo = {
-          id: device.deviceId || device.device_id || device.id,
-          name: device.modules?.inventory?.deviceName || device.modules?.inventory?.computerName || device.deviceName || device.serial_number || deviceBasic.serialNumber || 'Unknown Device',
-          serialNumber: device.serialNumber || deviceBasic.serialNumber,
-          usage: device.modules?.inventory?.usage || '',
-          catalog: device.modules?.inventory?.catalog || '',
-          location: device.modules?.inventory?.location || '',
-          room: device.modules?.inventory?.location || '', // Use location as room
-          fleet: '', // Fleet not implemented yet - leave empty
-          modules: {
-            applications: device.modules?.applications || null,
-            inventory: device.modules?.inventory || null
-          }
-        }
-        
-        // Debug log for first few devices to verify data
-        if (devices.length < 3) {
-          console.log(`[APPLICATIONS FILTERS API] Device ${devices.length + 1}:`, {
-            serial: deviceInfo.serialNumber,
-            usage: deviceInfo.usage,
-            catalog: deviceInfo.catalog,
-            location: deviceInfo.location,
-            appsCount: device.modules?.applications?.installedApplications?.length || 0
-          })
-        }
-        
-        devices.push(deviceInfo)
-
-        // Extract applications data - applications are at device.modules.applications.installedApplications
-        const applicationsModule = device.modules?.applications
-        if (applicationsModule?.installedApplications && Array.isArray(applicationsModule.installedApplications)) {
-          console.log(`[APPLICATIONS FILTERS API] Processing ${applicationsModule.installedApplications.length} apps from device ${deviceInfo.serialNumber}`)
-          
-          applicationsModule.installedApplications.forEach((app: any) => {
-            // Process application names with normalization
-            const appName = app.name || app.displayName
-            if (appName && shouldIncludeApplication(appName)) {
-              applicationNames.add(appName) // Keep original for backward compatibility
-              const normalized = normalizeAppName(appName)
-              if (normalized) {
-                normalizedAppNames.add(normalized)
-              }
-            }
-            
-            // Process publishers and categories
-            if (app.publisher) publishers.add(app.publisher)
-            if (app.signed_by) publishers.add(app.signed_by)
-            if (app.vendor) publishers.add(app.vendor)
-            if (app.category) categories.add(app.category)
-          })
-        } else {
-          console.log(`[APPLICATIONS FILTERS API] No applications found for device ${deviceInfo.serialNumber}`)
-        }
-      } catch (error) {
-        console.error(`[APPLICATIONS FILTERS API] Error processing device ${deviceBasic.serialNumber}:`, error)
-        continue
       }
+
+      if (app.publisher) publishers.add(app.publisher)
+      if (app.vendor) publishers.add(app.vendor)
+      if (app.category) categories.add(app.category)
     }
 
-    // Extract inventory filter values from devices array
-    const usages = [...new Set(devices.map(d => d.usage).filter(Boolean))]
-    const catalogs = [...new Set(devices.map(d => d.catalog).filter(Boolean))]
-    const locations = [...new Set(devices.map(d => d.location).filter(Boolean))]
-    const rooms = [...new Set(devices.map(d => d.room).filter(Boolean))]
-    const fleets = [...new Set(devices.map(d => d.fleet).filter(Boolean))]
+    // Only include devices that have applications
+    const devices = Array.from(devicesMap.values()).filter(d => {
+      const appCount = deviceAppsCount.get(d.serialNumber) || 0
+      return appCount > 0
+    })
+
+    // Convert sets to sorted arrays
+    const usages = Array.from(usagesSet).filter(Boolean).sort()
+    const catalogs = Array.from(catalogsSet).filter(Boolean).sort()
+    const locations = Array.from(locationsSet).filter(Boolean).sort()
+    const rooms = Array.from(roomsSet).filter(Boolean).sort()
+    const fleets = Array.from(fleetsSet).filter(Boolean).sort()
     
     const filterOptions = {
       devices,
       applicationNames: Array.from(normalizedAppNames).sort(),
       publishers: Array.from(publishers).filter(p => p && p.trim()).sort(),
       categories: Array.from(categories).filter(c => c && c.trim()).sort(),
-      versions: [] // We'll populate this when needed, as it's app-specific
+      versions: [],
+      // Inventory filters extracted from applications data
+      usages,
+      catalogs,
+      locations,
+      rooms,
+      fleets
     }
 
-    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Generated filter options from Container Apps API:`, {
+    console.log(`[APPLICATIONS FILTERS API] Generated filter options:`, {
       devicesProcessed: devices.length,
-      originalAppNames: applicationNames.size,
+      totalApplications: applicationsData.length,
       normalizedAppNames: filterOptions.applicationNames.length,
       publishers: filterOptions.publishers.length,
       categories: filterOptions.categories.length,
@@ -308,10 +341,7 @@ export async function GET() {
         locations: locations.length,
         rooms: rooms.length,
         fleets: fleets.length
-      },
-      sampleUsages: usages.slice(0, 5),
-      sampleCatalogs: catalogs.slice(0, 5),
-      sampleLocations: locations.slice(0, 5)
+      }
     })
     
     return NextResponse.json(filterOptions, {
@@ -319,7 +349,7 @@ export async function GET() {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
         'X-Fetched-At': timestamp,
-        'X-Data-Source': 'container-apps-api'
+        'X-Data-Source': 'fastapi-bulk-endpoint'
       }
     })
 

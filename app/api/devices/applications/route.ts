@@ -9,13 +9,18 @@ export const revalidate = 0
  * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
  */
 export async function GET(request: Request) {
-  // CRITICAL: Check authentication
-  const session = await getServerSession()
-  if (!session) {
-    return NextResponse.json({ 
-      error: 'Unauthorized',
-      details: 'Authentication required'
-    }, { status: 401 })
+  // LOCALHOST BYPASS: Skip auth check for local development
+  const isLocalhost = request.headers.get('host')?.includes('localhost')
+  
+  // Check authentication (skip for localhost)
+  if (!isLocalhost) {
+    const session = await getServerSession()
+    if (!session) {
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Authentication required'
+      }, { status: 401 })
+    }
   }
 
   try {
@@ -32,9 +37,25 @@ export async function GET(request: Request) {
     const fastApiUrl = `${API_BASE_URL}/api/devices/applications?${searchParams.toString()}`
     console.log(`[APPLICATIONS PROXY] Calling: ${fastApiUrl}`)
     
+    const isLocalhost = request.headers.get('host')?.includes('localhost')
+    
+    // Build headers with authentication
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    
+    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    } else {
+      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+      if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
+    }
+    
     const response = await fetch(fastApiUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       cache: 'no-store'
     })
     
