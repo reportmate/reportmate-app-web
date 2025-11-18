@@ -665,15 +665,8 @@ function ApplicationsPageContent() {
       app.deviceName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       app.vendor.toLowerCase().includes(searchQuery.toLowerCase())
     
-    // CRITICAL: The API returns ALL apps that match the selected normalized names
-    // BUT the frontend displays both the normalized name AND the full name
-    // We need to filter client-side so only apps matching the EXACT normalized name show
-    // Example: When "Toon Boom Harmony" is selected:
-    //   - "Toon Boom Harmony 24 Premium" normalizes to "Toon Boom Harmony" ✓ show
-    //   - "Harmony CXP" normalizes to "Harmony CXP" ✗ don't show
-    const normalizedAppName = normalizeAppName(app.name)
-    const matchesApplicationName = selectedApplications.length === 0 || 
-      selectedApplications.includes(normalizedAppName)
+    // Note: API already filtered by applicationNames (using substring matching for inclusiveness)
+    // Client-side only applies inventory filters (usage, catalog, location, etc.)
     
     const matchesUsages = selectedUsages.length === 0 || selectedUsages.includes(app.usage?.toLowerCase() || '')
     const matchesCatalogs = selectedCatalogs.length === 0 || selectedCatalogs.includes(app.catalog?.toLowerCase() || '')
@@ -697,7 +690,7 @@ function ApplicationsPageContent() {
         }
       })
     
-    return matchesSearch && matchesApplicationName && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesVersions
+    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesVersions
   })
 
   // Sort filtered applications
