@@ -7,7 +7,7 @@ export const revalidate = 0;
 let cachedData: { devices: any[], timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchAllDevicesWithModules(API_BASE_URL: string) {
+async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boolean) {
   // Check cache first
   if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
     console.log('[INSTALLS DATA] Using cached device data');
@@ -16,9 +16,24 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
 
   console.log('[INSTALLS DATA] Fetching fresh device data from API');
   
+  // Build headers with authentication
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  
+  if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+    headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+  } else {
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+  }
+  
   // Fetch all devices from FastAPI container
   const listResponse = await fetch(`${API_BASE_URL}/api/devices`, {
-    cache: 'no-store'
+    cache: 'no-store',
+    headers
   });
 
   if (!listResponse.ok) {
@@ -37,7 +52,8 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
     const batchPromises = batch.map(async (device: any) => {
       try {
         const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
-          cache: 'no-store'
+          cache: 'no-store',
+          headers
         });
         if (!detailResponse.ok) return null;
         const detailData = await detailResponse.json();
@@ -71,7 +87,10 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
  * Returns all devices with ONLY installs + inventory modules
  * Uses shared cache with filters route for performance
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Detect if localhost for authentication
+  const isLocalhost = request.headers.get('host')?.includes('localhost') || false
+  
   const API_BASE_URL = process.env.API_BASE_URL;
 
   if (!API_BASE_URL) {
@@ -79,7 +98,7 @@ export async function GET() {
   }
 
   try {
-    const devices = await fetchAllDevicesWithModules(API_BASE_URL);
+    const devices = await fetchAllDevicesWithModules(API_BASE_URL, isLocalhost);
 
     // Extract only installs + inventory modules from each device
     const installsData = devices.map((device: any) => {

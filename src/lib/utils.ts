@@ -99,22 +99,11 @@ export function forceThemeSync(): void {
       
       root.classList.remove('light', 'dark')
       root.classList.add(prefersDark ? 'dark' : 'light')
-      
-      console.log('[Utils] Forced theme sync:', {
-        systemPrefersDark: prefersDark,
-        appliedTheme: prefersDark ? 'dark' : 'light',
-        userAgent: navigator.userAgent
-      })
     } else {
       // Apply stored explicit theme
       const root = document.documentElement
       root.classList.remove('light', 'dark')
       root.classList.add(stored)
-      
-      console.log('[Utils] Forced explicit theme sync:', {
-        storedTheme: stored,
-        appliedTheme: stored
-      })
     }
   } catch (error) {
     console.warn('[Utils] Force theme sync failed:', error)

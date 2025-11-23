@@ -37,8 +37,14 @@ function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' |
     return 'deviceName'
   }
   
-  // For everything else, just call it an assetTag if it's not already known to be a serial
-  return 'assetTag'
+  // Asset tag pattern: Letter followed by digits (e.g., L003994, A004733)
+  const assetTagPattern = /^[A-Z]\d+$/i
+  if (assetTagPattern.test(identifier)) {
+    return 'assetTag'
+  }
+  
+  // Everything else is assumed to be a serial number
+  return 'serialNumber'
 }
 
 // Device resolution for middleware - direct API call, no Next.js dependency
@@ -54,19 +60,28 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
     // Get the API base URL from environment
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
-      console.log('[MIDDLEWARE] No API_BASE_URL configured, skipping resolution')
       return null
     }
     
-    console.log(`[MIDDLEWARE] Attempting to resolve ${identifierType}: ${identifier} using API: ${apiBaseUrl}`)
+    // Build authentication headers
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'User-Agent': 'ReportMate-Middleware/1.0'
+    }
+    
+    // Add passphrase authentication for localhost development
+    const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
+                       _request.nextUrl.hostname === '127.0.0.1' || 
+                       _request.nextUrl.hostname === '0.0.0.0'
+    
+    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    }
     
     // Fetch devices directly from the Azure Function API (not the Next.js API)
     const response = await fetch(`${apiBaseUrl}/api/devices?limit=1000`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'User-Agent': 'ReportMate-Middleware/1.0'
-      }
+      headers
     })
     
     if (!response.ok) {
@@ -74,26 +89,25 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
       return null
     }
     
-    const devices = await response.json()
+    const data = await response.json()
+    
+    // Handle both response formats: {devices: [...]} or just [...]
+    const devices = Array.isArray(data) ? data : data.devices
     
     if (!Array.isArray(devices)) {
-      console.error('[MIDDLEWARE] Invalid devices response format')
+      console.error('[MIDDLEWARE] Invalid devices response format:', typeof data)
       return null
     }
-    
-    console.log(`[MIDDLEWARE] Searching ${devices.length} devices for identifier: ${identifier}`)
     
     // Try asset tag matches first (most common case for the reported issue)
     let device = devices.find((d: any) => d.assetTag === identifier)
     if (device && device.serialNumber) {
-      console.log(`[MIDDLEWARE] ✅ Resolved Asset Tag ${identifier} → serial number: ${device.serialNumber}`)
       return device.serialNumber
     }
     
     // Check for asset tag in inventory modules  
     device = devices.find((d: any) => d.inventory?.assetTag === identifier)
     if (device && device.serialNumber) {
-      console.log(`[MIDDLEWARE] ✅ Resolved Asset Tag (inventory) ${identifier} → serial number: ${device.serialNumber}`)
       return device.serialNumber
     }
     
@@ -106,11 +120,9 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
       d.inventory?.computer_name === identifier
     )
     if (device && device.serialNumber) {
-      console.log(`[MIDDLEWARE] ✅ Resolved Device Name ${identifier} → serial number: ${device.serialNumber}`)
       return device.serialNumber
     }
     
-    console.log(`[MIDDLEWARE] ❌ No device found for identifier: ${identifier}`)
     return null
     
   } catch (error) {
@@ -131,36 +143,17 @@ export default async function middleware(request: NextRequest) {
     return originalUrl
   }
   
-  // Log all requests for debugging
-  console.log('[MIDDLEWARE] Request:', {
-    url: getCorrectUrl(request.url),
-    hostname: hostname,
-    pathname: pathname,
-    nodeEnv: process.env.NODE_ENV
-  })
-  
-  // STRICT LOCALHOST BYPASS - ONLY FOR ACTUAL LOCAL DEVELOPMENT
-  const isActualLocalhost = (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') && process.env.NODE_ENV === 'development'
-  
-  if (isActualLocalhost) {
-    console.log('[MIDDLEWARE] LOCALHOST DETECTED - COMPLETE BYPASS - NO AUTH OR RESOLUTION')
-    return NextResponse.next()
-  }
-  
-  // Handle device identifier resolution BEFORE authentication (production only)
+  // Handle device identifier resolution FIRST (before any bypasses)
   const devicePageMatch = pathname.match(/^\/device\/([^\/]+)/)
-  if (devicePageMatch && process.env.API_BASE_URL) {
+  if (devicePageMatch) {
     const deviceIdentifier = decodeURIComponent(devicePageMatch[1])
     const identifierType = identifyDeviceIdentifierType(deviceIdentifier)
     
-    console.log('[MIDDLEWARE] Device page detected, identifier:', deviceIdentifier, 'type:', identifierType)
-    
-    // Only resolve asset tags and device names, not UUIDs or serial numbers
-    if (identifierType === 'assetTag' || identifierType === 'deviceName') {
-      console.log('[MIDDLEWARE] Attempting device resolution for:', deviceIdentifier)
+    if (!process.env.API_BASE_URL) {
+      // Continue without resolution
+    } else if (identifierType === 'assetTag' || identifierType === 'deviceName') {
       const resolvedSerial = await resolveDeviceInMiddleware(deviceIdentifier, request)
       if (resolvedSerial && resolvedSerial !== deviceIdentifier) {
-        console.log(`[MIDDLEWARE] Redirecting /device/${deviceIdentifier} → /device/${resolvedSerial}`)
         const newUrl = new URL(getCorrectUrl(request.url))
         newUrl.pathname = `/device/${encodeURIComponent(resolvedSerial)}`
         // Preserve any hash fragments
@@ -168,20 +161,25 @@ export default async function middleware(request: NextRequest) {
           newUrl.hash = request.nextUrl.hash
         }
         return NextResponse.redirect(newUrl)
+      } else {
       }
+    } else {
     }
-  } else if (devicePageMatch && !process.env.API_BASE_URL) {
-    console.log('[MIDDLEWARE] Device page detected but no API_BASE_URL configured, skipping resolution')
+  }
+  
+  // STRICT LOCALHOST BYPASS - ONLY FOR ACTUAL LOCAL DEVELOPMENT
+  const isActualLocalhost = (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0') && process.env.NODE_ENV === 'development'
+  
+  if (isActualLocalhost) {
+    return NextResponse.next()
   }
   
   // Don't redirect public routes
   if (isPublicRoute(pathname)) {
-    console.log('[MIDDLEWARE] Public route, allowing through')
     return NextResponse.next()
   }
   
   // PRODUCTION: Check if user has valid session
-  console.log('[MIDDLEWARE] Production request - checking authentication')
   
   try {
     const token = await getToken({ 
@@ -191,11 +189,9 @@ export default async function middleware(request: NextRequest) {
     })
     
     if (token) {
-      console.log('[MIDDLEWARE] Valid session found - allowing access')
       return NextResponse.next()
     }
     
-    console.log('[MIDDLEWARE] No valid session - redirecting to sign in')
     const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
     const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)

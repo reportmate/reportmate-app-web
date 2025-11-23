@@ -28,6 +28,7 @@ interface ManagedInstallsTableProps {
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warning' | 'error' | 'removed'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
 
   const togglePackageExpansion = (packageId: string) => {
@@ -139,25 +140,33 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       });
       return [];
     }
-    if (statusFilter === 'all') return data.packages;
     
-    return data.packages.filter((pkg: any) => {
-      const status = pkg.status?.toLowerCase() || '';
-      switch (statusFilter) {
-        case 'installed':
-          return status === 'installed';
-        case 'pending':
-          return status === 'pending';
-        case 'warning':
-          return status === 'warning'; 
-        case 'error':
-          return status === 'error';
-        case 'removed':
-          return status === 'removed';
-        default:
-          return true;
-      }
-    });
+    let filtered = data.packages;
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((pkg: any) => {
+        const status = pkg.status?.toLowerCase() || '';
+        switch (statusFilter) {
+          case 'installed': return status === 'installed';
+          case 'pending': return status === 'pending';
+          case 'warning': return status === 'warning'; 
+          case 'error': return status === 'error';
+          case 'removed': return status === 'removed';
+          default: return true;
+        }
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter((pkg: any) => 
+        (pkg.displayName || pkg.name || '').toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
   };
 
   const filteredPackages = getFilteredPackages();
@@ -195,18 +204,20 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   </div>
                 </div>
                 
-                {/* Status Filters */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setStatusFilter('all')}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'all'
-                        ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    All
-                  </button>
+                {/* Search and Filters */}
+                <div className="flex items-center gap-4">
+                  {/* Status Filters */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                        statusFilter === 'all'
+                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      All
+                    </button>
                   <button
                     onClick={() => setStatusFilter('installed')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
@@ -258,9 +269,26 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     Removed - {removedCount}
                   </button>
                 </div>
+
+                  {/* Search Input */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-full bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-400 w-48 transition-all focus:w-64"
+                    />
+                  </div>
               </div>
             </div>
-            <div className="overflow-x-auto overlay-scrollbar">
+          </div>
+          <div className="overflow-x-auto overlay-scrollbar">
               {statusFilter !== 'all' && (
                 <div className="px-6 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <div className="text-xs text-gray-600 dark:text-gray-400">

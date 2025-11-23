@@ -18,7 +18,6 @@ if (process.env.NODE_ENV !== 'production') {
 export async function testDatabaseConnection() {
   try {
     await prisma.$connect()
-    console.log('[DB] Prisma connection successful')
     return true
   } catch (error) {
     console.error('[DB] Prisma connection failed:', error)

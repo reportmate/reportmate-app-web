@@ -51,8 +51,6 @@ export function useSmartDeviceLoading(deviceId: string) {
       setInfoLoading(true)
       setInfoError(null)
       
-      console.log(`[SMART LOAD] 🚀 Loading InfoTab data for ${deviceId}`)
-      
       try {
         const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/info`)
         
@@ -72,8 +70,6 @@ export function useSmartDeviceLoading(deviceId: string) {
         
         // Process through mapDeviceData to ensure proper structure
         const processed = mapDeviceData(result.device)
-        
-        console.log(`[SMART LOAD] ✅ InfoTab data loaded (${Object.keys(result.device.modules || {}).length} modules)`)
         
         setDeviceInfo(processed)
         
@@ -122,8 +118,6 @@ export function useSmartDeviceLoading(deviceId: string) {
     let cancelled = false
     
     const loadBackgroundModules = async () => {
-      console.log(`[SMART LOAD] 📦 Loading background modules in PARALLEL`)
-      
       // Load ALL remaining modules at once (browser will handle parallelization)
       const promises = BACKGROUND_MODULES.map(async (moduleName) => {
         // Skip if already loaded
@@ -159,8 +153,6 @@ export function useSmartDeviceLoading(deviceId: string) {
           if (cancelled) return
           
           if (result.success) {
-            console.log(`[SMART LOAD] ✅ Module '${moduleName}' loaded`)
-            
             setModuleStates(prev => ({
               ...prev,
               [moduleName]: {
@@ -205,7 +197,6 @@ export function useSmartDeviceLoading(deviceId: string) {
       await Promise.allSettled(promises)
       
       if (!cancelled) {
-        console.log(`[SMART LOAD] 🎉 All modules loaded!`)
         setAllModulesLoaded(true)
       }
     }
@@ -245,8 +236,6 @@ export function useSmartDeviceLoading(deviceId: string) {
     }
     
     // Otherwise, load it now
-    console.log(`[SMART LOAD] 🎯 On-demand load: ${moduleName}`)
-    
     setModuleStates(prev => ({
       ...prev,
       [moduleName]: { state: 'loading', data: null, error: null }

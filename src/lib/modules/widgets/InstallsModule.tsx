@@ -583,7 +583,7 @@ const PackageHistoryWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isExpande
         <div className="flex gap-4">
           <input
             type="text"
-            placeholder="Search packages..."
+            placeholder="Search items..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="flex-1 px-3 py-2 border border-gray-300 rounded-md dark:border-gray-600 dark:bg-gray-700 dark:text-white"
