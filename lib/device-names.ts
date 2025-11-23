@@ -24,8 +24,6 @@ export async function getDeviceNames(_requestedSerials: string[] = []): Promise<
   }
   
   try {
-    console.log('[DEVICE-NAMES] Fetching device names from FastAPI Container')
-    
     // Fetch only basic device info from FastAPI Container
     const response = await fetch(`${apiBaseUrl}/api/devices`, {
       cache: 'no-store',
@@ -64,8 +62,6 @@ export async function getDeviceNames(_requestedSerials: string[] = []): Promise<
     // Update cache
     deviceNamesCache = newCache
     cacheTimestamp = now
-    
-    console.log(`[DEVICE-NAMES] Cached ${deviceNamesCache.size} device names`)
     
     return deviceNamesCache
     

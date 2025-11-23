@@ -454,8 +454,22 @@ function getLatestAttemptTimestamp(item: any): string {
     }
   }
   
-  // Fallback to existing fields
-  return item.lastSeenInSession || item.lastUpdate || '';
+  // For installed items without recent attempts, do NOT fallback to session time
+  // This prevents misleading "Date Processed" timestamps that just show collection time
+  // Only return a timestamp if we have a specific update time or if it's NOT installed
+  
+  // If we have a specific lastUpdate from the item itself (not the session), use it
+  if (item.lastUpdate) return item.lastUpdate;
+
+  // If status is 'Installed' and we don't have a specific timestamp, return empty string
+  // This avoids showing "8 hours ago" for something installed months ago
+  const status = standardizeInstallStatus(item.status || item.currentStatus || '');
+  if (status === 'Installed') {
+      return '';
+  }
+
+  // For other statuses (Pending, Error, Warning), the last check time IS relevant
+  return item.lastSeenInSession || '';
 }
 
 /**

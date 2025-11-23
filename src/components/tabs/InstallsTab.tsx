@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { ManagedInstallsTable } from '../tables'
+import { ManagedInstallsTable } from '../tables/ManagedInstallsTable'
 import { extractInstalls, type InstallsInfo } from '../../lib/data-processing/modules/installs'
 
 interface InstallsTabProps {
@@ -80,8 +80,6 @@ const formatDuration = (durationSeconds: number | string): string => {
   const minutes = Math.floor((seconds % 3600) / 60)
   const remainingSeconds = seconds % 60
 
-  console.log(`🕐 Formatting duration: ${durationSeconds} seconds -> ${hours}h ${minutes}m ${remainingSeconds}s`)
-
   // Build formatted string
   const parts_formatted: string[] = []
   
@@ -97,15 +95,100 @@ const formatDuration = (durationSeconds: number | string): string => {
   }
 
   const formatted = parts_formatted.join(' ')
-  console.log(`🕐 Final formatted duration: "${formatted}"`)
   return formatted
 }
 
+const InstallsTabSkeleton = () => (
+  <div className="space-y-6 animate-pulse">
+    {/* Header Skeleton */}
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+        <div className="space-y-2">
+          <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+      <div className="text-right mr-8 space-y-2">
+        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+        <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+      </div>
+    </div>
+
+    {/* Config Card Skeleton */}
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
+      <div className="flex gap-8 items-end">
+        <div className="flex-[0_0_45%] space-y-4">
+          <div className="space-y-2">
+            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+          <div className="space-y-2">
+            <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+        <div className="flex-[0_0_25%] space-y-4">
+          <div className="space-y-2 flex flex-col items-center">
+            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+          </div>
+          <div className="space-y-2 flex flex-col items-center">
+            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-10 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+        <div className="flex-[0_0_25%] space-y-4 flex flex-col items-end pr-[2%]">
+          <div className="space-y-2 flex flex-col items-end">
+            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+          <div className="space-y-2 flex flex-col items-end">
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-10 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Run Log Skeleton */}
+    <div className="h-14 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700"></div>
+
+    {/* Table Skeleton */}
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between">
+        <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        <div className="flex gap-2">
+          {[1, 2, 3, 4, 5].map(i => (
+            <div key={i} className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+          ))}
+        </div>
+      </div>
+      <div className="p-6 space-y-4">
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="flex justify-between items-center">
+            <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+            <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data }) => {
   const params = useParams()
-  const [selfFetchedDevice, setSelfFetchedDevice] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(false)
   const deviceId = params?.deviceId as string
+  const [selfFetchedDevice, setSelfFetchedDevice] = useState<any>(null)
+  const [isLoading, setIsLoading] = useState(!device && !!deviceId)
+  const [isLogExpanded, setIsLogExpanded] = useState(false)
+  const [logContent, setLogContent] = useState<string | null>(null)
+  const [isLogLoading, setIsLogLoading] = useState(false)
+  const [isLogCopied, setIsLogCopied] = useState(false)
+  const [logSearchTerm, setLogSearchTerm] = useState('')
 
   // EMERGENCY WORKAROUND: Try synchronous data processing first
   // If device prop is null/empty, we'll show a fallback message
@@ -115,44 +198,21 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
   // The data prop might be empty or not processed correctly, so we handle it ourselves
   const installsData = effectiveDevice ? extractInstalls(effectiveDevice.modules) : null
   
-  // Debug logging for error messages
-  console.log('🔍 InstallsTab Debug:', {
-    hasInstallsData: !!installsData,
-    hasMessages: !!installsData?.messages,
-    hasErrors: !!installsData?.messages?.errors,
-    errorCount: installsData?.messages?.errors?.length ?? 0,
-    errors: installsData?.messages?.errors,
-    packages: installsData?.packages?.map(p => ({ name: p.name, status: p.status }))
-  })
-  
   // Self-contained device data fetching as workaround for broken device page useEffect
   // BUT ONLY if we don't have device data already
   useEffect(() => {
-    console.log('🚨🚨🚨 INSTALLS TAB USEEFFECT STARTING 🚨🚨🚨')
-    console.log('[INSTALLS TAB] Device prop:', device ? 'provided' : 'null/undefined')
-    console.log('[INSTALLS TAB] DeviceId from params:', deviceId)
-    
     // If we have no device prop or an empty device, fetch it ourselves
     if (!device && deviceId) {
       setIsLoading(true)
-      console.log('[INSTALLS TAB] Fetching device data directly...')
       
       fetch(`/api/device/${deviceId}`)
         .then(response => {
-          console.log('[INSTALLS TAB] API response status:', response.status)
           if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`)
           }
           return response.json()
         })
         .then(deviceData => {
-          console.log('[INSTALLS TAB] Fetched device data:', {
-            hasData: !!deviceData,
-            hasModules: !!deviceData?.modules,
-            hasInstalls: !!deviceData?.modules?.installs,
-            hasCimian: !!deviceData?.modules?.installs?.cimian,
-            cimianItemsCount: deviceData?.modules?.installs?.cimian?.items?.length || 0
-          })
           // CRITICAL FIX: Use deviceData.device (not deviceData) since API returns {success: true, device: {...}}
           if (deviceData?.success && deviceData?.device) {
             setSelfFetchedDevice(deviceData.device)  // Use .device property!
@@ -169,42 +229,19 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
     }
   }, [device, deviceId])
   
-  // EMERGENCY LOGGING - This should appear immediately when component renders
-  console.log('🟨🟨🟨 INSTALLS TAB COMPONENT RENDERING! 🟨🟨🟨')
-  console.log('[INSTALLS TAB] Component state at render time:', {
-    hasDeviceProp: !!device,
-    deviceId,
-    hasEffectiveDevice: !!effectiveDevice,
-    hasSelfFetched: !!selfFetchedDevice,
-    isLoading,
-    installsDataResult: installsData ? 'processed' : 'null'
-  })
-  
   // Process raw Cimian data to ensure proper version and duration fields
   const processedInstallsData = useMemo(() => {
-    console.log('[INSTALLS TAB] Processing installsData:', {
-      hasInstallsData: !!installsData,
-      totalPackages: installsData?.totalPackages,
-      packagesLength: installsData?.packages?.length,
-      cacheSizeMb: installsData?.cacheSizeMb,
-      hasCacheSizeMb: !!installsData?.cacheSizeMb
-    })
-    
     if (!installsData) {
-      console.log('[INSTALLS TAB] No installsData - returning null')
       return null
     }
     
     // ALWAYS return the installsData as processed data (even if it looks complete)
     // The extractInstalls function should have already processed everything including cacheSizeMb
-    console.log('[INSTALLS TAB] Returning installsData with cache size:', installsData.cacheSizeMb)
     return installsData
     
     // If we have raw device data but no processed packages, create them
     const cimianData = effectiveDevice?.modules?.installs?.cimian
     if (!cimianData) return installsData
-    
-    console.log('🔧 INLINE PROCESSING: Converting raw Cimian data to package format')
     
     const packages: any[] = []
     
@@ -258,22 +295,8 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
     
     // Get duration from latest COMPLETED session using duration_seconds instead of duration
     let duration = 'Unknown'
-    console.log('🔥🔥🔥 DURATION EXTRACTION STARTING - CIMIAN SESSIONS 🔥🔥🔥')
-    console.log('🔥 Sessions data exists:', !!(cimianData.sessions))
-    console.log('🔥 Sessions is array:', Array.isArray(cimianData.sessions))
-    console.log('🔥 Sessions length:', cimianData.sessions?.length || 0)
     
     if (cimianData.sessions && Array.isArray(cimianData.sessions) && cimianData.sessions.length > 0) {
-      console.log('🔍 DEBUGGING ALL SESSIONS:', cimianData.sessions.slice(0, 5).map((s: any) => ({
-        sessionId: s.session_id,
-        duration: s.duration,
-        duration_seconds: s.duration_seconds,
-        status: s.status,
-        hasCompletedStatus: s.status === 'completed',
-        hasDurationSeconds: !!s.duration_seconds,
-        durationSecondsNotZero: s.duration_seconds > 0
-      })))
-      
       // Find the most recent session with duration_seconds > 0 (prefer completed sessions)
       const completedSessionWithDuration = cimianData.sessions.find((session: any) => 
         session.status === 'completed' && session.duration_seconds && session.duration_seconds > 0
@@ -281,8 +304,6 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
       
       if (completedSessionWithDuration) {
         duration = completedSessionWithDuration.duration_seconds
-        console.log('🕐 Using completed session duration_seconds:', duration, 'from session:', completedSessionWithDuration.session_id)
-        console.log('🔥🔥🔥 DURATION FOUND AND SET TO:', duration, 'seconds 🔥🔥🔥')
       } else {
         // Try to find any session with duration_seconds > 0
         const sessionWithDuration = cimianData.sessions.find((session: any) => 
@@ -291,18 +312,14 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
         
         if (sessionWithDuration) {
           duration = sessionWithDuration.duration_seconds
-          console.log('🕐 Using session with duration_seconds:', duration, 'from session:', sessionWithDuration.session_id, 'status:', sessionWithDuration.status)
-          console.log('🔥🔥🔥 FALLBACK DURATION FOUND AND SET TO:', duration, 'seconds 🔥🔥🔥')
         } else {
           // Fallback to first session if no sessions with duration_seconds found
           const latestSession = cimianData.sessions[0]
           duration = latestSession.duration_seconds || 'Unknown'
-          console.log('⚠️ Using latest session duration_seconds (may be zero):', duration, 'from session:', latestSession.session_id)
-          console.log('🔥🔥🔥 LAST RESORT DURATION SET TO:', duration, 'seconds 🔥🔥🔥')
         }
       }
     } else {
-      console.log('❌ No sessions data available for duration extraction')
+      // No sessions data available
     }
     
     const processedData = {
@@ -325,44 +342,39 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
       }
     }
     
-    console.log('🔧 INLINE PROCESSING RESULT:', {
-      originalPackages: installsData?.packages?.length || 0,
-      processedPackages: packages.length,
-      duration: duration,
-      version: processedData.config.version
-    })
-    
     return processedData
   }, [installsData, effectiveDevice])
 
-  console.log('🚨🚨🚨 INSTALLS TAB RENDERED! 🚨🚨🚨 - SELF-FETCHING VERSION')
-  console.log('[INSTALLS TAB] Processing result:', {
-    hasDevice: !!device,
-    hasSelfFetched: !!selfFetchedDevice,
-    hasEffectiveDevice: !!effectiveDevice,
-    isLoading,
-    totalPackages: installsData?.totalPackages,
-    installed: installsData?.installed,
-    pending: installsData?.pending,
-    failed: installsData?.failed,
-    hasConfig: !!installsData?.config,
-    systemName: installsData?.systemName,
-    packagesCount: installsData?.packages?.length || 0,
-    firstPackage: installsData?.packages?.[0]?.name,
-    hasCimianData: !!effectiveDevice?.modules?.installs?.cimian,
-    cimianItemsCount: effectiveDevice?.modules?.installs?.cimian?.items?.length || 0,
-    pendingPackagesCount: effectiveDevice?.modules?.installs?.cimian?.pendingPackages?.length || 0
-  })
-  
-  console.log('[INSTALLS TAB] Processed data:', {
-    totalPackages: installsData?.totalPackages,
-    hasConfig: !!installsData?.config,
-    hasMessages: !!installsData?.messages,
-    errorCount: installsData?.messages?.errors?.length || 0,
-    warningCount: installsData?.messages?.warnings?.length || 0,
-    packagesLength: installsData?.packages?.length || 0,
-    samplePackage: installsData?.packages?.[0]
-  })
+  const toggleLog = async () => {
+    if (isLogExpanded) {
+      setIsLogExpanded(false)
+      return
+    }
+
+    setIsLogExpanded(true)
+    
+    if (!logContent && effectiveDevice?.serialNumber) {
+      setIsLogLoading(true)
+      try {
+        const response = await fetch(`/api/device/${effectiveDevice.serialNumber}/installs/log`)
+        if (response.ok) {
+          const data = await response.json()
+          setLogContent(data.runLog || 'No log data available')
+        } else {
+          setLogContent('Failed to load log data')
+        }
+      } catch (error) {
+        console.error('Error fetching run log:', error)
+        setLogContent('Error loading log data')
+      } finally {
+        setIsLogLoading(false)
+      }
+    }
+  }
+
+  if (isLoading) {
+    return <InstallsTabSkeleton />
+  }
 
   return (
     <div className="space-y-6">
@@ -440,14 +452,14 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
           </div>
 
           {/* Column 3 - 25% - Duration & Last Seen - Right Aligned with 2% padding */}
-          <div className="flex-[0_0_25%] space-y-4 text-right pr-[2%]">
-            <div>
+          <div className="flex-[0_0_25%] space-y-4 flex flex-col items-end pr-[2%]">
+            <div className="space-y-2 flex flex-col items-end">
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Duration</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 {formatDuration(processedInstallsData?.config?.duration || 'Unknown')}
               </div>
             </div>
-            <div>
+            <div className="space-y-2 flex flex-col items-end">
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Seen Timestamp</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
                 {(() => {
@@ -477,25 +489,123 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
         </div>
       </div>
 
-
+      {/* Run Log Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        <button
+          onClick={toggleLog}
+          className="w-full px-6 py-4 flex items-center justify-between bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            <span className="font-medium text-gray-900 dark:text-white">Managed Software Update Last Run Log</span>
+          </div>
+          <svg 
+            className={`w-5 h-5 text-gray-500 transition-transform ${isLogExpanded ? 'transform rotate-180' : ''}`} 
+            fill="none" 
+            stroke="currentColor" 
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </button>
+        
+        {isLogExpanded && (
+          <div className="border-t border-gray-200 dark:border-gray-700">
+            {isLogLoading ? (
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600 mx-auto mb-2"></div>
+                Loading run log...
+              </div>
+            ) : (
+              <div>
+                {/* Toolbar */}
+                <div className="flex items-center justify-between px-4 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search log..."
+                      value={logSearchTerm}
+                      onChange={(e) => setLogSearchTerm(e.target.value)}
+                      className="pl-9 pr-4 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded-full bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent placeholder-gray-500 dark:placeholder-gray-400 w-64"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       if (logContent) {
+                         navigator.clipboard.writeText(logContent);
+                         setIsLogCopied(true);
+                         setTimeout(() => setIsLogCopied(false), 2000);
+                       }
+                     }}
+                     className={`p-2 rounded-md border shadow-sm transition-all duration-200 ${
+                       isLogCopied 
+                         ? 'text-green-600 dark:text-green-400 border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 scale-110' 
+                         : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                     }`}
+                     title={isLogCopied ? "Copied!" : "Copy to clipboard"}
+                   >
+                     {isLogCopied ? (
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                       </svg>
+                     ) : (
+                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                       </svg>
+                     )}
+                   </button>
+                   <button 
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       if (logContent) {
+                         const blob = new Blob([logContent], { type: 'text/plain' });
+                         const url = window.URL.createObjectURL(blob);
+                         const a = document.createElement('a');
+                         a.href = url;
+                         a.download = `run-${effectiveDevice?.serialNumber || 'log'}.log`;
+                         document.body.appendChild(a);
+                         a.click();
+                         window.URL.revokeObjectURL(url);
+                         document.body.removeChild(a);
+                       }
+                     }}
+                     className="p-2 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                     title="Download log"
+                   >
+                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                     </svg>
+                   </button>
+                  </div>
+                </div>
+                
+                <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[500px] overflow-y-auto">
+                  {logSearchTerm.trim() && logContent 
+                    ? logContent.split('\n').filter(line => line.toLowerCase().includes(logSearchTerm.toLowerCase())).join('\n')
+                    : logContent}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Loading State */}
-      {isLoading && (
-        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-          <div className="text-blue-800 dark:text-blue-200">Loading device data...</div>
-        </div>
-      )}
+      {/* Removed simple loading state in favor of full page skeleton */}
 
       {/* Managed Installs with Configuration */}
       {processedInstallsData ? (
         <>
-          {console.log('[INSTALLS TAB] Passing data to ManagedInstallsTable:', {
-            hasData: !!processedInstallsData,
-            totalPackages: processedInstallsData.totalPackages,
-            cacheSizeMb: processedInstallsData.cacheSizeMb,
-            hasCacheSizeMb: !!processedInstallsData.cacheSizeMb,
-            dataKeys: Object.keys(processedInstallsData)
-          })}
           <ManagedInstallsTable data={processedInstallsData} />
         </>
       ) : (

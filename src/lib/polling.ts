@@ -59,12 +59,10 @@ export function testWebSocketConnection() {
     fetch(`${apiBaseUrl}/api/negotiate?device=test`)
       .then(res => res.json())
       .then(connectionInfo => {
-        console.log("Negotiate successful:", connectionInfo)
         
         const ws = new WebSocket(connectionInfo.url, "json.webpubsub.azure.v1")
         
         ws.onopen = () => {
-          console.log("✅ WebSocket test connection successful")
           ws.close()
           resolve("Connection successful")
         }

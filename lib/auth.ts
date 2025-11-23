@@ -35,16 +35,8 @@ const isAllowedDomain = (email: string, allowedDomains: string[]): boolean => {
 
 // Build providers array based on configuration
 const buildProviders = () => {
-  console.log('[AUTH] Building providers...')
   const config = getAuthConfig()
   const providers = []
-
-  console.log('[AUTH] Config:', config)
-  console.log('[AUTH] Entra ID Client ID:', process.env.AZURE_AD_CLIENT_ID ? 'SET' : 'MISSING')
-  console.log('[AUTH] Entra ID Client Secret:', process.env.AZURE_AD_CLIENT_SECRET ? 'SET' : 'MISSING') 
-  console.log('[AUTH] Entra ID Tenant ID:', process.env.AZURE_AD_TENANT_ID ? 'SET' : 'MISSING')
-  console.log('[AUTH] NEXTAUTH_URL:', process.env.NEXTAUTH_URL)
-  console.log('[AUTH] NODE_ENV:', process.env.NODE_ENV)
 
   // Entra ID / Entra ID Provider
   if (config.providers.includes(AUTH_PROVIDERS.AZURE_AD)) {
@@ -57,7 +49,6 @@ const buildProviders = () => {
       throw new Error('Missing required Entra ID environment variables')
     }
 
-    console.log('[AUTH] Adding Entra ID provider')
     providers.push(
       AzureADProvider({
         clientId: clientId,
@@ -136,8 +127,6 @@ const buildProviders = () => {
   return providers
 }
 
-console.log('[AUTH] Creating authOptions...')
-
 export const authOptions: NextAuthOptions = {
   providers: buildProviders(),
   
@@ -156,13 +145,6 @@ export const authOptions: NextAuthOptions = {
 
   callbacks: {
   async signIn({ user, account, profile: _profile }) {
-      console.log('[AUTH] Sign in callback:', { 
-        userEmail: user?.email,
-        provider: account?.provider,
-        error: account?.error,
-        accountType: account?.type 
-      })
-      
       if (account?.error) {
         console.error('[AUTH] OAuth account error:', account.error)
         return false
@@ -183,7 +165,6 @@ export const authOptions: NextAuthOptions = {
         return (_profile as any)?.email_verified === true
       }
 
-      console.log('[AUTH] Sign in successful for:', user.email)
       return true
     },
 
@@ -220,20 +201,15 @@ export const authOptions: NextAuthOptions = {
       // Get the correct base URL from environment variables
       const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || baseUrl
       
-      console.log(`[NextAuth Redirect] Detected baseUrl: ${baseUrl}, URL param: ${url}`)
-      console.log(`[NextAuth Redirect] Using configured baseUrl: ${correctBaseUrl}`)
-      
       // Always use the configured base URL
       if (url.startsWith("/")) {
         const redirectUrl = `${correctBaseUrl}${url}`
-        console.log(`[NextAuth Redirect] Relative URL redirect: ${redirectUrl}`)
         return redirectUrl
       }
       
       // Replace any incorrect base URL with the correct one
       if (url.includes('0.0.0.0:3000') || url.includes('localhost:3000')) {
         const correctedUrl = url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
-        console.log(`[NextAuth Redirect] Corrected URL from ${url} to ${correctedUrl}`)
         return correctedUrl
       }
       
@@ -246,7 +222,6 @@ export const authOptions: NextAuthOptions = {
           urlObj.protocol = correctBaseUrlObj.protocol
           urlObj.port = correctBaseUrlObj.port || ''
           const correctedUrl = urlObj.toString()
-          console.log(`[NextAuth Redirect] Origin corrected from ${url} to ${correctedUrl}`)
           return correctedUrl
         }
         return url
@@ -259,14 +234,14 @@ export const authOptions: NextAuthOptions = {
 
   events: {
   async signIn({ user, account, profile: _profile }) {
-      console.log(`[AUTH] User signed in: ${user.email} via ${account?.provider}`)
+      // User signed in
     },
     
     async signOut({ session }) {
-      console.log(`[AUTH] User signed out: ${session?.user?.email}`)
+      // User signed out
     }
   },
 
-  debug: true, // Enable debug logging in all environments
+  debug: false, // Disable debug logging
 }
 
