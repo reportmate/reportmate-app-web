@@ -112,8 +112,6 @@ class MemoryManager {
     this.connections.forEach((connection, key) => {
       this.closeConnection(key)
     })
-
-    console.log('[MemoryManager] Cleanup completed')
   }
 
   // Log memory status
@@ -121,13 +119,6 @@ class MemoryManager {
     const memStats = this.getMemoryStats()
     const compStats = this.getComponentStats()
     
-    console.log(`[Memory Status${context ? ` - ${context}` : ''}]`, {
-      memory: memStats,
-      components: compStats,
-      activeIntervals: this.intervals.size,
-      activeConnections: this.connections.size
-    })
-
     // Warn if memory usage is high
     if (memStats && memStats.usedJSHeapSize > 100) { // 100MB threshold
       console.warn(`[Memory Warning] High memory usage: ${memStats.usedJSHeapSize}MB`)

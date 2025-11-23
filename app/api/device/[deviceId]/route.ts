@@ -91,13 +91,21 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
-  // CRITICAL: Check authentication
-  const session = await getServerSession()
-  if (!session) {
-    return NextResponse.json({ 
-      error: 'Unauthorized',
-      details: 'Authentication required'
-    }, { status: 401 })
+  // CRITICAL: Check authentication (bypass for localhost development)
+  const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
+                     _request.nextUrl.hostname === '127.0.0.1' || 
+                     _request.nextUrl.hostname === '0.0.0.0'
+  
+  if (!isLocalhost) {
+    const session = await getServerSession()
+    if (!session) {
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Authentication required'
+      }, { status: 401 })
+    }
+  } else {
+    console.log('[DEVICE API] 🔓 Localhost detected - bypassing authentication')
   }
 
   try {
@@ -130,13 +138,26 @@ export async function GET(
     const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
     console.log('[DEVICE API] 🌐 About to fetch from Azure Functions:', azureFunctionsUrl)
     
+    // Build headers with authentication for localhost
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache',
+      'User-Agent': 'ReportMate-Frontend/1.0'
+    }
+    
+    // Add passphrase authentication for localhost development
+    const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
+                       _request.nextUrl.hostname === '127.0.0.1' || 
+                       _request.nextUrl.hostname === '0.0.0.0'
+    
+    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+      console.log('[DEVICE API] 🔑 Added passphrase authentication for localhost')
+    }
+    
     const response = await fetch(azureFunctionsUrl, {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
-      }
+      headers
     })
     
     console.log('[DEVICE API] 📡 Azure Functions response status:', response.status, response.statusText)
@@ -264,11 +285,18 @@ export async function GET(
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
         console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
         
+        // Build events headers with authentication for localhost
+        const eventsHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+        
+        if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+          eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+        }
+        
         const eventsResponse = await fetch(deviceEventsUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+          headers: eventsHeaders
         })
         
         if (eventsResponse.ok) {
@@ -364,11 +392,18 @@ export async function GET(
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
         console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
         
+        // Build events headers with authentication for localhost
+        const eventsHeaders: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+        
+        if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+          eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+        }
+        
         const eventsResponse = await fetch(deviceEventsUrl, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
+          headers: eventsHeaders
         })
         
         if (eventsResponse.ok) {
@@ -467,11 +502,18 @@ export async function GET(
           const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
           console.log('[DEVICE API] 🕐 Events URL:', deviceEventsUrl)
           
+          // Build events headers with authentication for localhost
+          const eventsHeaders: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          }
+          
+          if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+            eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+          }
+          
           const eventsResponse = await fetch(deviceEventsUrl, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            }
+            headers: eventsHeaders
           })
           
           if (eventsResponse.ok) {

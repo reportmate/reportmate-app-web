@@ -20,11 +20,8 @@ export function useLiveEvents() {
     let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     
-    console.log("🚀 SignalR client initialized")
-    
     const startSignalR = async () => {
       try {
-        console.log("🔌 Attempting SignalR connection...")
         setConnectionStatus("connecting")
         
         // Get API base URL from environment
@@ -40,7 +37,6 @@ export function useLiveEvents() {
         }
         
         const connectionInfo = await negotiateResponse.json()
-        console.log("📡 Got SignalR connection info:", { url: connectionInfo.url })
         
         // Build SignalR connection
         connection = new HubConnectionBuilder()
@@ -53,7 +49,6 @@ export function useLiveEvents() {
         
         // Set up event handlers
         connection.on("NewEvent", (event: FleetEvent) => {
-          console.log("📨 New event via SignalR:", event)
           setEvents((prev: FleetEvent[]) => {
             const existingIds = new Set(prev.map(e => e.id))
             if (!existingIds.has(event.id)) {
@@ -66,23 +61,19 @@ export function useLiveEvents() {
         
         // Handle reconnection
         connection.onreconnected(() => {
-          console.log("✅ SignalR reconnected")
           setConnectionStatus("connected")
         })
         
         connection.onreconnecting(() => {
-          console.log("� SignalR reconnecting...")
           setConnectionStatus("reconnecting")
         })
         
         connection.onclose(() => {
-          console.log("❌ SignalR connection closed")
           setConnectionStatus("disconnected")
         })
         
         // Start connection
         await connection.start()
-        console.log("✅ SignalR connected successfully")
         setConnectionStatus("connected")
         
         // Load initial events via HTTP
@@ -114,7 +105,6 @@ export function useLiveEvents() {
     }
     
     const startPolling = () => {
-      console.log("🔄 Starting HTTP polling fallback")
       setConnectionStatus("polling")
       
       const poll = async () => {
@@ -150,7 +140,6 @@ export function useLiveEvents() {
 
     return () => {
       if (connection) {
-        console.log("🔌 Closing SignalR connection")
         connection.stop()
       }
       if (pollingInterval) {

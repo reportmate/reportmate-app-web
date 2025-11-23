@@ -8,7 +8,7 @@ export const revalidate = 0;
 let cachedData: { devices: any[], timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchAllDevicesWithModules(API_BASE_URL: string) {
+async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boolean) {
   // Check cache first
   if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
     console.log('[INSTALLS FILTERS] Using cached device data');
@@ -17,9 +17,24 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
 
   console.log('[INSTALLS FILTERS] Fetching fresh device data from API');
   
+  // Build headers with authentication
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  
+  if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+    headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+  } else {
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+  }
+  
   // Fetch all devices from FastAPI container
   const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
-    cache: 'no-store'
+    cache: 'no-store',
+    headers
   });
 
   if (!devicesResponse.ok) {
@@ -38,7 +53,8 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
     const batchPromises = batch.map(async (device: any) => {
       try {
         const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
-          cache: 'no-store'
+          cache: 'no-store',
+          headers
         });
         if (!detailResponse.ok) return null;
         const detailData = await detailResponse.json();
@@ -62,14 +78,19 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string) {
   return devices;
 }
 
-export async function GET() {
-  // CRITICAL: Check authentication
-  const session = await getServerSession()
-  if (!session) {
-    return NextResponse.json({ 
-      error: 'Unauthorized',
-      details: 'Authentication required'
-    }, { status: 401 })
+export async function GET(request: Request) {
+  // LOCALHOST BYPASS: Skip auth check for local development
+  const isLocalhost = request.headers.get('host')?.includes('localhost')
+  
+  // CRITICAL: Check authentication (skip for localhost)
+  if (!isLocalhost) {
+    const session = await getServerSession()
+    if (!session) {
+      return NextResponse.json({ 
+        error: 'Unauthorized',
+        details: 'Authentication required'
+      }, { status: 401 })
+    }
   }
 
   const API_BASE_URL = process.env.API_BASE_URL;
@@ -79,7 +100,7 @@ export async function GET() {
   }
 
   try {
-  const devices = await fetchAllDevicesWithModules(API_BASE_URL);
+  const devices = await fetchAllDevicesWithModules(API_BASE_URL, isLocalhost);
     
     const installsDevices = devices.filter(d => d.modules?.installs);
     const inventoryDevices = devices;
