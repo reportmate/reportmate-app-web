@@ -36,13 +36,26 @@ export async function GET(request: NextRequest) {
     console.log(`[INSTALLS API] ${timestamp} - Fetching device data for: ${deviceId}`)
     
     try {
+      // Get managed identity principal ID from Azure Container Apps
+      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+      
+      // For localhost, use passphrase authentication
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'User-Agent': 'ReportMate-Frontend/1.0'
+      }
+      
+      // Prioritize passphrase if available (for local dev or when explicitly configured)
+      if (process.env.REPORTMATE_PASSPHRASE) {
+        headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+      } else if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
+      
       const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        }
+        headers
       })
       
       if (!deviceResponse.ok) {

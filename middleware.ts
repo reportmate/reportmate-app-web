@@ -70,12 +70,8 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
       'User-Agent': 'ReportMate-Middleware/1.0'
     }
     
-    // Add passphrase authentication for localhost development
-    const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
-                       _request.nextUrl.hostname === '127.0.0.1' || 
-                       _request.nextUrl.hostname === '0.0.0.0'
-    
-    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+    // Add passphrase authentication if configured (prioritize over Managed Identity)
+    if (process.env.REPORTMATE_PASSPHRASE) {
       headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
     }
     

@@ -22,13 +22,10 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
     'Content-Type': 'application/json'
   }
   
-  if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+  if (process.env.REPORTMATE_PASSPHRASE) {
     headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-  } else {
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-    if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+  } else if (managedIdentityId) {
+    headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
   }
   
   // Fetch all devices from FastAPI container

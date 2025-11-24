@@ -10,12 +10,21 @@ export async function GET() {
     console.log(`[DEVICES LIST API] ${timestamp} - Fast devices list (inventory only)`)
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
-    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
-      headers: {
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
-      }
-    })
+    
+    // Add authentication headers
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'ReportMate-Frontend/1.0'
+    }
+
+    if (process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    } else if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+
+    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, { headers })
 
     if (!devicesResponse.ok) {
       throw new Error(`FastAPI Container returned ${devicesResponse.status}: ${devicesResponse.statusText}`)

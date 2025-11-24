@@ -177,8 +177,14 @@ function EventsPageContent() {
           devices.forEach((device: any) => {
             if (device.serialNumber) {
               // Get inventory from the correct nested path (like dashboard does)
-              const inventory = device.modules?.inventory || {}
-              const deviceName = inventory.deviceName || device.name || device.serialNumber
+              // Prioritize device.modules.inventory.deviceName as requested
+              // Also check device.inventory (top level) and device.deviceName
+              const inventory = device.modules?.inventory || device.inventory || {}
+              const deviceName = 
+                inventory.deviceName || 
+                device.deviceName || 
+                device.name || 
+                device.serialNumber
               
               nameMap[device.serialNumber as string] = deviceName as string
               
@@ -186,7 +192,7 @@ function EventsPageContent() {
               inventoryMap[device.serialNumber as string] = {
                 deviceName: deviceName as string,
                 serialNumber: device.serialNumber as string,
-                assetTag: inventory.assetTag || undefined
+                assetTag: inventory.assetTag || device.assetTag || undefined
               }
             }
           })
@@ -371,10 +377,14 @@ function EventsPageContent() {
     try {
       console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventIdStr}`)
       
+      // Check if this is a bundled event
+      const eventObj = filteredEvents.find(e => e.id === eventIdStr)
+      const isBundle = eventIdStr.startsWith('bundle-') || (eventObj && eventObj.isBundle)
+      
       // For bundled events, we need to handle them differently
-      if (eventIdStr.startsWith('bundle-')) {
+      if (isBundle) {
         // For bundled events, fetch payloads from all constituent events
-        const bundledEvent = filteredEvents.find(e => e.id === eventIdStr)
+        const bundledEvent = eventObj || filteredEvents.find(e => e.id === eventIdStr)
         if (bundledEvent && bundledEvent.isBundle && bundledEvent.eventIds) {
           // Fetching payloads for bundled events
           
@@ -729,8 +739,8 @@ function EventsPageContent() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full table-fixed">
+              <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+                <table className="w-full table-fixed relative border-collapse">
                   <colgroup>
                     <col style={{width: '12%'}} />
                     <col style={{width: '8.5%'}} />
@@ -739,10 +749,10 @@ function EventsPageContent() {
                     <col style={{width: '12.75%'}} />
                     <col style={{width: '11.75%'}} />
                   </colgroup>
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-6 py-3">
+                      <td colSpan={6} className="px-6 py-2 h-14">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -763,7 +773,7 @@ function EventsPageContent() {
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
                                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                                } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                                } w-32 justify-center px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                               >
                                 {statusConfig && (
                                   <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
@@ -866,9 +876,9 @@ function EventsPageContent() {
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                                  title={inventoryMap[event.device]?.deviceName || event.device}
+                                  title={event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
                                 >
-                                  {inventoryMap[event.device]?.deviceName || event.device}
+                                  {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
                                 </Link>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                   {event.device}
@@ -1053,7 +1063,7 @@ function EventsPageContent() {
                 </div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full table-fixed">
+                <table className="w-full table-fixed border-collapse">
                   <colgroup>
                     <col style={{width: '12%'}} />
                     <col style={{width: '8.5%'}} />
@@ -1065,7 +1075,7 @@ function EventsPageContent() {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-4 py-3">
+                      <td colSpan={6} className="px-4 py-2 h-14">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
@@ -1086,7 +1096,7 @@ function EventsPageContent() {
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
                                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                                } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                                } w-32 justify-center px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                               >
                                 {statusConfig && (
                                   <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
@@ -1189,9 +1199,9 @@ function EventsPageContent() {
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                                  title={inventoryMap[event.device]?.deviceName || event.device}
+                                  title={event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
                                 >
-                                  {inventoryMap[event.device]?.deviceName || event.device}
+                                  {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
                                 </Link>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                   {event.device}
@@ -1389,7 +1399,7 @@ function EventsPageContent() {
                           href={`/device/${encodeURIComponent(event.device)}#events`}
                           className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
                         >
-                          {inventoryMap[event.device]?.deviceName || event.device}
+                          {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
                         </Link>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           {event.device}

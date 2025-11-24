@@ -81,6 +81,26 @@ export async function GET(request: Request) {
       }, { status: 500 })
     }
 
+    // Determine if running on localhost
+    const isLocalhost = request.headers.get('host')?.includes('localhost') || request.headers.get('host')?.includes('127.0.0.1')
+
+    // Get managed identity principal ID from Azure Container Apps
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    
+    // Prepare headers with authentication
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'ReportMate-Frontend/1.0'
+    }
+    
+    // Prioritize passphrase if available (for local dev or when explicitly configured)
+    if (process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    } else if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+
     // For pagination with date filters, we need fresh data each time
     // Only use cache for limit=50 and offset=0 with no date filters (dashboard requests)
     const shouldCache = validLimit <= 50 && validOffset === 0 && !validStartDate && !validEndDate
@@ -137,9 +157,7 @@ export async function GET(request: Request) {
       
       const response = await fetch(apiUrl, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         cache: 'no-store', // Ensure fresh data for pagination
         signal: controller.signal
       });
@@ -225,7 +243,13 @@ export async function GET(request: Request) {
         
         return NextResponse.json(data);
       } else {
-        console.log('[EVENTS API] Azure Functions API error:', response.status, response.statusText);
+        console.error('[EVENTS API] Azure Functions API error:', response.status, response.statusText);
+        try {
+          const errorText = await response.text();
+          console.error('[EVENTS API] Error details:', errorText);
+        } catch (e) {
+          console.error('[EVENTS API] Could not read error body');
+        }
         // Fall through to local fallback
       }
     } catch (fetchError) {

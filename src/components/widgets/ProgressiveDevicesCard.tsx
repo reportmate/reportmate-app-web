@@ -58,8 +58,9 @@ export const ProgressiveDevicesCard: React.FC = () => {
     )
   }
 
-  const onlineDevices = devices.filter(device => device.status === 'online').length
-  const offlineDevices = devices.length - onlineDevices
+  const activeDevices = devices.filter(device => device.status === 'active' || device.status === 'online').length
+  const staleDevices = devices.filter(device => device.status === 'stale').length
+  const missingDevices = devices.filter(device => device.status === 'missing' || (!['active', 'online', 'stale'].includes(device.status))).length
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -83,15 +84,21 @@ export const ProgressiveDevicesCard: React.FC = () => {
           <div className="flex items-center gap-4">
             <div className="text-center">
               <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                {onlineDevices}
+                {activeDevices}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Online</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Active</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-yellow-600 dark:text-yellow-400">
+                {staleDevices}
+              </div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Stale</div>
             </div>
             <div className="text-center">
               <div className="text-lg font-semibold text-gray-500 dark:text-gray-400">
-                {offlineDevices}
+                {missingDevices}
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Offline</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">Missing</div>
             </div>
           </div>
         </div>
@@ -107,8 +114,10 @@ export const ProgressiveDevicesCard: React.FC = () => {
             >
               <div className="flex items-center gap-3">
                 <div className={`w-3 h-3 rounded-full ${
-                  device.status === 'online' 
+                  device.status === 'active' || device.status === 'online'
                     ? 'bg-green-500' 
+                    : device.status === 'stale'
+                    ? 'bg-yellow-500'
                     : 'bg-gray-400'
                 }`} />
                 <div>

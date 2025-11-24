@@ -36,9 +36,14 @@ export async function GET(
     }
 
     // For localhost, use passphrase authentication
-    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+    if (process.env.REPORTMATE_PASSPHRASE) {
       headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[INSTALLS LOG API] Added passphrase authentication for localhost')
+      console.log('[INSTALLS LOG API] Added passphrase authentication')
+    } else {
+      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+      if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
     }
     
     const upstreamUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/installs/log`

@@ -111,7 +111,7 @@ function DevicesPageContent() {
               manufacturer: inventory.manufacturer,
               model: inventory.model,
               uuid: inventory.uuid || device.deviceId,
-              raw: { status: calculatedStatus, ...device }
+              raw: { ...device, status: calculatedStatus }
             }
           })
           
@@ -437,9 +437,9 @@ function DevicesPageContent() {
               </div>
 
               {/* Table skeleton */}
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+              <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+                <table className="w-full relative">
+                  <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-4 lg:px-6 py-3">
                         <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
@@ -693,8 +693,7 @@ function DevicesPageContent() {
                           : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                       } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                     >
-                      <span className="hidden lg:inline">{filter.label}</span>
-                      <span className="lg:hidden">{filter.label}</span>
+                      <span>{filter.label}</span>
                       <span className={`${
                         isActive 
                           ? 'bg-white/20 text-current'
@@ -728,8 +727,7 @@ function DevicesPageContent() {
                           : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                       } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                     >
-                      <span className="hidden lg:inline">{filter.label}</span>
-                      <span className="lg:hidden">{filter.label}</span>
+                      <span>{filter.label}</span>
                       <span className={`${
                         isActive 
                           ? 'bg-white/20 text-current'
@@ -765,8 +763,7 @@ function DevicesPageContent() {
                           : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                       } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                     >
-                      <span className="hidden lg:inline">{filter.label}</span>
-                      <span className="lg:hidden">{filter.label}</span>
+                      <span>{filter.label}</span>
                       <span className={`${
                         isActive 
                           ? 'bg-white/20 text-current'
@@ -780,9 +777,9 @@ function DevicesPageContent() {
               </nav>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+            <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+              <table className="w-full relative">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <tr>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       <button

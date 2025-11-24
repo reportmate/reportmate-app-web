@@ -263,6 +263,7 @@ const DeviceInfoWidget: React.FC = () => {
               total: devices.length,
               active: devices.filter((d: any) => d.status === 'active').length,
               stale: devices.filter((d: any) => d.status === 'stale').length,
+              missing: devices.filter((d: any) => d.status === 'missing').length,
               warning: devices.filter((d: any) => d.status === 'warning').length,
               error: devices.filter((d: any) => d.status === 'error').length,
             }
@@ -300,16 +301,16 @@ const DeviceInfoWidget: React.FC = () => {
           <div className="text-sm text-gray-500 dark:text-gray-400">Total</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.online}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Online</div>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-400">{stats.active}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Active</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.offline}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Offline</div>
+          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.stale}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Stale</div>
         </div>
         <div className="text-center">
-          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{stats.warning}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Warning</div>
+          <div className="text-2xl font-bold text-gray-600 dark:text-gray-400">{stats.missing}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Missing</div>
         </div>
         <div className="text-center">
           <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.error}</div>

@@ -106,10 +106,14 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     try {
       console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventIdStr}`)
       
+      // Check if this is a bundled event
+      const eventObj = events.find(e => e.id === eventIdStr)
+      const isBundle = eventIdStr.startsWith('bundle-') || (eventObj && (eventObj as any).raw?.bundledEvents)
+      
       // For bundled events, we need to handle them differently
-      if (eventIdStr.startsWith('bundle-')) {
+      if (isBundle) {
         // For bundled events, fetch payloads from all constituent events
-        const bundledEvent = events.find(e => e.id === eventIdStr)
+        const bundledEvent = eventObj || events.find(e => e.id === eventIdStr)
         if (bundledEvent && (bundledEvent as any).raw?.bundledEvents) {
           const bundledEventIds = (bundledEvent as any).raw.bundledEvents
           console.log(`[DEVICE EVENTS SIMPLE] Fetching payloads for ${bundledEventIds.length} bundled events`)

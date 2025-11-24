@@ -41,10 +41,15 @@ export async function GET(
       'User-Agent': 'ReportMate-Frontend/1.0'
     }
 
-    // For localhost, use passphrase authentication
-    if (isLocalhost && process.env.REPORTMATE_PASSPHRASE) {
+    // Prioritize passphrase if available (for local dev or when explicitly configured)
+    if (process.env.REPORTMATE_PASSPHRASE) {
       headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[MODULE API] 🔐 Added passphrase authentication for localhost')
+      console.log('[MODULE API] 🔐 Added passphrase authentication')
+    } else {
+      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+      if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
     }
     
     // Special handling for events module (events are stored separately)
