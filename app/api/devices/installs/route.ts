@@ -158,7 +158,15 @@ export async function GET(request: Request) {
         : cimianItems).filter((item: any) => {
           // Always filter out internal managed_apps and managed_profiles items
           const itemName = item.itemName || item.displayName || item.name;
-          return itemName !== 'managed_apps' && itemName !== 'managed_profiles';
+          const itemType = item.type || item.itemType || item.group;
+          
+          // Filter by name
+          if (itemName === 'managed_apps' || itemName === 'managed_profiles') return false;
+          
+          // Filter by type/group
+          if (itemType === 'managed_apps' || itemType === 'managed_profiles') return false;
+          
+          return true;
         });
       
       // Create a record for each install item

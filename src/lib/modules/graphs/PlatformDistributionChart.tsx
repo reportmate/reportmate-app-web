@@ -266,10 +266,9 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
   const handleFilterChange = (filterType: string, value: string, checked: boolean) => {
     if (!onFilterChange) return
 
-    const currentFilter = (filters as any)?.[filterType] || []
-    const newFilter = checked 
-      ? [...currentFilter, value]
-      : currentFilter.filter((v: string) => v !== value)
+    // Mutually exclusive behavior: if checking, replace entire filter with new value
+    // If unchecking, clear the filter (since only one can be selected)
+    const newFilter = checked ? [value] : []
 
     onFilterChange({
       ...filters,
@@ -475,6 +474,19 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
                   })}
                 </div>
               </div>
+            )}
+
+            {/* Clear Filters Button */}
+            {(filters?.architecture?.length > 0 || filters?.catalog?.length > 0 || filters?.usage?.length > 0) && (
+              <button
+                onClick={() => onFilterChange({})}
+                className="w-full px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded transition-colors flex items-center justify-center gap-1.5 mt-2"
+              >
+                <span>Clear filters</span>
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             )}
           </div>
         )}
