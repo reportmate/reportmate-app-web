@@ -535,7 +535,15 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     packagesToProcess = installs.cimian.items
       .filter((item: any) => {
         const name = item.itemName || item.displayName || item.name;
-        return name !== 'managed_apps' && name !== 'managed_profiles';
+        const type = item.type || item.itemType || item.group;
+        
+        // Filter out internal managed_apps and managed_profiles items by name
+        if (name === 'managed_apps' || name === 'managed_profiles') return false;
+        
+        // Filter out items that belong to managed_apps or managed_profiles types/groups
+        if (type === 'managed_apps' || type === 'managed_profiles') return false;
+        
+        return true;
       })
       .map((item: any) => ({
       ...item,
