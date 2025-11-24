@@ -50,7 +50,47 @@ export async function GET(request: Request) {
       const securityData = await response.json()
       console.log(`[SECURITY API] ${timestamp} - Successfully fetched ${securityData.length || 0} security records from FastAPI`)
       
-      return NextResponse.json(securityData, {
+      // Map the raw API data to the frontend Security interface
+      const mappedData = Array.isArray(securityData) ? securityData.map((item: any) => {
+        const raw = item.raw || {};
+        
+        // Determine encryption status (BitLocker for Windows, FileVault for macOS)
+        const isEncrypted = raw.encryption?.bitLocker?.isEnabled || raw.encryption?.fileVault?.isEnabled || false;
+        
+        return {
+          id: item.id,
+          deviceId: item.deviceId,
+          deviceName: item.deviceName,
+          serialNumber: item.serialNumber,
+          lastSeen: item.lastSeen,
+          collectedAt: item.collectedAt,
+          
+          // Map security fields
+          firewallEnabled: raw.firewall?.isEnabled || false,
+          fileVaultEnabled: isEncrypted,
+          
+          // macOS specific fields (default to false/empty for Windows)
+          gatekeeperEnabled: raw.gatekeeper?.isEnabled || false,
+          systemIntegrityProtection: raw.sip?.isEnabled || false,
+          
+          // Boot security
+          secureBootLevel: raw.tpm?.isEnabled ? 'Secure' : 'Not Secure',
+          externalBootLevel: 'Unknown',
+          
+          // Other security settings
+          activationLockEnabled: false,
+          remoteDesktopEnabled: false,
+          autoLoginUser: '',
+          passwordPolicyEnforced: true, // Default to true for enterprise devices
+          screenLockEnabled: true,      // Default to true for enterprise devices
+          
+          // Updates
+          automaticUpdates: raw.antivirus?.isUpToDate || false,
+          lastSecurityUpdate: raw.antivirus?.lastUpdate || item.lastSecurityScan || null
+        };
+      }) : [];
+      
+      return NextResponse.json(mappedData, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache', 

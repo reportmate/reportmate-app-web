@@ -355,8 +355,33 @@ export function ArchitectureDonutChart({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
       <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Architecture</h3>
       
-      {/* Legend Above Chart */}
-      <div className="space-y-1 mb-3">
+      {/* Donut Chart */}
+      <div className="flex justify-center mb-4">
+        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
+          {pieSlices.map((slice, index) => (
+            <path
+              key={slice.architecture}
+              d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
+              fill={slice.color}
+              stroke="white"
+              strokeWidth="2"
+              className={`transition-all duration-200 cursor-pointer ${
+                slice.isGreyedOut 
+                  ? 'opacity-30' 
+                  : slice.isSelected 
+                    ? 'opacity-100' 
+                    : selectedArchitectures.length > 0 
+                      ? 'opacity-40' 
+                      : 'opacity-100'
+              } hover:opacity-80`}
+              onClick={() => onArchitectureToggle && onArchitectureToggle(slice.architecture)}
+            />
+          ))}
+        </svg>
+      </div>
+
+      {/* Legend Below Chart */}
+      <div className="space-y-1">
         {archData.map(item => (
           <div 
             key={item.architecture} 
@@ -390,36 +415,11 @@ export function ArchitectureDonutChart({
                     ? 'text-gray-400 dark:text-gray-500' 
                     : 'text-gray-500 dark:text-gray-400'
               }`}>
-                {item.count} ({item.percentage}%)
+                ({item.count})
               </span>
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Donut Chart */}
-      <div className="flex justify-center">
-        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
-          {pieSlices.map((slice, index) => (
-            <path
-              key={slice.architecture}
-              d={createSlicePath(centerX, centerY, outerRadius, innerRadius, slice.startAngle, slice.endAngle)}
-              fill={slice.color}
-              stroke="white"
-              strokeWidth="2"
-              className={`transition-all duration-200 cursor-pointer ${
-                slice.isGreyedOut 
-                  ? 'opacity-30' 
-                  : slice.isSelected 
-                    ? 'opacity-100' 
-                    : selectedArchitectures.length > 0 
-                      ? 'opacity-40' 
-                      : 'opacity-100'
-              } hover:opacity-80`}
-              onClick={() => onArchitectureToggle && onArchitectureToggle(slice.architecture)}
-            />
-          ))}
-        </svg>
       </div>
     </div>
   )

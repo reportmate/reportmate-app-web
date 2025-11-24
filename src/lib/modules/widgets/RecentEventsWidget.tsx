@@ -241,7 +241,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
           text: 'Connecting', 
           color: 'text-yellow-600 dark:text-yellow-400', 
           dot: 'bg-yellow-500',
-          show: false,  // Hide this status as requested by user
+          show: false,
           tooltip: 'Real-time connection handshake in progress'
         }
       case 'error':

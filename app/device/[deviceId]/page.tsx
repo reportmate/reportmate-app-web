@@ -215,7 +215,6 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
 type TabType = 'info' | 'installs' | 'profiles' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'peripherals' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string; accentColor: string }[] = [
-  // New priority order as requested
   { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Device information, management status, and system details', accentColor: 'monochrome' },
   { id: 'installs', label: 'Installs', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4', description: 'Managed software installations and updates', accentColor: 'emerald' },
   { id: 'applications', label: 'Applications', icon: 'M19 12.2H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V10.2a2 2 0 00-2-2M5 12.2V10.2a2 2 0 012-2m0 0V6.2a2 2 0 012-2h6a2 2 0 012 2v2M7 8.2h10', description: 'Installed applications and packages', accentColor: 'blue' },

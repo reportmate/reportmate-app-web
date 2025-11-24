@@ -94,7 +94,8 @@ export async function GET(
   // CRITICAL: Check authentication (bypass for localhost development)
   const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
                      _request.nextUrl.hostname === '127.0.0.1' || 
-                     _request.nextUrl.hostname === '0.0.0.0'
+                     _request.nextUrl.hostname === '0.0.0.0' ||
+                     process.env.NODE_ENV === 'development'
   
   if (!isLocalhost) {
     const session = await getServerSession()
