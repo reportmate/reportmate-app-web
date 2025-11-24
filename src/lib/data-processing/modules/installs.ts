@@ -532,7 +532,12 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   
   // CRITICAL FIX: Check cimian.items FIRST as it contains the real data
   if (installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0) {
-    packagesToProcess = installs.cimian.items.map((item: any) => ({
+    packagesToProcess = installs.cimian.items
+      .filter((item: any) => {
+        const name = item.itemName || item.displayName || item.name;
+        return name !== 'managed_apps' && name !== 'managed_profiles';
+      })
+      .map((item: any) => ({
       ...item,
       name: item.itemName || item.displayName || item.name || 'Unknown',
       displayName: item.displayName || item.itemName || item.name || 'Unknown',

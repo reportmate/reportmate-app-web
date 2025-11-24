@@ -177,7 +177,7 @@ function EventsPageContent() {
           devices.forEach((device: any) => {
             if (device.serialNumber) {
               // Get inventory from the correct nested path (like dashboard does)
-              // Prioritize device.modules.inventory.deviceName as requested
+              // Prioritize device.modules.inventory.deviceName
               // Also check device.inventory (top level) and device.deviceName
               const inventory = device.modules?.inventory || device.inventory || {}
               const deviceName = 

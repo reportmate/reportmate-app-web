@@ -89,7 +89,6 @@ export function useProgressiveModuleLoading(
       return existingData
     }
     
-    // Mark as requested
     requestedModules.current.add(moduleName)
     
     try {

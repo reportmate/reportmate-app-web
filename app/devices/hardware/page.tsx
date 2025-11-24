@@ -320,6 +320,58 @@ function HardwarePageContent() {
       }
     }
     
+    // Get modules from main API or raw data
+    const modules = deviceFromMainAPI?.modules || hardwareRecord.raw?.modules || {}
+
+    // Ensure memory data is populated from modules if missing in record
+    let memory = hardwareRecord.memory
+    if (!memory || memory === 'Unknown') {
+      if (modules?.hardware?.memory) {
+        memory = modules.hardware.memory
+      } else if (hardwareRecord.raw?.memory) {
+        memory = hardwareRecord.raw.memory
+      } else if (modules?.system?.hardwareInfo?.memory) {
+        memory = modules.system.hardwareInfo.memory
+      }
+    }
+
+    // Ensure graphics data is populated from modules if missing in record
+    let graphics = hardwareRecord.graphics
+    if (!graphics || graphics === 'Unknown') {
+      if (modules?.hardware?.graphics) {
+        graphics = modules.hardware.graphics
+      } else if (hardwareRecord.raw?.graphics) {
+        graphics = hardwareRecord.raw.graphics
+      }
+    }
+
+    // Ensure processor data is populated from modules if missing in record
+    let processor = hardwareRecord.processor
+    let processorCores = hardwareRecord.processorCores
+    let processorSpeed = hardwareRecord.processorSpeed
+
+    if (!processor || processor === 'Unknown') {
+      let sourceProcessor = null
+      
+      if (modules?.hardware?.processor) {
+        sourceProcessor = modules.hardware.processor
+      } else if (hardwareRecord.raw?.processor) {
+        sourceProcessor = hardwareRecord.raw.processor
+      } else if (modules?.system?.hardwareInfo?.processor) {
+        sourceProcessor = modules.system.hardwareInfo.processor
+      }
+
+      if (sourceProcessor) {
+        processor = sourceProcessor
+        
+        // Try to extract details if it's an object
+        if (typeof sourceProcessor === 'object') {
+           if (!processorCores) processorCores = sourceProcessor.cores || sourceProcessor.core_count || sourceProcessor.logicalCores || sourceProcessor.number_of_cores
+           if (!processorSpeed) processorSpeed = sourceProcessor.speed || sourceProcessor.frequency || sourceProcessor.currentSpeed || sourceProcessor.current_clock_speed
+        }
+      }
+    }
+
     return {
       ...hardwareRecord,
       // Use the device name from the main API if available, fallback to hardware module data
@@ -328,6 +380,14 @@ function HardwarePageContent() {
       assetTag: deviceFromMainAPI?.modules?.inventory?.assetTag,
       // Include processed architecture
       architecture: architecture,
+      // CRITICAL: Include modules from main API to ensure widgets have access to full data
+      modules: modules,
+      // Ensure memory and graphics are populated
+      memory: memory,
+      graphics: graphics,
+      processor: processor,
+      processorCores: processorCores,
+      processorSpeed: processorSpeed
     }
   })
 
@@ -346,21 +406,44 @@ function HardwarePageContent() {
     
     if (typeof memory === 'object' && memory !== null) {
       const memObj = memory as any
-      if (memObj.totalPhysical) {
-        memoryGB = typeof memObj.totalPhysical === 'number' 
-          ? memObj.totalPhysical / (1024 * 1024 * 1024)
-          : parseFloat(memObj.totalPhysical) || 0
+      
+      // Try totalFormatted first
+      if (memObj.totalFormatted) {
+         const match = memObj.totalFormatted.match(/(\d+(?:\.\d+)?)\s*GB/i)
+         if (match) memoryGB = parseFloat(match[1])
+      }
+      // Try totalPhysical
+      else if (memObj.totalPhysical) {
+        const val = memObj.totalPhysical
+        if (typeof val === 'number') {
+           memoryGB = val / (1024 * 1024 * 1024)
+        } else if (typeof val === 'string') {
+           // If digits only, parse as bytes
+           if (/^\d+$/.test(val)) {
+              memoryGB = parseFloat(val) / (1024 * 1024 * 1024)
+           } else {
+              // Try parsing as string with units
+              const match = val.match(/(\d+(?:\.\d+)?)\s*GB/i)
+              if (match) memoryGB = parseFloat(match[1])
+           }
+        }
       }
     } else if (typeof memory === 'number') {
       memoryGB = memory / (1024 * 1024 * 1024)
     } else if (typeof memory === 'string') {
-      const match = memory.match(/(\d+(?:\.\d+)?)\s*GB/i)
-      if (match) {
-        memoryGB = parseFloat(match[1])
+      // If digits only, parse as bytes
+      if (/^\d+$/.test(memory)) {
+         memoryGB = parseFloat(memory) / (1024 * 1024 * 1024)
+      } else {
+         const match = memory.match(/(\d+(?:\.\d+)?)\s*GB/i)
+         if (match) {
+           memoryGB = parseFloat(match[1])
+         }
       }
     }
     
     // Match the exact ranges used in MemoryBreakdownChart
+    if (memoryGB <= 0) return 'Unknown'
     if (memoryGB <= 4) return '4 GB'
     if (memoryGB <= 8) return '8 GB'
     if (memoryGB <= 16) return '16 GB'
@@ -698,30 +781,63 @@ function HardwarePageContent() {
   }
 
   const formatMemory = (memory: string | number | object | any) => {
-    // Handle memory object with physical/virtual properties
+    // Helper to format bytes to GB without trailing .0
+    const formatGB = (bytes: number) => {
+      const gb = parseFloat((bytes / 1073741824).toFixed(1))
+      return `${gb} GB`
+    }
+
+    // Handle memory object
     if (typeof memory === 'object' && memory !== null) {
       const memObj = memory as any
-      if (memObj.totalPhysical) {
-        const physicalGB = typeof memObj.totalPhysical === 'number' 
-          ? (memObj.totalPhysical / 1073741824).toFixed(1)
-          : memObj.totalPhysical
-        return `${physicalGB} GB`
+      
+      // Check for totalFormatted first (e.g. "16 GB")
+      if (memObj.totalFormatted) {
+        return memObj.totalFormatted.replace('.0 GB', ' GB')
       }
-      // Fallback to any numeric property in the object
+
+      // Check for totalPhysical
+      if (memObj.totalPhysical) {
+        const val = memObj.totalPhysical
+        // If it's a string that looks like bytes (digits only)
+        if (typeof val === 'string' && /^\d+$/.test(val)) {
+           const bytes = parseFloat(val)
+           return bytes >= 1000000000 ? formatGB(bytes) : `${Math.round(bytes / 1048576)} MB`
+        }
+        // If it's a number
+        if (typeof val === 'number') {
+           return val >= 1000000000 ? formatGB(val) : `${Math.round(val / 1048576)} MB`
+        }
+        // If it's a string with units already
+        if (typeof val === 'string') {
+           return val.replace('.0 GB', ' GB')
+        }
+      }
+      
+      // Fallback to any numeric property
       const numericValue = Object.values(memObj).find(val => typeof val === 'number') as number
       if (numericValue) {
-        return numericValue >= 1000000000 ? `${(numericValue / 1073741824).toFixed(1)} GB` : `${Math.round(numericValue / 1048576)} MB`
+        return numericValue >= 1000000000 ? formatGB(numericValue) : `${Math.round(numericValue / 1048576)} MB`
       }
       return 'Unknown'
     }
     
-    // Handle numeric memory values
+    // Handle numeric memory values (assumed bytes)
     if (typeof memory === 'number') {
-      return memory >= 1000000000 ? `${(memory / 1073741824).toFixed(1)} GB` : `${Math.round(memory / 1048576)} MB`
+      return memory >= 1000000000 ? formatGB(memory) : `${Math.round(memory / 1048576)} MB`
     }
     
     // Handle string memory values
-    return memory || 'Unknown'
+    if (typeof memory === 'string') {
+       // If it's just digits, treat as bytes
+       if (/^\d+$/.test(memory)) {
+          const bytes = parseFloat(memory)
+          return bytes >= 1000000000 ? formatGB(bytes) : `${Math.round(bytes / 1048576)} MB`
+       }
+       return memory.replace('.0 GB', ' GB')
+    }
+    
+    return 'Unknown'
   }
 
   const formatStorage = (storage: any) => {
@@ -1085,9 +1201,9 @@ function HardwarePageContent() {
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48 min-w-0">Device</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32 min-w-0">Model</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48 min-w-0">Processor</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32 min-w-0">Graphics</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40 min-w-0">Model</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-56 min-w-0">Processor</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20 min-w-0">Graphics</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 min-w-0">Memory</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 min-w-0">Storage</th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-16 min-w-0">Arch</th>
@@ -1108,7 +1224,7 @@ function HardwarePageContent() {
                             {hw.assetTag ? ` | ${hw.assetTag}` : ''}
                           </div>
                         </td>
-                        <td className="px-4 py-4 min-w-0 w-32">
+                        <td className="px-4 py-4 min-w-0 w-40">
                           <div className="text-xs text-gray-900 dark:text-white">
                             {(() => {
                               // Try to get model from device data
@@ -1144,7 +1260,7 @@ function HardwarePageContent() {
                             })()}
                           </div>
                         </td>
-                        <td className="px-4 py-4 min-w-0 w-48">
+                        <td className="px-4 py-4 min-w-0 w-56">
                           <div className="text-xs text-gray-900 dark:text-white">
                             {typeof hw.processor === 'object' && hw.processor ? 
                               (hw.processor as any).name || (hw.processor as any).model || 'Unknown Processor' : 
@@ -1158,7 +1274,7 @@ function HardwarePageContent() {
                             </div>
                           )}
                         </td>
-                        <td className="px-4 py-4 min-w-0 w-32 text-xs text-gray-900 dark:text-white">
+                        <td className="px-4 py-4 min-w-0 w-20 text-xs text-gray-900 dark:text-white">
                           {(() => {
                             // Priority 1: Check main device API for graphics under modules.hardware.graphics
                             const deviceFromMainAPI = devices.find(d => 

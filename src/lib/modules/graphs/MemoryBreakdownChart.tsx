@@ -16,8 +16,9 @@ interface Device {
   modules?: {
     hardware?: {
       memory?: {
-        totalPhysical?: number
-        availablePhysical?: number
+        totalPhysical?: number | string
+        availablePhysical?: number | string
+        totalFormatted?: string
       }
       manufacturer?: string
       model?: string
@@ -36,8 +37,9 @@ interface Device {
     }
   }
   memory?: string | number | {
-    totalPhysical?: number
-    availablePhysical?: number
+    totalPhysical?: number | string
+    availablePhysical?: number | string
+    totalFormatted?: string
   }
 }
 
@@ -79,29 +81,32 @@ export function MemoryBreakdownChart({
 
     // Helper function to get memory size in GB
     const getMemoryGB = (device: Device): number => {
-      // Only enable debug logging in development AND when specifically needed
-      if (process.env.NODE_ENV === 'development' && process.env.DEBUG_MEMORY_CHART === 'true') {
-        console.log('Memory debug for device:', device.serialNumber || device.deviceName || device.name, {
-          // Check all possible memory locations based on HardwareTab.tsx
-          directMemory: device.memory,
-          hardwareModuleMemory: device.modules?.hardware?.memory,
-          // From HardwareRecord structure (hardware page)
-          memoryFromRecord: (device as any).memory,
-          device: device
-        })
-      }
-
       // Try the modules.hardware.memory structure first (from HardwareTab.tsx)
-      if (device.modules?.hardware?.memory?.totalPhysical) {
-        const totalBytes = device.modules.hardware.memory.totalPhysical
-        return Math.round(totalBytes / (1024 * 1024 * 1024))
+      if (device.modules?.hardware?.memory) {
+        const mem = device.modules.hardware.memory
+        // Handle totalPhysical
+        if (mem.totalPhysical) {
+          const totalBytes = typeof mem.totalPhysical === 'string' ? parseFloat(mem.totalPhysical) : mem.totalPhysical
+          if (!isNaN(totalBytes)) {
+            return Math.round(totalBytes / (1024 * 1024 * 1024))
+          }
+        }
+        // Handle totalFormatted (e.g. "16 GB")
+        if (mem.totalFormatted) {
+           const match = mem.totalFormatted.match(/(\d+\.?\d*)\s*GB/i)
+           if (match) return Math.round(parseFloat(match[1]))
+        }
       }
 
       // Try direct memory field (could be from HardwareRecord)
       const memoryField = device.memory || (device as any).memory
       if (memoryField) {
         if (typeof memoryField === 'number') {
-          // If it's already in GB
+          // If it's a large number, assume bytes
+          if (memoryField > 1000) {
+             return Math.round(memoryField / (1024 * 1024 * 1024))
+          }
+          // If small, assume GB
           return memoryField
         }
         if (typeof memoryField === 'string') {
@@ -110,12 +115,20 @@ export function MemoryBreakdownChart({
           if (match) {
             return Math.round(parseFloat(match[1]))
           }
+          // Try parsing as bytes string
+          const bytes = parseFloat(memoryField)
+          if (!isNaN(bytes) && bytes > 1000) {
+             return Math.round(bytes / (1024 * 1024 * 1024))
+          }
         }
         // Try to handle object memory
         if (typeof memoryField === 'object' && memoryField !== null) {
           const memObj = memoryField as any
           if (memObj.totalPhysical) {
-            return Math.round(memObj.totalPhysical / (1024 * 1024 * 1024))
+            const totalBytes = typeof memObj.totalPhysical === 'string' ? parseFloat(memObj.totalPhysical) : memObj.totalPhysical
+            if (!isNaN(totalBytes)) {
+               return Math.round(totalBytes / (1024 * 1024 * 1024))
+            }
           }
         }
       }

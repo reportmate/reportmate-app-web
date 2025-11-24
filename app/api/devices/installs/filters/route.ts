@@ -17,6 +17,9 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
 
   console.log('[INSTALLS FILTERS] Fetching fresh device data from API');
   
+  // Get managed identity principal ID from Azure Container Apps
+  const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+  
   // Build headers with authentication
   const headers: Record<string, string> = {
     'Content-Type': 'application/json'
@@ -77,7 +80,7 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
 
 export async function GET(request: Request) {
   // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost')
+  const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
   
   // CRITICAL: Check authentication (skip for localhost)
   if (!isLocalhost) {
@@ -116,7 +119,8 @@ export async function GET(request: Request) {
       if (m.installs?.cimian?.items) {
         for (const item of m.installs.cimian.items) {
           const name = item.itemName || item.displayName || item.name;
-          if (name) {
+          // Filter out internal managed_apps and managed_profiles items
+          if (name && name !== 'managed_apps' && name !== 'managed_profiles') {
             managed.add(name.trim());
           }
         }

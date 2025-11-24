@@ -6,7 +6,7 @@ export const revalidate = 0;
 
 export async function GET(request: Request) {
   // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost')
+  const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
   
   // Check authentication (skip for localhost)
   if (!isLocalhost) {
@@ -150,12 +150,16 @@ export async function GET(request: Request) {
       }
       
       // Filter by selected installs
-      const filteredItems = selectedInstalls.length > 0
+      const filteredItems = (selectedInstalls.length > 0
         ? cimianItems.filter((item: any) => {
             const itemName = item.itemName || item.displayName || item.name;
             return selectedInstalls.includes(itemName);
           })
-        : cimianItems;
+        : cimianItems).filter((item: any) => {
+          // Always filter out internal managed_apps and managed_profiles items
+          const itemName = item.itemName || item.displayName || item.name;
+          return itemName !== 'managed_apps' && itemName !== 'managed_profiles';
+        });
       
       // Create a record for each install item
       for (const item of filteredItems) {
