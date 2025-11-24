@@ -26,21 +26,30 @@ export async function POST(request: Request) {
     
     console.log(`[DEVICE API] ${timestamp} - Forwarding to Azure Functions API:`, apiBaseUrl)
     
+    // Get managed identity principal ID from Azure Container Apps
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+
     // Try Azure Functions first, fall back to local processing if it fails
     let response: Response | null = null
     let useLocalFallback = false
     
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'User-Agent': 'ReportMate-Frontend/1.0'
+      }
+
+      if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
+
       // Forward the request to Azure Functions /api/device endpoint
       // Use Azure Managed Identity for authentication (no passphrase needed for internal Azure-to-Azure communication)
       response = await fetch(`${apiBaseUrl}/api/device`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        },
+        headers,
         body: JSON.stringify(requestData)
       })
       

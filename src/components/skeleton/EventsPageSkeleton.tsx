@@ -79,13 +79,13 @@ export const EventsPageSkeleton: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-6 py-3">
+                      <td colSpan={6} className="px-6 py-2 h-14">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
-                          {Array.from({ length: 6 }).map((_, index) => (
+                          {Array.from({ length: 5 }).map((_, index) => (
                             <div
                               key={index}
-                              className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white dark:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500 transition-colors"
+                              className="w-32 justify-center flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white dark:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500 transition-colors"
                             >
                               <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse -mt-1"></div>
                               <div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
@@ -202,13 +202,13 @@ export const EventsPageSkeleton: React.FC = () => {
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-4 py-3">
+                      <td colSpan={6} className="px-4 py-2 h-14">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
-                          {Array.from({ length: 6 }).map((_, index) => (
+                          {Array.from({ length: 5 }).map((_, index) => (
                             <div
                               key={index}
-                              className="flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white dark:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500 transition-colors"
+                              className="w-32 justify-center flex items-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium bg-white dark:bg-gray-600 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-500 transition-colors"
                             >
                               <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse -mt-1"></div>
                               <div className="w-16 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
