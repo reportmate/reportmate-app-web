@@ -241,6 +241,20 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
         version: versionData.displayName, 
         count: versionData.count 
       }))
+      .filter(item => {
+        // Filter out generic "Windows" entry if it has 0% or if we have other specific versions
+        if (item.version === 'Windows') {
+           const totalDevices = devices.length
+           const percentage = Math.round((item.count / totalDevices) * 100)
+           // If 0% or if we have other versions, hide it
+           // We check if there are other versions by checking if the filtered list would be empty without this check
+           // But here we are inside filter. 
+           // Logic: Hide "Windows" if percentage is 0 OR if there are other entries in the original versions object
+           const hasOtherVersions = Object.keys(versions).length > 1
+           if (percentage === 0 || hasOtherVersions) return false
+        }
+        return true
+      })
       .sort((a, b) => {
         if (a.version === 'Unknown') return 1
         if (b.version === 'Unknown') return -1

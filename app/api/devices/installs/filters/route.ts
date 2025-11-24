@@ -119,8 +119,13 @@ export async function GET(request: Request) {
       if (m.installs?.cimian?.items) {
         for (const item of m.installs.cimian.items) {
           const name = item.itemName || item.displayName || item.name;
+          const type = item.type || item.itemType || item.group;
+          
           // Filter out internal managed_apps and managed_profiles items
-          if (name && name !== 'managed_apps' && name !== 'managed_profiles') {
+          const isInternal = (name === 'managed_apps' || name === 'managed_profiles') || 
+                             (type === 'managed_apps' || type === 'managed_profiles');
+                             
+          if (name && !isInternal) {
             managed.add(name.trim());
           }
         }
