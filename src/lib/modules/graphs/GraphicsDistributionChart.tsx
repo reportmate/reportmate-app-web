@@ -113,6 +113,18 @@ export function GraphicsDistributionChart({
         }
       }
 
+      // Try raw data as last resort
+      if ((device as any).raw?.graphics) {
+         const rawG = (device as any).raw.graphics
+         if (typeof rawG === 'string') return rawG
+         if (Array.isArray(rawG) && rawG.length > 0) {
+            return rawG[0].name || rawG[0].model || 'Unknown Graphics'
+         }
+         if (typeof rawG === 'object') {
+            return rawG.name || rawG.model || 'Unknown Graphics'
+         }
+      }
+
       return 'Unknown Graphics'
     }
 

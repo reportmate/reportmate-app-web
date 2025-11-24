@@ -11,7 +11,9 @@ export const revalidate = 0
 export async function GET(request: Request) {
   // CRITICAL: Check authentication
   const session = await getServerSession()
-  if (!session) {
+  
+  // Allow access in development mode without session
+  if (!session && process.env.NODE_ENV !== 'development') {
     return NextResponse.json({ 
       error: 'Unauthorized',
       details: 'Authentication required'
@@ -32,9 +34,23 @@ export async function GET(request: Request) {
     const fastApiUrl = `${API_BASE_URL}/api/devices/hardware?${searchParams.toString()}`
     console.log(`[HARDWARE PROXY] Calling: ${fastApiUrl}`)
     
+    // Build headers with authentication
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    
+    if (process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    } else {
+      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+      if (managedIdentityId) {
+        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+      }
+    }
+
     const response = await fetch(fastApiUrl, {
       method: 'GET',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       cache: 'no-store'
     })
     
