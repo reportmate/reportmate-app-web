@@ -26,6 +26,7 @@ interface InstallRecord {
   deviceId: string
   deviceName: string
   serialNumber: string
+  assetTag?: string
   lastSeen: string
   name: string
   version?: string
@@ -55,6 +56,8 @@ function InstallsPageContent() {
   const [selectedSoftwareRepo, setSelectedSoftwareRepo] = useState<string>('')
   const [selectedMunkiVersion, setSelectedMunkiVersion] = useState<string>('')
   const [selectedCimianVersion, setSelectedCimianVersion] = useState<string>('')
+  const [hasGeneratedReport, setHasGeneratedReport] = useState(false)
+  const [reportProgress, setReportProgress] = useState(0)
   
   // Sorting state for config report
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
@@ -288,13 +291,35 @@ function InstallsPageContent() {
       return
     }
 
+    let progressInterval: NodeJS.Timeout | null = null
+
     try {
       setLoading(true)
       setError(null)
+      setReportProgress(0)
+      setLoadingMessage('Initializing request...')
       
       // Collapse filters and clear search when generating report
       setFiltersExpanded(false)
       setSearchQuery('')
+
+      // Simulate progress for the long-running API call
+      progressInterval = setInterval(() => {
+        setReportProgress(prev => {
+          // Fast start, then slow down
+          const increment = prev < 30 ? 2 : prev < 60 ? 0.5 : prev < 85 ? 0.2 : 0.05
+          const next = Math.min(prev + increment, 95)
+          
+          // Update messages based on progress stages to give feedback
+          if (next < 20) setLoadingMessage('Querying device database...')
+          else if (next < 40) setLoadingMessage('Retrieving install records...')
+          else if (next < 60) setLoadingMessage('Processing device data...')
+          else if (next < 80) setLoadingMessage('Filtering results...')
+          else setLoadingMessage('Finalizing report...')
+          
+          return next
+        })
+      }, 200)
 
       const params = new URLSearchParams()
       selectedInstalls.forEach(install => params.append('installs', install))
@@ -311,7 +336,19 @@ function InstallsPageContent() {
       }
 
       const data = await response.json()
-      setInstalls(data)
+      
+      if (Array.isArray(data)) {
+        setInstalls(data)
+        setHasGeneratedReport(true)
+      } else {
+        console.error('API returned non-array data:', data)
+        if (data.error || data.message) {
+          setError(data.error || data.message)
+        } else {
+          setError('Received invalid data format from API')
+        }
+        setInstalls([])
+      }
       
       // Save current filters as "last applied" for smart button detection
       setLastAppliedFilters({
@@ -326,7 +363,13 @@ function InstallsPageContent() {
       console.error('Error generating installs report:', error)
       setError(error instanceof Error ? error.message : 'Unknown error occurred')
     } finally {
-      setLoading(false)
+      if (progressInterval) clearInterval(progressInterval)
+      setReportProgress(100)
+      setLoadingMessage('Complete!')
+      // Small delay to show 100% before hiding
+      setTimeout(() => {
+        setLoading(false)
+      }, 500)
     }
   }
 
@@ -403,6 +446,7 @@ function InstallsPageContent() {
   // Reset report handler
   const handleResetReport = () => {
     setInstalls([])
+    setHasGeneratedReport(false)
     setConfigReportData([])
     setIsConfigReport(false)
     setSelectedManifest('')
@@ -470,12 +514,16 @@ function InstallsPageContent() {
   const filteredInstalls = useMemo(() => {
     if (!searchQuery) return installs
     
+    const lowerQuery = searchQuery.toLowerCase()
+    
     return installs.filter(install => 
-      install.deviceName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      install.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      install.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      install.version?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      install.source?.toLowerCase().includes(searchQuery.toLowerCase())
+      install.deviceName?.toLowerCase().includes(lowerQuery) ||
+      install.serialNumber?.toLowerCase().includes(lowerQuery) ||
+      install.name?.toLowerCase().includes(lowerQuery) ||
+      install.version?.toLowerCase().includes(lowerQuery) ||
+      install.source?.toLowerCase().includes(lowerQuery) ||
+      // Add support for "Name - Version" search from widget clicks
+      `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
     )
   }, [installs, searchQuery])
 
@@ -526,11 +574,11 @@ function InstallsPageContent() {
       </header>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           
           {/* Header Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40 bg-white dark:bg-gray-800 rounded-t-xl">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {isConfigReport ? 'Config Report' : 'Installs Report'} {(isConfigReport ? configReportData.length : filteredInstalls.length) > 0 && `(${isConfigReport ? configReportData.length : filteredInstalls.length})`}
@@ -544,7 +592,9 @@ function InstallsPageContent() {
                 {isConfigReport
                   ? `Showing configuration details for ${configReportData.length} devices with Cimian or Munki`
                   : installs.length === 0 
-                    ? 'Select managed installs from the filters to generate your report, or click "Config Report" to view all device configurations'
+                    ? hasGeneratedReport
+                      ? 'No install records found matching your criteria.'
+                      : 'Select managed installs from the filters to generate your report, or click "Config Report" to view all device configurations'
                     : `Showing ${filteredInstalls.length} of ${installs.length} install records`
                 }
               </p>
@@ -554,14 +604,6 @@ function InstallsPageContent() {
             <div className="flex items-center gap-4">
               {/* Generate Report Button with Loading Spinner */}
               <div className="flex items-center gap-3">
-                {/* Loading Spinner - Left of Button */}
-                {loading && (
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Generating report...</span>
-                  </div>
-                )}
-
                 {/* Clear All Selections Button - Show when selections are active and NO report loaded */}
                 {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && !loading && installs.length === 0 && configReportData.length === 0 && (
                   <button
@@ -643,9 +685,9 @@ function InstallsPageContent() {
                         ...filteredInstalls.map(install => [
                           install.deviceName,
                           install.serialNumber,
-                          install.itemName,
-                          install.latestVersion || '',
-                          install.currentStatus || '',
+                          install.name,
+                          install.version || '',
+                          install.status || '',
                           install.usage || '',
                           install.catalog || '',
                           install.room || '',
@@ -1168,6 +1210,24 @@ function InstallsPageContent() {
             </div>
           </div>
 
+          {/* Search Input - Always visible when not loading */}
+          {!filtersLoading && (
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="relative max-w-md">
+                <input
+                  type="text"
+                  placeholder={filtersExpanded ? "Search filters..." : "Search installs, devices, versions..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+                <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+          )}
+
           {/* Status Overview Cards - Show only when report generated */}
           {installs.length > 0 && (
             <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
@@ -1201,14 +1261,27 @@ function InstallsPageContent() {
                     .slice(0, 10)
                     .map(([itemVersion, data]) => {
                       const percentage = Math.round((data.count / installs.filter(i => i.source === 'cimian' || i.source === 'munki').length) * 100)
+                      const isSelected = searchQuery === itemVersion
                       return (
-                        <div key={itemVersion} className="flex items-center">
+                        <div 
+                          key={itemVersion} 
+                          className={`flex items-center cursor-pointer p-2 rounded-lg transition-colors ${
+                            isSelected 
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 ring-1 ring-emerald-500' 
+                              : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+                          }`}
+                          onClick={() => setSearchQuery(isSelected ? '' : itemVersion)}
+                        >
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                              <span className={`text-sm font-medium truncate ${
+                                isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'
+                              }`}>
                                 {itemVersion}
                               </span>
-                              <span className="text-sm text-gray-500 dark:text-gray-400">
+                              <span className={`text-sm ${
+                                isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'
+                              }`}>
                                 {data.count} ({percentage}%)
                               </span>
                             </div>
@@ -1441,20 +1514,34 @@ function InstallsPageContent() {
             </div>
           )}
 
-          {/* Search Input - Only show when data loaded */}
-          {installs.length > 0 && (
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="relative max-w-md">
-                <input
-                  type="text"
-                  placeholder="Search installs, devices, versions..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                />
-                <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+
+
+          {/* Report Generation Loading State */}
+          {loading && (
+            <div className="px-6 py-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="max-w-lg mx-auto">
+                <div className="flex flex-col items-center justify-center text-center">
+                  <div className="mb-6 relative">
+                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
+                  </div>
+                  
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                    Generating Report
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto">
+                    {loadingMessage}
+                  </p>
+                  
+                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${reportProgress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    Processing data for {filterOptions.devicesWithData || 'all'} devices...
+                  </p>
+                </div>
               </div>
             </div>
           )}
@@ -1512,7 +1599,6 @@ function InstallsPageContent() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inventory</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Seen</th>
                   </tr>
                 </thead>
@@ -1521,8 +1607,21 @@ function InstallsPageContent() {
                     <tr key={install.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{install.deviceName}</div>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{install.serialNumber}</div>
+                          <Link
+                            href={`/device/${install.serialNumber}`}
+                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                          >
+                            {install.deviceName}
+                          </Link>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                            <span>{install.serialNumber}</span>
+                            {install.assetTag && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-600">•</span>
+                                <span>{install.assetTag}</span>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -1541,17 +1640,6 @@ function InstallsPageContent() {
                         }`}>
                           {(install.status || 'Unknown').toUpperCase()}
                         </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {install.deviceName || '-'}
-                        </div>
-                        <div className="text-sm text-gray-500 dark:text-gray-400 space-y-0.5">
-                          {install.usage && <div>Usage: {install.usage}</div>}
-                          {install.catalog && <div>Catalog: {install.catalog}</div>}
-                          {install.room && <div>Room: {install.room}</div>}
-                          {install.fleet && <div>Fleet: {install.fleet}</div>}
-                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-500 dark:text-gray-400">{formatRelativeTime(install.lastSeen)}</div>
