@@ -175,6 +175,8 @@ export async function GET(request: Request) {
         const catalog = parsedInventory?.catalog || '';
         const room = parsedInventory?.location || '';
         const fleet = parsedInventory?.fleet || parsedInventory?.department || '';
+        const assetTag = parsedInventory?.assetTag || '';
+        const deviceName = parsedInventory?.deviceName || device.deviceName || device.serialNumber || 'Unknown Device';
         
         // Apply inventory filters
         if (selectedUsages.length > 0 && !selectedUsages.includes(usage.toLowerCase())) continue;
@@ -185,8 +187,9 @@ export async function GET(request: Request) {
         installRecords.push({
           id: `${device.serialNumber}-${item.id || item.itemName}`,
           deviceId: device.deviceId,
-          deviceName: device.deviceName,
+          deviceName,
           serialNumber: device.serialNumber,
+          assetTag,
           lastSeen: device.lastSeen,
           name: item.itemName || item.displayName || item.name,
           version: item.latestVersion || item.installedVersion || '',
