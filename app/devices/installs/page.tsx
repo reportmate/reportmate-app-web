@@ -1046,7 +1046,12 @@ function InstallsPageContent() {
                         acc[version].devices.push(device)
                         return acc
                       }, {})
-                    ).sort(([,a], [,b]) => b.count - a.count)
+                    ).sort(([versionA], [versionB]) => {
+                      // Sort by version number (highest first), handle 'Unknown' specially
+                      if (versionA === 'Unknown') return 1
+                      if (versionB === 'Unknown') return -1
+                      return versionB.localeCompare(versionA, undefined, { numeric: true, sensitivity: 'base' })
+                    })
                     
                     return versionGroups.map(([version, data]) => {
                       const total = munkiDevices.length
@@ -1149,7 +1154,12 @@ function InstallsPageContent() {
                         acc[version].devices.push(device)
                         return acc
                       }, {})
-                    ).sort(([,a], [,b]) => b.count - a.count)
+                    ).sort(([versionA], [versionB]) => {
+                      // Sort by version number (highest first), handle 'Unknown' specially
+                      if (versionA === 'Unknown') return 1
+                      if (versionB === 'Unknown') return -1
+                      return versionB.localeCompare(versionA, undefined, { numeric: true, sensitivity: 'base' })
+                    })
                     
                     console.log('[CIMIAN WIDGET] Version groups:', versionGroups.length, 'versions')
                     
