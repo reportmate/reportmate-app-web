@@ -15,6 +15,7 @@ interface Security {
   serialNumber: string
   lastSeen: string
   collectedAt: string
+  platform: string
   firewallEnabled: boolean
   gatekeeperEnabled: boolean
   systemIntegrityProtection: boolean
@@ -28,6 +29,10 @@ interface Security {
   fileVaultEnabled: boolean
   automaticUpdates: boolean
   lastSecurityUpdate: string
+  secureShell?: {
+    statusDisplay: string
+    isConfigured: boolean
+  }
 }
 
 function LoadingSkeleton() {
@@ -234,7 +239,7 @@ function SecurityPageContent() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Protection</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Boot Security</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Access Control</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Updates</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Secure Shell</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
                 </tr>
               </thead>
@@ -279,7 +284,7 @@ function SecurityPageContent() {
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           }`}>
-                            FileVault {sec.fileVaultEnabled ? 'On' : 'Off'}
+                            {sec.platform === 'Windows' ? 'BitLocker' : 'FileVault'} {sec.fileVaultEnabled ? 'On' : 'Off'}
                           </span>
                           {sec.gatekeeperEnabled && (
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
@@ -295,8 +300,8 @@ function SecurityPageContent() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
                         <div>
-                          <div>Secure: {sec.secureBootLevel || 'Unknown'}</div>
-                          {sec.externalBootLevel && (
+                          <div>{sec.secureBootLevel || 'Unknown'}</div>
+                          {sec.externalBootLevel && sec.externalBootLevel !== 'Unknown' && (
                             <div className="text-xs text-gray-400 dark:text-gray-500">
                               External: {sec.externalBootLevel}
                             </div>
@@ -329,17 +334,16 @@ function SecurityPageContent() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <div className={`flex items-center gap-1 ${
-                            sec.automaticUpdates 
-                              ? 'text-green-600 dark:text-green-400'
-                              : 'text-red-600 dark:text-red-400'
-                          }`}>
-                            {sec.automaticUpdates ? '✓' : '✗'} Auto Updates
-                          </div>
-                          {sec.lastSecurityUpdate && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                              {formatRelativeTime(sec.lastSecurityUpdate)}
+                          {sec.secureShell ? (
+                            <div className={`flex items-center gap-1 ${
+                              sec.secureShell.isConfigured 
+                                ? 'text-green-600 dark:text-green-400'
+                                : 'text-gray-500 dark:text-gray-400'
+                            }`}>
+                              {sec.secureShell.isConfigured ? '✓' : '•'} {sec.secureShell.statusDisplay || 'Not Configured'}
                             </div>
+                          ) : (
+                            <span className="text-gray-400">Unknown</span>
                           )}
                         </div>
                       </td>

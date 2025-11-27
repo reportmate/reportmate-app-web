@@ -1,99 +1,67 @@
 /**
  * Security Tab Component  
- * Security features and compliance information with card-based design
+ * Security features and compliance information with 3x2 grid design
  */
 
 import React from 'react'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
-import { Lock, Fingerprint, Cpu } from 'lucide-react'
+import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
 }
 
-const StatusIndicator = ({ enabled, label }: { enabled: boolean | undefined, label: string }) => {
+const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled' }: { 
+  enabled: boolean | undefined, 
+  activeLabel?: string, 
+  inactiveLabel?: string 
+}) => {
   if (enabled === undefined) {
     return (
-      <div className="text-left">
-        <div className="text-lg font-semibold text-gray-500 dark:text-gray-400 mb-3">{label}</div>
-        <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
-          Status Unknown
-        </div>
-      </div>
+      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+        Unknown
+      </span>
     )
   }
   
   return (
-    <div className="text-left">
-      <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">{label}</div>
-      <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-        enabled 
-          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-          : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-      }`}>
-        {enabled ? 'Enabled' : 'Disabled'}
-      </div>
-    </div>
+    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+      enabled 
+        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+    }`}>
+      {enabled ? activeLabel : inactiveLabel}
+    </span>
   )
 }
 
+const DetailRow = ({ label, value, isStatus, enabled }: { 
+  label: string, 
+  value?: string, 
+  isStatus?: boolean, 
+  enabled?: boolean 
+}) => (
+  <div className="flex items-center justify-between py-1">
+    <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+    {isStatus ? (
+      <StatusBadge enabled={enabled} activeLabel={value || 'Yes'} inactiveLabel={value || 'No'} />
+    ) : (
+      <span className="text-xs font-medium text-gray-900 dark:text-white">{value || 'Unknown'}</span>
+    )}
+  </div>
+)
+
 export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
-  // Get security data from the new modular structure
   const rawSecurity = device?.modules?.security || device?.security
-
-  // Parse PowerShell objects to proper JavaScript objects
   const security = convertPowerShellObjects(rawSecurity)
-
-  // Debug logging to see exactly what data we're getting
-  console.log('🔐 SecurityTab DEBUG:', {
-    deviceName: device?.name,
-    hasModules: !!device?.modules,
-    hasModulesSecurity: !!device?.modules?.security,
-    hasDirectSecurity: !!device?.security,
-    rawSecurityData: rawSecurity,
-    parsedSecurityData: security,
-    windowsHelloData: security?.windowsHello,
-    windowsHelloStatusDisplay: security?.windowsHello?.statusDisplay,
-    credentialProviders: security?.windowsHello?.credentialProviders,
-    pinEnabled: security?.windowsHello?.credentialProviders?.pinEnabled,
-    faceRecognition: security?.windowsHello?.credentialProviders?.faceRecognitionEnabled,
-    fingerprint: security?.windowsHello?.credentialProviders?.fingerprintEnabled
-  })
-  
-  // DETAILED PowerShell parsing debug
-  console.log('🔍 DETAILED PARSING DEBUG:')
-  console.log('  📥 Raw security type:', typeof rawSecurity)
-  console.log('  📥 Raw security string preview:', typeof rawSecurity === 'string' ? rawSecurity.substring(0, 200) + '...' : 'NOT A STRING')
-  console.log('  📥 Raw security full data:', JSON.stringify(rawSecurity, null, 2))
-  console.log('  🔧 Parsed security:', JSON.stringify(security, null, 2))
-  
-  if (security?.windowsHello) {
-    console.log('  ✅ windowsHello found:')
-    console.log('    - statusDisplay:', security.windowsHello.statusDisplay)
-    console.log('    - credentialProviders:', JSON.stringify(security.windowsHello.credentialProviders, null, 2))
-    
-    if (security.windowsHello.credentialProviders) {
-      console.log('    - pinEnabled value:', security.windowsHello.credentialProviders.pinEnabled)
-      console.log('    - pinEnabled type:', typeof security.windowsHello.credentialProviders.pinEnabled)
-      console.log('    - faceRecognitionEnabled value:', security.windowsHello.credentialProviders.faceRecognitionEnabled)
-      console.log('    - faceRecognitionEnabled type:', typeof security.windowsHello.credentialProviders.faceRecognitionEnabled)
-      console.log('    - fingerprintEnabled value:', security.windowsHello.credentialProviders.fingerprintEnabled)
-      console.log('    - fingerprintEnabled type:', typeof security.windowsHello.credentialProviders.fingerprintEnabled)
-    } else {
-      console.log('    ❌ NO credentialProviders found')
-    }
-  } else {
-    console.log('  ❌ NO windowsHello found in security data')
-  }
+  const secureShell = security?.secureShell
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'
     try {
       const date = new Date(dateStr)
       if (isNaN(date.getTime())) return dateStr
-      
       return date.toLocaleDateString('en-US', {
-        year: 'numeric',
         month: 'short',
         day: 'numeric',
         hour: '2-digit',
@@ -113,12 +81,25 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Security Data</h3>
         <p className="text-gray-600 dark:text-gray-400">Security information is not available for this device.</p>
       </div>
-    );
+    )
   }
+
+  // Determine Windows Hello status
+  const windowsHelloEnabled = security.windowsHello?.statusDisplay !== 'Disabled' && (
+    security.windowsHello?.credentialProviders?.pinEnabled || 
+    security.windowsHello?.credentialProviders?.faceRecognitionEnabled ||
+    security.windowsHello?.credentialProviders?.fingerprintEnabled
+  )
+
+  // Determine TPM status
+  const tpmActive = security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated
+
+  // Determine SSH status
+  const sshConfigured = secureShell?.isConfigured || secureShell?.isServiceRunning
 
   return (
     <div className="space-y-6">
-      {/* Header with Last Scan */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
@@ -139,297 +120,171 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         )}
       </div>
 
-      {/* Protection Category - Big Card with 3 Columns */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-
+      {/* 3x2 Grid of Security Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         
-        <div className="grid grid-cols-3 gap-8 divide-x divide-gray-200 dark:divide-gray-700">
-          {/* Antivirus */}
-          <div className="px-4 first:pl-0">
-            <StatusIndicator enabled={security.antivirus?.isEnabled} label="Antivirus" />
-            {security.antivirus && (
-              <div className="mt-4 space-y-2">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {security.antivirus.name || 'Unknown Antivirus'}
-                </div>
-                {security.antivirus.version && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Version: {security.antivirus.version}
-                  </div>
-                )}
-                {security.antivirus.isUpToDate !== undefined && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Status: {security.antivirus.isUpToDate ? 'Up to date' : 'Needs update'}
-                  </div>
-                )}
-                {security.antivirus.lastUpdate && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Updated: {formatDate(security.antivirus.lastUpdate)}
-                  </div>
-                )}
-                {security.antivirus.lastScan && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Last Scan: {formatDate(security.antivirus.lastScan)} 
-                    {security.antivirus.scanType && ` (${security.antivirus.scanType})`}
-                  </div>
-                )}
-                {security.antivirus.realTimeProtection !== undefined && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Real-time Protection: {security.antivirus.realTimeProtection ? 'Enabled' : 'Disabled'}
-                  </div>
-                )}
-                {security.antivirus.definitionsVersion && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Definitions: {security.antivirus.definitionsVersion}
-                  </div>
-                )}
+        {/* 1. Encryption Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
               </div>
-            )}
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
+            </div>
+            <StatusBadge enabled={security.encryption?.bitLocker?.isEnabled} activeLabel="Encrypted" inactiveLabel="Not Encrypted" />
           </div>
-
-          {/* Firewall */}
-          <div className="px-4">
-            <StatusIndicator enabled={security.firewall?.isEnabled} label="Firewall" />
-            {security.firewall && (
-              <div className="mt-3 space-y-1">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  Windows Firewall
-                </div>
-                {security.firewall.profile && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Profile: {security.firewall.profile}
-                  </div>
-                )}
-              </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              BitLocker Drive Encryption
+            </div>
+            {security.encryption?.bitLocker?.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 ? (
+              <DetailRow label="Drives" value={security.encryption.bitLocker.encryptedDrives.join(', ')} />
+            ) : (
+              <DetailRow label="Drives" value="None encrypted" />
             )}
-          </div>
-
-          {/* BitLocker */}
-          <div className="px-4 last:pr-0">
-            <StatusIndicator enabled={security.encryption?.bitLocker?.isEnabled} label="BitLocker" />
-            {security.encryption?.bitLocker && (
-              <div className="mt-4 space-y-2">
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
-                  {security.encryption.bitLocker.isEnabled ? 'Encrypted' : 'Not Encrypted'}
-                </div>
-                {security.encryption.bitLocker.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {security.encryption.bitLocker.encryptedDrives.length} drive(s): {security.encryption.bitLocker.encryptedDrives.join(', ')}
-                  </div>
-                )}
-                {security.encryption.bitLocker.encryptionMethod && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Method: {security.encryption.bitLocker.encryptionMethod}
-                  </div>
-                )}
-                {security.encryption.bitLocker.status && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Status: {security.encryption.bitLocker.status}
-                  </div>
-                )}
-                {security.encryption.bitLocker.protectionStatus && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    Protection: {security.encryption.bitLocker.protectionStatus}
-                  </div>
-                )}
-              </div>
-            )}
+            <DetailRow label="Method" value={security.encryption?.bitLocker?.encryptionMethod || 'XTS-AES'} />
+            <DetailRow label="Status" value={security.encryption?.bitLocker?.status || (security.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
           </div>
         </div>
-      </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        {/* Authentication Card - 50% Left */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-              <Fingerprint className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+        {/* 2. Authentication Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                <Fingerprint className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Authentication</h3>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Authentication</h2>
+            <StatusBadge enabled={windowsHelloEnabled} />
           </div>
-
-          {security.windowsHello ? (
-            <div className="space-y-6">
-              <div className="text-left">
-                <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Hello</div>
-                <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  security.windowsHello.statusDisplay !== 'Disabled' && (
-                    security.windowsHello.credentialProviders?.pinEnabled || 
-                    security.windowsHello.credentialProviders?.faceRecognitionEnabled ||
-                    security.windowsHello.credentialProviders?.fingerprintEnabled
-                  ) ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                }`}>
-                  {security.windowsHello.statusDisplay !== 'Disabled' && (
-                    security.windowsHello.credentialProviders?.pinEnabled || 
-                    security.windowsHello.credentialProviders?.faceRecognitionEnabled ||
-                    security.windowsHello.credentialProviders?.fingerprintEnabled
-                  ) ? 'Enabled' : 'Disabled'}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">PIN Status:</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    security.windowsHello.credentialProviders?.pinEnabled 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {security.windowsHello.credentialProviders?.pinEnabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Biometric Status:</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    (security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                     security.windowsHello.credentialProviders?.fingerprintEnabled)
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {(security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                      security.windowsHello.credentialProviders?.fingerprintEnabled) ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-
-                {/* Policy Information */}
-                {security.windowsHello.policies && (
-                  <>
-                                        <div className="flex items-center justify-between py-1">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">Domain PIN Logon:</span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        security.windowsHello.policies.allowDomainPinLogon
-                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        {security.windowsHello.policies.allowDomainPinLogon ? 'Allowed' : 'Not Allowed'}
-                      </span>
-                    </div>
-                    
-                    <div className="flex items-center justify-between py-1">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">Biometric Logon:</span>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        security.windowsHello.policies.biometricLogonEnabled
-                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        {security.windowsHello.policies.biometricLogonEnabled ? 'Enabled' : 'Disabled'}
-                      </span>
-                    </div>
-
-                    {/* Passport Policies */}
-                    {security.windowsHello.policies.passportPolicies && Array.isArray(security.windowsHello.policies.passportPolicies) && security.windowsHello.policies.passportPolicies.length > 0 && (
-                      <div className="border-t border-gray-100 dark:border-gray-700 pt-4">
-                        <span className="text-sm font-medium text-gray-900 dark:text-white mb-2 block">Passport Policies:</span>
-                        <div className="space-y-2">
-                          {security.windowsHello.policies.passportPolicies.map((policy: any, index: number) => (
-                            <div key={index} className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded-lg p-2">
-                              {typeof policy === 'string' ? policy : JSON.stringify(policy)}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              Windows Hello
             </div>
-          ) : (
-                        <div className="text-left py-8">
-              <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Hello</div>
-              <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
-                Not Available
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-                Windows Hello is not configured on this device
-              </div>
-            </div>
-          )}
+            <DetailRow 
+              label="PIN" 
+              isStatus 
+              enabled={security.windowsHello?.credentialProviders?.pinEnabled} 
+            />
+            <DetailRow 
+              label="Face Recognition" 
+              isStatus 
+              enabled={security.windowsHello?.credentialProviders?.faceRecognitionEnabled} 
+            />
+            <DetailRow 
+              label="Fingerprint" 
+              isStatus 
+              enabled={security.windowsHello?.credentialProviders?.fingerprintEnabled} 
+            />
+            <DetailRow 
+              label="Domain PIN Logon" 
+              isStatus 
+              enabled={security.windowsHello?.policies?.allowDomainPinLogon} 
+            />
+          </div>
         </div>
 
-        {/* Hardware Card - 50% Right */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <div className="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-              <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+        {/* 3. Protection Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Protection</h3>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Hardware</h2>
+            <StatusBadge enabled={security.antivirus?.isEnabled} />
           </div>
-
-          {security.tpm ? (
-            <div className="space-y-6">
-              <div className="text-left">
-                <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Trusted Platform Module</div>
-                <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  (security.tpm.isPresent && security.tpm.isEnabled && security.tpm.isActivated)
-                    ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                    : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                }`}>
-                  {(security.tpm.isPresent && security.tpm.isEnabled && security.tpm.isActivated) ? 'Active' : 'Inactive'}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Present:</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    security.tpm.isPresent 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {security.tpm.isPresent ? 'Yes' : 'No'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Enabled:</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    security.tpm.isEnabled 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {security.tpm.isEnabled ? 'Yes' : 'No'}
-                  </span>
-                </div>
-                
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">Activated:</span>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    security.tpm.isActivated 
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' 
-                      : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                  }`}>
-                    {security.tpm.isActivated ? 'Yes' : 'No'}
-                  </span>
-                </div>
-
-                {security.tpm.version && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">Version:</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{security.tpm.version}</span>
-                  </div>
-                )}
-
-                {security.tpm.manufacturer && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">Manufacturer:</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{security.tpm.manufacturer}</span>
-                  </div>
-                )}
-              </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              {security.antivirus?.name || 'Windows Defender'}
             </div>
-          ) : (
-            <div className="text-left py-8">
-              <div className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Trusted Platform Module</div>
-              <div className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 mb-2">
-                Not Available
-              </div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 mt-4">
-                TPM information is not available for this device
-              </div>
-            </div>
-          )}
+            <DetailRow label="Version" value={security.antivirus?.version} />
+            <DetailRow label="Definitions" value={security.antivirus?.isUpToDate ? 'Up to date' : 'Needs update'} />
+            <DetailRow label="Last Update" value={formatDate(security.antivirus?.lastUpdate)} />
+            <DetailRow label="Last Scan" value={`${formatDate(security.antivirus?.lastScan)}${security.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`} />
+          </div>
         </div>
+
+        {/* 4. Tampering Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tampering</h3>
+            </div>
+            <StatusBadge enabled={tpmActive} activeLabel="Secure" inactiveLabel="Not Secure" />
+          </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              Trusted Platform Module
+            </div>
+            <DetailRow label="Present" isStatus enabled={security.tpm?.isPresent} />
+            <DetailRow label="Enabled" isStatus enabled={security.tpm?.isEnabled} />
+            <DetailRow label="Activated" isStatus enabled={security.tpm?.isActivated} />
+            <DetailRow label="Version" value={security.tpm?.version} />
+            <DetailRow label="Manufacturer" value={security.tpm?.manufacturer} />
+          </div>
+        </div>
+
+        {/* 5. Firewall Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                <BrickWall className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Firewall</h3>
+            </div>
+            <StatusBadge enabled={security.firewall?.isEnabled} />
+          </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              Windows Firewall
+            </div>
+            <DetailRow label="Profile" value={security.firewall?.profile || 'Domain/Private/Public'} />
+            <DetailRow label="Inbound Rules" value={security.firewall?.inboundRules?.toString() || 'Active'} />
+            <DetailRow label="Outbound Rules" value={security.firewall?.outboundRules?.toString() || 'Active'} />
+          </div>
+        </div>
+
+        {/* 6. Secure Shell Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+                <Terminal className="w-5 h-5 text-slate-700 dark:text-slate-300" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Secure Shell</h3>
+            </div>
+            <StatusBadge 
+              enabled={sshConfigured} 
+              activeLabel={secureShell?.statusDisplay || 'Configured'} 
+              inactiveLabel={secureShell?.statusDisplay || 'Not Configured'} 
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+              OpenSSH Server
+            </div>
+            <DetailRow label="Installed" isStatus enabled={secureShell?.isInstalled} />
+            <DetailRow label="Service Running" isStatus enabled={secureShell?.isServiceRunning} />
+            <DetailRow label="Firewall Rule" isStatus enabled={secureShell?.isFirewallRulePresent} />
+            <DetailRow label="Keys Deployed" isStatus enabled={secureShell?.isKeyDeployed} />
+            <DetailRow label="Service Status" value={secureShell?.serviceStatus || 'Unknown'} />
+          </div>
+        </div>
+
       </div>
     </div>
   )
