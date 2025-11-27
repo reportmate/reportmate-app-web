@@ -64,6 +64,7 @@ export async function GET(request: Request) {
           serialNumber: item.serialNumber,
           lastSeen: item.lastSeen,
           collectedAt: item.collectedAt,
+          platform: item.platform || 'Unknown',
           
           // Map security fields
           firewallEnabled: raw.firewall?.isEnabled || false,
@@ -86,7 +87,10 @@ export async function GET(request: Request) {
           
           // Updates
           automaticUpdates: raw.antivirus?.isUpToDate || false,
-          lastSecurityUpdate: raw.antivirus?.lastUpdate || item.lastSecurityScan || null
+          lastSecurityUpdate: raw.antivirus?.lastUpdate || item.lastSecurityScan || null,
+
+          // Secure Shell
+          secureShell: raw.secureShell || null
         };
       }) : [];
       
