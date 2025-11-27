@@ -29,6 +29,7 @@ interface InventoryItem {
   manufacturer?: string
   model?: string
   uuid?: string
+  archived?: boolean
   raw?: any
 }
 
@@ -53,7 +54,7 @@ function DevicesPageContent() {
       }
       
       const urlStatus = searchParams.get('status')
-      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
+      if (urlStatus && ['active', 'stale', 'missing', 'archived'].includes(urlStatus.toLowerCase())) {
         setStatusFilter(urlStatus.toLowerCase())
       }
       
@@ -85,9 +86,10 @@ function DevicesPageContent() {
           const inventoryItems = devices.map((device: any) => {
             // Extract inventory data from modules (where it actually lives)
             const inventory = device.modules?.inventory || {}
+            const isArchived = device.archived === true
             
             // Calculate status from lastSeen timestamp
-            const calculatedStatus = calculateDeviceStatus(device.lastSeen)
+            const calculatedStatus = calculateDeviceStatus(device.lastSeen, {}, isArchived)
             
             return {
               id: device.serialNumber || device.deviceId,
@@ -111,6 +113,7 @@ function DevicesPageContent() {
               manufacturer: inventory.manufacturer,
               model: inventory.model,
               uuid: inventory.uuid || device.deviceId,
+              archived: isArchived,
               raw: { ...device, status: calculatedStatus }
             }
           })
@@ -160,6 +163,9 @@ function DevicesPageContent() {
             return false
           }
         })
+      } else {
+        // If status is 'all', exclude archived devices by default
+        filtered = filtered.filter(item => !item.archived)
       }
       
       // Apply usage filter
@@ -353,7 +359,7 @@ function DevicesPageContent() {
       
       // Calculate counts from search-filtered results
       return {
-        all: searchFiltered.length,
+        all: searchFiltered.filter(item => !item.archived).length,
         active: searchFiltered.filter(item => 
           item.raw?.status?.toLowerCase() === 'active'
         ).length,
@@ -362,6 +368,9 @@ function DevicesPageContent() {
         ).length,
         missing: searchFiltered.filter(item => 
           item.raw?.status?.toLowerCase() === 'missing'
+        ).length,
+        archived: searchFiltered.filter(item => 
+          item.archived
         ).length,
         assigned: searchFiltered.filter(item => 
           item.usage?.toLowerCase() === 'assigned'
@@ -384,7 +393,7 @@ function DevicesPageContent() {
       }
     } catch (e) {
       console.error('Error calculating filter counts:', e)
-      return { all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
+      return { all: 0, active: 0, stale: 0, missing: 0, archived: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
     }
   }
 

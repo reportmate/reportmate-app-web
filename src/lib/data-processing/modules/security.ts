@@ -14,8 +14,21 @@ export interface SecurityInfo {
   firewall: FirewallInfo
   antivirus: AntivirusInfo
   encryption: EncryptionInfo
+  secureShell?: SecureShellInfo
   policies: PolicyInfo[]
   summary: SecuritySummary
+}
+
+export interface SecureShellInfo {
+  isInstalled: boolean
+  isServiceRunning: boolean
+  isFirewallRulePresent: boolean
+  isConfigured: boolean
+  isKeyDeployed: boolean
+  arePermissionsCorrect: boolean
+  serviceStatus: string
+  configStatus: string
+  statusDisplay: string
 }
 
 export interface ThreatInfo {
@@ -137,6 +150,7 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     firewall: security.firewall || createEmptyFirewall(),
     antivirus: security.antivirus || createEmptyAntivirus(),
     encryption: security.encryption || createEmptyEncryption(),
+    secureShell: security.secureShell || createEmptySecureShell(),
     
     // Read policy compliance
     policies: security.policies ? security.policies.map(mapPolicy) : [],
@@ -247,6 +261,20 @@ function createEmptyEncryption(): EncryptionInfo {
   return {
     diskEncryption: false,
     networkEncryption: false
+  }
+}
+
+function createEmptySecureShell(): SecureShellInfo {
+  return {
+    isInstalled: false,
+    isServiceRunning: false,
+    isFirewallRulePresent: false,
+    isConfigured: false,
+    isKeyDeployed: false,
+    arePermissionsCorrect: false,
+    serviceStatus: 'Unknown',
+    configStatus: 'Unknown',
+    statusDisplay: 'Unknown'
   }
 }
 

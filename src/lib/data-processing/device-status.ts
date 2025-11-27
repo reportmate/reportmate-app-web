@@ -3,7 +3,7 @@
  * Handles all device status calculation logic in isolation
  */
 
-export type DeviceStatus = 'active' | 'stale' | 'warning' | 'error' | 'missing'
+export type DeviceStatus = 'active' | 'stale' | 'warning' | 'error' | 'missing' | 'archived'
 
 interface StatusConfig {
   activeThresholdHours: number    // Default: 24
@@ -21,10 +21,12 @@ const DEFAULT_CONFIG: StatusConfig = {
  */
 export function calculateDeviceStatus(
   lastSeen: string | Date | null | undefined, 
-  config: Partial<StatusConfig> = {}
+  config: Partial<StatusConfig> = {},
+  isArchived: boolean = false
 ): DeviceStatus {
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
   
+  if (isArchived) return 'archived'
   if (!lastSeen) return 'missing'
   
   try {

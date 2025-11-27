@@ -612,6 +612,13 @@ export default function DeviceDetailPage() {
     }
   }
 
+  // Copy pill value to clipboard - silent copy, no visual feedback
+  const copyPillValue = (value: string) => {
+    navigator.clipboard.writeText(value).catch((error) => {
+      console.error('Failed to copy:', error)
+    })
+  }
+
   const handleCopyShareableLink = async () => {
     try {
       // Get the preferred identifier (asset tag first, then serial number)
@@ -650,15 +657,30 @@ export default function DeviceDetailPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
-                {/* Devices back button - hidden on mobile */}
-                <Link
-                  href="/devices"
-                  className="hidden sm:flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                {/* Breadcrumbs with sliding hover effect */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <Link
+                    href="/"
+                    className="group flex items-center gap-1 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4 transform scale-110 origin-bottom" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                    </svg>
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[100px] transition-all duration-300 ease-in-out">Dashboard</span>
+                  </Link>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                </Link>
+                  <Link
+                    href="/devices"
+                    className="group flex items-center gap-1 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all duration-200"
+                  >
+                    <svg className="w-4 h-4 transform scale-110 origin-bottom" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[100px] transition-all duration-300 ease-in-out">Devices</span>
+                  </Link>
+                </div>
                 <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
                 
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
@@ -666,23 +688,61 @@ export default function DeviceDetailPage() {
                     {deviceInfo.name}
                   </h1>
                   
-                  {/* Asset tag and serial - below device name on mobile, inline on desktop */}
+                  {/* Clickable pills with copy functionality */}
                   <div className="flex items-center gap-2 mt-1 sm:mt-0">
                     {(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
-                        {deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}
-                      </span>
+                      <button
+                        onClick={() => copyPillValue(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag || '')}
+                        className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        title="Click to copy asset tag"
+                      >
+                        <span className="truncate max-w-[100px]">{deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}</span>
+                      </button>
                     )}
                     {(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber) && (
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 min-w-[80px] justify-center">
-                        {deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber}
-                      </span>
+                      <button
+                        onClick={() => copyPillValue(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber || '')}
+                        className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        title="Click to copy serial number"
+                      >
+                        <span className="truncate max-w-[130px]">{deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber}</span>
+                      </button>
                     )}
+                    {(() => {
+                      // Get active IP address
+                      const getActiveIPAddress = () => {
+                        if (deviceInfo.modules?.network?.interfaces) {
+                          const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
+                            iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
+                          )
+                          if (activeInterface) {
+                            const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
+                              /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                            )
+                            if (ipv4) return ipv4
+                          }
+                        }
+                        return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
+                      }
+                      
+                      const ipAddress = getActiveIPAddress()
+                      if (!ipAddress) return null
+                      
+                      return (
+                        <button
+                          onClick={() => copyPillValue(ipAddress)}
+                          className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          title="Click to copy IP address"
+                        >
+                          <span className="truncate max-w-[140px]">{ipAddress}</span>
+                        </button>
+                      )
+                    })()}
                   </div>
                 </div>
               </div>
               
-              {/* Last seen and action buttons - hidden on mobile */}
+              {/* Last seen, status pill, and action buttons - hidden on mobile */}
               <div className="hidden sm:flex items-center gap-4 pr-4">
                 <div className="flex items-center gap-2 text-2sm text-gray-600 dark:text-gray-400">
                   {/* Subtle version indicator dot */}
@@ -696,6 +756,29 @@ export default function DeviceDetailPage() {
                       </div>
                     </div>
                   )}
+                  {/* Status pill for Stale/Missing devices - moved before Last seen */}
+                  {(() => {
+                    const lastSeenDate = deviceInfo.lastSeen ? new Date(deviceInfo.lastSeen) : null
+                    if (!lastSeenDate) return null
+                    
+                    const now = new Date()
+                    const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+                    
+                    if (hoursSinceLastSeen > 72) {
+                      return (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                          Missing
+                        </span>
+                      )
+                    } else if (hoursSinceLastSeen > 24) {
+                      return (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                          Stale
+                        </span>
+                      )
+                    }
+                    return null
+                  })()}
                   <span>Last seen {formatRelativeTime(deviceInfo.lastSeen)}</span>
                 </div>
                 
@@ -778,6 +861,44 @@ export default function DeviceDetailPage() {
                   )
                 })()}
                 
+                {/* Open Shell button */}
+                {(() => {
+                  // Get active network interface IP address
+                  const getActiveIPAddress = () => {
+                    if (deviceInfo.modules?.network?.interfaces) {
+                      const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
+                        iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
+                      )
+                      if (activeInterface) {
+                        const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
+                          /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                        )
+                        if (ipv4) return ipv4
+                      }
+                    }
+                    return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
+                  }
+                  
+                  const ipAddress = getActiveIPAddress()
+                  if (!ipAddress) return null
+                  
+                  return (
+                    <button
+                      onClick={() => {
+                        const sshUrl = `ssh://${ipAddress}`
+                        window.location.href = sshUrl
+                      }}
+                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900 dark:hover:text-cyan-300"
+                      title={`Open SSH shell to ${ipAddress}`}
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      <span>Shell</span>
+                    </button>
+                  )
+                })()}
+                
                 {/* Copy shareable link button */}
                 <button
                   onClick={handleCopyShareableLink}
@@ -804,17 +925,6 @@ export default function DeviceDetailPage() {
                     </>
                   )}
                 </button>
-                
-                {/* Subtle loading indicator when background modules are loading */}
-                {!allModulesLoaded && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>Loading modules...</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -824,7 +934,7 @@ export default function DeviceDetailPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="border-b border-gray-200 dark:border-gray-700">
             {/* Desktop tabs - Icon + Hover Labels (always collapsed, expands on hover) */}
-            <nav ref={tabsContainerRef} className="hidden sm:flex -mb-px space-x-2 md:space-x-4 lg:space-x-6 xl:space-x-8 justify-start">
+            <nav ref={tabsContainerRef} className="hidden sm:flex -mb-px space-x-2 md:space-x-4 lg:space-x-6 xl:space-x-8 justify-start items-center">
               {/* Dynamically visible tabs based on container width */}
               {tabs.slice(0, visibleTabsCount).map((tab) => {
                 const isActive = activeTab === tab.id
@@ -859,6 +969,17 @@ export default function DeviceDetailPage() {
                   activeTab={activeTab}
                   onTabChange={handleTabChange}
                 />
+              )}
+              
+              {/* Loading indicator in tab row */}
+              {!allModulesLoaded && (
+                <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 ml-4 pb-0.5">
+                  <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Loading modules...</span>
+                </div>
               )}
             </nav>
 
