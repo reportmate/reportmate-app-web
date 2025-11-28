@@ -54,7 +54,7 @@ function DevicesPageContent() {
       }
       
       const urlStatus = searchParams.get('status')
-      if (urlStatus && ['active', 'stale', 'missing', 'archived'].includes(urlStatus.toLowerCase())) {
+      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
         setStatusFilter(urlStatus.toLowerCase())
       }
       
@@ -154,8 +154,10 @@ function DevicesPageContent() {
       
       // Apply status filter first
       if (statusFilter !== 'all') {
+        // Show non-archived devices matching the status
         filtered = filtered.filter(item => {
           try {
+            if (item.archived) return false // Never show archived in status filters
             const status = item.raw?.status?.toLowerCase()
             return status === statusFilter
           } catch (e) {
@@ -369,10 +371,7 @@ function DevicesPageContent() {
         missing: searchFiltered.filter(item => 
           item.raw?.status?.toLowerCase() === 'missing'
         ).length,
-        archived: searchFiltered.filter(item => 
-          item.archived
-        ).length,
-        assigned: searchFiltered.filter(item => 
+        assigned: searchFiltered.filter(item =>
           item.usage?.toLowerCase() === 'assigned'
         ).length,
         shared: searchFiltered.filter(item => 
@@ -393,7 +392,7 @@ function DevicesPageContent() {
       }
     } catch (e) {
       console.error('Error calculating filter counts:', e)
-      return { all: 0, active: 0, stale: 0, missing: 0, archived: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
+      return { all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
     }
   }
 
@@ -987,14 +986,17 @@ function DevicesPageContent() {
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         {(() => {
-                          // Use the status from the API instead of calculating locally
-                          const status = item.raw?.status || 'missing'
+                          // Use archived flag first, then status from API
+                          const isArchived = item.archived === true
+                          const status = isArchived ? 'archived' : (item.raw?.status || 'missing')
                           const getStatusColor = (status: string) => {
                             switch (status.toLowerCase()) {
                               case 'active':
                                 return 'text-green-700 dark:text-green-400'
                               case 'stale':
                                 return 'text-yellow-700 dark:text-yellow-400'
+                              case 'archived':
+                                return 'text-slate-500 dark:text-slate-400'
                               case 'missing':
                               default:
                                 return 'text-gray-700 dark:text-gray-400'
@@ -1004,7 +1006,7 @@ function DevicesPageContent() {
                           return (
                             <span 
                               className={`text-sm font-medium ${getStatusColor(status)}`}
-                              title={`Last seen: ${formatRelativeTime(item.lastSeen)}`}
+                              title={isArchived ? 'Device is archived' : `Last seen: ${formatRelativeTime(item.lastSeen)}`}
                             >
                               {status.charAt(0).toUpperCase() + status.slice(1)}
                             </span>

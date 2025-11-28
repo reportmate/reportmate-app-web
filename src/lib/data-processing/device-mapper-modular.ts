@@ -25,6 +25,10 @@ export interface ProcessedDeviceInfo {
   createdAt?: string
   registrationDate?: string  // Alias for createdAt for clearer UI display
   
+  // Archive status
+  archived?: boolean
+  archivedAt?: string
+  
   // Client information
   clientVersion?: string
   
@@ -141,9 +145,13 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     
     // Status and timestamps
     lastSeen: normalizedLastSeen,
-    status: calculatedStatus,
+    status: rawDevice.archived ? 'archived' : calculatedStatus,
     createdAt: rawDevice.createdAt,
     registrationDate: rawDevice.createdAt,  // Alias for clearer display
+    
+    // Archive status
+    archived: rawDevice.archived || false,
+    archivedAt: rawDevice.archivedAt,
     
     // Client information
     clientVersion: rawDevice.clientVersion,
