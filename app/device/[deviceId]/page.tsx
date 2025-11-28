@@ -756,8 +756,18 @@ export default function DeviceDetailPage() {
                       </div>
                     </div>
                   )}
-                  {/* Status pill for Stale/Missing devices - moved before Last seen */}
+                  {/* Status pill for Archived/Stale/Missing devices - moved before Last seen */}
                   {(() => {
+                    // Check if device is archived first
+                    const isArchived = deviceInfo.archived === true
+                    if (isArchived) {
+                      return (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                          Archived
+                        </span>
+                      )
+                    }
+                    
                     const lastSeenDate = deviceInfo.lastSeen ? new Date(deviceInfo.lastSeen) : null
                     if (!lastSeenDate) return null
                     
