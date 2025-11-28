@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { getDevicesWithInstalls, parseInventory } from './shared';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// Allow up to 60 seconds for this endpoint (fetches 349+ devices)
+export const maxDuration = 60;
 
 export async function GET(request: Request) {
   // LOCALHOST BYPASS: Skip auth check for local development
@@ -51,13 +54,25 @@ export async function GET(request: Request) {
       const timestamp = new Date().toISOString();
       console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
 
+      // Build headers with authentication (matching shared.ts pattern)
+      const headers: Record<string, string> = {
+        'Cache-Control': 'no-cache',
+        'User-Agent': 'ReportMate-Frontend/1.0'
+      };
+      
+      if (process.env.REPORTMATE_PASSPHRASE) {
+        headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE;
+      } else {
+        const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID;
+        if (managedIdentityId) {
+          headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId;
+        }
+      }
+
       // Fetch device data from Azure Functions device endpoint
       const apiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        }
+        headers
       });
       
       if (!apiResponse.ok) {
@@ -96,26 +111,12 @@ export async function GET(request: Request) {
       });
     }
 
-    // No device ID - use the optimized data endpoint
+    // No device ID - use the shared data fetcher directly (no HTTP call needed)
     const timestamp = new Date().toISOString();
-    console.log(`[INSTALLS API] ${timestamp} - Fetching installs data using optimized endpoint`);
+    console.log(`[INSTALLS API] ${timestamp} - Fetching installs data using shared module`);
     
-    // Use the dedicated installs data endpoint (already optimized with batching)
-    // Get the request URL to construct internal API call
-    const requestUrl = new URL(request.url);
-    const dataUrl = `${requestUrl.protocol}//${requestUrl.host}/api/devices/installs/data`;
-    console.log(`[INSTALLS API] Calling internal data endpoint: ${dataUrl}`);
-    
-    const dataResponse = await fetch(dataUrl, {
-      cache: 'no-store'
-    });
-
-    if (!dataResponse.ok) {
-      console.error('[INSTALLS API] Data endpoint failed:', dataResponse.status, dataResponse.statusText);
-      return NextResponse.json([]);
-    }
-    
-    const dataResult = await dataResponse.json();
+    // Direct function call - no internal HTTP request, no middleware interception
+    const dataResult = await getDevicesWithInstalls();
     const devicesWithInstalls = dataResult.devices || [];
     
     console.log(`[INSTALLS API] Received ${devicesWithInstalls.length} devices with installs data`);
@@ -128,26 +129,8 @@ export async function GET(request: Request) {
       const cimianItems = device.modules?.installs?.cimian?.items || [];
       const inventory = device.modules?.inventory || {};
       
-      // Parse inventory if it's PowerShell format
-      let parsedInventory = inventory;
-      if (typeof inventory === 'string' && inventory.startsWith('@{')) {
-        try {
-          const jsonStr = inventory
-            .replace(/@\{/g, '{')
-            .replace(/\}/g, '}')
-            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)=/g, '"$1":')
-            .replace(/; /g, ', ')
-            .replace(/: ([^,}]+)/g, (match, value) => {
-              if (!value.trim().startsWith('"')) {
-                return `: "${value.trim()}"`;
-              }
-              return match;
-            });
-          parsedInventory = JSON.parse(jsonStr);
-        } catch {
-          // Keep original if parse fails
-        }
-      }
+      // Use shared parseInventory function
+      const parsedInventory = parseInventory(inventory);
       
       // Filter by selected installs
       const filteredItems = (selectedInstalls.length > 0
