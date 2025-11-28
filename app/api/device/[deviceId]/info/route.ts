@@ -108,6 +108,8 @@ export async function GET(
           createdAt: data.device.createdAt,
           registrationDate: data.device.registrationDate || data.device.createdAt,
           status: data.device.status,
+          archived: data.device.archived || false,
+          archivedAt: data.device.archivedAt || null,
           // Only include info modules (but in same format as full response)
           modules: infoData
         }
