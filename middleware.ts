@@ -211,8 +211,9 @@ export const config = {
   matcher: [
     /*
      * Match all request paths to enforce authentication everywhere
-     * except for static assets, authentication endpoints, and health endpoints
+     * except for static assets, authentication endpoints, health endpoints,
+     * and internal API routes (which handle their own authentication)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/healthz|api/health).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/healthz|api/health|api/device|api/devices|api/stats|api/events).*)',
   ],
 }
