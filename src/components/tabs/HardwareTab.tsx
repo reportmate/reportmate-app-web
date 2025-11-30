@@ -44,6 +44,26 @@ interface HardwareData {
     computeUnits?: unknown;
     compute_units?: unknown;
   };
+  wireless?: {
+    name?: unknown;
+    manufacturer?: unknown;
+    macAddress?: unknown;
+    driverVersion?: unknown;
+    driverDate?: unknown;
+    status?: unknown;
+    protocol?: unknown;
+    isAvailable?: unknown;
+  };
+  bluetooth?: {
+    name?: unknown;
+    manufacturer?: unknown;
+    macAddress?: unknown;
+    driverVersion?: unknown;
+    driverDate?: unknown;
+    status?: unknown;
+    bluetoothVersion?: unknown;
+    isAvailable?: unknown;
+  };
   [key: string]: unknown;
 }
 
@@ -395,6 +415,73 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
                 {`${batteryCycleCount} cycles • ${batteryIsCharging ? 'Charging' : 'Not charging'}`}
+              </div>
+            </div>
+          )}
+
+          {/* Row 3: Wireless and Bluetooth - Connectivity Hardware */}
+          {/* 7. Wireless - Only show if available */}
+          {hardwareData.wireless && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-cyan-100 dark:bg-cyan-900 rounded-lg">
+                  <div className="font-semibold text-lg text-cyan-600 dark:text-cyan-400">Wireless</div>
+                </div>
+              </div>
+              <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.wireless.name) || 'Unknown'}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-500">
+                {safeString(hardwareData.wireless.manufacturer)} • {safeString(hardwareData.wireless.protocol) || 'Unknown Protocol'}
+              </div>
+              <div className="text-xs text-gray-400 dark:text-gray-600 mt-1">
+                Status: {safeString(hardwareData.wireless.status)}
+              </div>
+            </div>
+          )}
+
+          {/* 8. Bluetooth - Only show if available */}
+          {hardwareData.bluetooth && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-indigo-100 dark:bg-indigo-900 rounded-lg">
+                  <div className="font-semibold text-lg text-indigo-600 dark:text-indigo-400">Bluetooth</div>
+                </div>
+              </div>
+              <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.bluetooth.name) || 'Unknown'}</div>
+              <div className="text-sm text-gray-500 dark:text-gray-500">
+                {safeString(hardwareData.bluetooth.manufacturer)} • {safeString(hardwareData.bluetooth.bluetoothVersion) ? `v${safeString(hardwareData.bluetooth.bluetoothVersion)}` : 'Unknown Version'}
+              </div>
+              <div className="text-xs text-gray-400 dark:text-gray-600 mt-1">
+                Status: {safeString(hardwareData.bluetooth.status)}
+              </div>
+            </div>
+          )}
+
+          {/* Show "No Wireless" indicator if not present */}
+          {!hardwareData.wireless && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                  <div className="font-semibold text-lg text-gray-400 dark:text-gray-500">Wireless</div>
+                </div>
+              </div>
+              <div className="text-gray-400 dark:text-gray-500 mb-2">Not Present</div>
+              <div className="text-sm text-gray-400 dark:text-gray-600">
+                No wireless adapter detected
+              </div>
+            </div>
+          )}
+
+          {/* Show "No Bluetooth" indicator if not present */}
+          {!hardwareData.bluetooth && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded-lg">
+                  <div className="font-semibold text-lg text-gray-400 dark:text-gray-500">Bluetooth</div>
+                </div>
+              </div>
+              <div className="text-gray-400 dark:text-gray-500 mb-2">Not Present</div>
+              <div className="text-sm text-gray-400 dark:text-gray-600">
+                No Bluetooth adapter detected
               </div>
             </div>
           )}
