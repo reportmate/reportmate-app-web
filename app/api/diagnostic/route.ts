@@ -4,9 +4,10 @@ export async function GET(request: Request) {
   try {
     console.log('[DIAGNOSTIC] Testing both APIs from server side')
     
-    // Get the base URL from the request
-    const requestUrl = new URL(request.url);
-    const baseUrl = `${requestUrl.protocol}//${requestUrl.host}`;
+    // Use internal localhost call for internal API calls
+    // In production containers, the app runs on port 3000 internally
+    const internalPort = process.env.PORT || '3000';
+    const baseUrl = `http://localhost:${internalPort}`;
     
     // Test devices API
     const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
