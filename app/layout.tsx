@@ -6,6 +6,7 @@ import { ThemeProvider } from "../src/components/theme-provider";
 import { EdgeThemeFix } from "../src/components/edge-theme-fix";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
+import { SWRProvider } from "../src/providers/SWRProvider";
 
 // Force dynamic rendering to ensure middleware runs
 export const dynamic = 'force-dynamic'
@@ -108,20 +109,22 @@ export default function RootLayout({
           }}
         />
         <AuthProvider>
-          <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
-            <EdgeThemeFix />
-            <ErrorBoundary>
-              {isDevelopment ? (
-                // Development: No AutoAuth component
-                children
-              ) : (
-                // Production: Full authentication with AutoAuth
-                <AutoAuth>
-                  {children}
-                </AutoAuth>
-              )}
-            </ErrorBoundary>
-          </ThemeProvider>
+          <SWRProvider>
+            <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+              <EdgeThemeFix />
+              <ErrorBoundary>
+                {isDevelopment ? (
+                  // Development: No AutoAuth component
+                  children
+                ) : (
+                  // Production: Full authentication with AutoAuth
+                  <AutoAuth>
+                    {children}
+                  </AutoAuth>
+                )}
+              </ErrorBoundary>
+            </ThemeProvider>
+          </SWRProvider>
         </AuthProvider>
       </body>
     </html>
