@@ -368,6 +368,32 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
     const keys = Object.keys(payloadObj)
     if (keys.length === 0) return 'Empty event data'
     
+    // **PRIORITY 8: Handle Cimian/installs events (session_id, run_type patterns)**
+    if (keys.includes('session_id') || keys.includes('run_type') || keys.includes('runType')) {
+      const runType = payloadObj.run_type || payloadObj.runType
+      if (runType) {
+        const runTypeStr = String(runType).charAt(0).toUpperCase() + String(runType).slice(1).toLowerCase()
+        return `${runTypeStr} software update check`
+      }
+      return 'Software update activity'
+    }
+    
+    // **PRIORITY 9: Handle device/collection events**
+    if (keys.includes('device_id') || keys.includes('deviceId') || keys.includes('serial_number')) {
+      if (keys.includes('collection_type') || keys.includes('collectionType')) {
+        return 'Device data collection'
+      }
+      return 'Device event'
+    }
+    
+    // **PRIORITY 10: Handle client version updates**
+    if (keys.includes('client_version') || keys.includes('clientVersion')) {
+      const version = payloadObj.client_version || payloadObj.clientVersion
+      if (version) {
+        return `Client version ${version}`
+      }
+    }
+    
     // Check for known patterns in key names
     if (keys.some(k => k.includes('module') || k.includes('install') || k.includes('system'))) {
       return 'System event occurred'
@@ -383,11 +409,15 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
       }
     }
     
-    // Last resort - show key count but make it more user-friendly
+    // Last resort - show more descriptive message
     if (keys.length <= 3) {
-      return `Event with ${keys.join(', ')} data`
+      // Format keys nicely (convert snake_case to Title Case)
+      const formattedKeys = keys.map(k => 
+        k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+      )
+      return `Event: ${formattedKeys.join(', ')}`
     } else {
-      return `Complex event (${keys.length} data fields)`
+      return `System event (${keys.length} fields)`
     }
     
   } catch (_error) {
