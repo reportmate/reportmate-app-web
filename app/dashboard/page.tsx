@@ -214,7 +214,6 @@ export default function Dashboard() {
     if (devices.length === 0) return
     
     try {
-      console.log('[DASHBOARD] Fetching OS data for charts from first 20 devices')
       const containerApiUrl = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
       
       // Get first 20 devices for sampling
@@ -254,8 +253,6 @@ export default function Dashboard() {
       const successfulResults = results
         .filter(r => r.status === 'fulfilled' && r.value)
         .map(r => (r as PromiseFulfilledResult<any>).value)
-      
-      console.log(`[DASHBOARD] Got OS data for ${successfulResults.length} devices`)
       
       // Update devices with OS data
       setDevices(prevDevices => 
