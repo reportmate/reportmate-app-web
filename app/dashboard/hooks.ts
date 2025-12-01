@@ -255,6 +255,12 @@ export function useLiveEvents() {
         
         const negotiateData = await negotiateResponse.json()
         
+        // Check if negotiate returned an error (WebPubSub not configured)
+        if (negotiateData.error || !negotiateData.url) {
+          console.warn('SignalR negotiate returned error:', negotiateData.error || 'No URL')
+          throw new Error(negotiateData.error || 'SignalR not available')
+        }
+        
         if (!isActive) return // Check again before creating connection
         
         // Build SignalR connection for Azure Web PubSub
