@@ -52,20 +52,6 @@ interface NewClientsWidgetProps {
 }
 
 export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }: NewClientsWidgetProps) => {
-  // Debug logging for devices received
-  console.log(`[NEW CLIENTS WIDGET] Rendered with:`, {
-    devicesCount: devices.length,
-    loading: loading,
-    firstDeviceCheck: devices.length > 0 ? {
-      name: devices[0].name,
-      serialNumber: devices[0].serialNumber,
-      assetTag: devices[0].assetTag,
-      lastSeen: devices[0].lastSeen,
-      hasAssetTag: !!devices[0].assetTag,
-      assetTagValue: devices[0].assetTag || 'NO ASSET TAG'
-    } : 'NO DEVICES'
-  })
-
   // Sort devices by registration date (createdAt) descending to show newest registrations first
   const sortedDevices = [...devices].sort((a, b) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0

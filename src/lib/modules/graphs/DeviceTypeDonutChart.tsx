@@ -79,19 +79,6 @@ export function DeviceTypeDonutChart({
 
     // Helper function to get device type (using exact same logic as table/hardware categorization)
     const getDeviceType = (device: Device): string => {
-      // Debug logging
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Device type debug for device:', device.serialNumber || device.name || device.deviceName, {
-          directModel: device.model,
-          hardwareModel: device.modules?.hardware?.model,
-          systemModel: device.modules?.system?.hardwareInfo?.model,
-          rawModel: (device as any).raw?.model,
-          rawSystemModel: (device as any).raw?.system?.hardwareInfo?.model,
-          rawHardwareModel: (device as any).raw?.hardware?.model,
-          device: device
-        })
-      }
-
       // Get model using exact same logic as HardwareModelChart
       const model = device?.model || 
                    device?.modules?.hardware?.model ||

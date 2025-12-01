@@ -99,43 +99,17 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
                           device?.modules?.profiles?.registryPolicies?.length > 0 ||
                           profilesModuleData?.profiles?.length > 0
 
-  console.log('🔍 ProfilesTab Debug:', {
-    hasDataProp: !!data,
-    dataProfilesLength: data?.profiles?.length,
-    dataProfilesIsArray: Array.isArray(data?.profiles),
-    hasDeviceProfiles: !!device?.profiles,
-    deviceProfilesLength: device?.profiles?.length,
-    deviceProfilesIsArray: Array.isArray(device?.profiles),
-    hasModuleProfiles: !!device?.modules?.profiles,
-    moduleConfigurationProfilesLength: device?.modules?.profiles?.ConfigurationProfiles?.length,
-    moduleConfigurationProfilesLengthCamel: device?.modules?.profiles?.configurationProfiles?.length,
-    moduleIntunePoliciesLength: device?.modules?.profiles?.IntunePolicies?.length,
-    moduleIntunePoliciesLengthCamel: device?.modules?.profiles?.intunePolicies?.length,
-    moduleRegistryPoliciesLength: device?.modules?.profiles?.RegistryPolicies?.length,
-    moduleRegistryPoliciesLengthCamel: device?.modules?.profiles?.registryPolicies?.length,
-    hasProcessedData: !!profilesModuleData?.profiles?.length,
-    processedProfilesIsArray: Array.isArray(profilesModuleData?.profiles),
-    hasProfilesData,
-    fullDevice: JSON.stringify(device).substring(0, 1000),
-    deviceModuleKeys: device?.modules ? Object.keys(device.modules) : 'NO_MODULES',
-    profilesModuleKeys: device?.modules?.profiles ? Object.keys(device.modules.profiles) : 'NO_PROFILES_MODULE',
-    profilesModuleData: JSON.stringify(profilesModuleData).substring(0, 500)
-  });
-
   // Prioritize data prop, then processed device data, then fallback to raw module data
   const profiles = useMemo(() => {
     if (data?.profiles?.length > 0) {
-      console.log('✅ Using data prop (processedData.profiles)')
       return ensureProfilesArray(data.profiles)
     }
 
     if (profilesModuleData?.profiles?.length > 0) {
-      console.log('✅ Using processed profiles data')
       return ensureProfilesArray(profilesModuleData.profiles)
     }
 
     if (device?.modules?.profiles?.intunePolicies?.length > 0) {
-      console.log('⚠️ Falling back to raw module intunePolicies data (camelCase)')
       const intunePolicies = ensureProfilesArray(device.modules.profiles.intunePolicies)
       return intunePolicies.map((policy: any) => ({
         id: policy.policyId || 'unknown',
@@ -153,7 +127,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }
 
     if (device?.modules?.profiles?.ConfigurationProfiles) {
-      console.log('⚠️ Falling back to raw module ConfigurationProfiles data (PascalCase)')
       const configurationProfiles = ensureProfilesArray(device.modules.profiles.ConfigurationProfiles)
       return configurationProfiles.map((profile: any) => ({
         ...profile,
@@ -167,7 +140,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }
 
     if (device?.modules?.profiles?.IntunePolicies) {
-      console.log('⚠️ Falling back to raw module IntunePolicies data (PascalCase)')
       const intunePolicies = ensureProfilesArray(device.modules.profiles.IntunePolicies)
       return intunePolicies.map((policy: any) => ({
         id: policy.PolicyId || 'unknown',
@@ -185,11 +157,9 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     }
 
     if (device?.profiles) {
-      console.log('⚠️ Falling back to device.profiles')
       return ensureProfilesArray(device.profiles)
     }
 
-    console.log('❌ No profiles data found')
     return []
   }, [data, device, profilesModuleData])
 

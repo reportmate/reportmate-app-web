@@ -79,18 +79,6 @@ export function ArchitectureDonutChart({
 
     // Helper function to get architecture from device (using exact same logic as table)
     const getArchitecture = (device: Device): string => {
-      // Debug logging
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Architecture debug for device:', device.serialNumber || device.name || device.deviceName, {
-          directArch: device.architecture,
-          hardwareProcessor: device.modules?.hardware?.processor?.architecture,
-          systemOS: device.modules?.system?.operatingSystem?.architecture,
-          rawProcessor: (device as any).raw?.processor?.architecture,
-          rawArch: (device as any).raw?.architecture,
-          device: device
-        })
-      }
-
       // Use exact same logic as table
       let architecture = 'Unknown'
       

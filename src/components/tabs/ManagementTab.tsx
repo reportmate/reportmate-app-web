@@ -20,23 +20,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)
 
-  // Debug logging to see what data we're getting for the tab
-  console.log('🔧 ManagementTab DEBUG:', {
-    deviceName: device?.name,
-    hasModules: !!device.modules,
-    hasManagement: !!management,
-    managementKeys: management ? Object.keys(management) : [],
-    deviceState: management?.deviceState,
-    entraJoined: management?.deviceState?.entraJoined,
-    ssoState: management?.ssoState,
-    entraPrt: management?.ssoState?.entraPrt,
-    userState: management?.userState,
-    ngcSet: management?.userState?.ngcSet,
-    mdmEnrollment: management?.mdmEnrollment?.isEnrolled
-  })
-
-
-
   if (!management) {
     return (
       <div className="text-center py-16">

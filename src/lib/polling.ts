@@ -34,8 +34,8 @@ export function usePollingEvents() {
       }
     }
 
-    // Poll every 10 seconds
-    const interval = setInterval(fetchEvents, 10000)
+    // Poll every 60 seconds (reduced from 10 to save resources)
+    const interval = setInterval(fetchEvents, 60000)
     
     // Initial fetch
     fetchEvents()
