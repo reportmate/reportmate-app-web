@@ -38,17 +38,22 @@ export function useLiveEvents() {
         
         const connectionInfo = await negotiateResponse.json()
         
+        // Check if negotiate returned an error (WebPubSub not configured)
+        if (connectionInfo.error || !connectionInfo.url) {
+          throw new Error(connectionInfo.error || 'SignalR not available')
+        }
+        
         // Build SignalR connection
         connection = new HubConnectionBuilder()
           .withUrl(connectionInfo.url, {
             accessTokenFactory: () => connectionInfo.accessToken
           })
           .withAutomaticReconnect([0, 2000, 10000, 30000])
-          .configureLogging(LogLevel.Information)
+          .configureLogging(LogLevel.Warning) // Reduce logging noise
           .build()
         
         // Set up event handlers
-        connection.on("NewEvent", (event: FleetEvent) => {
+        connection.on("event", (event: FleetEvent) => {
           setEvents((prev: FleetEvent[]) => {
             const existingIds = new Set(prev.map(e => e.id))
             if (!existingIds.has(event.id)) {
