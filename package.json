@@ -7,7 +7,7 @@
     "dev:profile": "node --inspect node_modules/next/dist/bin/next dev",
     "build": "next build",
     "start": "next start",
-  "lint": "eslint --max-warnings=0 --cache --cache-location .eslintcache --ext .js,.jsx,.ts,.tsx .",
+    "lint": "eslint --max-warnings=0 --cache --cache-location .eslintcache --ext .js,.jsx,.ts,.tsx .",
     "test": "jest",
     "test:e2e": "playwright test"
   },
@@ -21,6 +21,7 @@
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.1.12",
     "@tailwindcss/typography": "^0.5.16",
+    "@types/react-window": "^2.0.0",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.1",
@@ -30,7 +31,9 @@
     "next-auth": "^4.24.11",
     "pg": "^8.16.3",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-window": "^2.2.3",
+    "swr": "^2.3.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",
