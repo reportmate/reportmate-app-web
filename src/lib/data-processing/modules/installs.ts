@@ -432,12 +432,19 @@ export function mapStatusToEventType(status: StandardInstallStatus): 'success' |
 }
 
 /**
- * Get the latest attempt timestamp from recentAttempts array
- * Returns the timestamp from the most recent attempt, or fallback to lastSeenInSession
+ * Get the latest attempt timestamp from recentAttempts array.
+ * 
+ * IMPORTANT: Cimian sets last_update/last_attempt_time to the session run time for ALL packages,
+ * not when they were actually installed. This is misleading for pre-existing packages.
+ * 
+ * Logic:
+ * - If installCount > 0 or updateCount > 0: Package was actually processed by Cimian, show timestamp
+ * - If status is "Installed" but installCount == 0 and updateCount == 0: Package was pre-existing, hide timestamp
+ * - For Pending/Error/Warning status: Show timestamp as it indicates last attempt
  */
 function getLatestAttemptTimestamp(item: any): string {
+  // First check recentAttempts if available
   if (item.recentAttempts && Array.isArray(item.recentAttempts) && item.recentAttempts.length > 0) {
-    // Find the attempt with the latest timestamp
     const latestAttempt = item.recentAttempts.reduce((latest: any, current: any) => {
       if (!latest) return current;
       if (!current.timestamp) return latest;
@@ -454,21 +461,21 @@ function getLatestAttemptTimestamp(item: any): string {
     }
   }
   
-  // For installed items without recent attempts, do NOT fallback to session time
-  // This prevents misleading "Date Processed" timestamps that just show collection time
-  // Only return a timestamp if we have a specific update time or if it's NOT installed
-  
-  // If we have a specific lastUpdate from the item itself (not the session), use it
-  if (item.lastUpdate) return item.lastUpdate;
-
-  // If status is 'Installed' and we don't have a specific timestamp, return empty string
-  // This avoids showing "8 hours ago" for something installed months ago
   const status = standardizeInstallStatus(item.status || item.currentStatus || '');
-  if (status === 'Installed') {
-      return '';
+  const installCount = item.installCount ?? 0;
+  const updateCount = item.updateCount ?? 0;
+  const hasActivity = installCount > 0 || updateCount > 0;
+  
+  // For "Installed" packages that Cimian never actually installed/updated,
+  // don't show any timestamp - it's misleading to show session run time
+  if (status === 'Installed' && !hasActivity) {
+    return '';
   }
-
-  // For other statuses (Pending, Error, Warning), the last check time IS relevant
+  
+  // For packages with actual activity OR non-Installed status, show the timestamp
+  // This includes: Failed, Pending, Warning, or actually installed/updated packages
+  if (item.lastUpdate) return item.lastUpdate;
+  if (item.lastAttemptTime) return item.lastAttemptTime;
   return item.lastSeenInSession || '';
 }
 
