@@ -1,7 +1,6 @@
 "use client"
 
-import { useEffect, useState, useCallback } from "react"
-import { HubConnectionBuilder, HubConnection, LogLevel } from "@microsoft/signalr"
+import { useEffect, useState, useCallback, useRef } from "react"
 
 export interface FleetEvent {
   id: string
@@ -12,6 +11,19 @@ export interface FleetEvent {
   payload: Record<string, unknown>
 }
 
+// WebPubSub message types for JSON subprotocol
+interface WebPubSubMessage {
+  type: "message" | "system" | "ack"
+  from?: string
+  group?: string
+  data?: unknown
+  dataType?: string
+  event?: string
+  connectionId?: string
+  userId?: string
+  message?: string
+}
+
 export function useLiveEvents() {
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
@@ -19,6 +31,10 @@ export function useLiveEvents() {
   const [mounted, setMounted] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
+  
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
 
   // Ensure we're mounted before showing time-dependent data
   useEffect(() => {
@@ -155,9 +171,9 @@ export function useLiveEvents() {
 
   // Main effect to start connection and polling
   useEffect(() => {
-    let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     let progressInterval: NodeJS.Timeout | null = null
+    let reconnectTimeout: NodeJS.Timeout | null = null
     let isActive = true // Track if component is still active
     
     // Function to fetch events from local API
@@ -202,40 +218,59 @@ export function useLiveEvents() {
       }
     }
     
-    async function startConnection() {
+    function startPolling() {
+      if (pollingInterval || !isActive) return // Already polling or component unmounted
+      
+      setConnectionStatus("polling")
+      
+      // Fetch events immediately
+      fetchLocalEvents()
+      
+      // Poll every 60 seconds to reduce browser workload
+      pollingInterval = setInterval(() => {
+        if (isActive) {
+          fetchLocalEvents()
+        }
+      }, 60000)
+    }
+    
+    async function connectWebSocket() {
+      if (!isActive) return
+      
       try {
-        if (!isActive) return // Don't start if component unmounted
-        
         setConnectionStatus("connecting")
         
         // Start progress simulation
-        const estimatedTotal = 50 // Expected number of events to load
+        const estimatedTotal = 50
         let progress = 0
         progressInterval = setInterval(() => {
           if (progress < Math.floor(estimatedTotal * 0.85)) {
-            progress += 3 // Fast to 85%
+            progress += 3
             setLoadingMessage('Connecting to event stream...')
           } else if (progress < Math.floor(estimatedTotal * 0.95)) {
-            progress += 1 // Medium to 95%
+            progress += 1
             setLoadingMessage('Negotiating connection...')
           } else if (progress < Math.floor(estimatedTotal * 0.995)) {
-            progress += 0.5 // Slow to 99.5%
+            progress += 0.5
             setLoadingMessage('Loading events...')
           }
           setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
         }, 200)
         
-        // Check if SignalR is enabled
-        const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
+        // Check if WebPubSub is enabled
+        const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
         
         if (!apiBaseUrl) {
           throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is not configured')
         }
         
-        if (!isSignalREnabled) {
+        if (!isEnabled) {
           if (isActive) {
-            setConnectionStatus("polling")
+            if (progressInterval) {
+              clearInterval(progressInterval)
+              progressInterval = null
+            }
             startPolling()
           }
           return
@@ -255,102 +290,108 @@ export function useLiveEvents() {
         
         const negotiateData = await negotiateResponse.json()
         
-        // Check if negotiate returned an error (WebPubSub not configured)
+        // Check if negotiate returned an error
         if (negotiateData.error || !negotiateData.url) {
-          console.warn('SignalR negotiate returned error:', negotiateData.error || 'No URL')
-          throw new Error(negotiateData.error || 'SignalR not available')
+          console.warn('WebPubSub negotiate returned error:', negotiateData.error || 'No URL')
+          throw new Error(negotiateData.error || 'WebPubSub not available')
         }
         
-        if (!isActive) return // Check again before creating connection
-        
-        // Build SignalR connection for Azure Web PubSub
-        connection = new HubConnectionBuilder()
-          .withUrl(negotiateData.url, {
-            accessTokenFactory: () => negotiateData.accessToken
-          })
-          .withAutomaticReconnect([0, 2000, 10000, 30000]) // Limit reconnect attempts
-          .configureLogging(LogLevel.Warning) // Only log warnings and errors
-          .build()
-        
-        // Set up event handlers
-        connection.on("event", (eventData: FleetEvent) => {
-          if (!isActive) return // Don't process events if component unmounted
-          setEvents(prev => {
-            const sanitized = sanitizeEventForDisplay(eventData)
-            return [sanitized, ...prev].slice(0, 50) // Keep max 50 events
-          })
-          setLastUpdateTime(new Date())
-        })
-        
-        // Handle reconnection
-        connection.onreconnecting(() => {
-          if (!isActive) return
-          setConnectionStatus("connecting")
-        })
-        
-        connection.onreconnected(() => {
-          if (!isActive) return
-          setConnectionStatus("connected")
-          setLastUpdateTime(new Date())
-        })
-        
-        connection.onclose(() => {
-          if (!isActive) return
-          setConnectionStatus("error")
-          startPolling()
-        })
-        
-        // Start the connection
-        await connection.start()
         if (!isActive) return
         
-        setConnectionStatus("connected")
-        setLastUpdateTime(new Date())
+        // Connect using native WebSocket with Azure Web PubSub JSON subprotocol
+        const ws = new WebSocket(negotiateData.url, 'json.webpubsub.azure.v1')
+        wsRef.current = ws
         
-        // Clear progress interval on successful connection
+        ws.onopen = () => {
+          if (!isActive) {
+            ws.close()
+            return
+          }
+          setConnectionStatus("connected")
+          reconnectAttemptsRef.current = 0
+          setLastUpdateTime(new Date())
+          
+          // Clear progress interval
+          if (progressInterval) {
+            clearInterval(progressInterval)
+            progressInterval = null
+          }
+          
+          // Fetch initial events
+          fetchLocalEvents()
+        }
+        
+        ws.onmessage = (event) => {
+          if (!isActive) return
+          try {
+            const message: WebPubSubMessage = JSON.parse(event.data)
+            
+            if (message.type === "message") {
+              const eventData = message.data as FleetEvent
+              if (eventData && eventData.id) {
+                setEvents(prev => {
+                  const existingIds = new Set(prev.map(e => e.id))
+                  if (!existingIds.has(eventData.id)) {
+                    const sanitized = sanitizeEventForDisplay(eventData)
+                    setLastUpdateTime(new Date())
+                    return [sanitized, ...prev].slice(0, 50)
+                  }
+                  return prev
+                })
+              }
+            }
+          } catch (error) {
+            console.error("Failed to parse WebSocket message:", error)
+          }
+        }
+        
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error)
+        }
+        
+        ws.onclose = (event) => {
+          if (!isActive) return
+          console.log('WebSocket closed:', event.code, event.reason)
+          wsRef.current = null
+          
+          // Attempt reconnection with exponential backoff
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
+            reconnectAttemptsRef.current++
+            setConnectionStatus("reconnecting")
+            
+            reconnectTimeout = setTimeout(() => {
+              if (isActive) connectWebSocket()
+            }, delay)
+          } else {
+            console.log('Max reconnect attempts reached, falling back to polling')
+            startPolling()
+          }
+        }
+        
+      } catch (error) {
+        if (!isActive) return
+        console.error("WebSocket connection failed:", error)
+        
         if (progressInterval) {
           clearInterval(progressInterval)
           progressInterval = null
         }
-        
-        // Also fetch initial events via polling to get any missed events
-        fetchLocalEvents()
-        
-      } catch (error) {
-        if (!isActive) return
         
         setConnectionStatus("error")
         startPolling()
       }
     }
 
-    function startPolling() {
-      if (pollingInterval || !isActive) return // Already polling or component unmounted
-      
-      setConnectionStatus("polling")
-      
-      // Fetch events immediately
-      fetchLocalEvents()
-      
-      // Poll every 60 seconds to reduce browser workload (increased from 30s)
-      pollingInterval = setInterval(() => {
-        if (isActive) {
-          fetchLocalEvents()
-        }
-      }, 60000)
-    }
-
-    startConnection()
+    connectWebSocket()
 
     return () => {
-      // Mark component as inactive
       isActive = false
       
-      // Cleanup SignalR connection
-      if (connection) {
-        connection.off("event") // Remove event handlers
-        connection.stop().catch(err => console.warn("Error stopping SignalR connection:", err))
-        connection = null
+      // Cleanup WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
       }
       
       // Cleanup polling interval
@@ -363,6 +404,12 @@ export function useLiveEvents() {
       if (progressInterval) {
         clearInterval(progressInterval)
         progressInterval = null
+      }
+      
+      // Cleanup reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
       }
     }
   }, [sanitizeEventForDisplay])
