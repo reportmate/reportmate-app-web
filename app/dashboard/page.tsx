@@ -197,35 +197,16 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Debug current state
-  console.log('[DASHBOARD DEBUG] Component render:', {
-    devicesCount: devices.length,
-    devicesLoading,
-    devicesState: devices.length > 0 ? 'HAS_DEVICES' : 'EMPTY_DEVICES'
-  })
-
-  // Memory monitoring and cleanup
+  // Memory monitoring and cleanup - combined into single interval
   useEffect(() => {
     const interval = setInterval(() => {
       const memoryCheck = checkMemoryUsage()
       if (memoryCheck.warning && memoryCheck.usage > 200) {
-        console.warn(`[DASHBOARD] Critical memory usage: ${memoryCheck.usage}MB - triggering cleanup`)
         triggerMemoryCleanup()
       }
-    }, 60000) // Check every minute
+    }, 120000) // Check every 2 minutes (reduced frequency)
     
     return () => clearInterval(interval)
-  }, [])
-
-  // Log memory status every 5 minutes in development
-  useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      const interval = setInterval(() => {
-        memoryManager.logMemoryStatus('Dashboard')
-      }, 300000) // 5 minutes
-      
-      return () => clearInterval(interval)
-    }
   }, [])
 
   // Function to fetch OS data for dashboard charts
@@ -580,11 +561,11 @@ export default function Dashboard() {
   }, [])
   */
 
-  // Update relative times every 60 seconds (increased from 30 to reduce processing)
+  // Update relative times every 2 minutes (reduced from 60s to decrease processing)
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeUpdateCounter(prev => prev + 1)
-    }, 60000)
+    }, 120000)
     return () => clearInterval(interval)
   }, [])
 
@@ -616,7 +597,7 @@ export default function Dashboard() {
     }
 
     fetchInstallStatistics()
-    const interval = setInterval(fetchInstallStatistics, 300000)
+    const interval = setInterval(fetchInstallStatistics, 600000) // 10 minutes
 
     return () => {
       aborted = true
@@ -624,25 +605,8 @@ export default function Dashboard() {
     }
   }, [])
 
-  // Debug: Log devices state changes (DISABLED - causes memory issues)
-  useEffect(() => {
-    // Only log basic info in development and limit frequency
-    if (process.env.NODE_ENV === 'development' && devices.length > 0) {
-      // Devices loaded successfully
-      // Removed detailed device mapping to prevent memory issues
-    }
-  }, [devices.length, devicesLoading]) // Use devices.length instead of full array
-
   // Show skeleton while data is loading
-  console.log('[DASHBOARD RENDER DEBUG]:', {
-    devicesLoading,
-    devicesCount: devices.length,
-    firstDevice: devices[0]?.name,
-    shouldShowSkeleton: devicesLoading
-  })
-  
   if (devicesLoading) {
-    console.log('[DASHBOARD] Showing skeleton due to devicesLoading =', devicesLoading)
     return <DashboardSkeleton />
   }
 

@@ -150,19 +150,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // FIXED: Ensure we're correctly accessing the hardware module from the new structure
   const hardwareData = device?.modules?.hardware || device?.hardware || data || {}
   
-  console.log('HardwareTab Debug - FIXED:', {
-    hasDevice: !!device,
-    hasDeviceModules: !!device?.modules,
-    hasDeviceModulesHardware: !!device?.modules?.hardware,
-    hasDeviceHardware: !!device?.hardware,
-    hasData: !!data,
-    hardwareDataKeys: Object.keys(hardwareData),
-    hardwareDataSample: JSON.stringify(hardwareData).substring(0, 500),
-    // Additional debugging to see the full modules structure
-    deviceModulesKeys: device?.modules ? Object.keys(device.modules) : [],
-    fullHardwareModuleStructure: device?.modules?.hardware ? JSON.stringify(device.modules.hardware, null, 2).substring(0, 1000) : 'No hardware module found'
-  })
-  
   if (!hardwareData || Object.keys(hardwareData).length === 0) {
     return (
       <div className="space-y-6">

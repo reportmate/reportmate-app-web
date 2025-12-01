@@ -132,7 +132,7 @@ export function useLiveEvents() {
       }
       
       poll()
-      pollingInterval = setInterval(poll, 10000) // Poll every 10 seconds
+      pollingInterval = setInterval(poll, 60000) // Poll every 60 seconds (reduced from 10)
     }
     
     // Try SignalR first, fall back to polling if it fails

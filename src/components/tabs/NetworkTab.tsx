@@ -84,11 +84,6 @@ const CopyableValue: React.FC<{
 }
 
 export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading = false }) => {
-  console.log('🌐🌐🌐🌐🌐 NETWORK TAB COMPONENT RENDERING 🌐🌐🌐🌐🌐');
-  console.log('🌐🌐🌐 NETWORK TAB - Component starting with device:', device?.deviceId || 'undefined');
-  console.log('🌐🌐🌐 NETWORK TAB - Data prop:', data);
-  console.log('🌐🌐🌐 NETWORK TAB - Device object keys:', device ? Object.keys(device) : 'no device');
-  
   // Helper function to filter IPv6 addresses and return only IPv4
   const getIPv4Address = (ipAddress: string | undefined): string | undefined => {
     if (!ipAddress || ipAddress === 'N/A') return undefined;
@@ -113,22 +108,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
     ? extractNetwork({ ...device, modules: { ...device?.modules, network: data } }) 
     : extractNetwork(device)
   
-  console.log('🌐🌐🌐 NETWORK TAB - Processed data from processNetworkData:', processedNetworkData)
-  
   // Use processed data as primary source, fallback to data prop
   const networkData = processedNetworkData || data || {}
-  
-  console.log('🌐🌐🌐 NetworkTab rendering with final networkData:', {
-    hasProcessedData: !!processedNetworkData,
-    hasDataProp: !!data,
-    connectionType: networkData.connectionType,
-    interfacesCount: networkData.interfaces?.length || 0,
-    wifiNetworksCount: networkData.wifiNetworks?.length || 0,
-    vpnConnectionsCount: networkData.vpnConnections?.length || 0,
-    macAddress: networkData.macAddress,
-    ipAddress: networkData.ipAddress,
-    ssid: networkData.ssid
-  })
 
   return (
     <div className="space-y-6">

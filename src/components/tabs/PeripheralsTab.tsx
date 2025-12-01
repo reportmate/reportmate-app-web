@@ -179,20 +179,6 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
   const displaysModule = device.modules?.displays
   const printersModule = device.modules?.printers
 
-  console.log('PeripheralsTab Debug - STANDARDIZED ACCESS:', {
-    hasModules: !!device.modules,
-    moduleKeys: device.modules ? Object.keys(device.modules) : [],
-    hasDisplaysModule: !!displaysModule,
-    hasPrintersModule: !!printersModule,
-    hasPeripheralsData: !!peripheralsData,
-    displaysModuleKeys: displaysModule ? Object.keys(displaysModule) : [],
-    printersModuleKeys: printersModule ? Object.keys(printersModule) : [],
-    displaysModulePreview: displaysModule ? JSON.stringify(displaysModule).substring(0, 200) : 'No displays module',
-    printersModulePreview: printersModule ? JSON.stringify(printersModule).substring(0, 200) : 'No printers module',
-    peripheralsDisplays: peripheralsData?.displays ? Object.keys(peripheralsData.displays) : 'No peripherals displays',
-    monitorsCount: peripheralsData?.displays?.monitors?.length || 0
-  })
-
   // IMPORTANT: Get actual displays/monitors ONLY (graphics cards have been removed from peripherals)
   // Graphics cards now belong in hardware module where they should be
   const displayDevices = displaysModule?.displays || 

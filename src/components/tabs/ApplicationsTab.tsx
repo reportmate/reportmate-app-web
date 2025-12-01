@@ -53,8 +53,6 @@ interface ApplicationsTabProps {
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
-  console.log('🔍 APPLICATIONS TAB RENDERED - About to import ApplicationsTable', new Date().toISOString());
-  
   // Process applications data from the modular device structure
   const applicationsModuleData = extractApplications(device?.modules || {})
   
@@ -64,57 +62,19 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
                               (device?.modules?.applications?.installed_applications?.length ?? 0) > 0 || 
                               (device?.modules?.applications?.installedApplications?.length ?? 0) > 0 || 
                               (applicationsModuleData?.applications?.length ?? 0) > 0
-
-  console.log('🔍 ApplicationsTab Debug:', {
-    hasDataProp: !!data,
-    dataInstalledAppsLength: data?.installedApps?.length,
-    hasDeviceApplications: !!device?.applications,
-    deviceApplicationsLength: device?.applications?.installedApps?.length,
-    hasModuleApplications: !!device?.modules?.applications,
-    moduleApplicationsLength: device?.modules?.applications?.installed_applications?.length,
-    moduleApplicationsLengthCamelCase: device?.modules?.applications?.installedApplications?.length,
-    hasProcessedData: !!applicationsModuleData?.applications?.length,
-    hasApplicationsData,
-    // More detailed debugging
-    fullDevice: JSON.stringify(device).substring(0, 1000),
-    deviceModuleKeys: device?.modules ? Object.keys(device.modules) : 'NO_MODULES',
-    applicationsModuleData: JSON.stringify(applicationsModuleData).substring(0, 500)
-  });
-
-  console.log('🔍 ApplicationsTab Data Sources Debug:', {
-    hasDataProp: !!data?.installedApps?.length,
-    dataPropsAppsCount: data?.installedApps?.length || 0,
-    hasDeviceApplications: !!device?.applications?.installedApps,
-    deviceApplicationsCount: device?.applications?.installedApps?.length || 0,
-    hasRawModuleSnakeCase: !!device?.modules?.applications?.installed_applications,
-    rawModuleSnakeCaseCount: device?.modules?.applications?.installed_applications?.length || 0,
-    hasRawModuleCamelCase: !!device?.modules?.applications?.installedApplications,
-    rawModuleCamelCaseCount: device?.modules?.applications?.installedApplications?.length || 0,
-    hasProcessedModuleData: !!applicationsModuleData?.applications,
-    processedModuleDataCount: applicationsModuleData?.applications?.length || 0,
-    // Check for the actual Windows client field name
-    hasWindowsClientField: !!device?.modules?.applications?.InstalledApplications,
-    windowsClientFieldCount: device?.modules?.applications?.InstalledApplications?.length || 0,
-    applicationModuleKeys: device?.modules?.applications ? Object.keys(device.modules.applications) : []
-  });
   
   // Memoize the selection of installed apps to avoid unnecessary recalculations
   const installedApps = useMemo(() => {
     // Prioritize data prop, then processed device data, then fallback to raw module data
     if (data?.installedApps?.length) {
-      console.log('✅ Using data prop (processedData.applications)');
       return data.installedApps
     } else if (device?.modules?.applications?.installedApplications) {
-      console.log('⚠️ Falling back to raw module data (camelCase)');
       return device.modules.applications.installedApplications
     } else if (device?.modules?.applications?.InstalledApplications) {
-      console.log('⚠️ Falling back to raw module data (PascalCase - Windows Client)');
       return device.modules.applications.InstalledApplications
     } else if (device?.modules?.applications?.installed_applications) {
-      console.log('⚠️ Falling back to raw module data (snake_case)');
       return device.modules.applications.installed_applications
     } else if (applicationsModuleData?.applications) {
-      console.log('⚠️ Using processed module data');
       return applicationsModuleData.applications
     }
     return []

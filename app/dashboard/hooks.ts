@@ -20,15 +20,6 @@ export function useLiveEvents() {
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
 
-  // IMMEDIATE LOGGING - this should show up right when hook is called
-  console.log("🔥 useLiveEvents hook called!")
-  console.log("🔥 Environment variables at hook call time:")
-  console.log("  - NEXT_PUBLIC_ENABLE_SIGNALR:", process.env.NEXT_PUBLIC_ENABLE_SIGNALR)
-  console.log("  - NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL)
-  console.log("  - typeof process.env.NEXT_PUBLIC_ENABLE_SIGNALR:", typeof process.env.NEXT_PUBLIC_ENABLE_SIGNALR)
-  console.log("  - process.env keys count:", Object.keys(process.env).length)
-  console.log("  - NEXT_PUBLIC keys:", Object.keys(process.env).filter(k => k.startsWith('NEXT_PUBLIC')))
-
   // Ensure we're mounted before showing time-dependent data
   useEffect(() => {
     setMounted(true)
@@ -164,18 +155,10 @@ export function useLiveEvents() {
 
   // Main effect to start connection and polling
   useEffect(() => {
-    console.log("🎯 MAIN useEffect executing!")
-    
     let connection: HubConnection | null = null
     let pollingInterval: NodeJS.Timeout | null = null
     let progressInterval: NodeJS.Timeout | null = null
     let isActive = true // Track if component is still active
-    
-    console.log("Dashboard initialized - starting event polling")
-    console.log("Environment debug:")
-    console.log("- NEXT_PUBLIC_ENABLE_SIGNALR:", JSON.stringify(process.env.NEXT_PUBLIC_ENABLE_SIGNALR))
-    console.log("- API_BASE_URL:", JSON.stringify(process.env.API_BASE_URL))
-    console.log("- typeof NEXT_PUBLIC_ENABLE_SIGNALR:", typeof process.env.NEXT_PUBLIC_ENABLE_SIGNALR)
     
     // Function to fetch events from local API
     async function fetchLocalEvents() {
@@ -187,7 +170,6 @@ export function useLiveEvents() {
             setEvents(prev => {
               // If no events exist, load all events initially
               if (prev.length === 0) {
-                console.log("Loading initial events:", data.events.length)
                 setLastUpdateTime(new Date())
                 
                 // Clear progress interval and set to 100%
@@ -216,7 +198,7 @@ export function useLiveEvents() {
           }
         }
       } catch (error) {
-        console.error("Failed to fetch local events:", error)
+        // Silently fail - polling will retry
       }
     }
     
@@ -247,25 +229,17 @@ export function useLiveEvents() {
         const isSignalREnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
         
-        console.log("🔧 Environment check:")
-        console.log("  NEXT_PUBLIC_ENABLE_SIGNALR:", process.env.NEXT_PUBLIC_ENABLE_SIGNALR)
-        console.log("  NEXT_PUBLIC_API_BASE_URL:", process.env.NEXT_PUBLIC_API_BASE_URL)
-        console.log("  isSignalREnabled:", isSignalREnabled)
-        
         if (!apiBaseUrl) {
           throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is not configured')
         }
         
         if (!isSignalREnabled) {
-          console.log("❌ SignalR disabled in environment config, using polling mode...")
           if (isActive) {
             setConnectionStatus("polling")
             startPolling()
           }
           return
         }
-        
-        console.log("🚀 Starting SignalR connection...")
         
         // Get negotiate token from API with timeout
         const negotiateResponse = await Promise.race([
@@ -280,7 +254,6 @@ export function useLiveEvents() {
         }
         
         const negotiateData = await negotiateResponse.json()
-        console.log("✅ Negotiate successful, connecting to SignalR...")
         
         if (!isActive) return // Check again before creating connection
         
@@ -290,36 +263,33 @@ export function useLiveEvents() {
             accessTokenFactory: () => negotiateData.accessToken
           })
           .withAutomaticReconnect([0, 2000, 10000, 30000]) // Limit reconnect attempts
-          .configureLogging(LogLevel.Information) // Increase logging to see what's happening
+          .configureLogging(LogLevel.Warning) // Only log warnings and errors
           .build()
         
         // Set up event handlers
         connection.on("event", (eventData: FleetEvent) => {
           if (!isActive) return // Don't process events if component unmounted
-          console.log("📡 Received SignalR event:", eventData)
           setEvents(prev => {
             const sanitized = sanitizeEventForDisplay(eventData)
-            return [sanitized, ...prev].slice(0, 50) // Reduced from 100 to 50 events max
+            return [sanitized, ...prev].slice(0, 50) // Keep max 50 events
           })
           setLastUpdateTime(new Date())
         })
         
+        // Handle reconnection
         connection.onreconnecting(() => {
           if (!isActive) return
-          console.log("🔄 SignalR reconnecting...")
           setConnectionStatus("connecting")
         })
         
         connection.onreconnected(() => {
           if (!isActive) return
-          console.log("✅ SignalR reconnected")
           setConnectionStatus("connected")
           setLastUpdateTime(new Date())
         })
         
         connection.onclose(() => {
           if (!isActive) return
-          console.log("❌ SignalR connection closed, falling back to polling")
           setConnectionStatus("error")
           startPolling()
         })
@@ -328,7 +298,6 @@ export function useLiveEvents() {
         await connection.start()
         if (!isActive) return
         
-        console.log("✅ SignalR connected successfully")
         setConnectionStatus("connected")
         setLastUpdateTime(new Date())
         
@@ -344,11 +313,7 @@ export function useLiveEvents() {
       } catch (error) {
         if (!isActive) return
         
-        console.error("❌ Failed to start SignalR connection:", error)
         setConnectionStatus("error")
-        
-        console.log("🔄 SignalR connection failed, falling back to polling mode")
-        console.log("💡 To enable SignalR: Set NEXT_PUBLIC_ENABLE_SIGNALR=true and ensure /api/negotiate endpoint exists")
         startPolling()
       }
     }
@@ -357,17 +322,16 @@ export function useLiveEvents() {
       if (pollingInterval || !isActive) return // Already polling or component unmounted
       
       setConnectionStatus("polling")
-      console.log("📡 Starting HTTP polling mode (every 10 seconds)")
       
       // Fetch events immediately
       fetchLocalEvents()
       
-      // Poll every 30 seconds to reduce browser workload
+      // Poll every 60 seconds to reduce browser workload (increased from 30s)
       pollingInterval = setInterval(() => {
         if (isActive) {
           fetchLocalEvents()
         }
-      }, 30000)
+      }, 60000)
     }
 
     startConnection()
@@ -394,8 +358,6 @@ export function useLiveEvents() {
         clearInterval(progressInterval)
         progressInterval = null
       }
-      
-      console.log("Dashboard hooks cleanup completed")
     }
   }, [sanitizeEventForDisplay])
 
