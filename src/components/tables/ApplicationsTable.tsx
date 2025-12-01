@@ -1,5 +1,9 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { formatRelativeTime } from '../../lib/time';
+
+// Constants for pagination
+const PAGE_SIZE = 100;
+const INITIAL_VISIBLE = 50;
 
 interface ApplicationInfo {
   id: string;
@@ -40,7 +44,9 @@ interface ApplicationsTableProps {
 
 export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
   
   // Filter applications based on search term with relevance scoring
   const filteredApps = useMemo(() => {
@@ -112,6 +118,30 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
     return filteredWithScores;
   }, [data?.installedApps, searchTerm]);
 
+  // Paginated apps - only render what's visible
+  const visibleApps = useMemo(() => {
+    return filteredApps.slice(0, visibleCount);
+  }, [filteredApps, visibleCount]);
+
+  const hasMore = visibleCount < filteredApps.length;
+
+  // Load more when scrolling near bottom
+  const handleScroll = useCallback(() => {
+    const container = scrollContainerRef.current;
+    if (!container || !hasMore) return;
+
+    const { scrollTop, scrollHeight, clientHeight } = container;
+    // Load more when within 200px of bottom
+    if (scrollHeight - scrollTop - clientHeight < 200) {
+      setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filteredApps.length));
+    }
+  }, [hasMore, filteredApps.length]);
+
+  // Reset visible count when search changes
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE);
+  }, [searchTerm]);
+
   // Handle scrollbar visibility
   useEffect(() => {
     const container = scrollContainerRef.current;
@@ -176,9 +206,10 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
         </div>
         
         {/* Show filtered count */}
-        {searchTerm && (
+        {(searchTerm || filteredApps.length > 0) && (
           <div className="px-6 py-2 bg-gray-50 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400">
-            Showing {filteredApps.length} of {data.totalApps} applications
+            Showing {visibleApps.length} of {filteredApps.length} applications
+            {searchTerm && ` (filtered from ${data.totalApps})`}
           </div>
         )}
         
@@ -186,6 +217,7 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
         <div 
           ref={scrollContainerRef}
           className="h-[600px] overflow-auto"
+          onScroll={handleScroll}
         >
           <table className="w-full min-w-full">
             <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
@@ -197,14 +229,14 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filteredApps.length === 0 && searchTerm ? (
+              {visibleApps.length === 0 && searchTerm ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No applications found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
               ) : (
-                filteredApps.map((app, index) => {
+                visibleApps.map((app, index) => {
                   const uniqueKey = `${app.name || 'unknown'}-${app.version || 'unknown'}-${app.publisher || 'unknown'}-${index}`;
                   return (
                   <tr key={uniqueKey} className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -256,6 +288,12 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               )}
             </tbody>
           </table>
+          {/* Load more indicator */}
+          {hasMore && (
+            <div ref={loadMoreRef} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              Scroll for more... ({filteredApps.length - visibleApps.length} remaining)
+            </div>
+          )}
         </div>
       </div>
     </div>

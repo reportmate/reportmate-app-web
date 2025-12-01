@@ -113,17 +113,6 @@ const processStatusData = (devices: Device[]): StatusData[] => {
 export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loading }) => {
   const router = useRouter()
 
-  // Debug logging
-  console.log('[STATUS DONUT CHART] Rendering with:', {
-    devicesCount: devices.length,
-    loading,
-    deviceStatuses: devices.length > 0 ? devices.reduce((acc, d) => {
-      acc[d.status] = (acc[d.status] || 0) + 1
-      return acc
-    }, {} as Record<string, number>) : {},
-    hasDevicesWithStatus: devices.filter(d => d.status).length
-  })
-
   // Show loading state with a beautiful animated donut
   if (loading && devices.length === 0) {
     return (
@@ -190,7 +179,6 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
   }
 
   if (devices.length === 0) {
-    console.log('[STATUS DONUT CHART] No devices found, showing empty state')
     return (
       <div className="flex items-center justify-center py-8">
         <div className="text-center">

@@ -96,14 +96,6 @@ export function validateDeviceStructure(rawDevice: any): void {
  * Each aspect is processed by dedicated modules
  */
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
-  console.log('[DEVICE MAPPER] Processing device:', {
-    serialNumber: rawDevice.serialNumber,
-    hasModules: !!rawDevice.modules,
-    hasInventory: !!rawDevice.modules?.inventory,
-    inventoryDeviceName: rawDevice.modules?.inventory?.deviceName,
-    rawInventoryData: rawDevice.modules?.inventory
-  })
-  
   // Extract modules data with correct nesting
   const modules = rawDevice.modules || {}
   
@@ -118,20 +110,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const installs = extractInstalls(modules.installs || {})
   const profiles = extractProfiles(modules.profiles || {})
   
-  console.log('[DEVICE MAPPER] Extracted inventory:', {
-    deviceName: inventory.deviceName,
-    assetTag: inventory.assetTag,
-    location: inventory.location,
-    fullInventoryObject: inventory
-  })
-  
   const finalName = inventory.deviceName || rawDevice.name || rawDevice.serialNumber || 'Unknown Device'
-  console.log('[DEVICE MAPPER] Final device name logic:', {
-    inventoryDeviceName: inventory.deviceName,
-    rawDeviceName: rawDevice.name,
-    rawDeviceSerial: rawDevice.serialNumber,
-    finalName: finalName
-  })
   
   // Calculate status using centralized logic (single source of truth)
   const normalizedLastSeen = normalizeLastSeen(rawDevice.lastSeen)
