@@ -52,8 +52,18 @@ interface NewClientsWidgetProps {
 }
 
 export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(function NewClientsWidget({ devices, loading }) {
-  // Sort devices by registration date (createdAt) descending to show newest registrations first
-  const sortedDevices = [...devices].sort((a, b) => {
+  // Filter for NEW devices only (registered in the last 7 days)
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+  
+  const newDevices = devices.filter(device => {
+    if (!device.createdAt) return false
+    const createdDate = new Date(device.createdAt)
+    return createdDate >= sevenDaysAgo
+  })
+  
+  // Sort by registration date (createdAt) descending to show newest first
+  const sortedDevices = [...newDevices].sort((a, b) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
     const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
     return dateB - dateA  // Newest registrations first
@@ -71,7 +81,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(func
               New Clients
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Recently discovered devices
+              Registered in the last 7 days
             </p>
           </div>
           <div className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
@@ -89,7 +99,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(func
             <p className="text-sm text-gray-600 dark:text-gray-400">Loading devices...</p>
           </div>
         </div>
-      ) : devices.length === 0 ? (
+      ) : sortedDevices.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
@@ -98,10 +108,10 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(func
               </svg>
             </div>
             <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">
-              No devices found
+              No new clients
             </h3>
             <p className="text-xs text-gray-600 dark:text-gray-400">
-              Devices will appear here when they report in
+              No devices registered in the last 7 days
             </p>
           </div>
         </div>
