@@ -7,6 +7,7 @@ export interface FleetEvent {
   id: string
   device: string
   deviceName?: string  // Enhanced with actual device name from API
+  assetTag?: string    // Asset tag from inventory
   kind: string
   ts: string
   message?: string

@@ -51,7 +51,7 @@ interface NewClientsWidgetProps {
   loading: boolean
 }
 
-export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loading }: NewClientsWidgetProps) => {
+export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(function NewClientsWidget({ devices, loading }) {
   // Sort devices by registration date (createdAt) descending to show newest registrations first
   const sortedDevices = [...devices].sort((a, b) => {
     const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
@@ -167,4 +167,4 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = ({ devices, loa
       )}
     </div>
   )
-}
+})

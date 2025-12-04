@@ -97,8 +97,7 @@ function EventsPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
-  const [deviceNameMap, setDeviceNameMap] = useState<Record<string, string>>({})
-  const [inventoryMap, setInventoryMap] = useState<Record<string, { deviceName: string; serialNumber: string; assetTag?: string }>>({})
+  // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
   const [totalEvents, setTotalEvents] = useState(0)
@@ -146,68 +145,7 @@ function EventsPageContent() {
     }
   }, [searchParams])
 
-  // Fetch device name mappings
-  useEffect(() => {
-    const fetchDeviceNames = async () => {
-      try {
-        const response = await fetch('/api/devices', {
-          cache: 'no-store',
-          headers: {
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          }
-        })
-        if (response.ok) {
-          const data = await response.json()
-          
-          // Handle the response format from /api/devices  
-          let devices = []
-          if (Array.isArray(data)) {
-            // Direct array format
-            devices = data
-          } else if (data.success && Array.isArray(data.devices)) {
-            // Wrapped format: {success: true, devices: [...]}
-            devices = data.devices
-          }
-          
-          // Build device name mapping (serial -> name) and inventory mapping
-          const nameMap: Record<string, string> = {}
-          const inventoryMap: Record<string, { deviceName: string; serialNumber: string; assetTag?: string }> = {}
-          
-          devices.forEach((device: any) => {
-            if (device.serialNumber) {
-              // Get inventory from the correct nested path (like dashboard does)
-              // Prioritize device.modules.inventory.deviceName
-              // Also check device.inventory (top level) and device.deviceName
-              const inventory = device.modules?.inventory || device.inventory || {}
-              const deviceName = 
-                inventory.deviceName || 
-                device.deviceName || 
-                device.name || 
-                device.serialNumber
-              
-              nameMap[device.serialNumber as string] = deviceName as string
-              
-              // Build inventory data mapping
-              inventoryMap[device.serialNumber as string] = {
-                deviceName: deviceName as string,
-                serialNumber: device.serialNumber as string,
-                assetTag: inventory.assetTag || device.assetTag || undefined
-              }
-            }
-          })
-          setDeviceNameMap(nameMap)
-          setInventoryMap(inventoryMap)
-          console.log('[EVENTS PAGE] Device inventory loaded from /api/devices:', { devices: devices.length, nameMap, inventoryMap })
-        }
-      } catch (error) {
-        console.error('Failed to fetch device names:', error)
-        // Continue without device name mapping
-      }
-    }
-
-    fetchDeviceNames()
-  }, [])
+  // Device names fetch removed - events API now includes deviceName and assetTag directly
 
   useEffect(() => {
     const fetchEvents = async () => {
@@ -306,7 +244,8 @@ function EventsPageContent() {
       event.device.toLowerCase().includes(query) ||
       (event.bundledKinds || []).some(kind => kind.toLowerCase().includes(query)) ||
       getEventMessage(event).toLowerCase().includes(query) ||
-      (deviceNameMap[event.device] && deviceNameMap[event.device].toLowerCase().includes(query))
+      (event.deviceName && event.deviceName.toLowerCase().includes(query)) ||
+      (event.assetTag && event.assetTag.toLowerCase().includes(query))
     )
     
     return typeMatch && searchMatch
@@ -876,15 +815,15 @@ function EventsPageContent() {
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                                  title={event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
+                                  title={event.deviceName || event.device}
                                 >
-                                  {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
+                                  {event.deviceName || event.device}
                                 </Link>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                   {event.device}
-                                  {inventoryMap[event.device]?.assetTag && (
+                                  {event.assetTag && (
                                     <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                                      {inventoryMap[event.device].assetTag}
+                                      {event.assetTag}
                                     </span>
                                   )}
                                 </div>
@@ -1199,15 +1138,15 @@ function EventsPageContent() {
                                 <Link
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                                  title={event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
+                                  title={event.deviceName || event.device}
                                 >
-                                  {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
+                                  {event.deviceName || event.device}
                                 </Link>
                                 <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                   {event.device}
-                                  {inventoryMap[event.device]?.assetTag && (
+                                  {event.assetTag && (
                                     <span className="ml-1 px-1 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                                      {inventoryMap[event.device].assetTag}
+                                      {event.assetTag}
                                     </span>
                                   )}
                                 </div>
@@ -1399,13 +1338,13 @@ function EventsPageContent() {
                           href={`/device/${encodeURIComponent(event.device)}#events`}
                           className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
                         >
-                          {event.deviceName || inventoryMap[event.device]?.deviceName || event.device}
+                          {event.deviceName || event.device}
                         </Link>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           {event.device}
-                          {inventoryMap[event.device]?.assetTag && (
+                          {event.assetTag && (
                             <span className="ml-2 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 rounded text-xs">
-                              {inventoryMap[event.device].assetTag}
+                              {event.assetTag}
                             </span>
                           )}
                         </div>
