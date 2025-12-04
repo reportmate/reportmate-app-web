@@ -1,7 +1,7 @@
 /**
  * Profiles Module - Reader Only
  * Frontend reads pre-processed profiles data from device collection
- * NO heavy processing - device should provide clean, standardized data
+ * Handles both Windows (structured) and Mac (raw text) formats
  */
 
 export interface ProfilesInfo {
@@ -27,34 +27,117 @@ export interface ProfileItem {
 }
 
 /**
+ * Parse macOS profiles -C/-P output into profile identifiers
+ * Format: "_computerlevel[1] attribute: profileIdentifier: ca.ecuad.macadmin.OfficePrefs ..."
+ */
+function parseMacProfilesOutput(rawText: string): ProfileItem[] {
+  if (!rawText || typeof rawText !== 'string') return []
+  
+  const profiles: ProfileItem[] = []
+  
+  // Extract profile identifiers using regex
+  // Pattern matches: profileIdentifier: <identifier>
+  const identifierPattern = /profileIdentifier:\s*([^\s_]+)/g
+  let match: RegExpExecArray | null
+  const seenIds = new Set<string>()
+  
+  while ((match = identifierPattern.exec(rawText)) !== null) {
+    const identifier = match[1]
+    
+    // Skip duplicates
+    if (seenIds.has(identifier)) continue
+    seenIds.add(identifier)
+    
+    // Extract display name from identifier (e.g., ca.ecuad.macadmin.OfficePrefs -> OfficePrefs)
+    const parts = identifier.split('.')
+    const displayName = parts[parts.length - 1] || identifier
+    
+    // Determine organization from identifier
+    let organization = 'Unknown'
+    if (identifier.includes('micromdm')) {
+      organization = 'MicroMDM'
+    } else if (identifier.includes('jamf')) {
+      organization = 'Jamf'
+    } else if (identifier.includes('apple')) {
+      organization = 'Apple'
+    } else if (parts.length >= 2) {
+      // Use reverse domain as organization hint
+      organization = parts.slice(0, -1).join('.')
+    }
+    
+    profiles.push({
+      id: identifier,
+      displayName: displayName,
+      uuid: identifier,
+      type: 'Device',
+      installDate: '',
+      organization: organization,
+      description: `MDM Configuration Profile: ${identifier}`,
+      payloads: [],
+      isRemovable: true,
+      hasRemovalPasscode: false,
+      isEncrypted: false
+    })
+  }
+  
+  return profiles
+}
+
+/**
  * Extract profiles information from device modules
  * READER ONLY: Expects device to provide pre-processed, clean data
+ * Also handles Mac raw profiles output
  */
 export function extractProfiles(deviceModules: any): ProfilesInfo {
   if (!deviceModules?.profiles) {
-    console.log('[PROFILES MODULE] No profiles data found in modules')
-    return {
-      totalProfiles: 0,
-      systemProfiles: 0,
-      userProfiles: 0,
-      profiles: []
+    // Check in modules.profiles
+    if (!deviceModules?.modules?.profiles) {
+      console.log('[PROFILES MODULE] No profiles data found')
+      return {
+        totalProfiles: 0,
+        systemProfiles: 0,
+        userProfiles: 0,
+        profiles: []
+      }
     }
   }
 
-  const profilesData = deviceModules.profiles
+  const profilesData = deviceModules.profiles || deviceModules.modules?.profiles
   
-  console.log('[PROFILES MODULE] Reading pre-processed profiles data:', {
-    hasIntunePolicies: !!profilesData.intunePolicies,
-    policyCount: Array.isArray(profilesData.intunePolicies) ? profilesData.intunePolicies.length : 0,
-    hasConfigurationProfiles: !!profilesData.configurationProfiles,
-    configProfileCount: Array.isArray(profilesData.configurationProfiles) ? profilesData.configurationProfiles.length : 0
+  console.log('[PROFILES MODULE] Reading profiles data:', {
+    keys: Object.keys(profilesData || {}),
+    hasIntunePolicies: !!profilesData?.intunePolicies,
+    hasConfigurationProfiles: !!profilesData?.configurationProfiles,
+    hasProfilesC: !!profilesData?.profiles_C,
+    hasProfilesP: !!profilesData?.profiles_P
   })
 
   // Process profiles from different sources
   const profiles: ProfileItem[] = []
 
+  // Handle Mac raw profiles output (profiles -C / profiles -P)
+  if (profilesData?.profiles_C || profilesData?.profiles_P) {
+    console.log('[PROFILES MODULE] Parsing Mac profiles raw output')
+    // Combine both computer-level and user profiles
+    const macProfiles = [
+      ...parseMacProfilesOutput(profilesData.profiles_C || ''),
+      ...parseMacProfilesOutput(profilesData.profiles_P || '')
+    ]
+    
+    // Deduplicate by ID
+    const seenIds = new Set<string>()
+    macProfiles.forEach(profile => {
+      if (!seenIds.has(profile.id)) {
+        seenIds.add(profile.id)
+        profiles.push(profile)
+      }
+    })
+    
+    console.log('[PROFILES MODULE] Parsed Mac profiles:', profiles.length)
+  }
+
   // Add Intune policies - Ensure it's an array
-  if (profilesData.intunePolicies && Array.isArray(profilesData.intunePolicies)) {
+  if (profilesData?.intunePolicies && Array.isArray(profilesData.intunePolicies)) {
     profilesData.intunePolicies.forEach((policy: any) => {
       profiles.push({
         id: policy.policyId || 'unknown',
@@ -73,7 +156,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
   }
 
   // Add configuration profiles - Ensure it's an array
-  if (profilesData.configurationProfiles && Array.isArray(profilesData.configurationProfiles)) {
+  if (profilesData?.configurationProfiles && Array.isArray(profilesData.configurationProfiles)) {
     profilesData.configurationProfiles.forEach((profile: any) => {
       profiles.push({
         id: profile.profileId || profile.uuid || 'unknown',
@@ -99,6 +182,6 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
     systemProfiles,
     userProfiles,
     profiles,
-    lastUpdated: profilesData.lastUpdated
+    lastUpdated: profilesData?.lastUpdated
   }
 }
