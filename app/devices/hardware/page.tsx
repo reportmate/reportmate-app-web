@@ -39,7 +39,6 @@ interface HardwareRecord {
 
 function HardwarePageContent() {
   const [hardware, setHardware] = useState<HardwareRecord[]>([])
-  const [devices, setDevices] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -161,16 +160,11 @@ function HardwarePageContent() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetching hardware data using optimized bulk API
-        
-        // Use the new bulk hardware API - single call instead of multiple individual calls
+        // OPTIMIZED: Single consolidated API call for hardware data with device names
         const hardwareResponse = await fetch('/api/devices/hardware', {
           cache: 'no-store',
           headers: { 'Cache-Control': 'no-cache' }
         })
-        
-        // Hardware API response received
-        // Hardware API response headers processed
         
         if (!hardwareResponse.ok) {
           throw new Error(`Hardware API request failed: ${hardwareResponse.status}`)
@@ -178,27 +172,7 @@ function HardwarePageContent() {
         
         const hardwareData = await hardwareResponse.json()
         
-        // Raw hardware response processed
-        
-        // Loaded devices with hardware data in single API call
-        // Cache headers processed - dataSource and fetchedAt available
-        
-        // Still fetch devices for additional name mapping (this is already cached)
-        const devicesResponse = await fetch('/api/devices', {
-          cache: 'no-store',
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-        
-        // Devices API response received
-        
-        let devicesData = []
-        if (devicesResponse.ok) {
-          devicesData = await devicesResponse.json()
-          // Raw devices response processed
-        }
-        
         if (Array.isArray(hardwareData)) {
-          // Setting hardware data
           setHardware(hardwareData)
           setError(null)
         } else {
@@ -206,19 +180,10 @@ function HardwarePageContent() {
           throw new Error('Invalid hardware API response format')
         }
         
-        if (Array.isArray(devicesData)) {
-          // Setting devices data
-          setDevices(devicesData)
-        } else {
-          console.warn('Invalid devices API response format')
-          setDevices([])
-        }
-        
       } catch (error) {
         console.error('Failed to fetch data:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
         setHardware([])
-        setDevices([])
       } finally {
         setLoading(false)
       }
@@ -227,35 +192,16 @@ function HardwarePageContent() {
     fetchData()
   }, [])
 
-  // Process hardware info for each device to get proper device names
+  // Process hardware info - deviceName is now included in the API response
   const processedHardware = hardware.map(hardwareRecord => {
-    // Find the corresponding device from the main devices API to get the proper name
-    const deviceFromMainAPI = devices.find(d => 
-      d.deviceId === hardwareRecord.deviceId || 
-      d.serialNumber === hardwareRecord.serialNumber
-    )
-    
-    // Debug logging to verify device name mapping
-    if (deviceFromMainAPI && deviceFromMainAPI.name !== hardwareRecord.deviceName) {
-      console.log(`[HARDWARE PAGE] Device name mapping: "${hardwareRecord.deviceName}" -> "${deviceFromMainAPI.name}"`)
-    }
-    
-    // Extract architecture from various sources
+    // Extract architecture from various sources in the hardware record
     let architecture = 'Unknown'
     
     // First try from the hardware module architecture field
     if (hardwareRecord.architecture) {
       architecture = hardwareRecord.architecture
     }
-    // Try from device modules if available
-    else if (deviceFromMainAPI?.modules?.hardware?.processor?.architecture) {
-      architecture = deviceFromMainAPI.modules.hardware.processor.architecture
-    }
-    // Try from system module
-    else if (deviceFromMainAPI?.modules?.system?.operatingSystem?.architecture) {
-      architecture = deviceFromMainAPI.modules.system.operatingSystem.architecture
-    }
-    // Try from raw hardware data
+    // Try from raw hardware data processor
     else if (hardwareRecord.raw?.processor?.architecture) {
       architecture = hardwareRecord.raw.processor.architecture
     }
@@ -320,8 +266,8 @@ function HardwarePageContent() {
       }
     }
     
-    // Get modules from main API or raw data
-    const modules = deviceFromMainAPI?.modules || hardwareRecord.raw?.modules || {}
+    // Get modules from raw data only
+    const modules = hardwareRecord.raw?.modules || {}
 
     // Ensure memory data is populated from modules if missing in record
     let memory = hardwareRecord.memory
@@ -336,7 +282,7 @@ function HardwarePageContent() {
     }
 
     // Ensure graphics data is populated from modules if missing in record
-    let graphics = hardwareRecord.graphics
+    let graphics = hardwareRecord.graphics || hardwareRecord.gpu
     if (!graphics || graphics === 'Unknown') {
       if (modules?.hardware?.graphics) {
         graphics = modules.hardware.graphics
@@ -346,7 +292,7 @@ function HardwarePageContent() {
     }
 
     // Ensure processor data is populated from modules if missing in record
-    let processor = hardwareRecord.processor
+    let processor = hardwareRecord.processor || hardwareRecord.cpu
     let processorCores = hardwareRecord.processorCores
     let processorSpeed = hardwareRecord.processorSpeed
 
@@ -374,13 +320,13 @@ function HardwarePageContent() {
 
     return {
       ...hardwareRecord,
-      // Use the device name from the main API if available, fallback to hardware module data
-      deviceName: deviceFromMainAPI?.name || hardwareRecord.deviceName || hardwareRecord.serialNumber,
-      // Include assetTag from inventory data if available
-      assetTag: deviceFromMainAPI?.modules?.inventory?.assetTag,
+      // Use the device name from API (already included by /api/devices/hardware endpoint)
+      deviceName: hardwareRecord.deviceName || hardwareRecord.serialNumber,
+      // assetTag would need to be fetched separately if needed, but for now skip it
+      assetTag: hardwareRecord.assetTag,
       // Include processed architecture
       architecture: architecture,
-      // CRITICAL: Include modules from main API to ensure widgets have access to full data
+      // Include modules from raw data
       modules: modules,
       // Ensure memory and graphics are populated
       memory: memory,
@@ -393,9 +339,7 @@ function HardwarePageContent() {
 
   // Debug logging for chart data  
   console.log('Hardware Page Debug:', {
-    devicesCount: devices.length,
     hardwareCount: hardware.length,
-    sampleDevice: devices[0],
     sampleHardware: hardware[0],
     processedHardwareSample: processedHardware[0]
   })
@@ -452,16 +396,9 @@ function HardwarePageContent() {
     return '128+ GB'
   }
 
-  // Helper function to get device model
+  // Helper function to get device model - uses data from /api/devices/hardware directly
   const getDeviceModel = (h: any): string => {
-    const deviceFromMainAPI = devices.find(d => 
-      d.deviceId === h.deviceId || 
-      d.serialNumber === h.serialNumber
-    )
-    
-    return deviceFromMainAPI?.model || 
-           deviceFromMainAPI?.modules?.hardware?.model ||
-           deviceFromMainAPI?.modules?.system?.hardwareInfo?.model ||
+    return h.model || 
            h.raw?.model ||
            h.raw?.system?.hardwareInfo?.model ||
            h.raw?.hardware?.model ||
@@ -1226,38 +1163,18 @@ function HardwarePageContent() {
                         </td>
                         <td className="px-4 py-4 min-w-0 w-40">
                           <div className="text-xs text-gray-900 dark:text-white">
-                            {(() => {
-                              // Try to get model from device data
-                              const deviceFromMainAPI = devices.find(d => 
-                                d.deviceId === hw.deviceId || 
-                                d.serialNumber === hw.serialNumber
-                              )
-                              
-                              return deviceFromMainAPI?.model || 
-                                     deviceFromMainAPI?.modules?.hardware?.model ||
-                                     deviceFromMainAPI?.modules?.system?.hardwareInfo?.model ||
-                                     hw.raw?.model ||
-                                     hw.raw?.system?.hardwareInfo?.model ||
-                                     hw.raw?.hardware?.model ||
-                                     'Unknown Model'
-                            })()}
+                            {hw.model || 
+                             hw.raw?.model ||
+                             hw.raw?.system?.hardwareInfo?.model ||
+                             hw.raw?.hardware?.model ||
+                             'Unknown Model'}
                           </div>
                           <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {(() => {
-                              // Try to get manufacturer from device data
-                              const deviceFromMainAPI = devices.find(d => 
-                                d.deviceId === hw.deviceId || 
-                                d.serialNumber === hw.serialNumber
-                              )
-                              
-                              return deviceFromMainAPI?.manufacturer || 
-                                     deviceFromMainAPI?.modules?.hardware?.manufacturer ||
-                                     deviceFromMainAPI?.modules?.system?.hardwareInfo?.manufacturer ||
-                                     hw.raw?.manufacturer ||
-                                     hw.raw?.system?.hardwareInfo?.manufacturer ||
-                                     hw.raw?.hardware?.manufacturer ||
-                                     'Unknown Manufacturer'
-                            })()}
+                            {hw.manufacturer || 
+                             hw.raw?.manufacturer ||
+                             hw.raw?.system?.hardwareInfo?.manufacturer ||
+                             hw.raw?.hardware?.manufacturer ||
+                             'Unknown Manufacturer'}
                           </div>
                         </td>
                         <td className="px-4 py-4 min-w-0 w-56">
@@ -1276,55 +1193,27 @@ function HardwarePageContent() {
                         </td>
                         <td className="px-4 py-4 min-w-0 w-20 text-xs text-gray-900 dark:text-white">
                           {(() => {
-                            // Priority 1: Check main device API for graphics under modules.hardware.graphics
-                            const deviceFromMainAPI = devices.find(d => 
-                              d.deviceId === hw.deviceId || 
-                              d.serialNumber === hw.serialNumber
-                            )
+                            // Use gpu from API or graphics from raw data
+                            const graphicsData = hw.gpu || hw.graphics || hw.raw?.graphics
                             
-                            // Debug logging for graphics data
-                            if (process.env.NODE_ENV === 'development' && hw.serialNumber === '0F33V9G25083HJ') {
-                              console.log('[GRAPHICS DEBUG] Device:', hw.serialNumber, {
-                                deviceFromMainAPI: deviceFromMainAPI,
-                                hasHardwareModule: !!deviceFromMainAPI?.modules?.hardware,
-                                hasGraphics: !!deviceFromMainAPI?.modules?.hardware?.graphics,
-                                graphicsData: deviceFromMainAPI?.modules?.hardware?.graphics,
-                                graphicsType: typeof deviceFromMainAPI?.modules?.hardware?.graphics,
-                                fallbackGraphics: hw.graphics,
-                                fallbackType: typeof hw.graphics
-                              })
+                            if (!graphicsData) {
+                              return <div className="text-gray-500 dark:text-gray-400">Unknown</div>
                             }
                             
-                            // Check modules.hardware.graphics first (this is the correct path based on your example)
-                            if (deviceFromMainAPI?.modules?.hardware?.graphics) {
-                              const deviceGraphics = deviceFromMainAPI.modules.hardware.graphics
-                              
-                              // Handle as object (most common case based on your example)
-                              if (typeof deviceGraphics === 'object' && !Array.isArray(deviceGraphics)) {
-                                const displayName = deviceGraphics.name || deviceGraphics.model || deviceGraphics.description || deviceGraphics.deviceName || 'Graphics Card'
-                                return <div className="truncate">{displayName}</div>
-                              }
-                              
-                              // Handle as array
-                              if (Array.isArray(deviceGraphics) && deviceGraphics.length > 0) {
-                                const firstGraphics = deviceGraphics[0]
-                                if (typeof firstGraphics === 'string') {
-                                  return <div className="truncate">{firstGraphics}</div>
-                                } else if (typeof firstGraphics === 'object') {
-                                  const displayName = firstGraphics.name || firstGraphics.model || firstGraphics.description || firstGraphics.deviceName || 'Graphics Card'
-                                  return <div className="truncate">{displayName}</div>
-                                }
-                              } 
-                              
-                              // Handle as string
-                              else if (typeof deviceGraphics === 'string') {
-                                return <div className="truncate">{deviceGraphics}</div>
-                              }
+                            // Handle as string
+                            if (typeof graphicsData === 'string' && graphicsData.trim()) {
+                              return <div className="truncate">{graphicsData}</div>
                             }
-
-                            // Priority 2: Fallback to hardware record graphics
-                            if (Array.isArray(hw.graphics) && hw.graphics.length > 0) {
-                              const firstGraphics = hw.graphics[0]
+                            
+                            // Handle as object
+                            if (typeof graphicsData === 'object' && !Array.isArray(graphicsData)) {
+                              const displayName = graphicsData.name || graphicsData.model || graphicsData.description || graphicsData.deviceName || 'Graphics Card'
+                              return <div className="truncate">{displayName}</div>
+                            }
+                            
+                            // Handle as array
+                            if (Array.isArray(graphicsData) && graphicsData.length > 0) {
+                              const firstGraphics = graphicsData[0]
                               let displayName = 'Graphics Card'
                               
                               if (typeof firstGraphics === 'string') {
@@ -1336,47 +1225,13 @@ function HardwarePageContent() {
                               return (
                                 <div>
                                   <div className="truncate">{displayName}</div>
-                                  {hw.graphics.length > 1 && (
+                                  {graphicsData.length > 1 && (
                                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                                      +{hw.graphics.length - 1} more
+                                      +{graphicsData.length - 1} more
                                     </div>
                                   )}
                                 </div>
                               )
-                            }
-                            
-                            // Handle graphics as object
-                            if (typeof hw.graphics === 'object' && hw.graphics !== null && !Array.isArray(hw.graphics)) {
-                              const graphicsObj = hw.graphics as any
-                              const displayName = graphicsObj.name || graphicsObj.model || graphicsObj.description || graphicsObj.deviceName || 'Graphics Card'
-                              return <div className="truncate">{displayName}</div>
-                            }
-                            
-                            // Handle graphics as string
-                            if (typeof hw.graphics === 'string' && hw.graphics.trim()) {
-                              return <div className="truncate">{hw.graphics}</div>
-                            }
-                            
-                            // Priority 3: Check if graphics info is in raw data
-                            if (hw.raw?.graphics) {
-                              // Handle raw graphics as object
-                              if (typeof hw.raw.graphics === 'object' && !Array.isArray(hw.raw.graphics)) {
-                                const displayName = hw.raw.graphics.name || hw.raw.graphics.model || hw.raw.graphics.description || hw.raw.graphics.deviceName || 'Graphics Card'
-                                return <div className="truncate">{displayName}</div>
-                              }
-                              
-                              if (Array.isArray(hw.raw.graphics) && hw.raw.graphics.length > 0) {
-                                const firstRawGraphics = hw.raw.graphics[0]
-                                if (typeof firstRawGraphics === 'string') {
-                                  return <div className="truncate">{firstRawGraphics}</div>
-                                } else if (typeof firstRawGraphics === 'object') {
-                                  const displayName = firstRawGraphics.name || firstRawGraphics.model || firstRawGraphics.description || firstRawGraphics.deviceName || 'Graphics Card'
-                                  return <div className="truncate">{displayName}</div>
-                                }
-                              }
-                              if (typeof hw.raw.graphics === 'string') {
-                                return <div className="truncate">{hw.raw.graphics}</div>
-                              }
                             }
                             
                             return <div className="text-gray-500 dark:text-gray-400">Unknown</div>

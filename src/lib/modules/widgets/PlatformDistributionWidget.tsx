@@ -46,10 +46,10 @@ interface PlatformDistributionWidgetProps {
   loading: boolean
 }
 
-export const PlatformDistributionWidget: React.FC<PlatformDistributionWidgetProps> = ({ 
+export const PlatformDistributionWidget: React.FC<PlatformDistributionWidgetProps> = React.memo(function PlatformDistributionWidget({ 
   devices, 
   loading 
-}) => {
+}) {
   const [filters, setFilters] = useState({
     architecture: [] as string[],
     catalog: [] as string[],
@@ -99,6 +99,6 @@ export const PlatformDistributionWidget: React.FC<PlatformDistributionWidgetProp
       </div>
     </div>
   )
-}
+})
 
 export default PlatformDistributionWidget

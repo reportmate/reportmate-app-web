@@ -85,56 +85,39 @@ function ManagementPageContent() {
       try {
         console.log('🚀 Fetching management data...')
         
-        // Fetch both devices (for inventory) and management data (for MDM details)
-        const [devicesResponse, managementResponse] = await Promise.all([
-          fetch('/api/devices', { 
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-          }),
-          fetch('/api/modules/management', { 
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-          })
-        ])
+        // OPTIMIZED: Single consolidated API call for management data with inventory
+        const response = await fetch('/api/devices/management', { 
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+        })
         
-        if (!devicesResponse.ok) throw new Error(`Devices API failed: ${devicesResponse.status}`)
-        if (!managementResponse.ok) throw new Error(`Management API failed: ${managementResponse.status}`)
+        if (!response.ok) throw new Error(`Management API failed: ${response.status}`)
         
-        const devicesData = await devicesResponse.json()
-        const managementList = await managementResponse.json()
+        const managementList = await response.json()
+        console.log(`✅ Loaded ${Array.isArray(managementList) ? managementList.length : 0} management records`)
         
-        const devices = devicesData.devices || []
-        console.log(`✅ Loaded ${devices.length} devices and ${Array.isArray(managementList) ? managementList.length : 0} management records`)
-        
-        // Create map of management data by serial number for fast lookup
-        const managementMap = new Map(
-          (Array.isArray(managementList) ? managementList : []).map((m: any) => [m.serialNumber, m])
-        )
-        
-        // Map devices to Management interface, merging inventory and management data
-        const combinedData = devices.map((device: any) => {
-          const mgmt = managementMap.get(device.serialNumber) || {}
-          const inv = device.modules?.inventory || {}
-          const status = calculateDeviceStatus(device.lastSeen)
+        // Map API response to Management interface
+        const combinedData = (Array.isArray(managementList) ? managementList : []).map((mgmt: any) => {
+          const status = calculateDeviceStatus(mgmt.lastSeen)
           
           return {
-            id: device.serialNumber || device.deviceId,
-            deviceId: device.deviceId,
-            deviceName: inv.deviceName || device.serialNumber,
-            serialNumber: device.serialNumber,
-            lastSeen: device.lastSeen,
-            collectedAt: device.lastSeen,
+            id: mgmt.serialNumber || mgmt.deviceId,
+            deviceId: mgmt.deviceId,
+            deviceName: mgmt.deviceName || mgmt.serialNumber,
+            serialNumber: mgmt.serialNumber,
+            lastSeen: mgmt.lastSeen,
+            collectedAt: mgmt.collectedAt || mgmt.lastSeen,
             provider: mgmt.provider || 'Unknown',
             enrollmentStatus: mgmt.enrollmentStatus || 'Unknown',
             enrollmentType: mgmt.enrollmentType || 'Unknown',
             intuneId: mgmt.intuneId || 'N/A',
             tenantName: mgmt.tenantName || '',
             isEnrolled: mgmt.isEnrolled || false,
-            // Inventory fields
-            usage: inv.usage,
-            catalog: inv.catalog,
+            // Inventory fields from consolidated response
+            usage: mgmt.usage,
+            catalog: mgmt.catalog,
             status: status,
-            raw: device
+            raw: mgmt.raw || mgmt
           }
         })
         
