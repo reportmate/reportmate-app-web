@@ -347,14 +347,7 @@ export default function DeviceDetailPage() {
     const handleHashChange = () => {
       if (typeof window !== 'undefined') {
         const hash = window.location.hash.replace('#', '') as TabType
-        console.log('🧭 HASH NAVIGATION DEBUG:', {
-          currentHash: hash,
-          currentActiveTab: activeTab,
-          validTabs: tabs.map(t => t.id),
-          isValidHash: hash && tabs.some(tab => tab.id === hash)
-        })
         if (hash && tabs.some(tab => tab.id === hash)) {
-          console.log('🧭 Setting activeTab to:', hash)
           setActiveTab(hash)
         }
       }
@@ -509,11 +502,10 @@ export default function DeviceDetailPage() {
     
     // Request module if not already loaded (on-demand loading)
     if (tabId !== 'info' && !isModuleLoaded(tabId)) {
-      console.log(`[SMART LOAD] 🎯 On-demand loading for tab: ${tabId}`)
       try {
         await requestModule(tabId)
-      } catch (error) {
-        console.error(`[SMART LOAD] ❌ On-demand load failed for ${tabId}:`, error)
+      } catch (_error) {
+        // Module load failed - will show error state in UI
       }
     }
   }
@@ -544,8 +536,8 @@ export default function DeviceDetailPage() {
           setIsResolving(false)
           return
         }
-      } catch (error) {
-        console.error('[DEVICE DETAIL] Error resolving device identifier:', error)
+      } catch (_error) {
+        // Resolution failed - stay on current page
         setIsResolving(false)
         return
       }
@@ -614,8 +606,8 @@ export default function DeviceDetailPage() {
 
   // Copy pill value to clipboard - silent copy, no visual feedback
   const copyPillValue = (value: string) => {
-    navigator.clipboard.writeText(value).catch((error) => {
-      console.error('Failed to copy:', error)
+    navigator.clipboard.writeText(value).catch(() => {
+      // Silent fail - clipboard access may be denied
     })
   }
 
@@ -627,7 +619,6 @@ export default function DeviceDetailPage() {
       const preferredIdentifier = assetTag || serialNumber
       
       if (!preferredIdentifier) {
-        console.warn('No asset tag or serial number available for sharing')
         return
       }
       
@@ -641,10 +632,8 @@ export default function DeviceDetailPage() {
       // Show success feedback
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
-      
-      console.log('Copied shareable link:', shareableUrl)
-    } catch (error) {
-      console.error('Failed to copy link:', error)
+    } catch (_error) {
+      // Silent fail - clipboard access may be denied
     }
   }
 
