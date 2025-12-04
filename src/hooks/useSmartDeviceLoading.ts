@@ -212,27 +212,15 @@ export function useSmartDeviceLoading(deviceId: string) {
    * On-demand module loading (if user clicks tab before background load completes)
    */
   const requestModule = useCallback(async (moduleName: string) => {
-    // If already loaded, return data
-    if (moduleStates[moduleName]?.state === 'loaded') {
-      return moduleStates[moduleName].data
+    // If already loaded, return data from ref (always current)
+    if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
+      return moduleStatesRef.current[moduleName].data
     }
     
-    // If currently loading, wait for it
-    if (moduleStates[moduleName]?.state === 'loading') {
-      return new Promise((resolve) => {
-        const checkInterval = setInterval(() => {
-          if (moduleStates[moduleName]?.state === 'loaded') {
-            clearInterval(checkInterval)
-            resolve(moduleStates[moduleName].data)
-          }
-        }, 50)
-        
-        // Timeout after 10 seconds
-        setTimeout(() => {
-          clearInterval(checkInterval)
-          resolve(null)
-        }, 10000)
-      })
+    // If currently loading, just return null - the background load will update state
+    // No polling needed - React will re-render when moduleStates changes
+    if (moduleStatesRef.current[moduleName]?.state === 'loading') {
+      return null
     }
     
     // Otherwise, load it now
