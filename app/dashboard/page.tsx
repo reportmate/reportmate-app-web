@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for security
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useMemo, useCallback, useRef } from "react"
+import { useEffect, useState, useMemo, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
@@ -17,6 +17,19 @@ import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkelet
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
+
+// WebPubSub message types for JSON subprotocol
+interface WebPubSubMessage {
+  type: "message" | "system" | "ack"
+  from?: string
+  group?: string
+  data?: unknown
+  dataType?: string
+  event?: string
+  connectionId?: string
+  userId?: string
+  message?: string
+}
 
 // FleetEvent interface for events from consolidated API
 interface FleetEvent {
@@ -99,6 +112,9 @@ export default function Dashboard() {
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const fetchAbortRef = useRef(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
   
   // Mark as mounted
   useEffect(() => {
@@ -122,15 +138,17 @@ export default function Dashboard() {
     return nameMap
   }, [devices])
   
-  // CONSOLIDATED API FETCH: Single /api/dashboard call for all data
-  // Eliminates separate calls for devices + install stats (2 calls → 1)
+  // CONSOLIDATED API FETCH: Single /api/dashboard call for devices + installStats
+  // Events come via SignalR WebSocket for real-time updates
   useEffect(() => {
     let aborted = false
 
-    const fetchDashboardData = async () => {
+    const fetchDashboardData = async (isInitialLoad = false) => {
       try {
-        setDevicesLoading(true)
-        setInstallStatsLoading(true)
+        if (isInitialLoad) {
+          setDevicesLoading(true)
+          setInstallStatsLoading(true)
+        }
         
         // Single consolidated API call
         const response = await fetch('/api/dashboard?eventsLimit=50', { cache: 'no-store' })
@@ -208,40 +226,175 @@ export default function Dashboard() {
           setInstallStats(data.installStats)
         }
         
-        // Set events from consolidated response (eliminates separate /api/events call)
-        if (data.events && Array.isArray(data.events)) {
+        // Set events from consolidated response (initial load or fallback)
+        if (isInitialLoad && data.events && Array.isArray(data.events)) {
           setEvents(data.events)
           setLoadingProgress({ current: data.events.length, total: data.events.length })
           setLoadingMessage('Events loaded')
         }
         
-        // Update connection status
-        setConnectionStatus('polling')
         setLastUpdateTime(new Date())
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)
-          setDevices([])
-          setInstallStats(null)
-          setEvents([])
+          if (isInitialLoad) {
+            setDevices([])
+            setInstallStats(null)
+            setEvents([])
+          }
           setConnectionStatus('error')
         }
       } finally {
-        if (!aborted) {
+        if (!aborted && isInitialLoad) {
           setDevicesLoading(false)
           setInstallStatsLoading(false)
         }
       }
     }
 
-    fetchDashboardData()
+    // Initial load
+    fetchDashboardData(true)
     
-    // Refresh every 10 minutes
-    const interval = setInterval(fetchDashboardData, 600000)
+    // Refresh devices/installStats every 30 seconds
+    // Events come via SignalR WebSocket for real-time
+    const interval = setInterval(() => fetchDashboardData(false), 30000)
 
     return () => {
       aborted = true
       clearInterval(interval)
+    }
+  }, [])
+
+  // SignalR WebSocket connection for real-time events
+  useEffect(() => {
+    let isActive = true
+    let reconnectTimeout: NodeJS.Timeout | null = null
+
+    async function connectWebSocket() {
+      if (!isActive) return
+
+      try {
+        // Check if WebPubSub is enabled
+        const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
+
+        if (!isEnabled || !apiBaseUrl) {
+          console.log('[SIGNALR] WebPubSub not enabled, using polling fallback')
+          setConnectionStatus('polling')
+          return
+        }
+
+        setConnectionStatus('connecting')
+
+        // Get negotiate token from API with timeout
+        const negotiateResponse = await Promise.race([
+          fetch(`${apiBaseUrl}/api/negotiate?device=dashboard`),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
+          )
+        ]) as Response
+
+        if (!negotiateResponse.ok) {
+          throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
+        }
+
+        const negotiateData = await negotiateResponse.json()
+
+        if (negotiateData.error || !negotiateData.url) {
+          console.warn('[SIGNALR] WebPubSub negotiate returned error:', negotiateData.error || 'No URL')
+          throw new Error(negotiateData.error || 'WebPubSub not available')
+        }
+
+        if (!isActive) return
+
+        // Connect using native WebSocket with Azure Web PubSub JSON subprotocol
+        const ws = new WebSocket(negotiateData.url, 'json.webpubsub.azure.v1')
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          if (!isActive) {
+            ws.close()
+            return
+          }
+          console.log('[SIGNALR] WebSocket connected')
+          setConnectionStatus('connected')
+          reconnectAttemptsRef.current = 0
+          setLastUpdateTime(new Date())
+        }
+
+        ws.onmessage = (event) => {
+          if (!isActive) return
+          try {
+            const message: WebPubSubMessage = JSON.parse(event.data)
+
+            if (message.type === 'message') {
+              const eventData = message.data as FleetEvent
+              if (eventData && eventData.id) {
+                console.log('[SIGNALR] Received event:', eventData.id)
+                setEvents(prev => {
+                  // Avoid duplicates
+                  const exists = prev.some(e => e.id === eventData.id)
+                  if (exists) return prev
+                  // Add new event at the beginning, keep last 50
+                  return [eventData, ...prev].slice(0, 50)
+                })
+                setLastUpdateTime(new Date())
+              }
+            } else if (message.type === 'system') {
+              console.log('[SIGNALR] System message:', message.event)
+            }
+          } catch (e) {
+            console.warn('[SIGNALR] Failed to parse message:', e)
+          }
+        }
+
+        ws.onerror = (error) => {
+          console.error('[SIGNALR] WebSocket error:', error)
+        }
+
+        ws.onclose = (event) => {
+          console.log('[SIGNALR] WebSocket closed:', event.code, event.reason)
+          wsRef.current = null
+
+          if (!isActive) return
+
+          // Attempt reconnect with exponential backoff
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
+            reconnectAttemptsRef.current++
+            console.log(`[SIGNALR] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`)
+            setConnectionStatus('reconnecting')
+            reconnectTimeout = setTimeout(connectWebSocket, delay)
+          } else {
+            console.log('[SIGNALR] Max reconnect attempts reached, falling back to polling')
+            setConnectionStatus('polling')
+          }
+        }
+      } catch (error) {
+        console.error('[SIGNALR] Connection failed:', error)
+        if (isActive) {
+          setConnectionStatus('polling')
+        }
+      }
+    }
+
+    // Start WebSocket connection
+    connectWebSocket()
+
+    return () => {
+      isActive = false
+
+      // Cleanup WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+
+      // Cleanup reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
+      }
     }
   }, [])
 
