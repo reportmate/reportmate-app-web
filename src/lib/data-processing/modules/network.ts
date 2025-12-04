@@ -179,28 +179,47 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     const allInterfaces = network.interfaces.map((iface: any) => {
       // Find best IP address to display
       let displayAddress = ''
+      
+      // Handle both Windows (ipAddresses array) and Mac (addresses array with family/address objects)
+      const ipAddresses: string[] = []
       if (iface.ipAddresses && Array.isArray(iface.ipAddresses)) {
+        ipAddresses.push(...iface.ipAddresses)
+      }
+      // Mac format: addresses: [{ address: "192.168.1.100", family: "IPv4", netmask: "..." }]
+      if (iface.addresses && Array.isArray(iface.addresses)) {
+        iface.addresses.forEach((addr: any) => {
+          if (addr.address) {
+            ipAddresses.push(addr.address)
+          }
+        })
+      }
+      
+      // Determine if interface is up/active
+      // Mac uses isUp: 1/0, Windows uses status: "Up"
+      const isUp = iface.status === 'Up' || iface.status === 'Active' || iface.status === 'Connected' || 
+                   iface.isUp === 1 || iface.isUp === true
+      
+      if (ipAddresses.length > 0) {
         // For active interfaces, prioritize IPv4
-        if (iface.status === 'Up' || iface.isActive) {
+        if (isUp || iface.isActive) {
           // Look for IPv4 address first (format: x.x.x.x)
-          const ipv4 = iface.ipAddresses.find((ip: string) => 
+          const ipv4 = ipAddresses.find((ip: string) => 
             /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
           )
-          displayAddress = ipv4 || iface.ipAddresses[0] || ''
+          displayAddress = ipv4 || ipAddresses[0] || ''
         } else {
           // For disconnected interfaces, show the current IP address (likely IPv6 link-local)
           // Look for any actual IP address (prefer non-link-local if available)
-          const nonLinkLocal = iface.ipAddresses.find((ip: string) => 
+          const nonLinkLocal = ipAddresses.find((ip: string) => 
             !ip.startsWith('fe80::') && 
             !ip.startsWith('169.254.') && // APIPA
             !ip.startsWith('127.') // Loopback
           )
-          displayAddress = nonLinkLocal || iface.ipAddresses[0] || ''
+          displayAddress = nonLinkLocal || ipAddresses[0] || ''
         }
       }
 
       // Normalize status - map "Up" to active status
-      const isUp = iface.status === 'Up' || iface.status === 'Active' || iface.status === 'Connected'
       const isActive = iface.isActive === true || isUp
       const normalizedStatus = isUp ? (iface.isActive ? 'Active' : 'Connected') : 'Disconnected'
 
@@ -208,7 +227,7 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         name: iface.name || iface.friendlyName || 'Unknown',
         friendlyName: iface.friendlyName,
         ipAddress: displayAddress,
-        ipAddresses: iface.ipAddresses,
+        ipAddresses: ipAddresses,
         macAddress: iface.macAddress,
         type: iface.type,
         status: normalizedStatus,
