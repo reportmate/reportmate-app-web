@@ -33,7 +33,7 @@ interface StatusWidgetProps {
   loading: boolean
 }
 
-export const StatusWidget: React.FC<StatusWidgetProps> = ({ devices, loading }) => {
+export const StatusWidget: React.FC<StatusWidgetProps> = React.memo(function StatusWidget({ devices, loading }) {
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
       <Link href="/devices" className="block">
@@ -71,4 +71,4 @@ export const StatusWidget: React.FC<StatusWidgetProps> = ({ devices, loading }) 
       </div>
     </div>
   )
-}
+})
