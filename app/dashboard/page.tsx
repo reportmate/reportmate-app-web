@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for security
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useMemo, useCallback } from "react"
+import { useEffect, useState, useMemo, useCallback, useRef } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import ErrorBoundary from "../../src/components/ErrorBoundary"
@@ -14,10 +14,21 @@ import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
-import { useLiveEvents } from "./hooks"
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
+
+// FleetEvent interface for events from consolidated API
+interface FleetEvent {
+  id: string
+  device: string
+  deviceName?: string
+  kind: string
+  ts: string
+  message?: string
+  payload: Record<string, unknown>
+  serialNumber?: string
+}
 
 interface InventorySummary {
   deviceName?: string
@@ -73,16 +84,26 @@ interface Device {
   createdAt?: string
 }
 
-// Reuse the live events hook from the original dashboard
-
 export default function Dashboard() {
-  // Component tracking disabled for performance
-  const { events, connectionStatus, lastUpdateTime, mounted, loadingProgress, loadingMessage } = useLiveEvents()
+  // All data comes from consolidated /api/dashboard call
+  // Eliminates separate events API call for faster load
+  const [events, setEvents] = useState<FleetEvent[]>([])
   const [devices, setDevices] = useState<Device[]>([])
-  const [devicesLoading, setDevicesLoading] = useState(true) // Start with true to show loading
+  const [devicesLoading, setDevicesLoading] = useState(true)
   const [, setTimeUpdateCounter] = useState(0)
   const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
   const [installStatsLoading, setInstallStatsLoading] = useState(true)
+  const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
+  const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
+  const [mounted, setMounted] = useState(false)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
+  const fetchAbortRef = useRef(false)
+  
+  // Mark as mounted
+  useEffect(() => {
+    setMounted(true)
+  }, [])
   
   // Memoize device name map to avoid recalculating on every render
   const deviceNameMap = useMemo(() => {
@@ -186,11 +207,24 @@ export default function Dashboard() {
         if (data.installStats) {
           setInstallStats(data.installStats)
         }
+        
+        // Set events from consolidated response (eliminates separate /api/events call)
+        if (data.events && Array.isArray(data.events)) {
+          setEvents(data.events)
+          setLoadingProgress({ current: data.events.length, total: data.events.length })
+          setLoadingMessage('Events loaded')
+        }
+        
+        // Update connection status
+        setConnectionStatus('polling')
+        setLastUpdateTime(new Date())
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)
           setDevices([])
           setInstallStats(null)
+          setEvents([])
+          setConnectionStatus('error')
         }
       } finally {
         if (!aborted) {
