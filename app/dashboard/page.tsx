@@ -279,7 +279,6 @@ export default function Dashboard() {
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
 
         if (!isEnabled || !apiBaseUrl) {
-          console.log('[SIGNALR] WebPubSub not enabled, using polling fallback')
           setConnectionStatus('polling')
           return
         }
@@ -301,7 +300,6 @@ export default function Dashboard() {
         const negotiateData = await negotiateResponse.json()
 
         if (negotiateData.error || !negotiateData.url) {
-          console.warn('[SIGNALR] WebPubSub negotiate returned error:', negotiateData.error || 'No URL')
           throw new Error(negotiateData.error || 'WebPubSub not available')
         }
 
@@ -316,7 +314,6 @@ export default function Dashboard() {
             ws.close()
             return
           }
-          console.log('[SIGNALR] WebSocket connected')
           setConnectionStatus('connected')
           reconnectAttemptsRef.current = 0
           setLastUpdateTime(new Date())
@@ -330,7 +327,6 @@ export default function Dashboard() {
             if (message.type === 'message') {
               const eventData = message.data as FleetEvent
               if (eventData && eventData.id) {
-                console.log('[SIGNALR] Received event:', eventData.id)
                 setEvents(prev => {
                   // Avoid duplicates
                   const exists = prev.some(e => e.id === eventData.id)
@@ -340,20 +336,17 @@ export default function Dashboard() {
                 })
                 setLastUpdateTime(new Date())
               }
-            } else if (message.type === 'system') {
-              console.log('[SIGNALR] System message:', message.event)
             }
-          } catch (e) {
-            console.warn('[SIGNALR] Failed to parse message:', e)
+          } catch {
+            // Silently ignore parse errors
           }
         }
 
-        ws.onerror = (error) => {
-          console.error('[SIGNALR] WebSocket error:', error)
+        ws.onerror = () => {
+          // Error handled in onclose
         }
 
-        ws.onclose = (event) => {
-          console.log('[SIGNALR] WebSocket closed:', event.code, event.reason)
+        ws.onclose = () => {
           wsRef.current = null
 
           if (!isActive) return
@@ -362,16 +355,13 @@ export default function Dashboard() {
           if (reconnectAttemptsRef.current < maxReconnectAttempts) {
             const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
             reconnectAttemptsRef.current++
-            console.log(`[SIGNALR] Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})`)
             setConnectionStatus('reconnecting')
             reconnectTimeout = setTimeout(connectWebSocket, delay)
           } else {
-            console.log('[SIGNALR] Max reconnect attempts reached, falling back to polling')
             setConnectionStatus('polling')
           }
         }
-      } catch (error) {
-        console.error('[SIGNALR] Connection failed:', error)
+      } catch {
         if (isActive) {
           setConnectionStatus('polling')
         }
@@ -413,11 +403,6 @@ export default function Dashboard() {
   if (devicesLoading) {
     return <DashboardSkeleton />
   }
-
-    // DEBUG: Add unique timestamp to force re-render 
-    // Removed render timestamp log to save memory
-    
-    // Dashboard rendering with current device state
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black" suppressHydrationWarning>
