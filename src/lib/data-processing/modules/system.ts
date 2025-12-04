@@ -167,28 +167,38 @@ export function extractSystem(deviceModules: any): SystemInfo {
     }))
   }
 
-  // Extract operating system info
+  // Extract operating system info - handle both Windows and Mac structures
   if (modules?.system?.operatingSystem) {
     const os = modules.system.operatingSystem
+    // Check for Mac's systemDetails which contains locale, timeZone, keyboardLayouts
+    const systemDetails = modules.system.systemDetails || {}
+    
     systemInfo.operatingSystem = {
       name: os.name || os.productName || '',
       version: os.version || '',
-      displayVersion: os.displayVersion || os.display_version || '',
-      edition: os.edition || '',
+      // Mac uses majorVersion.minorVersion.patchVersion format
+      displayVersion: os.displayVersion || os.display_version || 
+        (os.majorVersion !== undefined ? `${os.majorVersion}.${os.minorVersion || 0}` : ''),
+      edition: os.edition || os.platform || '', // Mac uses platform (Darwin)
       build: os.build || os.buildNumber || '',
       architecture: os.architecture || os.arch || '',
-      locale: os.locale || '',
-      timeZone: os.timeZone || os.timezone || '',
-      activeKeyboardLayout: os.activeKeyboardLayout || '',
+      // Mac stores locale/timezone in systemDetails
+      locale: os.locale || systemDetails.locale || '',
+      timeZone: os.timeZone || os.timezone || systemDetails.timeZone || '',
+      // Mac stores keyboard layouts as array in systemDetails
+      activeKeyboardLayout: os.activeKeyboardLayout || 
+        (systemDetails.keyboardLayouts?.length > 0 ? systemDetails.keyboardLayouts.join(', ') : ''),
       featureUpdate: os.featureUpdate || ''
     }
   }
 
-  // Boot time - check various possible locations
+  // Boot time - check various possible locations including Mac's systemDetails
   if (modules?.system?.lastBootTime) {
     systemInfo.bootTime = modules.system.lastBootTime
   } else if (modules?.system?.bootTime) {
     systemInfo.bootTime = modules.system.bootTime
+  } else if (modules?.system?.systemDetails?.bootTime) {
+    systemInfo.bootTime = modules.system.systemDetails.bootTime
   }
 
   console.log('[SYSTEM MODULE] System info extracted:', {
