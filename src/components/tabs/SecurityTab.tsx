@@ -432,16 +432,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
                 <Terminal className="w-5 h-5 text-slate-700 dark:text-slate-300" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isMac ? 'Remote Login' : 'Secure Shell'}
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Secure Shell</h3>
             </div>
             {isMac ? (
-              // For Mac, SSH enabled is a potential security concern - show as warning if enabled
               <StatusBadge 
-                enabled={!macSshEnabled} 
-                activeLabel="Disabled" 
-                inactiveLabel="Enabled (Risk)" 
+                enabled={macSshEnabled} 
+                activeLabel="Enabled" 
+                inactiveLabel="Disabled" 
               />
             ) : (
               <StatusBadge 
@@ -457,12 +454,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               // macOS SSH/Remote Login
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  SSH Access
+                  Remote Login
                 </div>
-                <DetailRow label="Remote Login" isStatus enabled={macSshEnabled} />
+                <DetailRow label="Status" isStatus enabled={macSshEnabled} />
                 <DetailRow 
                   label="Details" 
-                  value={security.ssh?.details || (macSshEnabled ? 'SSH is enabled' : 'SSH is disabled')} 
+                  value={security.ssh?.details || (macSshEnabled ? 'Remote Login: On' : 'Remote Login: Off')} 
+                />
+                <DetailRow 
+                  label="Authentication" 
+                  value={security.ssh?.authMethod || security.ssh?.authentication || 'Password & Key'} 
                 />
               </>
             ) : (
