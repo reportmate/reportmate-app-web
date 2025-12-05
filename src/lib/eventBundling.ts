@@ -27,8 +27,19 @@ export interface BundledEvent extends FleetEvent {
 export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
   if (!events.length) return []
 
+  // STEP 1: Deduplicate events by ID before processing
+  // This handles cases where the API returns duplicate events
+  const seenIds = new Set<string>()
+  const uniqueEvents = events.filter(event => {
+    if (seenIds.has(event.id)) {
+      return false // Skip duplicate
+    }
+    seenIds.add(event.id)
+    return true
+  })
+
   // Sort events by timestamp (newest first)
-  const sortedEvents = [...events].sort((a, b) => 
+  const sortedEvents = [...uniqueEvents].sort((a, b) => 
     new Date(b.ts).getTime() - new Date(a.ts).getTime()
   )
 
@@ -57,14 +68,10 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       // Mark all related events as processed
       relatedEvents.forEach(e => processed.add(e.id))
 
-      // Generate numeric bundle ID: use the highest (most recent) event ID + 1
-      // This ensures bundles have sequential numeric IDs like regular events
-      const numericIds = relatedEvents
-        .map(e => parseInt(e.id))
-        .filter(id => !isNaN(id))
-      const bundleId = numericIds.length > 0 
-        ? String(Math.max(...numericIds) + 1)
-        : `bundle-${event.device}-${eventTime}` // Fallback if no numeric IDs
+      // Generate truly unique bundle ID: combine device + timestamp + sorted event IDs hash
+      // This ensures two bundles from the same device at the same time still have unique IDs
+      const sortedEventIds = relatedEvents.map(e => e.id).sort().join('-')
+      const bundleId = `bundle-${event.device}-${eventTime}-${sortedEventIds.substring(0, 20)}`
 
       bundled.push({
         id: bundleId,

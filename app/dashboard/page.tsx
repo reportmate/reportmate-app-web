@@ -227,9 +227,18 @@ export default function Dashboard() {
         }
         
         // Set events from consolidated response (initial load or fallback)
+        // Deduplicate events by ID before setting state
         if (isInitialLoad && data.events && Array.isArray(data.events)) {
-          setEvents(data.events)
-          setLoadingProgress({ current: data.events.length, total: data.events.length })
+          const seenIds = new Set<string>()
+          const uniqueEvents = data.events.filter((event: FleetEvent) => {
+            if (seenIds.has(event.id)) {
+              return false // Skip duplicate
+            }
+            seenIds.add(event.id)
+            return true
+          })
+          setEvents(uniqueEvents)
+          setLoadingProgress({ current: uniqueEvents.length, total: uniqueEvents.length })
           setLoadingMessage('Events loaded')
         }
         
