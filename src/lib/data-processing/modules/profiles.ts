@@ -28,7 +28,7 @@ export interface ProfileItem {
 
 /**
  * Parse macOS profiles -C/-P output into profile identifiers
- * Format: "_computerlevel[1] attribute: profileIdentifier: ca.ecuad.macadmin.OfficePrefs ..."
+ * Format: "_computerlevel[1] attribute: profileIdentifier: ca.ecuad.macadmin.OfficePrefs _computerlevel[2]..."
  */
 function parseMacProfilesOutput(rawText: string): ProfileItem[] {
   if (!rawText || typeof rawText !== 'string') return []
@@ -36,8 +36,9 @@ function parseMacProfilesOutput(rawText: string): ProfileItem[] {
   const profiles: ProfileItem[] = []
   
   // Extract profile identifiers using regex
-  // Pattern matches: profileIdentifier: <identifier>
-  const identifierPattern = /profileIdentifier:\s*([^\s_]+)/g
+  // Pattern matches: profileIdentifier: <identifier> (identifier ends at space or underscore)
+  // The output format is: "profileIdentifier: com.example.profile _computerlevel[N]"
+  const identifierPattern = /profileIdentifier:\s*([a-zA-Z0-9._-]+)/g
   let match: RegExpExecArray | null
   const seenIds = new Set<string>()
   
