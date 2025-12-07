@@ -1191,8 +1191,19 @@ function InstallsPageContent() {
                 {/* Items with Errors Table - Only show if has errors */}
                 {itemsWithErrors.length > 0 && (
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <div 
+                    className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => {
+                      if (itemsStatusFilter === 'errors' && !searchQuery) {
+                        setItemsStatusFilter('all')
+                      } else {
+                        setSearchQuery('')
+                        setItemsStatusFilter('errors')
+                      }
+                    }}
+                    title="Click to show all devices with errors"
+                  >
+                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'errors' && !searchQuery ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -1287,8 +1298,19 @@ function InstallsPageContent() {
                 {/* Items with Warnings Table - Only show if has warnings */}
                 {itemsWithWarnings.length > 0 && (
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <div 
+                    className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => {
+                      if (itemsStatusFilter === 'warnings' && !searchQuery) {
+                        setItemsStatusFilter('all')
+                      } else {
+                        setSearchQuery('')
+                        setItemsStatusFilter('warnings')
+                      }
+                    }}
+                    title="Click to show all devices with warnings"
+                  >
+                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'warnings' && !searchQuery ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -1383,8 +1405,19 @@ function InstallsPageContent() {
                 {/* Items with Pending Table - Only show if has pending */}
                 {itemsWithPending.length > 0 && (
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                  <div 
+                    className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => {
+                      if (itemsStatusFilter === 'pending' && !searchQuery) {
+                        setItemsStatusFilter('all')
+                      } else {
+                        setSearchQuery('')
+                        setItemsStatusFilter('pending')
+                      }
+                    }}
+                    title="Click to show all devices with pending updates"
+                  >
+                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'pending' && !searchQuery ? 'text-cyan-700 dark:text-cyan-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
