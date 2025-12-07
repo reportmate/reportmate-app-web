@@ -90,6 +90,9 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
   const healthyDevices: any[] = []
   
   for (const device of devices) {
+    // Skip archived devices
+    if (device.archived === true) continue
+    
     const cimianItems = device.modules?.installs?.cimian?.items || []
     
     const hasError = cimianItems.some((item: any) => {
