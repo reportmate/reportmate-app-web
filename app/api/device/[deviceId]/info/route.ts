@@ -77,7 +77,7 @@ export async function GET(
     const data = await response.json()
     
     // Extract only the modules needed for InfoTab
-    // CRITICAL: Return FULL module data, not filtered subsets
+    // Return FULL module data, not filtered subsets
     // Tabs need complete data to work properly
     const extractInfoData = (modules: Record<string, any>) => {
       return {
@@ -96,7 +96,7 @@ export async function GET(
       
       console.log('[INFO API] ✅ Successfully extracted info data')
       
-      // CRITICAL: Return the SAME structure as full endpoint, just with fewer modules
+      // Return the SAME structure as full endpoint, just with fewer modules
       // This ensures mapDeviceData() works correctly
       return NextResponse.json({
         success: true,

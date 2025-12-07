@@ -94,7 +94,7 @@ function DevicesPageContent() {
             return {
               id: device.serialNumber || device.deviceId,
               deviceId: device.deviceId,
-              // CRITICAL: Get deviceName from modules.inventory.deviceName
+              // Get deviceName from modules.inventory.deviceName
               deviceName: inventory.deviceName || device.serialNumber,
               serialNumber: device.serialNumber,
               lastSeen: device.lastSeen,

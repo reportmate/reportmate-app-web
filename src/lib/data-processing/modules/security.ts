@@ -132,7 +132,7 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
   })
 
   const securityInfo: SecurityInfo = {
-    // CRITICAL: Use device-calculated security score, not frontend calculation
+    // Use device-calculated security score, not frontend calculation
     overallScore: security.overallScore || 0,
     riskLevel: security.riskLevel || calculateRiskFromScore(security.overallScore || 0),
     lastScan: security.lastScan,
