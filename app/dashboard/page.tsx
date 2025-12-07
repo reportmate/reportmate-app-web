@@ -17,6 +17,7 @@ import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkelet
 import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { DeviceSearchField } from "../../src/components/search/DeviceSearchField"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
+import { preloadInstallsData } from "../../src/hooks/useInstallsData"
 
 // WebPubSub message types for JSON subprotocol
 interface WebPubSubMessage {
@@ -243,6 +244,12 @@ export default function Dashboard() {
         }
         
         setLastUpdateTime(new Date())
+        
+        // Prefetch installs data in background for faster navigation to /devices/installs
+        // This starts loading the data that will be needed if user clicks on Errors/Warnings
+        if (isInitialLoad) {
+          preloadInstallsData()
+        }
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)
