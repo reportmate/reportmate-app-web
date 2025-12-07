@@ -959,7 +959,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       latestCompletedPackagesFailed: latestCompletedSession?.packagesFailed
     })
     
-    // CRITICAL: Only process errors from the latest COMPLETED session
+    // Only process errors from the latest COMPLETED session
     if (latestCompletedSession) {
       console.log('[INSTALLS MODULE] ✅ Processing errors from latest completed session:', {
         sessionId: latestCompletedSession.sessionId,
