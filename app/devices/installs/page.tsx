@@ -2296,6 +2296,8 @@ function InstallsPageContent() {
                 )}
 
                 {/* Installs Filter Cloud - Dynamic Height showing ALL installs */}
+                {/* Hide when items status filter is active (showing all errors/warnings/pending) */}
+                {itemsStatusFilter === 'all' && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -2347,6 +2349,7 @@ function InstallsPageContent() {
                     </div>
                   </div>
                 </div>
+                )}
 
               </div>
             </div>
