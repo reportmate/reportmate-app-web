@@ -111,13 +111,18 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
              status.includes('pending') || status.includes('scheduled')
     })
     
+    // Devices can be in multiple categories - they're not mutually exclusive
+    // A device with errors can also have pending items
     if (hasError) {
       devicesWithErrors.push(device)
-    } else if (hasWarning) {
+    }
+    if (hasWarning) {
       devicesWithWarnings.push(device)
-    } else if (hasPending) {
+    }
+    if (hasPending) {
       devicesWithPending.push(device)
-    } else {
+    }
+    if (!hasError && !hasWarning && !hasPending) {
       healthyDevices.push(device)
     }
   }
