@@ -636,16 +636,65 @@ function InstallsPageContent() {
   }, [devices])
 
   // Calculate device status counts (Active/Stale/Missing)
+  // When items filter is active with a search query, show counts for devices with that specific item
   const deviceStatusCounts = useMemo(() => {
     const counts = { active: 0, stale: 0, missing: 0 }
-    devices.forEach((device: any) => {
-      const status = calculateDeviceStatus(device.lastSeen)
-      if (status === 'active') counts.active++
-      else if (status === 'stale') counts.stale++
-      else counts.missing++
-    })
+    
+    // If we have a specific item selected (searchQuery + itemsStatusFilter), count only those devices
+    if (searchQuery && itemsStatusFilter !== 'all') {
+      // Get devices that have this item with the matching status
+      let relevantDevices: any[] = []
+      if (itemsStatusFilter === 'errors') {
+        relevantDevices = devicesWithErrors.filter((device: any) => {
+          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          return cimianItems.some((item: any) => {
+            const itemName = (item.itemName || item.name || '').toLowerCase()
+            const status = item.currentStatus?.toLowerCase() || ''
+            return itemName === searchQuery.toLowerCase() && 
+                   (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'install-error')
+          })
+        })
+      } else if (itemsStatusFilter === 'warnings') {
+        relevantDevices = devicesWithWarnings.filter((device: any) => {
+          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          return cimianItems.some((item: any) => {
+            const itemName = (item.itemName || item.name || '').toLowerCase()
+            const status = item.currentStatus?.toLowerCase() || ''
+            return itemName === searchQuery.toLowerCase() && 
+                   (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available')
+          })
+        })
+      } else if (itemsStatusFilter === 'pending') {
+        relevantDevices = devicesWithPending.filter((device: any) => {
+          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          return cimianItems.some((item: any) => {
+            const itemName = (item.itemName || item.name || '').toLowerCase()
+            const status = item.currentStatus?.toLowerCase() || ''
+            return itemName === searchQuery.toLowerCase() && 
+                   (status.includes('will-be-installed') || status.includes('update-available') || 
+                    status.includes('update_available') || status.includes('will-be-removed') || 
+                    status.includes('pending') || status.includes('scheduled'))
+          })
+        })
+      }
+      
+      relevantDevices.forEach((device: any) => {
+        const status = calculateDeviceStatus(device.lastSeen)
+        if (status === 'active') counts.active++
+        else if (status === 'stale') counts.stale++
+        else counts.missing++
+      })
+    } else {
+      // Default: count all devices
+      devices.forEach((device: any) => {
+        const status = calculateDeviceStatus(device.lastSeen)
+        if (status === 'active') counts.active++
+        else if (status === 'stale') counts.stale++
+        else counts.missing++
+      })
+    }
     return counts
-  }, [devices])
+  }, [devices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter])
 
   // Check if we have any Munki or Cimian installations
   const hasMunkiInstalls = useMemo(() => {
@@ -771,7 +820,10 @@ function InstallsPageContent() {
   const itemsWithErrors = useMemo(() => {
     const errorItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
+    // Exclude archived devices from counts
     devices.forEach((device: any) => {
+      if (device.archived === true) return // Skip archived devices
+      
       const cimianItems = device?.modules?.installs?.cimian?.items || []
       cimianItems.forEach((item: any) => {
         // Check for error statuses
@@ -808,7 +860,10 @@ function InstallsPageContent() {
   const itemsWithWarnings = useMemo(() => {
     const warningItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
+    // Exclude archived devices from counts
     devices.forEach((device: any) => {
+      if (device.archived === true) return // Skip archived devices
+      
       const cimianItems = device?.modules?.installs?.cimian?.items || []
       cimianItems.forEach((item: any) => {
         // Check for warning statuses ONLY (not pending statuses)
@@ -844,7 +899,10 @@ function InstallsPageContent() {
   const itemsWithPending = useMemo(() => {
     const pendingItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
+    // Exclude archived devices from counts
     devices.forEach((device: any) => {
+      if (device.archived === true) return // Skip archived devices
+      
       const cimianItems = device?.modules?.installs?.cimian?.items || []
       cimianItems.forEach((item: any) => {
         // Check for pending statuses - scheduled installations, updates, removals
