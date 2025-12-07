@@ -87,7 +87,7 @@ export function validateDeviceStructure(rawDevice: any): void {
       serialNumber: rawDevice.serialNumber,
       availableKeys: Object.keys(rawDevice)
     })
-    throw new Error('🚨 CRITICAL: Device data missing required modules structure')
+    throw new Error('🚨 Device data missing required modules structure')
   }
 }
 

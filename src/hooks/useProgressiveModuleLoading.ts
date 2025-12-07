@@ -227,7 +227,7 @@ export function useProgressiveModuleLoading(
         
         console.log(`[PROGRESSIVE] ✅ Fast info data loaded successfully`)
         
-        // CRITICAL: Process data through mapDeviceData to ensure proper structure
+        // Process data through mapDeviceData to ensure proper structure
         const processedDevice = mapDeviceData(result.device)
         setDeviceInfo(processedDevice)
         

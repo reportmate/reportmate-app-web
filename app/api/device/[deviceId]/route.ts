@@ -91,7 +91,7 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
-  // CRITICAL: Check authentication (bypass for localhost development)
+  // Check authentication (bypass for localhost development)
   const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
                      _request.nextUrl.hostname === '127.0.0.1' || 
                      _request.nextUrl.hostname === '0.0.0.0' ||

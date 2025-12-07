@@ -9,7 +9,7 @@ export const revalidate = 0
  * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
  */
 export async function GET(request: Request) {
-  // CRITICAL: Check authentication
+  // Check authentication
   const session = await getServerSession()
   
   // Allow access in development mode without session

@@ -148,7 +148,7 @@ export async function GET(request: Request) {
   // LOCALHOST BYPASS: Skip auth check for local development
   const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
   
-  // CRITICAL: Check authentication (skip for localhost)
+  // Check authentication (skip for localhost)
   if (!isLocalhost) {
     const session = await getServerSession()
     if (!session) {
