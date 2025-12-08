@@ -51,7 +51,7 @@ function InstallsPageContent() {
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [filtersExpanded, setFiltersExpanded] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
   const [devices, setDevices] = useState<any[]>([])
   const [isConfigReport, setIsConfigReport] = useState(false)
   const [configReportData, setConfigReportData] = useState<any[]>([])
@@ -61,6 +61,7 @@ function InstallsPageContent() {
   const [selectedCimianVersion, setSelectedCimianVersion] = useState<string>('')
   const [hasGeneratedReport, setHasGeneratedReport] = useState(false)
   const [reportProgress, setReportProgress] = useState(0)
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false) // Track when user is selecting installs for a report
   
   // Sorting state for config report
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
@@ -75,6 +76,10 @@ function InstallsPageContent() {
   const [itemsStatusFilter, setItemsStatusFilter] = useState<'all' | 'errors' | 'warnings' | 'pending'>('all')
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | 'active' | 'stale' | 'missing'>('all')
+  // Install status filter (installed, pending, warnings, errors, removed)
+  const [installStatusFilter, setInstallStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warnings' | 'errors' | 'removed'>('all')
+  // Widgets accordion state
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const searchParams = useSearchParams()
   
   // Filter state
@@ -425,6 +430,7 @@ function InstallsPageContent() {
       if (Array.isArray(data)) {
         setInstalls(data)
         setHasGeneratedReport(true)
+        setFiltersExpanded(true) // Auto-expand filters after report generation
       } else {
         console.error('API returned non-array data:', data)
         if (data.error || data.message) {
@@ -477,7 +483,32 @@ function InstallsPageContent() {
            !arraysEqual(selectedPlatforms, lastAppliedFilters.platforms)
   }, [selectedInstalls, selectedUsages, selectedCatalogs, selectedRooms, selectedFleets, selectedPlatforms, lastAppliedFilters, installs.length])
   
-  // Config Report handler
+  // Helper function to classify item status
+  const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
+    const status = item.currentStatus?.toLowerCase() || ''
+    
+    // Check for errors first
+    if (status.includes('error') || status.includes('failed') || status === 'needs_reinstall') {
+      return 'error'
+    }
+    // Check for warnings
+    if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+      return 'warning'
+    }
+    // Check for pending removals (separate from other pending)
+    if (status.includes('will-be-removed') || status.includes('removal-requested')) {
+      return 'removed'
+    }
+    // Check for other pending statuses
+    if (status.includes('will-be-installed') || status.includes('update-available') || 
+        status.includes('update_available') || status.includes('pending') || status.includes('scheduled')) {
+      return 'pending'
+    }
+    // Everything else is installed
+    return 'installed'
+  }
+
+  // Config Report handler - now the default view
   const handleConfigReport = async () => {
     try {
       setLoading(true)
@@ -485,7 +516,7 @@ function InstallsPageContent() {
       setFiltersExpanded(false)
       setSearchQuery('')
       
-      // Process devices to extract config data
+      // Process devices to extract config data with item counts
       const configData = devices.map(device => {
         const cimianConfig = device.modules?.installs?.cimian
         const munkiConfig = device.modules?.installs?.munki
@@ -493,6 +524,25 @@ function InstallsPageContent() {
         // Prefer Cimian over Munki
         const config = cimianConfig || munkiConfig
         const isCimian = !!cimianConfig
+        
+        // Get items and count by status
+        const items = config?.items || []
+        let installedCount = 0
+        let pendingCount = 0
+        let errorCount = 0
+        let warningCount = 0
+        let removedCount = 0
+        
+        items.forEach((item: any) => {
+          const classification = classifyItemStatus(item)
+          switch (classification) {
+            case 'installed': installedCount++; break
+            case 'pending': pendingCount++; break
+            case 'error': errorCount++; break
+            case 'warning': warningCount++; break
+            case 'removed': removedCount++; break
+          }
+        })
         
         // Get most recent session
         const sessions = config?.sessions || []
@@ -502,10 +552,13 @@ function InstallsPageContent() {
           deviceId: device.deviceId,
           serialNumber: device.serialNumber,
           deviceName: device.modules?.inventory?.deviceName || device.serialNumber,
+          assetTag: device.modules?.inventory?.assetTag || '',
           usage: device.modules?.inventory?.usage || 'Unknown',
           catalog: device.modules?.inventory?.catalog || 'Unknown',
           room: device.modules?.inventory?.location || 'Unknown',
+          location: device.modules?.inventory?.location || 'Unknown',
           fleet: device.modules?.inventory?.fleet || 'Unknown',
+          platform: device.modules?.inventory?.platform || device.modules?.system?.operatingSystem?.platform || device.platform || 'Unknown',
           lastSeen: device.lastSeen,
           // Config data
           configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
@@ -513,7 +566,13 @@ function InstallsPageContent() {
           softwareRepoUrl: config?.config?.SoftwareRepoURL || config?.config?.softwareRepoUrl || 'N/A',
           version: config?.version || 'N/A',
           lastSessionStatus: latestSession?.status || 'N/A',
-          totalPackagesManaged: latestSession?.totalPackagesManaged || 0
+          totalPackagesManaged: items.length,
+          // Item counts by status
+          installedCount,
+          pendingCount,
+          errorCount,
+          warningCount,
+          removedCount
         }
       }).filter(d => d.configType !== 'None')
       
@@ -528,12 +587,10 @@ function InstallsPageContent() {
     }
   }
   
-  // Reset report handler - clears report data but keeps filter selections
+  // Reset report handler - returns to default config report view
   const handleResetReport = () => {
     setInstalls([])
     setHasGeneratedReport(false)
-    setConfigReportData([])
-    setIsConfigReport(false)
     setSelectedManifest('')
     setSelectedSoftwareRepo('')
     setSelectedMunkiVersion('')
@@ -544,6 +601,19 @@ function InstallsPageContent() {
     setSearchQuery('')
     setItemsStatusFilter('all')
     setDeviceStatusFilter('all')
+    setInstallStatusFilter('all')
+    // Clear selected filters
+    setSelectedInstalls([])
+    setSelectedUsages([])
+    setSelectedCatalogs([])
+    setSelectedRooms([])
+    setSelectedFleets([])
+    setSelectedPlatforms([])
+    // Go to Generate Report view with filters expanded
+    setIsGeneratingReport(true)
+    setFiltersExpanded(true)
+    setIsConfigReport(false)
+    setConfigReportData([])
   }
   
   // Sort handler for config report
@@ -559,6 +629,33 @@ function InstallsPageContent() {
   // Filter and sort config report data
   const filteredConfigData = useMemo(() => {
     let filtered = [...configReportData]
+    
+    // Apply device status filter (Active/Stale/Missing based on lastSeen)
+    if (deviceStatusFilter !== 'all') {
+      const now = new Date()
+      filtered = filtered.filter(device => {
+        if (!device.lastSeen) return deviceStatusFilter === 'missing'
+        const lastSeenDate = new Date(device.lastSeen)
+        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+        
+        if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
+        if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
+        if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
+        return true
+      })
+    }
+    
+    // Apply install status filter (Installed/Pending/Warnings/Errors/Removed)
+    if (installStatusFilter !== 'all') {
+      filtered = filtered.filter(device => {
+        if (installStatusFilter === 'installed') return (device.installedCount || 0) > 0
+        if (installStatusFilter === 'pending') return (device.pendingCount || 0) > 0
+        if (installStatusFilter === 'warnings') return (device.warningCount || 0) > 0
+        if (installStatusFilter === 'errors') return (device.errorCount || 0) > 0
+        if (installStatusFilter === 'removed') return (device.removedCount || 0) > 0
+        return true
+      })
+    }
     
     // Filter by selected manifest
     if (selectedManifest) {
@@ -580,6 +677,38 @@ function InstallsPageContent() {
       filtered = filtered.filter(device => device.configType === 'Cimian' && device.version === selectedCimianVersion)
     }
     
+    // Filter by inventory filters (usage, catalog, fleet, platform, room)
+    if (selectedUsages.length > 0) {
+      filtered = filtered.filter(device => {
+        const usage = device.usage?.toLowerCase() || ''
+        return selectedUsages.some(u => usage.includes(u.toLowerCase()))
+      })
+    }
+    if (selectedCatalogs.length > 0) {
+      filtered = filtered.filter(device => {
+        const catalog = device.catalog?.toLowerCase() || ''
+        return selectedCatalogs.some(c => catalog.includes(c.toLowerCase()))
+      })
+    }
+    if (selectedFleets.length > 0) {
+      filtered = filtered.filter(device => {
+        const fleet = device.fleet?.toLowerCase() || ''
+        return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
+      })
+    }
+    if (selectedPlatforms.length > 0) {
+      filtered = filtered.filter(device => {
+        const platform = device.platform?.toLowerCase() || ''
+        return selectedPlatforms.some(p => platform.includes(p.toLowerCase()))
+      })
+    }
+    if (selectedRooms.length > 0) {
+      filtered = filtered.filter(device => {
+        const room = device.location?.toLowerCase() || ''
+        return selectedRooms.some(r => room.includes(r.toLowerCase()))
+      })
+    }
+    
     // Sort data
     filtered.sort((a, b) => {
       let aVal = a[sortColumn]
@@ -595,28 +724,118 @@ function InstallsPageContent() {
     })
     
     return filtered
-  }, [configReportData, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, sortColumn, sortDirection])
+  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, sortColumn, sortDirection])
   
-  // Filter installs based on search query
+  // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
-    if (!searchQuery) return installs
+    let filtered = installs
     
-    const lowerQuery = searchQuery.toLowerCase()
+    // Apply device status filter (Active/Stale/Missing based on lastSeen)
+    if (deviceStatusFilter !== 'all') {
+      const now = new Date()
+      filtered = filtered.filter(install => {
+        if (!install.lastSeen) return deviceStatusFilter === 'missing'
+        const lastSeenDate = new Date(install.lastSeen)
+        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+        
+        if (deviceStatusFilter === 'active') {
+          return hoursSinceLastSeen <= 24 // Active = seen in last 24 hours
+        } else if (deviceStatusFilter === 'stale') {
+          return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168 // Stale = 1-7 days
+        } else if (deviceStatusFilter === 'missing') {
+          return hoursSinceLastSeen > 168 // Missing = not seen in 7+ days
+        }
+        return true
+      })
+    }
     
-    return installs.filter(install => 
-      install.deviceName?.toLowerCase().includes(lowerQuery) ||
-      install.serialNumber?.toLowerCase().includes(lowerQuery) ||
-      install.name?.toLowerCase().includes(lowerQuery) ||
-      install.version?.toLowerCase().includes(lowerQuery) ||
-      install.source?.toLowerCase().includes(lowerQuery) ||
-      // Add support for "Name - Version" search from widget clicks
-      `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
-    )
-  }, [installs, searchQuery])
+    // Apply install status filter (Installed/Pending/Warnings/Errors/Removed)
+    // For generate report mode, filter by status field
+    if (installStatusFilter !== 'all') {
+      filtered = filtered.filter(install => {
+        const status = (install.status || '').toLowerCase()
+        if (installStatusFilter === 'installed') {
+          return status.includes('installed') || status === 'present'
+        }
+        if (installStatusFilter === 'pending') {
+          return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')
+        }
+        if (installStatusFilter === 'warnings') {
+          return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+        }
+        if (installStatusFilter === 'errors') {
+          return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
+        }
+        if (installStatusFilter === 'removed') {
+          return status.includes('removed') || status.includes('will-be-removed') || status.includes('removal')
+        }
+        return true
+      })
+    }
+    
+    // Apply search query filter
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase()
+      filtered = filtered.filter(install => 
+        install.deviceName?.toLowerCase().includes(lowerQuery) ||
+        install.serialNumber?.toLowerCase().includes(lowerQuery) ||
+        install.name?.toLowerCase().includes(lowerQuery) ||
+        install.version?.toLowerCase().includes(lowerQuery) ||
+        install.source?.toLowerCase().includes(lowerQuery) ||
+        // Add support for "Name - Version" search from widget clicks
+        `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
+      )
+    }
+    
+    // Apply Usage filter
+    if (selectedUsages.length > 0) {
+      filtered = filtered.filter(install => 
+        install.usage && selectedUsages.includes(install.usage.toLowerCase())
+      )
+    }
+    
+    // Apply Catalog filter
+    if (selectedCatalogs.length > 0) {
+      filtered = filtered.filter(install => 
+        install.catalog && selectedCatalogs.includes(install.catalog.toLowerCase())
+      )
+    }
+    
+    // Apply Fleet filter
+    if (selectedFleets.length > 0) {
+      filtered = filtered.filter(install => 
+        install.fleet && selectedFleets.includes(install.fleet)
+      )
+    }
+    
+    // Apply Platform filter
+    if (selectedPlatforms.length > 0) {
+      filtered = filtered.filter(install => 
+        install.platform && selectedPlatforms.includes(install.platform)
+      )
+    }
+    
+    // Apply Location filter
+    if (selectedRooms.length > 0) {
+      filtered = filtered.filter(install => 
+        install.room && selectedRooms.includes(install.room)
+      )
+    }
+    
+    return filtered
+  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter])
 
   useEffect(() => {
     fetchFilterOptions()
   }, [fetchFilterOptions])
+
+  // Auto-load Config Report when devices are loaded (default view)
+  useEffect(() => {
+    if (devices.length > 0 && !isConfigReport && configReportData.length === 0 && !hasGeneratedReport && itemsStatusFilter === 'all') {
+      // Trigger config report as the default view
+      handleConfigReport()
+    }
+  }, [devices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter])
 
   // Handle URL filter parameter (from dashboard click-through)
   useEffect(() => {
@@ -636,9 +855,188 @@ function InstallsPageContent() {
   }, [devices])
 
   // Calculate device status counts (Active/Stale/Missing)
-  // When items filter is active with a search query, show counts for devices with that specific item
+  // Counts should reflect data with OTHER filters applied (not deviceStatusFilter itself)
+  // This makes the counts dynamic - showing what would match if you clicked that status
   const deviceStatusCounts = useMemo(() => {
     const counts = { active: 0, stale: 0, missing: 0 }
+    const now = new Date()
+    
+    // If we're in config report mode with data, count from configReportData with other filters applied
+    if (isConfigReport && configReportData.length > 0) {
+      // Apply all filters EXCEPT deviceStatusFilter to get the base data
+      let dataToCount = [...configReportData]
+      
+      // Apply install status filter
+      if (installStatusFilter !== 'all') {
+        dataToCount = dataToCount.filter(device => {
+          if (installStatusFilter === 'installed') return (device.installedCount || 0) > 0
+          if (installStatusFilter === 'pending') return (device.pendingCount || 0) > 0
+          if (installStatusFilter === 'warnings') return (device.warningCount || 0) > 0
+          if (installStatusFilter === 'errors') return (device.errorCount || 0) > 0
+          if (installStatusFilter === 'removed') return (device.removedCount || 0) > 0
+          return true
+        })
+      }
+      
+      // Apply manifest filter
+      if (selectedManifest) {
+        dataToCount = dataToCount.filter(device => device.clientIdentifier === selectedManifest)
+      }
+      
+      // Apply software repo filter
+      if (selectedSoftwareRepo) {
+        dataToCount = dataToCount.filter(device => device.softwareRepoUrl === selectedSoftwareRepo)
+      }
+      
+      // Apply Munki version filter
+      if (selectedMunkiVersion) {
+        dataToCount = dataToCount.filter(device => device.configType === 'Munki' && device.version === selectedMunkiVersion)
+      }
+      
+      // Apply Cimian version filter
+      if (selectedCimianVersion) {
+        dataToCount = dataToCount.filter(device => device.configType === 'Cimian' && device.version === selectedCimianVersion)
+      }
+      
+      // Apply inventory filters
+      if (selectedUsages.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const usage = device.usage?.toLowerCase() || ''
+          return selectedUsages.some(u => usage.includes(u.toLowerCase()))
+        })
+      }
+      if (selectedCatalogs.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const catalog = device.catalog?.toLowerCase() || ''
+          return selectedCatalogs.some(c => catalog.includes(c.toLowerCase()))
+        })
+      }
+      if (selectedFleets.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const fleet = device.fleet?.toLowerCase() || ''
+          return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
+        })
+      }
+      if (selectedPlatforms.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const platform = device.platform?.toLowerCase() || ''
+          return selectedPlatforms.some(p => platform.includes(p.toLowerCase()))
+        })
+      }
+      if (selectedRooms.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const room = device.location?.toLowerCase() || ''
+          return selectedRooms.some(r => room.includes(r.toLowerCase()))
+        })
+      }
+      
+      // Now count device statuses from the filtered data
+      dataToCount.forEach(device => {
+        if (!device.lastSeen) {
+          counts.missing++
+          return
+        }
+        const lastSeenDate = new Date(device.lastSeen)
+        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+        
+        if (hoursSinceLastSeen <= 24) counts.active++
+        else if (hoursSinceLastSeen <= 168) counts.stale++
+        else counts.missing++
+      })
+      return counts
+    }
+    
+    // If we have a generated report with installs, count from those with other filters applied
+    if (installs.length > 0) {
+      // Apply all filters EXCEPT deviceStatusFilter
+      let installsToCount = [...installs]
+      
+      // Apply install status filter
+      if (installStatusFilter !== 'all') {
+        installsToCount = installsToCount.filter(install => {
+          const status = (install.status || '').toLowerCase()
+          if (installStatusFilter === 'installed') {
+            return status.includes('installed') || status === 'present'
+          }
+          if (installStatusFilter === 'pending') {
+            return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')
+          }
+          if (installStatusFilter === 'warnings') {
+            return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+          }
+          if (installStatusFilter === 'errors') {
+            return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
+          }
+          if (installStatusFilter === 'removed') {
+            return status.includes('removed') || status.includes('will-be-removed') || status.includes('removal')
+          }
+          return true
+        })
+      }
+      
+      // Apply search query filter
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase()
+        installsToCount = installsToCount.filter(install => 
+          install.deviceName?.toLowerCase().includes(lowerQuery) ||
+          install.serialNumber?.toLowerCase().includes(lowerQuery) ||
+          install.name?.toLowerCase().includes(lowerQuery) ||
+          install.version?.toLowerCase().includes(lowerQuery) ||
+          install.source?.toLowerCase().includes(lowerQuery) ||
+          `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
+        )
+      }
+      
+      // Apply inventory filters
+      if (selectedUsages.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.usage && selectedUsages.includes(install.usage.toLowerCase())
+        )
+      }
+      if (selectedCatalogs.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.catalog && selectedCatalogs.includes(install.catalog.toLowerCase())
+        )
+      }
+      if (selectedFleets.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.fleet && selectedFleets.includes(install.fleet)
+        )
+      }
+      if (selectedPlatforms.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.platform && selectedPlatforms.includes(install.platform)
+        )
+      }
+      if (selectedRooms.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.room && selectedRooms.includes(install.room)
+        )
+      }
+      
+      // Get unique devices from filtered installs
+      const deviceLastSeen = new Map<string, string>()
+      installsToCount.forEach(install => {
+        const existing = deviceLastSeen.get(install.serialNumber)
+        if (!existing || (install.lastSeen && install.lastSeen > existing)) {
+          deviceLastSeen.set(install.serialNumber, install.lastSeen || '')
+        }
+      })
+      
+      deviceLastSeen.forEach((lastSeen) => {
+        if (!lastSeen) {
+          counts.missing++
+          return
+        }
+        const lastSeenDate = new Date(lastSeen)
+        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+        
+        if (hoursSinceLastSeen <= 24) counts.active++
+        else if (hoursSinceLastSeen <= 168) counts.stale++
+        else counts.missing++
+      })
+      return counts
+    }
     
     // If we have a specific item selected (searchQuery + itemsStatusFilter), count only those devices
     if (searchQuery && itemsStatusFilter !== 'all') {
@@ -694,7 +1092,201 @@ function InstallsPageContent() {
       })
     }
     return counts
-  }, [devices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter])
+  }, [installs, devices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter, isConfigReport, configReportData, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+
+  // Calculate install status counts (Installed/Pending/Warnings/Errors/Removed)
+  // Counts should reflect data with OTHER filters applied (not installStatusFilter itself)
+  // This makes the counts dynamic - showing what would match if you clicked that status
+  const installStatusCounts = useMemo(() => {
+    const counts = { installed: 0, pending: 0, warnings: 0, errors: 0, removed: 0 }
+    
+    // Use configReportData for config report mode (sum up count fields)
+    if (isConfigReport && configReportData.length > 0) {
+      // Apply all filters EXCEPT installStatusFilter to get the base data
+      let dataToCount = [...configReportData]
+      const now = new Date()
+      
+      // Apply device status filter
+      if (deviceStatusFilter !== 'all') {
+        dataToCount = dataToCount.filter(device => {
+          if (!device.lastSeen) return deviceStatusFilter === 'missing'
+          const lastSeenDate = new Date(device.lastSeen)
+          const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+          
+          if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
+          if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
+          if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
+          return true
+        })
+      }
+      
+      // Apply manifest filter
+      if (selectedManifest) {
+        dataToCount = dataToCount.filter(device => device.clientIdentifier === selectedManifest)
+      }
+      
+      // Apply software repo filter
+      if (selectedSoftwareRepo) {
+        dataToCount = dataToCount.filter(device => device.softwareRepoUrl === selectedSoftwareRepo)
+      }
+      
+      // Apply Munki version filter
+      if (selectedMunkiVersion) {
+        dataToCount = dataToCount.filter(device => device.configType === 'Munki' && device.version === selectedMunkiVersion)
+      }
+      
+      // Apply Cimian version filter
+      if (selectedCimianVersion) {
+        dataToCount = dataToCount.filter(device => device.configType === 'Cimian' && device.version === selectedCimianVersion)
+      }
+      
+      // Apply inventory filters
+      if (selectedUsages.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const usage = device.usage?.toLowerCase() || ''
+          return selectedUsages.some(u => usage.includes(u.toLowerCase()))
+        })
+      }
+      if (selectedCatalogs.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const catalog = device.catalog?.toLowerCase() || ''
+          return selectedCatalogs.some(c => catalog.includes(c.toLowerCase()))
+        })
+      }
+      if (selectedFleets.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const fleet = device.fleet?.toLowerCase() || ''
+          return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
+        })
+      }
+      if (selectedPlatforms.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const platform = device.platform?.toLowerCase() || ''
+          return selectedPlatforms.some(p => platform.includes(p.toLowerCase()))
+        })
+      }
+      if (selectedRooms.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const room = device.location?.toLowerCase() || ''
+          return selectedRooms.some(r => room.includes(r.toLowerCase()))
+        })
+      }
+      
+      // Now sum up counts from the filtered data
+      dataToCount.forEach(item => {
+        counts.installed += item.installedCount || 0
+        counts.pending += item.pendingCount || 0
+        counts.warnings += item.warningCount || 0
+        counts.errors += item.errorCount || 0
+        counts.removed += item.removedCount || 0
+      })
+    } else if (installs.length > 0) {
+      // Apply all filters EXCEPT installStatusFilter
+      let installsToCount = [...installs]
+      const now = new Date()
+      
+      // Apply device status filter
+      if (deviceStatusFilter !== 'all') {
+        installsToCount = installsToCount.filter(install => {
+          if (!install.lastSeen) return deviceStatusFilter === 'missing'
+          const lastSeenDate = new Date(install.lastSeen)
+          const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+          
+          if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
+          if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
+          if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
+          return true
+        })
+      }
+      
+      // Apply search query filter
+      if (searchQuery) {
+        const lowerQuery = searchQuery.toLowerCase()
+        installsToCount = installsToCount.filter(install => 
+          install.deviceName?.toLowerCase().includes(lowerQuery) ||
+          install.serialNumber?.toLowerCase().includes(lowerQuery) ||
+          install.name?.toLowerCase().includes(lowerQuery) ||
+          install.version?.toLowerCase().includes(lowerQuery) ||
+          install.source?.toLowerCase().includes(lowerQuery) ||
+          `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
+        )
+      }
+      
+      // Apply inventory filters
+      if (selectedUsages.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.usage && selectedUsages.includes(install.usage.toLowerCase())
+        )
+      }
+      if (selectedCatalogs.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.catalog && selectedCatalogs.includes(install.catalog.toLowerCase())
+        )
+      }
+      if (selectedFleets.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.fleet && selectedFleets.includes(install.fleet)
+        )
+      }
+      if (selectedPlatforms.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.platform && selectedPlatforms.includes(install.platform)
+        )
+      }
+      if (selectedRooms.length > 0) {
+        installsToCount = installsToCount.filter(install => 
+          install.room && selectedRooms.includes(install.room)
+        )
+      }
+      
+      // For generate report mode, count by status field
+      installsToCount.forEach(item => {
+        const status = (item.status || '').toLowerCase()
+        if (status.includes('installed') || status === 'present') {
+          counts.installed++
+        } else if (status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')) {
+          counts.pending++
+        } else if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+          counts.warnings++
+        } else if (status.includes('error') || status.includes('failed') || status === 'needs_reinstall') {
+          counts.errors++
+        } else if (status.includes('removed') || status.includes('will-be-removed') || status.includes('removal')) {
+          counts.removed++
+        }
+      })
+    }
+    return counts
+  }, [installs, configReportData, isConfigReport, deviceStatusFilter, searchQuery, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+
+  // Compute available filter options from the current report data (installs array)
+  // Only show filter values that actually exist in the report
+  const reportFilterOptions = useMemo(() => {
+    if (installs.length === 0) {
+      return { usages: [], catalogs: [], fleets: [], platforms: [], rooms: [] }
+    }
+    
+    const usages = new Set<string>()
+    const catalogs = new Set<string>()
+    const fleets = new Set<string>()
+    const platforms = new Set<string>()
+    const rooms = new Set<string>()
+    
+    installs.forEach(install => {
+      if (install.usage) usages.add(install.usage)
+      if (install.catalog) catalogs.add(install.catalog)
+      if (install.fleet) fleets.add(install.fleet)
+      if (install.platform) platforms.add(install.platform)
+      if (install.room) rooms.add(install.room)
+    })
+    
+    return {
+      usages: Array.from(usages).sort(),
+      catalogs: Array.from(catalogs).sort(),
+      fleets: Array.from(fleets).sort(),
+      platforms: Array.from(platforms).sort(),
+      rooms: Array.from(rooms).sort()
+    }
+  }, [installs])
 
   // Check if we have any Munki or Cimian installations
   const hasMunkiInstalls = useMemo(() => {
@@ -961,11 +1553,11 @@ function InstallsPageContent() {
                 <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                <div className="min-w-0">
+                {/* <div className="min-w-0">
                   <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
                     Installs Report
                   </h1>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -989,97 +1581,122 @@ function InstallsPageContent() {
 
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40 bg-white dark:bg-gray-800 rounded-t-xl">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isConfigReport ? 'Device Configuration Report' : 'Managed Software Update Report'} {(isConfigReport ? configReportData.length : filteredInstalls.length) > 0 && `(${isConfigReport ? configReportData.length : filteredInstalls.length})`}
-                {(searchQuery || selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && installs.length > 0 && (
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
-                    (filtered)
-                  </span>
-                )}
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {isConfigReport
-                  ? `Showing configuration details for ${configReportData.length} devices with Cimian or Munki`
-                  : installs.length === 0 
-                    ? hasGeneratedReport
-                      ? 'No install records found matching your criteria.'
-                      : 'Select packages from filters below to generate an items report, or click "Config Report" to view device configurations'
-                    : `Showing ${filteredInstalls.length} of ${installs.length} install records across devices`
-                }
-              </p>
+            <div className="flex items-center gap-4">
+              {/* Back to Config Report Button - Shows when in Generate Report mode, loading report, or after report generated */}
+              {(isGeneratingReport || loading || (hasGeneratedReport && installs.length > 0)) && (
+                <button
+                  onClick={() => {
+                    // Go back to Config Report (default view)
+                    setIsGeneratingReport(false)
+                    setFiltersExpanded(false)
+                    setSelectedInstalls([])
+                    handleConfigReport()
+                  }}
+                  className="p-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center justify-center"
+                  title="Back to Config Report"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                </button>
+              )}
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Managed Software Update Reporting
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  {isGeneratingReport
+                    ? 'Select items from the list below, then click Generate Report'
+                    : isConfigReport
+                      ? 'View device configurations, drill down by status, or generate targeted reports using filters'
+                      : installs.length === 0 
+                        ? hasGeneratedReport
+                          ? 'No install records found matching your criteria.'
+                          : 'Select items from filters to generate an items report'
+                        : 'Filtered install records across selected devices and criteria'
+                  }
+                </p>
+              </div>
             </div>
 
             {/* Action Buttons in Header */}
-            <div className="flex items-center gap-4">
-              {/* Generate Report Button with Loading Spinner */}
-              <div className="flex items-center gap-3">
-                {/* Clear All Selections Button - Show when selections are active and NO report loaded */}
-                {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && !loading && installs.length === 0 && configReportData.length === 0 && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
-                  >
-                    Clear All Selections
-                  </button>
-                )}
-                
-                {/* Generate Report Button - Show when filters are selected */}
-                {!loading && selectedInstalls.length > 0 && (
-                  <button
-                    onClick={handleGenerateReport}
-                    disabled={selectedInstalls.length === 0}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
-                  >
-                    {filtersChanged ? 'Update Report' : 'Generate Report'}
-                  </button>
-                )}
-                
-                {/* Config Report Button - Show when NO filters selected, NO report loaded, and data is loaded */}
-                {!loading && !filtersLoading && selectedInstalls.length === 0 && installs.length === 0 && configReportData.length === 0 && (
-                  <button
-                    onClick={handleConfigReport}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    Config Report
-                  </button>
-                )}
+            <div className="flex items-center gap-3">
+              {/* Generate Report Button - Hidden during initial loading, expands filters if no installs selected */}
+              {!loading && !filtersLoading && (
+                <>
+                  {/* "New Report" button when report has been generated */}
+                  {hasGeneratedReport && installs.length > 0 && (
+                    <button
+                      onClick={() => {
+                        // Reset to generate report mode
+                        setFiltersExpanded(true)
+                        setIsConfigReport(false)
+                        setInstalls([])
+                        setHasGeneratedReport(false)
+                        setIsGeneratingReport(true)
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      New Report
+                    </button>
+                  )}
+                  {/* Blue Generate/Update Report button */}
+                  {!(hasGeneratedReport && installs.length > 0) && (
+                    <button
+                      onClick={() => {
+                        if (selectedInstalls.length === 0) {
+                          // No installs selected - expand filters, hide widgets, show items filter cloud
+                          setFiltersExpanded(true)
+                          setIsConfigReport(false)
+                          setInstalls([])
+                          setIsGeneratingReport(true) // Enter generate report mode
+                        } else {
+                          // Installs selected - generate the report
+                          setIsGeneratingReport(false) // Exit generate report mode
+                          setIsConfigReport(false) // Ensure config report view is off
+                          handleGenerateReport()
+                        }
+                      }}
+                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      {selectedInstalls.length > 0 
+                        ? (filtersChanged ? 'Update Report' : 'Generate Report')
+                        : 'Generate Report'
+                      }
+                    </button>
+                  )}
+                </>
+              )}
 
-                {/* Reset Button - Show after report is generated */}
-                {(installs.length > 0 || configReportData.length > 0) && !loading && (
-                  <button
-                    onClick={handleResetReport}
-                    className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Reset Report
-                  </button>
-                )}
-              </div>
-
-              {/* Export CSV Button */}
-              {(filteredInstalls.length > 0 || configReportData.length > 0) && (
+              {/* Export CSV Button - Only show after report is generated, hide during loading */}
+              {!loading && !filtersLoading && (filteredInstalls.length > 0 || (isConfigReport && configReportData.length > 0)) && (
                 <button
                   onClick={() => {
                     if (isConfigReport) {
-                      // Export config report CSV
+                      // Export config report CSV with new columns
                       const csvContent = [
-                        ['Device Name', 'Serial Number', 'System', 'Manifest', 'Repo', 'Version', 'Last Session Status', 'Managed Items'].join(','),
+                        ['Device Name', 'Serial Number', 'Asset Tag', 'System', 'Version', 'Manifest', 'Repo', 'Total Items', 'Installed', 'Pending', 'Errors', 'Warnings', 'Removed', 'Last Seen'].join(','),
                         ...filteredConfigData.map(device => [
                           device.deviceName,
                           device.serialNumber,
+                          device.assetTag || '',
                           device.configType,
+                          device.version,
                           device.clientIdentifier,
                           device.softwareRepoUrl,
-                          device.version,
-                          device.lastSessionStatus,
-                          device.totalPackagesManaged
+                          device.totalPackagesManaged,
+                          device.installedCount,
+                          device.pendingCount,
+                          device.errorCount,
+                          device.warningCount,
+                          device.removedCount,
+                          device.lastSeen
                         ].map(field => `\"${String(field).replace(/\"/g, '\"\"')}\"`).join(','))
                       ].join('\\n')
                       
@@ -1142,11 +1759,11 @@ function InstallsPageContent() {
           )}
 
           {/* Top Cards - Always Visible */}
-          <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className={`px-6 py-4 bg-white dark:bg-gray-800 ${filtersLoading ? 'rounded-b-xl' : 'border-b border-gray-200 dark:border-gray-700'}`}>
             
             {/* Loading Progress Bar - Always at top */}
             {filtersLoading && (
-              <div className="mb-6">
+              <div className="mb-0">
                 <div className="max-w-2xl mx-auto">
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -1178,9 +1795,46 @@ function InstallsPageContent() {
               </div>
             )}
 
-            {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show tables with data and NOT in config report mode */}
-            {!isConfigReport && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && (
-              <div className={`grid grid-cols-1 gap-6 mb-6 ${
+            {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}
+            {isConfigReport && !isGeneratingReport && (
+              itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 ||
+              (itemsStatusFilter === 'all' && configReportData.length > 0)
+            ) && (
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              {/* Widgets Accordion Header */}
+              <button
+                onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+                className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+                  {(itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {itemsWithErrors.length + itemsWithWarnings.length + itemsWithPending.length} items
+                    </span>
+                  )}
+                </div>
+                <svg 
+                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+            )}
+
+              {/* Widgets Content - Collapsible */}
+              {widgetsExpanded && isConfigReport && !isGeneratingReport && (
+                itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 ||
+                (itemsStatusFilter === 'all' && configReportData.length > 0)
+              ) && (
+              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show in config report mode */}
+            {(itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && (
+              <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
                 [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0].filter(Boolean).length === 3
                   ? 'lg:grid-cols-3'
                   : [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0].filter(Boolean).length === 2
@@ -1190,15 +1844,17 @@ function InstallsPageContent() {
                 
                 {/* Items with Errors Table - Only show if has errors */}
                 {itemsWithErrors.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'errors' && !searchQuery) {
                         setItemsStatusFilter('all')
+                        setFiltersExpanded(false)
                       } else {
                         setSearchQuery('')
                         setItemsStatusFilter('errors')
+                        setFiltersExpanded(true)
                       }
                     }}
                     title="Click to show all devices with errors"
@@ -1222,7 +1878,7 @@ function InstallsPageContent() {
                       </div>
                     ) : (
                       <table className="w-full">
-                        <thead className="sticky top-0 bg-gray-100 dark:bg-gray-600 z-10">
+                        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
                               className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
@@ -1297,15 +1953,17 @@ function InstallsPageContent() {
 
                 {/* Items with Warnings Table - Only show if has warnings */}
                 {itemsWithWarnings.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'warnings' && !searchQuery) {
                         setItemsStatusFilter('all')
+                        setFiltersExpanded(false)
                       } else {
                         setSearchQuery('')
                         setItemsStatusFilter('warnings')
+                        setFiltersExpanded(true)
                       }
                     }}
                     title="Click to show all devices with warnings"
@@ -1329,7 +1987,7 @@ function InstallsPageContent() {
                       </div>
                     ) : (
                       <table className="w-full">
-                        <thead className="sticky top-0 bg-gray-100 dark:bg-gray-600 z-10">
+                        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
                               className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
@@ -1404,15 +2062,17 @@ function InstallsPageContent() {
 
                 {/* Items with Pending Table - Only show if has pending */}
                 {itemsWithPending.length > 0 && (
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'pending' && !searchQuery) {
                         setItemsStatusFilter('all')
+                        setFiltersExpanded(false)
                       } else {
                         setSearchQuery('')
                         setItemsStatusFilter('pending')
+                        setFiltersExpanded(true)
                       }
                     }}
                     title="Click to show all devices with pending updates"
@@ -1436,7 +2096,7 @@ function InstallsPageContent() {
                       </div>
                     ) : (
                       <table className="w-full">
-                        <thead className="sticky top-0 bg-gray-100 dark:bg-gray-600 z-10">
+                        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
                               className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
@@ -1512,9 +2172,9 @@ function InstallsPageContent() {
             )}
             
             {/* Config Widgets Row: Software Repos + Munki (conditional) + Cimian (conditional) + Manifests */}
-            {/* Hide when items status filter is active (errors/warnings/pending from items tables) */}
+            {/* Only show when items status filter is 'all' (not filtering by errors/warnings/pending) */}
             {itemsStatusFilter === 'all' && (
-            <div className={`grid grid-cols-1 gap-6 ${
+            <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
               hasMunkiInstalls && hasCimianInstalls 
                 ? 'lg:grid-cols-4' 
                 : hasMunkiInstalls || hasCimianInstalls 
@@ -1523,7 +2183,7 @@ function InstallsPageContent() {
             }`}>
               
               {/* First Column: Software Repo Widget */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Software Repos
                 </h3>
@@ -1626,7 +2286,7 @@ function InstallsPageContent() {
 
               {/* Second Column: Munki Version Distribution - Only show if there are Munki installations */}
               {hasMunkiInstalls && (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Munki Versions
                 </h3>
@@ -1742,7 +2402,7 @@ function InstallsPageContent() {
 
               {/* Third Column: Cimian Version Distribution - Only show if there are Cimian installations */}
               {hasCimianInstalls && (
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Cimian Versions
                 </h3>
@@ -1862,7 +2522,7 @@ function InstallsPageContent() {
               )}
 
               {/* Fourth Column: Manifest Distribution */}
-              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
                   Manifests
                 </h3>
@@ -1983,6 +2643,8 @@ function InstallsPageContent() {
               </div>
             </div>
             )}
+              </div>
+              )}
 
           </div>
 
@@ -2013,13 +2675,19 @@ function InstallsPageContent() {
                     </button>
                   )}
                 </div>
-                {/* Clear Filter(s) Button - Show when items status filter or device status filter is active */}
-                {(itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all') && (
+                {/* Clear Filter(s) Button - Show when any filter is active */}
+                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
                   <button
                     onClick={() => {
                       setItemsStatusFilter('all')
                       setDeviceStatusFilter('all')
+                      setInstallStatusFilter('all')
                       setSearchQuery('')
+                      clearAllFilters()
+                      setSelectedManifest('')
+                      setSelectedSoftwareRepo('')
+                      setSelectedMunkiVersion('')
+                      setSelectedCimianVersion('')
                     }}
                     className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
                   >
@@ -2029,48 +2697,18 @@ function InstallsPageContent() {
                     Clear Filter(s)
                   </button>
                 )}
-              </div>
-            </div>
-          )}
-
-          {/* Device Status Filter Tabs - Active/Stale/Missing - Show when report is generated OR when items status filter is active */}
-          {!filtersLoading && (installs.length > 0 || itemsStatusFilter !== 'all') && (
-            <div className="px-6 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm text-gray-600 dark:text-gray-400 mr-2">Device Status:</span>
-                <button
-                  onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'active' ? 'all' : 'active')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors flex items-center gap-1.5 ${
-                    deviceStatusFilter === 'active'
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-green-50 hover:text-green-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-green-900/50 dark:hover:text-green-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                  Active ({deviceStatusCounts.active})
-                </button>
-                <button
-                  onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'stale' ? 'all' : 'stale')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors flex items-center gap-1.5 ${
-                    deviceStatusFilter === 'stale'
-                      ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-yellow-50 hover:text-yellow-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-yellow-900/50 dark:hover:text-yellow-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                  Stale ({deviceStatusCounts.stale})
-                </button>
-                <button
-                  onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'missing' ? 'all' : 'missing')}
-                  className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors flex items-center gap-1.5 ${
-                    deviceStatusFilter === 'missing'
-                      ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300'
-                      : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-red-900/50 dark:hover:text-red-400'
-                  }`}
-                >
-                  <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                  Missing ({deviceStatusCounts.missing})
-                </button>
+                {/* Reset Report Button - Only show for generated reports when NO widget filters are active */}
+                {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
+                  <button
+                    onClick={handleResetReport}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reset Report
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -2079,104 +2717,201 @@ function InstallsPageContent() {
           {installs.length > 0 && (
             <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
-              {/* Version Distribution Charts */}
-              <div className="grid grid-cols-1 gap-6">
-                
-                {/* Install Items Version Distribution */}
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                    Install Item(s) Versions
-                  </h3>
-                  <div className="space-y-3">
-                    {Object.entries(
-                      installs
-                        .filter(install => install.source === 'cimian' || install.source === 'munki')
-                        .reduce((acc: Record<string, { count: number; version: string }>, install) => {
-                          const key = `${install.name} - ${install.version || 'Unknown'}`
-                          if (!acc[key]) {
-                            acc[key] = { count: 0, version: install.version || 'Unknown' }
-                          }
-                          acc[key].count++
-                          return acc
-                        }, {})
-                    )
-                    .sort(([keyA,a], [keyB,b]) => {
-                      // Sort by version (latest first), then by count
-                      const versionCompare = b.version.localeCompare(a.version, undefined, { numeric: true, sensitivity: 'base' })
-                      return versionCompare !== 0 ? versionCompare : b.count - a.count
-                    })
-                    .slice(0, 10)
-                    .map(([itemVersion, data]) => {
-                      const percentage = Math.round((data.count / installs.filter(i => i.source === 'cimian' || i.source === 'munki').length) * 100)
-                      const isSelected = searchQuery === itemVersion
+              {/* Version Distribution Charts - Separate box per unique item name */}
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                Install Item(s) Versions
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                {(() => {
+                  // Group installs by unique item name first
+                  const managedInstalls = installs.filter(install => install.source === 'cimian' || install.source === 'munki')
+                  const itemsByName: Record<string, { versions: Record<string, number>; total: number }> = {}
+                  
+                  managedInstalls.forEach(install => {
+                    const itemName = install.name
+                    const version = install.version || 'Unknown'
+                    
+                    if (!itemsByName[itemName]) {
+                      itemsByName[itemName] = { versions: {}, total: 0 }
+                    }
+                    if (!itemsByName[itemName].versions[version]) {
+                      itemsByName[itemName].versions[version] = 0
+                    }
+                    itemsByName[itemName].versions[version]++
+                    itemsByName[itemName].total++
+                  })
+                  
+                  // Sort items by total count (most devices first)
+                  return Object.entries(itemsByName)
+                    .sort(([,a], [,b]) => b.total - a.total)
+                    .map(([itemName, data]) => {
+                      const sortedVersions = Object.entries(data.versions)
+                        .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                      
                       return (
                         <div 
-                          key={itemVersion} 
-                          className={`flex items-center cursor-pointer p-2 rounded-lg transition-colors ${
-                            isSelected 
-                              ? 'bg-emerald-50 dark:bg-emerald-900/20 ring-1 ring-emerald-500' 
-                              : 'hover:bg-gray-100 dark:hover:bg-gray-600'
-                          }`}
-                          onClick={() => setSearchQuery(isSelected ? '' : itemVersion)}
+                          key={itemName} 
+                          className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className={`text-sm font-medium truncate ${
-                                isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'
-                              }`}>
-                                {itemVersion}
-                              </span>
-                              <span className={`text-sm ${
-                                isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'
-                              }`}>
-                                {data.count} ({percentage}%)
-                              </span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
-                              <div 
-                                className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
-                                style={{ width: `${percentage}%` }}
-                              ></div>
-                            </div>
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={itemName}>
+                              {itemName}
+                            </h4>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
+                              {data.total} device{data.total !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          <div className="space-y-2">
+                            {sortedVersions.map(([version, count]) => {
+                              const percentage = Math.round((count / data.total) * 100)
+                              const searchKey = `${itemName} - ${version}`
+                              const isSelected = searchQuery === searchKey
+                              return (
+                                <div 
+                                  key={version}
+                                  className={`cursor-pointer p-2 rounded transition-colors ${
+                                    isSelected 
+                                      ? 'bg-emerald-50 dark:bg-emerald-900/20 ring-1 ring-emerald-500' 
+                                      : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+                                  }`}
+                                  onClick={() => setSearchQuery(isSelected ? '' : searchKey)}
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className={`text-xs font-medium ${
+                                      isSelected ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-700 dark:text-gray-300'
+                                    }`}>
+                                      v{version}
+                                    </span>
+                                    <span className={`text-xs ${
+                                      isSelected ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-500 dark:text-gray-400'
+                                    }`}>
+                                      {count} ({percentage}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
+                                    <div 
+                                      className="bg-emerald-600 h-1.5 rounded-full transition-all duration-300" 
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )
+                            })}
                           </div>
                         </div>
                       )
-                    })}
-                    {installs.filter(i => i.source === 'cimian' || i.source === 'munki').length === 0 && (
-                      <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                        No install items found
-                      </div>
-                    )}
+                    })
+                })()}
+                {installs.filter(i => i.source === 'cimian' || i.source === 'munki').length === 0 && (
+                  <div className="col-span-full text-center py-4 text-gray-500 dark:text-gray-400">
+                    No install items found
                   </div>
-                </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* Filter Clouds Section */}
-          {!filtersLoading && filtersExpanded && (
-            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-700">
+          {/* Filters Accordion - Hide when in generate report mode since items are already expanded */}
+          {!filtersLoading && !isGeneratingReport && (
+            <div className={hasGeneratedReport && installs.length > 0 ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+              {/* Accordion Header */}
+              <button
+                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Filters
+                  </span>
+                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && (
+                    <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
+                      {selectedInstalls.length + selectedUsages.length + selectedCatalogs.length + selectedRooms.length + selectedFleets.length + selectedPlatforms.length} active
+                    </span>
+                  )}
+                </div>
+                <svg 
+                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${filtersExpanded ? 'rotate-90' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
+          )}
+
+          {/* Filter Clouds Section - Show when expanded OR in generate report mode */}
+          {!filtersLoading && (filtersExpanded || isGeneratingReport) && (
+            <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <div className="space-y-4">
-                
-                {/* Inventory Filter Sections - Top - Only show filters that have data */}
-                {((filterOptions.usages && filterOptions.usages.length > 0) ||
-                  (filterOptions.catalogs && filterOptions.catalogs.length > 0) ||
-                  (filterOptions.fleets && filterOptions.fleets.length > 0) ||
-                  (filterOptions.platforms && filterOptions.platforms.length > 0)) && (
+
+                {/* Items Filter Cloud - Show when in Generate Report mode - ABOVE inventory filters */}
+                {isGeneratingReport && (filterOptions.managedInstalls?.length > 0 || filterOptions.otherInstalls?.length > 0) && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Items {selectedInstalls.length > 0 && `(${selectedInstalls.length} selected)`}
+                    </h3>
+                    {selectedInstalls.length > 0 && (
+                      <button
+                        onClick={() => setSelectedInstalls([])}
+                        className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                      >
+                        Clear selection
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {[...(filterOptions.managedInstalls || []), ...(filterOptions.otherInstalls || [])]
+                      .filter(install => install.toLowerCase().includes(searchQuery.toLowerCase()))
+                      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                      .map(install => (
+                        <button
+                          key={install}
+                          onClick={() => toggleInstall(install)}
+                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                            selectedInstalls.includes(install)
+                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
+                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                          }`}
+                        >
+                          {install}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+                )}
+
+                {/* Inventory Filter Sections - Show from report data when report exists, otherwise from all data */}
+                {(() => {
+                  // Use report-specific filters when report is generated, otherwise use all filter options
+                  // Only show filters when there's actual report data to filter
+                  if (installs.length === 0 && !isGeneratingReport) return null
+                  
+                  const activeFilters = installs.length > 0 ? reportFilterOptions : filterOptions
+                  const hasAnyFilter = (activeFilters.usages?.length > 0) ||
+                    (activeFilters.catalogs?.length > 0) ||
+                    (activeFilters.fleets?.length > 0) ||
+                    (activeFilters.platforms?.length > 0)
+                  
+                  if (!hasAnyFilter) return null
+                  
+                  return (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   
                   {/* Usage Filter - Only show if data exists */}
-                  {filterOptions.usages && filterOptions.usages.length > 0 && (
+                  {activeFilters.usages && activeFilters.usages.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Usage {selectedUsages.length > 0 && `(${selectedUsages.length} selected)`}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                      {filterOptions.usages.map(usage => (
+                      {activeFilters.usages.map((usage: string) => (
                         <button
                           key={usage}
                           onClick={() => toggleUsage(usage)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedUsages.includes(usage.toLowerCase())
                               ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -2190,17 +2925,17 @@ function InstallsPageContent() {
                   )}
 
                   {/* Catalog Filter - Only show if data exists */}
-                  {filterOptions.catalogs && filterOptions.catalogs.length > 0 && (
+                  {activeFilters.catalogs && activeFilters.catalogs.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Catalog {selectedCatalogs.length > 0 && `(${selectedCatalogs.length} selected)`}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                      {filterOptions.catalogs.map(catalog => (
+                      {activeFilters.catalogs.map((catalog: string) => (
                         <button
                           key={catalog}
                           onClick={() => toggleCatalog(catalog)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedCatalogs.includes(catalog.toLowerCase())
                               ? 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900 dark:text-teal-200 dark:border-teal-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -2214,17 +2949,17 @@ function InstallsPageContent() {
                   )}
 
                   {/* Fleet Filter - Only show if data exists */}
-                  {filterOptions.fleets && filterOptions.fleets.length > 0 && (
+                  {activeFilters.fleets && activeFilters.fleets.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Fleet {selectedFleets.length > 0 && `(${selectedFleets.length} selected)`}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                      {filterOptions.fleets.map(fleet => (
+                      {activeFilters.fleets.map((fleet: string) => (
                         <button
                           key={fleet}
                           onClick={() => toggleFleet(fleet)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedFleets.includes(fleet)
                               ? 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -2238,17 +2973,17 @@ function InstallsPageContent() {
                   )}
 
                   {/* Platform Filter - Only show if data exists */}
-                  {filterOptions.platforms && filterOptions.platforms.length > 0 && (
+                  {activeFilters.platforms && activeFilters.platforms.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Platform {selectedPlatforms.length > 0 && `(${selectedPlatforms.length} selected)`}
                     </h3>
                     <div className="flex flex-wrap gap-1">
-                      {filterOptions.platforms.map(platform => (
+                      {activeFilters.platforms.map((platform: string) => (
                         <button
                           key={platform}
                           onClick={() => togglePlatform(platform)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedPlatforms.includes(platform)
                               ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -2262,22 +2997,28 @@ function InstallsPageContent() {
                   )}
 
                 </div>
-                )}
+                  )
+                })()}
 
-                {/* Room Filter Cloud - Only show if data exists AND search matches */}
-                {filterOptions.rooms && filterOptions.rooms.length > 0 && 
-                 filterOptions.rooms.filter(room => room.toLowerCase().includes(searchQuery.toLowerCase())).length > 0 && (
+                {/* Locations Filter Cloud - Only show if report data exists AND has locations */}
+                {(() => {
+                  // Only show locations when there's report data
+                  if (installs.length === 0 && !isGeneratingReport) return null
+                  
+                  const activeRooms = installs.length > 0 ? reportFilterOptions.rooms : filterOptions.rooms
+                  const filteredRooms = activeRooms?.filter((room: string) => room.toLowerCase().includes(searchQuery.toLowerCase())) || []
+                  
+                  if (filteredRooms.length === 0) return null
+                  
+                  return (
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Room {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
+                      Locations {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
                     </h3>
                   </div>
-                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
-                    <div className="flex flex-wrap gap-1">
-                      {filterOptions.rooms
-                        .filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map(room => (
+                  <div className="flex flex-wrap gap-1">
+                      {filteredRooms.map((room: string) => (
                         <button
                           key={room}
                           onClick={() => toggleRoom(room)}
@@ -2290,62 +3031,127 @@ function InstallsPageContent() {
                           {room}
                         </button>
                       ))}
-                    </div>
                   </div>
                 </div>
-                )}
+                  )
+                })()}
 
-                {/* Installs Filter Cloud - Dynamic Height showing ALL installs */}
-                {/* Hide when items status filter is active (showing all errors/warnings/pending) */}
-                {itemsStatusFilter === 'all' && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Installs {selectedInstalls.length > 0 && `(${selectedInstalls.length} selected)`}
+                {/* Device Status and Install Status Filters - Only show after report is generated */}
+                {!isGeneratingReport && (installs.length > 0 || (isConfigReport && configReportData.length > 0)) && (
+                <div className="flex flex-col md:flex-row gap-8 pt-4">
+                  {/* Device Status Filter */}
+                  <div className="pb-2">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Device Status
                     </h3>
-                  </div>
-                  <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
-                      
-                      {/* Managed Installs - Show ALL */}
-                      {(filterOptions.managedInstalls || [])
-                        .filter((name: string) => name.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map((install: string) => (
-                        <button
-                          key={install}
-                          onClick={() => toggleInstall(install)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedInstalls.includes(install)
-                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          {install}
-                        </button>
-                      ))}
-                      
-                      {/* Other Installs - Show ALL */}
-                      {(filterOptions.otherInstalls || [])
-                        .filter((name: string) => name.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map((install: string) => (
-                        <button
-                          key={install}
-                          onClick={() => toggleInstall(install)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedInstalls.includes(install)
-                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                              : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          {install}
-                        </button>
-                      ))}
-                      
-                      {((!filterOptions.managedInstalls || filterOptions.managedInstalls.length === 0) && (!filterOptions.otherInstalls || filterOptions.otherInstalls.length === 0)) && (
-                        <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          No installs data available
-                        </span>
-                      )}
+                      <button
+                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'active' ? 'all' : 'active')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          deviceStatusFilter === 'active'
+                            ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
+                        Active ({deviceStatusCounts.active})
+                      </button>
+                      <button
+                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'stale' ? 'all' : 'stale')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          deviceStatusFilter === 'stale'
+                            ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+                        Stale ({deviceStatusCounts.stale})
+                      </button>
+                      <button
+                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'missing' ? 'all' : 'missing')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          deviceStatusFilter === 'missing'
+                            ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                        Missing ({deviceStatusCounts.missing})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Install Status Filter */}
+                  <div className="pb-2">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Install Status
+                    </h3>
+                    <div className="flex flex-wrap gap-1">
+                      <button
+                        onClick={() => setInstallStatusFilter(installStatusFilter === 'installed' ? 'all' : 'installed')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          installStatusFilter === 'installed'
+                            ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Installed ({installStatusCounts.installed})
+                      </button>
+                      <button
+                        onClick={() => setInstallStatusFilter(installStatusFilter === 'pending' ? 'all' : 'pending')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          installStatusFilter === 'pending'
+                            ? 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900 dark:text-cyan-200 dark:border-cyan-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <svg className="w-3 h-3 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Pending ({installStatusCounts.pending})
+                      </button>
+                      <button
+                        onClick={() => setInstallStatusFilter(installStatusFilter === 'warnings' ? 'all' : 'warnings')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          installStatusFilter === 'warnings'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        Warnings ({installStatusCounts.warnings})
+                      </button>
+                      <button
+                        onClick={() => setInstallStatusFilter(installStatusFilter === 'errors' ? 'all' : 'errors')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          installStatusFilter === 'errors'
+                            ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Errors ({installStatusCounts.errors})
+                      </button>
+                      <button
+                        onClick={() => setInstallStatusFilter(installStatusFilter === 'removed' ? 'all' : 'removed')}
+                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
+                          installStatusFilter === 'removed'
+                            ? 'bg-gray-200 text-gray-800 border-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Removed ({installStatusCounts.removed})
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -2355,41 +3161,59 @@ function InstallsPageContent() {
             </div>
           )}
 
-
-
           {/* Report Generation Loading State */}
           {loading && (
-            <div className="px-6 py-12 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="max-w-lg mx-auto">
-                <div className="flex flex-col items-center justify-center text-center">
-                  <div className="mb-6 relative">
-                    <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-                  </div>
-                  
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                    Generating Report
-                  </h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-xs mx-auto">
+            <div className="px-6 py-8 bg-white dark:bg-gray-800 rounded-b-xl">
+              <div className="max-w-2xl mx-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {loadingMessage}
-                  </p>
-                  
-                  <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
-                    <div 
-                      className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${reportProgress}%` }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-3">
-                    Processing data for {filterOptions.devicesWithData || 'all'} devices...
-                  </p>
+                  </span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {Math.round(reportProgress)}%
+                  </span>
                 </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${reportProgress}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  Processing {selectedInstalls.length} item{selectedInstalls.length !== 1 ? 's' : ''} across {filterOptions.devicesWithData || 'all'} devices
+                </p>
               </div>
+            </div>
+          )}
+
+          {/* No Results Message - Show when report generated but no results */}
+          {!loading && hasGeneratedReport && installs.length === 0 && !isConfigReport && (
+            <div className="px-6 py-12 text-center">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
+              </svg>
+              <h3 className="mt-4 text-lg font-medium text-gray-900 dark:text-white">No install records found</h3>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                No devices have the selected items installed. Try selecting different items or adjusting your filters.
+              </p>
+              <button
+                onClick={() => {
+                  // Go back to generate report mode with filters expanded
+                  setHasGeneratedReport(false)
+                  setIsGeneratingReport(true)
+                  setFiltersExpanded(true)
+                }}
+                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+              >
+                Try different items
+              </button>
             </div>
           )}
 
           {/* Results Section - Regular Installs Table */}
           {installs.length > 0 && !isConfigReport && (
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+            <div className="overflow-hidden rounded-b-xl">
+              <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
@@ -2433,6 +3257,10 @@ function InstallsPageContent() {
                           install.status === 'installed' 
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : install.status === 'pending'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : install.status === 'error' || install.status === 'failed'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            : install.status === 'warning'
                             ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                             : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                         }`}>
@@ -2446,63 +3274,97 @@ function InstallsPageContent() {
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
 
-          {/* Config Report Table */}
-          {filteredConfigData.length > 0 && isConfigReport && (
-            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+          {/* Config Report Table - Default View - Hide when items filter is active or in generate report mode */}
+          {!isGeneratingReport && filteredConfigData.length > 0 && isConfigReport && itemsStatusFilter === 'all' && (
+            <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
                     <th 
                       onClick={() => handleSort('deviceName')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Device {sortColumn === 'deviceName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th 
-                      onClick={() => handleSort('configType')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => handleSort('totalPackagesManaged')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      System {sortColumn === 'configType' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      # {sortColumn === 'totalPackagesManaged' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    </th>
+                    <th 
+                      onClick={() => handleSort('installedCount')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="Installed"
+                    >
+                      <svg className="w-4 h-4 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('pendingCount')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="Pending"
+                    >
+                      <svg className="w-4 h-4 mx-auto text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('errorCount')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="Errors"
+                    >
+                      <svg className="w-4 h-4 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('warningCount')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="Warnings"
+                    >
+                      <svg className="w-4 h-4 mx-auto text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </th>
+                    <th 
+                      onClick={() => handleSort('removedCount')}
+                      className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      title="Removed"
+                    >
+                      <svg className="w-4 h-4 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
                     </th>
                     <th 
                       onClick={() => handleSort('clientIdentifier')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Manifest {sortColumn === 'clientIdentifier' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Manifest / Repo {sortColumn === 'clientIdentifier' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th 
-                      onClick={() => handleSort('softwareRepoUrl')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      onClick={() => handleSort('lastSeen')}
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Repo {sortColumn === 'softwareRepoUrl' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Last Seen {sortColumn === 'lastSeen' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                     <th 
                       onClick={() => handleSort('version')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                      className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
                       Version {sortColumn === 'version' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('lastSessionStatus')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      Last Session {sortColumn === 'lastSessionStatus' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th 
-                      onClick={() => handleSort('totalPackagesManaged')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    >
-                      Managed Items {sortColumn === 'totalPackagesManaged' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredConfigData.map((device) => (
                     <tr key={device.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-3">
                         <div className="flex flex-col">
                           <Link 
                             href={`/device/${device.serialNumber}`}
@@ -2510,46 +3372,65 @@ function InstallsPageContent() {
                           >
                             {device.deviceName}
                           </Link>
-                          <div className="text-sm text-gray-500 dark:text-gray-400">{device.serialNumber}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {device.serialNumber}
+                            {device.assetTag && <span className="ml-2 text-gray-400">• {device.assetTag}</span>}
+                          </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          device.configType === 'Cimian'
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        }`}>
-                          {device.configType}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white font-mono max-w-xs truncate" title={device.clientIdentifier}>
-                          {device.clientIdentifier}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white font-mono max-w-xs truncate" title={device.softwareRepoUrl}>
-                          {device.softwareRepoUrl}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900 dark:text-white">{device.version}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          device.lastSessionStatus === 'success' || device.lastSessionStatus === 'complete'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : device.lastSessionStatus === 'partial_failure'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : device.lastSessionStatus === 'running'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                        }`}>
-                          {device.lastSessionStatus.toUpperCase().replace('_', ' ')}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{device.totalPackagesManaged}</div>
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
+                        {device.installedCount > 0 ? (
+                          <span className="text-sm font-medium text-green-600 dark:text-green-400">{device.installedCount}</span>
+                        ) : (
+                          <span className="text-sm text-gray-300 dark:text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
+                        {device.pendingCount > 0 ? (
+                          <span className="text-sm font-medium text-cyan-600 dark:text-cyan-400">{device.pendingCount}</span>
+                        ) : (
+                          <span className="text-sm text-gray-300 dark:text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
+                        {device.errorCount > 0 ? (
+                          <span className="text-sm font-medium text-red-600 dark:text-red-400">{device.errorCount}</span>
+                        ) : (
+                          <span className="text-sm text-gray-300 dark:text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
+                        {device.warningCount > 0 ? (
+                          <span className="text-sm font-medium text-amber-600 dark:text-amber-400">{device.warningCount}</span>
+                        ) : (
+                          <span className="text-sm text-gray-300 dark:text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-2 py-3 whitespace-nowrap text-center">
+                        {device.removedCount > 0 ? (
+                          <span className="text-sm font-medium text-gray-500 dark:text-gray-400">{device.removedCount}</span>
+                        ) : (
+                          <span className="text-sm text-gray-300 dark:text-gray-600">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col">
+                          <div className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[280px]" title={device.clientIdentifier}>
+                            {device.clientIdentifier}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[280px]" title={device.softwareRepoUrl}>
+                            {device.softwareRepoUrl}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">{formatRelativeTime(device.lastSeen)}</div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="text-sm text-gray-900 dark:text-white">{device.version}</div>
                       </td>
                     </tr>
                   ))}
@@ -2563,8 +3444,8 @@ function InstallsPageContent() {
 
           {/* Status-Filtered Devices Table - Shows when errors or warnings filter is active */}
           {itemsStatusFilter !== 'all' && !filtersLoading && statusFilteredDevices.length > 0 && (
-            <div className="px-6 py-4">
-              <div className="mb-4">
+            <div>
+              <div className="px-6 py-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   {itemsStatusFilter === 'errors' ? (
                     <>
@@ -2604,20 +3485,23 @@ function InstallsPageContent() {
                         : 'These devices have packages with pending updates.'}
                 </p>
               </div>
-              <div className="overflow-x-auto max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         {itemsStatusFilter === 'errors' ? 'Failed Packages' : itemsStatusFilter === 'warnings' ? 'Warning Packages' : 'Pending Packages'}
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Manifest / Repo
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Last Seen
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -2657,7 +3541,7 @@ function InstallsPageContent() {
                       
                       return (
                         <tr key={device.serialNumber} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-3">
                             <div>
                               <Link href={`/device/${device.serialNumber}`} className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
                                 {device.modules?.inventory?.deviceName || device.serialNumber}
@@ -2670,7 +3554,7 @@ function InstallsPageContent() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4">
+                          <td className="px-4 py-3">
                             <div className="flex flex-wrap gap-1">
                               {affectedPackages.slice(0, 5).map((pkg: any, idx: number) => (
                                 <span 
@@ -2694,10 +3578,20 @@ function InstallsPageContent() {
                               )}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col">
+                              <div className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.config?.ClientIdentifier || '-'}>
+                                {device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.config?.ClientIdentifier || '-'}
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.config?.SoftwareRepoURL || ''}>
+                                {device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.config?.SoftwareRepoURL || ''}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {formatRelativeTime(device.lastSeen)}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-4 py-3 whitespace-nowrap">
                             <Link 
                               href={`/device/${device.serialNumber}?tab=installs`}
                               className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"

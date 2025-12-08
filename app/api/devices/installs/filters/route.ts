@@ -110,6 +110,7 @@ export async function GET(request: Request) {
     const catalogs = new Set();
     const rooms = new Set();
     const fleets = new Set();
+    const platforms = new Set();
     
     // Extract managed installs from devices WITH installs data
     for (const device of installsDevices) {
@@ -162,6 +163,22 @@ export async function GET(request: Request) {
         if (inventory.catalog) catalogs.add(inventory.catalog);
         if (inventory.location) rooms.add(inventory.location);
         if (inventory.fleet) fleets.add(inventory.fleet);
+        // Normalize platform value
+        if (inventory.platform) {
+          const normalizedPlatform = inventory.platform === 'Darwin' ? 'Macintosh' 
+            : inventory.platform === 'Windows NT' ? 'Windows' 
+            : inventory.platform;
+          platforms.add(normalizedPlatform);
+        }
+      }
+      
+      // Also extract platform from system module or device level (normalize it)
+      const systemPlatform = device.modules?.system?.operatingSystem?.platform || device.platform;
+      if (systemPlatform) {
+        const normalizedPlatform = systemPlatform === 'Darwin' ? 'Macintosh' 
+          : systemPlatform === 'Windows NT' ? 'Windows' 
+          : systemPlatform;
+        platforms.add(normalizedPlatform);
       }
     }
     
@@ -210,7 +227,7 @@ export async function GET(request: Request) {
       catalogs: Array.from(catalogs).sort(),
       rooms: Array.from(rooms).sort(),
       fleets: Array.from(fleets).sort(),
-      platforms: ['Windows', 'Macintosh'],
+      platforms: Array.from(platforms).sort(),
       devicesWithData: inventoryDevices.length,
       // Include device data to avoid second API call
       devices: devicesWithInstalls

@@ -120,6 +120,18 @@ export async function GET(request: Request) {
     const devicesWithInstalls = dataResult.devices || [];
     
     console.log(`[INSTALLS API] Received ${devicesWithInstalls.length} devices with installs data`);
+    
+    // Debug: log first device structure
+    if (devicesWithInstalls.length > 0) {
+      const firstDevice = devicesWithInstalls[0];
+      console.log(`[INSTALLS API] First device:`, {
+        serial: firstDevice.serialNumber,
+        hasModules: !!firstDevice.modules,
+        hasInstalls: !!firstDevice.modules?.installs,
+        hasCimian: !!firstDevice.modules?.installs?.cimian,
+        itemsCount: firstDevice.modules?.installs?.cimian?.items?.length || 0
+      });
+    }
 
     // Transform device data into install records for the report
     const installRecords: any[] = [];
@@ -132,11 +144,12 @@ export async function GET(request: Request) {
       // Use shared parseInventory function
       const parsedInventory = parseInventory(inventory);
       
-      // Filter by selected installs
+      // Filter by selected installs (case-insensitive)
+      const selectedInstallsLower = selectedInstalls.map(i => i.toLowerCase());
       const filteredItems = (selectedInstalls.length > 0
         ? cimianItems.filter((item: any) => {
             const itemName = item.itemName || item.displayName || item.name;
-            return selectedInstalls.includes(itemName);
+            return itemName && selectedInstallsLower.includes(itemName.toLowerCase());
           })
         : cimianItems).filter((item: any) => {
           // Always filter out internal managed_apps and managed_profiles items
@@ -182,7 +195,12 @@ export async function GET(request: Request) {
           catalog,
           room,
           fleet,
-          platform: device.modules?.system?.operatingSystem?.platform === 'Windows NT' ? 'Windows' : 'Macintosh',
+          platform: (() => {
+            const p = device.modules?.system?.operatingSystem?.platform || device.modules?.inventory?.platform || device.platform || '';
+            if (p === 'Windows NT' || p.toLowerCase().includes('windows')) return 'Windows';
+            if (p === 'Darwin' || p.toLowerCase().includes('mac')) return 'Macintosh';
+            return p || 'Unknown';
+          })(),
           raw: device
         });
       }
