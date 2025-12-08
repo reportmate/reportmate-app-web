@@ -192,6 +192,7 @@ export async function GET(request: Request) {
           deviceId: install.deviceId,
           deviceName: install.deviceName,
           lastSeen: install.lastSeen,
+          platform: install.platform,
           modules: {
             installs: {
               cimian: {
@@ -199,9 +200,13 @@ export async function GET(request: Request) {
               }
             },
             inventory: {
+              deviceName: install.deviceName,
               usage: install.usage,
               catalog: install.catalog,
-              location: install.location
+              location: install.location,
+              assetTag: install.assetTag,
+              fleet: install.fleet,
+              platform: install.platform
             }
           }
         });
