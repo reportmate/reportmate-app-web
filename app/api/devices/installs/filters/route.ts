@@ -5,20 +5,18 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 // Simple in-memory cache with 5 minute TTL
-let cachedData: { devices: any[], timestamp: number } | null = null;
+let cachedInstalls: { data: any[], timestamp: number } | null = null;
+let cachedDevices: { data: any[], timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boolean) {
+async function fetchBulkInstalls(API_BASE_URL: string) {
   // Check cache first
-  if (cachedData && (Date.now() - cachedData.timestamp) < CACHE_TTL) {
-    console.log('[INSTALLS FILTERS] Using cached device data');
-    return cachedData.devices;
+  if (cachedInstalls && (Date.now() - cachedInstalls.timestamp) < CACHE_TTL) {
+    console.log('[INSTALLS FILTERS] Using cached installs data');
+    return cachedInstalls.data;
   }
 
-  console.log('[INSTALLS FILTERS] Fetching fresh device data from API');
-  
-  // Get managed identity principal ID from Azure Container Apps
-  const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+  console.log('[INSTALLS FILTERS] Fetching fresh installs from /api/devices/installs bulk endpoint');
   
   // Build headers with authentication
   const headers: Record<string, string> = {
@@ -27,54 +25,80 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
   
   if (process.env.REPORTMATE_PASSPHRASE) {
     headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-  } else if (managedIdentityId) {
-    headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+  } else {
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
   }
   
-  // Fetch all devices from FastAPI container
-  const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+  // Use the bulk installs endpoint - single request gets all data
+  const response = await fetch(`${API_BASE_URL}/api/devices/installs`, {
     cache: 'no-store',
     headers
   });
 
-  if (!devicesResponse.ok) {
-    throw new Error('Failed to fetch devices list');
+  if (!response.ok) {
+    throw new Error(`Failed to fetch bulk installs: ${response.status}`);
   }
 
-  const devicesData = await devicesResponse.json();
-  const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
+  const installs = await response.json();
+  const installsArray = Array.isArray(installs) ? installs : [];
   
-  // Fetch detailed data in batches of 50 to avoid overwhelming the API
-  const BATCH_SIZE = 50;
-  const devices: any[] = [];
-  
-  for (let i = 0; i < deviceList.length; i += BATCH_SIZE) {
-    const batch = deviceList.slice(i, i + BATCH_SIZE);
-    const batchPromises = batch.map(async (device: any) => {
-      try {
-        const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
-          cache: 'no-store',
-          headers
-        });
-        if (!detailResponse.ok) return null;
-        const detailData = await detailResponse.json();
-        return detailData.device || detailData;
-      } catch {
-        return null;
-      }
-    });
-    
-    const batchResults = await Promise.all(batchPromises);
-    devices.push(...batchResults.filter(d => d !== null));
-  }
+  console.log(`[INSTALLS FILTERS] Fetched ${installsArray.length} install records`);
 
   // Cache the results
-  cachedData = {
-    devices,
+  cachedInstalls = {
+    data: installsArray,
     timestamp: Date.now()
   };
 
-  console.log(`[INSTALLS FILTERS] Cached ${devices.length} devices`);
+  return installsArray;
+}
+
+async function fetchAllDevices(API_BASE_URL: string) {
+  // Check cache first
+  if (cachedDevices && (Date.now() - cachedDevices.timestamp) < CACHE_TTL) {
+    console.log('[INSTALLS FILTERS] Using cached devices data');
+    return cachedDevices.data;
+  }
+
+  console.log('[INSTALLS FILTERS] Fetching devices from /api/devices bulk endpoint');
+  
+  // Build headers with authentication
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json'
+  }
+  
+  if (process.env.REPORTMATE_PASSPHRASE) {
+    headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+  } else {
+    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    if (managedIdentityId) {
+      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
+    }
+  }
+  
+  const response = await fetch(`${API_BASE_URL}/api/devices`, {
+    cache: 'no-store',
+    headers
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to fetch devices: ${response.status}`);
+  }
+
+  const devicesData = await response.json();
+  const devices = Array.isArray(devicesData.devices) ? devicesData.devices : [];
+  
+  console.log(`[INSTALLS FILTERS] Fetched ${devices.length} devices`);
+
+  // Cache the results
+  cachedDevices = {
+    data: devices,
+    timestamp: Date.now()
+  };
+
   return devices;
 }
 
@@ -100,70 +124,45 @@ export async function GET(request: Request) {
   }
 
   try {
-  const devices = await fetchAllDevicesWithModules(API_BASE_URL, isLocalhost);
+    // Fetch both bulk endpoints in parallel - each is a single fast request
+    const [installs, devices] = await Promise.all([
+      fetchBulkInstalls(API_BASE_URL),
+      fetchAllDevices(API_BASE_URL)
+    ]);
     
-    const installsDevices = devices.filter(d => d.modules?.installs);
-    const inventoryDevices = devices;
+    // Extract unique filter options from installs data
+    const managed = new Set<string>();
+    const usages = new Set<string>();
+    const catalogs = new Set<string>();
+    const rooms = new Set<string>();
+    const platforms = new Set<string>();
+    const fleets = new Set<string>();
     
-    const managed = new Set();
-    const usages = new Set();
-    const catalogs = new Set();
-    const rooms = new Set();
-    const fleets = new Set();
-    const platforms = new Set();
-    
-    // Extract managed installs from devices WITH installs data
-    for (const device of installsDevices) {
-      const m = device.modules || {};
-      
-      // Extract managed installs from Cimian items
-      if (m.installs?.cimian?.items) {
-        for (const item of m.installs.cimian.items) {
-          const name = item.itemName || item.displayName || item.name;
-          const type = item.type || item.itemType || item.group;
-          
-          // Filter out internal managed_apps and managed_profiles items
-          const isInternal = (name === 'managed_apps' || name === 'managed_profiles') || 
-                             (type === 'managed_apps' || type === 'managed_profiles');
-                             
-          if (name && !isInternal) {
-            managed.add(name.trim());
-          }
-        }
+    // Process install records
+    for (const install of installs) {
+      // Extract item names (filter out internal items)
+      const name = install.itemName;
+      if (name && name !== 'managed_apps' && name !== 'managed_profiles') {
+        managed.add(name.trim());
       }
+      
+      // Extract inventory fields
+      if (install.usage) usages.add(install.usage);
+      if (install.catalog) catalogs.add(install.catalog);
+      if (install.location) rooms.add(install.location);
     }
     
-    // Extract inventory data from ALL devices
-    for (const device of inventoryDevices) {
-      const m = device.modules || {};
-      
-      // Parse inventory if it's PowerShell format
-      let inventory = m.inventory;
-      if (typeof inventory === 'string' && inventory.startsWith('@{')) {
-        try {
-          const jsonStr = inventory
-            .replace(/@\{/g, '{')
-            .replace(/\}/g, '}')
-            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)=/g, '"$1":')
-            .replace(/; /g, ', ')
-            .replace(/: ([^,}]+)/g, (match, value) => {
-              if (!value.trim().startsWith('"')) {
-                return `: "${value.trim()}"`;
-              }
-              return match;
-            });
-          inventory = JSON.parse(jsonStr);
-        } catch {
-          // Silently skip parse errors
-        }
-      }
-      
+    // Get additional inventory data from devices (for devices without installs)
+    for (const device of devices) {
+      // Extract from device-level inventory
+      const inventory = device.inventory || device.modules?.inventory;
       if (inventory && typeof inventory === 'object') {
         if (inventory.usage) usages.add(inventory.usage);
         if (inventory.catalog) catalogs.add(inventory.catalog);
         if (inventory.location) rooms.add(inventory.location);
         if (inventory.fleet) fleets.add(inventory.fleet);
-        // Normalize platform value
+        
+        // Normalize platform
         if (inventory.platform) {
           const normalizedPlatform = inventory.platform === 'Darwin' ? 'Macintosh' 
             : inventory.platform === 'Windows NT' ? 'Windows' 
@@ -172,68 +171,71 @@ export async function GET(request: Request) {
         }
       }
       
-      // Also extract platform from system module or device level (normalize it)
-      const systemPlatform = device.modules?.system?.operatingSystem?.platform || device.platform;
-      if (systemPlatform) {
-        const normalizedPlatform = systemPlatform === 'Darwin' ? 'Macintosh' 
-          : systemPlatform === 'Windows NT' ? 'Windows' 
-          : systemPlatform;
+      // Also extract platform from device level
+      const devicePlatform = device.platform;
+      if (devicePlatform) {
+        const normalizedPlatform = devicePlatform === 'Darwin' ? 'Macintosh' 
+          : devicePlatform === 'Windows NT' ? 'Windows' 
+          : devicePlatform;
         platforms.add(normalizedPlatform);
       }
     }
-    
-    // Return BOTH filter options AND device data to avoid duplicate API calls
-    const devicesWithInstalls = installsDevices.map((device: any) => {
-      const m = device.modules || {};
-      
-      // Parse inventory if it's PowerShell format
-      let inventory = m.inventory;
-      if (typeof inventory === 'string' && inventory.startsWith('@{')) {
-        try {
-          const jsonStr = inventory
-            .replace(/@\{/g, '{')
-            .replace(/\}/g, '}')
-            .replace(/([a-zA-Z_][a-zA-Z0-9_]*)=/g, '"$1":')
-            .replace(/; /g, ', ')
-            .replace(/: ([^,}]+)/g, (match, value) => {
-              if (!value.trim().startsWith('"')) {
-                return `: "${value.trim()}"`;
-              }
-              return match;
-            });
-          inventory = JSON.parse(jsonStr);
-        } catch {
-          // Silently skip parse errors
-        }
-      }
 
-      return {
-        serialNumber: device.serialNumber,
-        deviceId: device.deviceId,
-        deviceName: device.deviceName,
-        lastSeen: device.lastSeen,
-        modules: {
-          installs: m.installs || null,
-          inventory: inventory || null
-        }
-      };
-    });
+    // Group installs by device for the response
+    const deviceInstallsMap = new Map<string, any>();
+    
+    for (const install of installs) {
+      const serial = install.serialNumber;
+      if (!deviceInstallsMap.has(serial)) {
+        deviceInstallsMap.set(serial, {
+          serialNumber: serial,
+          deviceId: install.deviceId,
+          deviceName: install.deviceName,
+          lastSeen: install.lastSeen,
+          modules: {
+            installs: {
+              cimian: {
+                items: []
+              }
+            },
+            inventory: {
+              usage: install.usage,
+              catalog: install.catalog,
+              location: install.location
+            }
+          }
+        });
+      }
+      
+      // Add the install item
+      deviceInstallsMap.get(serial).modules.installs.cimian.items.push(install.raw || {
+        itemName: install.itemName,
+        currentStatus: install.currentStatus,
+        latestVersion: install.latestVersion,
+        installedVersion: install.installedVersion
+      });
+    }
+    
+    const devicesWithInstalls = Array.from(deviceInstallsMap.values());
 
     return NextResponse.json({
       success: true,
       managedInstalls: Array.from(managed).sort(),
-  otherInstalls: [],
+      otherInstalls: [],
       usages: Array.from(usages).sort(),
       catalogs: Array.from(catalogs).sort(),
       rooms: Array.from(rooms).sort(),
       fleets: Array.from(fleets).sort(),
       platforms: Array.from(platforms).sort(),
-      devicesWithData: inventoryDevices.length,
+      devicesWithData: devices.length,
       // Include device data to avoid second API call
       devices: devicesWithInstalls
     });
   } catch (error) {
     console.error('[INSTALLS FILTERS] Failed to build filter payload', error);
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Internal error',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 });
   }
 }
