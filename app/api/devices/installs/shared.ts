@@ -62,7 +62,8 @@ export async function fetchBulkInstallRecords(): Promise<any[]> {
   }
 
   const data = await response.json();
-  const records = Array.isArray(data.devices) ? data.devices : [];
+  // FastAPI endpoint returns array directly, not wrapped in { devices: [] }
+  const records = Array.isArray(data) ? data : (Array.isArray(data.devices) ? data.devices : []);
   
   // Cache the results
   cachedInstallRecords = {
