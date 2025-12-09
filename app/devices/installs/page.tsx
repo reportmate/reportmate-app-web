@@ -392,6 +392,10 @@ function InstallsPageContent() {
       // Collapse filters and clear search when generating report
       setFiltersExpanded(false)
       setSearchQuery('')
+      
+      // Reset post-generation filters to show all results initially
+      setDeviceStatusFilter('all')
+      setInstallStatusFilter('all')
 
       // Simulate progress for the long-running API call
       progressInterval = setInterval(() => {
@@ -1634,6 +1638,8 @@ function InstallsPageContent() {
                         setInstalls([])
                         setHasGeneratedReport(false)
                         setIsGeneratingReport(true)
+                        setItemsStatusFilter('all') // Reset items status filter
+                        setSearchQuery('') // Clear search box
                       }}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
                     >
@@ -1653,6 +1659,8 @@ function InstallsPageContent() {
                           setIsConfigReport(false)
                           setInstalls([])
                           setIsGeneratingReport(true) // Enter generate report mode
+                          setItemsStatusFilter('all') // Reset items status filter
+                          setSearchQuery('') // Clear search box
                         } else {
                           // Installs selected - generate the report
                           setIsGeneratingReport(false) // Exit generate report mode
@@ -2843,7 +2851,7 @@ function InstallsPageContent() {
 
           {/* Filter Clouds Section - Show when expanded OR in generate report mode */}
           {!filtersLoading && (filtersExpanded || isGeneratingReport) && (
-            <div className="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+            <div className={`px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 ${isGeneratingReport && !loading && installs.length === 0 && !hasGeneratedReport ? 'rounded-b-xl' : ''}`}>
               <div className="space-y-4">
 
                 {/* Items Filter Cloud - Show when in Generate Report mode - ABOVE inventory filters */}
@@ -3202,6 +3210,8 @@ function InstallsPageContent() {
                   setHasGeneratedReport(false)
                   setIsGeneratingReport(true)
                   setFiltersExpanded(true)
+                  setItemsStatusFilter('all') // Reset items status filter
+                  setSearchQuery('') // Clear search box
                 }}
                 className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
               >
@@ -3280,7 +3290,7 @@ function InstallsPageContent() {
 
           {/* Config Report Table - Default View - Hide when items filter is active or in generate report mode */}
           {!isGeneratingReport && filteredConfigData.length > 0 && isConfigReport && itemsStatusFilter === 'all' && (
-            <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
+            <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto rounded-b-xl">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
