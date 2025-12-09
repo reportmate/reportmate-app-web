@@ -363,6 +363,11 @@ function InstallsPageContent() {
         loadTime: 'fresh from API'
       })
     } catch (error) {
+      // Ignore abort errors - these happen when component unmounts or dev server reloads
+      if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('abort'))) {
+        console.log('[INSTALLS PAGE] Request aborted (likely dev server reload or navigation)')
+        return
+      }
       console.error('[INSTALLS PAGE] Error fetching filter options:', error)
       setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
       setLoadingProgress({ current: 0, total: 0 })
@@ -513,7 +518,9 @@ function InstallsPageContent() {
   }
 
   // Config Report handler - now the default view
-  const handleConfigReport = async () => {
+  const handleConfigReport = useCallback(async () => {
+    if (devices.length === 0) return // Guard against empty devices
+    
     try {
       setLoading(true)
       setError(null)
@@ -589,7 +596,7 @@ function InstallsPageContent() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [devices])
   
   // Reset report handler - returns to default config report view
   const handleResetReport = () => {
@@ -839,7 +846,7 @@ function InstallsPageContent() {
       // Trigger config report as the default view
       handleConfigReport()
     }
-  }, [devices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter])
+  }, [devices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
 
   // Handle URL filter parameter (from dashboard click-through)
   useEffect(() => {
@@ -1585,7 +1592,7 @@ function InstallsPageContent() {
 
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40 bg-white dark:bg-gray-800 rounded-t-xl">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-1 min-w-0">
               {/* Back to Config Report Button - Shows when in Generate Report mode, loading report, or after report generated */}
               {(isGeneratingReport || loading || (hasGeneratedReport && installs.length > 0)) && (
                 <button
@@ -1596,7 +1603,7 @@ function InstallsPageContent() {
                     setSelectedInstalls([])
                     handleConfigReport()
                   }}
-                  className="p-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center justify-center"
+                  className="p-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center justify-center flex-shrink-0"
                   title="Back to Config Report"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1604,7 +1611,7 @@ function InstallsPageContent() {
                   </svg>
                 </button>
               )}
-              <div>
+              <div className="flex-shrink-0">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Managed Software Update Reporting
                 </h2>
@@ -1621,6 +1628,42 @@ function InstallsPageContent() {
                   }
                 </p>
               </div>
+              
+              {/* Loading Progress - Inline with title */}
+              {filtersLoading && (
+                <div className="flex-1 min-w-0 ml-6 hidden sm:block">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                          {loadingMessage || 'Loading managed installs data...'}
+                        </p>
+                        {loadingProgress.total > 0 && (
+                          <p className="text-xs text-gray-500 dark:text-gray-500 ml-2 flex-shrink-0">
+                            {loadingProgress.current}/{loadingProgress.total}
+                          </p>
+                        )}
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="bg-emerald-600 h-2 rounded-full transition-all duration-300 ease-out"
+                          style={{ 
+                            width: loadingProgress.total > 0
+                              ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                              : '0%'
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                      {loadingProgress.total > 0 
+                        ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%`
+                        : ''
+                      }
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons in Header */}
@@ -1767,38 +1810,340 @@ function InstallsPageContent() {
           )}
 
           {/* Top Cards - Always Visible */}
-          <div className={`px-6 py-4 bg-white dark:bg-gray-800 ${filtersLoading ? 'rounded-b-xl' : 'border-b border-gray-200 dark:border-gray-700'}`}>
+          <div className={`bg-white dark:bg-gray-800 ${filtersLoading ? 'rounded-b-xl' : ''}`}>
             
-            {/* Loading Progress Bar - Always at top */}
+            {/* Mobile Loading Progress - Only on small screens */}
             {filtersLoading && (
-              <div className="mb-0">
-                <div className="max-w-2xl mx-auto">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      {loadingMessage || 'Loading managed installs data from all devices...'}
+              <div className="px-6 py-4 sm:hidden border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {loadingMessage || 'Loading...'}
+                  </p>
+                  {loadingProgress.total > 0 && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">
+                      {loadingProgress.current}/{loadingProgress.total}
                     </p>
-                    {loadingProgress.total > 0 && (
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {loadingProgress.current} / {loadingProgress.total}
-                      </p>
+                  )}
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                  <div 
+                    className="bg-emerald-600 h-2 rounded-full transition-all duration-300 ease-out"
+                    style={{ 
+                      width: loadingProgress.total > 0
+                        ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                        : '0%'
+                    }}
+                  ></div>
+                </div>
+              </div>
+            )}
+
+            {/* Skeleton Loading State - Shows full page structure while loading */}
+            {filtersLoading && (
+              <div className="animate-pulse">
+                {/* Skeleton Search Bar */}
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Skeleton Widgets Accordion Header */}
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                    </div>
+                    <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+
+                {/* Skeleton Widgets Content - 3 Tables Row */}
+                <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    {/* Skeleton Items with Errors Table */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-red-200 dark:bg-red-900/50 rounded-full"></div>
+                          <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                        </div>
+                        <div className="h-5 bg-red-100 dark:bg-red-900/30 rounded w-14"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Items with Warnings Table */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-amber-200 dark:bg-amber-900/50 rounded-full"></div>
+                          <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                        </div>
+                        <div className="h-5 bg-amber-100 dark:bg-amber-900/30 rounded w-14"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Items with Pending Table */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-cyan-200 dark:bg-cyan-900/50 rounded-full"></div>
+                          <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                        </div>
+                        <div className="h-5 bg-cyan-100 dark:bg-cyan-900/30 rounded w-14"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Skeleton Config Widgets Row - Software Repos, Cimian Versions, Manifests */}
+                  <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-3 gap-6 border-t border-gray-200 dark:border-gray-700">
+                    {/* Skeleton Software Repos */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-28 mb-4"></div>
+                      <div className="space-y-3">
+                        {[...Array(2)].map((_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-full"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-10"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Cimian Versions */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-32 mb-4"></div>
+                      <div className="space-y-3">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-purple-200 dark:bg-purple-900/30 rounded-full"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Manifests */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-20 mb-4"></div>
+                      <div className="space-y-3">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <div className="flex-1 h-2 bg-gray-200 dark:bg-gray-600 rounded-full"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Skeleton Filters Accordion */}
+                <div className="border-b border-gray-200 dark:border-gray-700">
+                  <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800">
+                    <div className="flex items-center gap-2">
+                      <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-14"></div>
+                    </div>
+                    <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+
+                {/* Skeleton Table */}
+                <div className="overflow-x-auto max-h-[calc(100vh-400px)] overflow-y-auto rounded-b-xl">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    {/* Table Header - Matches actual Config Report table */}
+                    <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Device
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          #
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Installed">
+                          <svg className="w-4 h-4 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Pending">
+                          <svg className="w-4 h-4 mx-auto text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Errors">
+                          <svg className="w-4 h-4 mx-auto text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Warnings">
+                          <svg className="w-4 h-4 mx-auto text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                          </svg>
+                        </th>
+                        <th className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider" title="Removed">
+                          <svg className="w-4 h-4 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Manifest / Repo
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Last Seen
+                        </th>
+                        <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                          Version
+                        </th>
+                      </tr>
+                    </thead>
+                    {/* Skeleton Rows */}
+                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                      {[...Array(12)].map((_, i) => (
+                        <tr key={i}>
+                          {/* Device column */}
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1.5">
+                              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28"></div>
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 bg-gray-100 dark:bg-gray-600 rounded w-20"></div>
+                                <div className="h-3 bg-gray-100 dark:bg-gray-600 rounded w-14"></div>
+                              </div>
+                            </div>
+                          </td>
+                          {/* # column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Installed column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-green-100 dark:bg-green-900/30 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Pending column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-cyan-100 dark:bg-cyan-900/30 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Errors column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Warnings column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Removed column */}
+                          <td className="px-2 py-3">
+                            <div className="h-4 bg-gray-100 dark:bg-gray-700 rounded w-6 mx-auto"></div>
+                          </td>
+                          {/* Manifest / Repo column */}
+                          <td className="px-4 py-3">
+                            <div className="flex flex-col gap-1.5">
+                              <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-44"></div>
+                              <div className="h-2.5 bg-gray-100 dark:bg-gray-600 rounded w-36"></div>
+                            </div>
+                          </td>
+                          {/* Last Seen column */}
+                          <td className="px-3 py-3">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                          </td>
+                          {/* Version column */}
+                          <td className="px-3 py-3">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Search Input - Always visible when not loading - ABOVE Widgets */}
+            {!filtersLoading && (
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                <div className="flex items-center gap-3">
+                  <div className="relative flex-1 max-w-md">
+                    <input
+                      type="text"
+                      placeholder={filtersExpanded ? "Search filters..." : "Search installs, devices, versions..."}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    />
+                    <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    {searchQuery && (
+                      <button
+                        onClick={() => setSearchQuery('')}
+                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        title="Clear search"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
                     )}
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden">
-                    <div 
-                      className="bg-emerald-600 h-3 rounded-full transition-all duration-300 ease-out"
-                      style={{ 
-                        width: loadingProgress.total > 0
-                          ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
-                          : '0%'
+                  {/* Clear Filter(s) Button - Show when any filter is active */}
+                  {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
+                    <button
+                      onClick={() => {
+                        setItemsStatusFilter('all')
+                        setDeviceStatusFilter('all')
+                        setInstallStatusFilter('all')
+                        setSearchQuery('')
+                        clearAllFilters()
+                        setSelectedManifest('')
+                        setSelectedSoftwareRepo('')
+                        setSelectedMunkiVersion('')
+                        setSelectedCimianVersion('')
                       }}
-                    ></div>
-                  </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                    {loadingProgress.total > 0 
-                      ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete`
-                      : 'First load may take 60-90 seconds'
-                    }
-                  </p>
+                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Clear Filter(s)
+                    </button>
+                  )}
+                  {/* Reset Report Button - Only show for generated reports when NO widget filters are active */}
+                  {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
+                    <button
+                      onClick={handleResetReport}
+                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Reset Report
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -1816,11 +2161,6 @@ function InstallsPageContent() {
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
-                  {(itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {itemsWithErrors.length + itemsWithWarnings.length + itemsWithPending.length} items
-                    </span>
-                  )}
                 </div>
                 <svg 
                   className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
@@ -2655,71 +2995,6 @@ function InstallsPageContent() {
               )}
 
           </div>
-
-          {/* Search Input - Always visible when not loading */}
-          {!filtersLoading && (
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="flex items-center gap-3">
-                <div className="relative flex-1 max-w-md">
-                  <input
-                    type="text"
-                    placeholder={filtersExpanded ? "Search filters..." : "Search installs, devices, versions..."}
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                  <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                      title="Clear search"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-                {/* Clear Filter(s) Button - Show when any filter is active */}
-                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
-                  <button
-                    onClick={() => {
-                      setItemsStatusFilter('all')
-                      setDeviceStatusFilter('all')
-                      setInstallStatusFilter('all')
-                      setSearchQuery('')
-                      clearAllFilters()
-                      setSelectedManifest('')
-                      setSelectedSoftwareRepo('')
-                      setSelectedMunkiVersion('')
-                      setSelectedCimianVersion('')
-                    }}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Clear Filter(s)
-                  </button>
-                )}
-                {/* Reset Report Button - Only show for generated reports when NO widget filters are active */}
-                {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
-                  <button
-                    onClick={handleResetReport}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Reset Report
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Status Overview Cards - Show only when report generated */}
           {installs.length > 0 && (
