@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Suspense, useMemo, useCallback } from 'react'
+import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { DevicePageNavigation } from '../../../src/components/navigation/DevicePageNavigation'
@@ -53,6 +53,7 @@ function InstallsPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
   const [devices, setDevices] = useState<any[]>([])
+  const [isPending, startTransition] = useTransition() // For non-blocking state updates
   const [isConfigReport, setIsConfigReport] = useState(false)
   const [configReportData, setConfigReportData] = useState<any[]>([])
   const [selectedManifest, setSelectedManifest] = useState<string>('')
@@ -178,79 +179,29 @@ function InstallsPageContent() {
       setFiltersLoading(true)
       setError(null) // Clear any previous errors
       
-      // Check if we have cached data in sessionStorage
-      const cachedData = sessionStorage.getItem('installs-filter-options')
-      const cachedTimestamp = sessionStorage.getItem('installs-filter-timestamp')
-      const cacheExpiry = 5 * 60 * 1000 // 5 minutes
-      
-      if (cachedData && cachedTimestamp) {
-        const age = Date.now() - parseInt(cachedTimestamp)
-        if (age < cacheExpiry) {
-          console.log('[INSTALLS PAGE] Using cached filter data (age:', Math.round(age / 1000), 'seconds)')
-          const data = JSON.parse(cachedData)
-          
-          setFilterOptions(data)
-          
-          if (data.devices && Array.isArray(data.devices)) {
-            setDevices(data.devices)
-          }
-          
-          setLoadingMessage('Loaded from cache')
-          setLoadingProgress({ current: data.devicesWithData || 0, total: data.devicesWithData || 0 })
-          setFiltersLoading(false)
-          return
-        } else {
-          console.log('[INSTALLS PAGE] Cache expired (age:', Math.round(age / 1000), 'seconds), fetching fresh data')
-        }
-      }
+      // NOTE: sessionStorage caching DISABLED - was causing 60+ second UI freeze
+      // due to JSON.stringify/parse of massive device data (10MB+)
+      // Always fetch fresh data for now
       
       // Show loading state without specific numbers initially
       setLoadingProgress({ current: 0, total: 0 })
       
-      // Get estimated device count from dashboard cache or SWR cache
+      // Get estimated device count from a quick API call
       let estimatedTotal = 0
       try {
-        // Try dashboard SWR cache first (most accurate if user came from dashboard)
-        const dashboardCache = sessionStorage.getItem('dashboard-data')
-        if (dashboardCache) {
-          const dashData = JSON.parse(dashboardCache)
-          if (dashData.devices?.length) {
-            estimatedTotal = dashData.devices.length
-            console.log('[INSTALLS PAGE] Using device count from dashboard cache:', estimatedTotal)
-          }
-        }
-        // Try previous installs cache if no dashboard data
-        if (estimatedTotal === 0) {
-          const prevInstallsCache = sessionStorage.getItem('installs-filter-options')
-          if (prevInstallsCache) {
-            const prevData = JSON.parse(prevInstallsCache)
-            if (prevData.devicesWithData) {
-              estimatedTotal = prevData.devicesWithData
-              console.log('[INSTALLS PAGE] Using device count from previous installs cache:', estimatedTotal)
-            }
+        const countResponse = await fetch('/api/devices', { 
+          cache: 'no-store',
+          headers: { 'Cache-Control': 'no-cache' }
+        })
+        if (countResponse.ok) {
+          const countData = await countResponse.json()
+          if (countData.devices?.length) {
+            estimatedTotal = countData.devices.length
+            console.log('[INSTALLS PAGE] Got device count from API:', estimatedTotal)
           }
         }
       } catch (e) {
-        console.log('[INSTALLS PAGE] Could not read cached device count')
-      }
-      
-      // If we still don't have a count, fetch it quickly from devices API
-      if (estimatedTotal === 0) {
-        try {
-          const countResponse = await fetch('/api/devices', { 
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache' }
-          })
-          if (countResponse.ok) {
-            const countData = await countResponse.json()
-            if (countData.devices?.length) {
-              estimatedTotal = countData.devices.length
-              console.log('[INSTALLS PAGE] Got device count from API:', estimatedTotal)
-            }
-          }
-        } catch (e) {
-          console.log('[INSTALLS PAGE] Could not fetch device count, using fallback')
-        }
+        console.log('[INSTALLS PAGE] Could not fetch device count, using fallback')
       }
       
       // Fallback if all else fails
@@ -304,12 +255,17 @@ function InstallsPageContent() {
         progressInterval = null
       }
       
+      // Set progress to 100% and hide skeleton IMMEDIATELY after response arrives
+      // This happens BEFORE JSON parsing to ensure UI updates right away
+      setLoadingMessage('Processing...')
+      setLoadingProgress({ current: estimatedTotal, total: estimatedTotal })
+      setFiltersLoading(false)
+      
       if (!response.ok) {
         console.error('[INSTALLS PAGE] Filters API failed:', response.status, response.statusText)
         throw new Error(`API returned ${response.status}: ${response.statusText}`)
       }
 
-      setLoadingMessage('Parsing response...')
       const data = await response.json()
       
       if (!data || typeof data !== 'object') {
@@ -322,36 +278,18 @@ function InstallsPageContent() {
       setFilterOptions(data)
       
       // Extract device data from same response (no second API call needed)
+      // Use startTransition to make this non-blocking - allows UI to update while processing
       if (data.devices && Array.isArray(data.devices)) {
-        setDevices(data.devices)
+        startTransition(() => {
+          setDevices(data.devices)
+        })
         console.log('[INSTALLS PAGE] Loaded', data.devices.length, 'devices with installs data from single API call')
-        
-        // Debug: Check Cimian versions
-        const cimianCount = data.devices.filter((d: any) => d.modules?.installs?.cimian?.version).length
-        console.log('[INSTALLS PAGE] Devices with Cimian version:', cimianCount)
-        
-        if (cimianCount > 0) {
-          const sample = data.devices.find((d: any) => d.modules?.installs?.cimian?.version)
-          console.log('[INSTALLS PAGE] Sample Cimian version:', sample?.modules?.installs?.cimian?.version)
-        }
       }
       
-      // Cache the data in sessionStorage for 5 minutes
-      try {
-        sessionStorage.setItem('installs-filter-options', JSON.stringify(data))
-        sessionStorage.setItem('installs-filter-timestamp', Date.now().toString())
-        console.log('[INSTALLS PAGE] Cached filter data for future page loads')
-      } catch (e) {
-        console.warn('[INSTALLS PAGE] Failed to cache data in sessionStorage:', e)
-      }
-      
-      // Set progress to complete with actual device count
-      setLoadingMessage('Complete!')
-      setLoadingProgress({ current: actualDeviceCount, total: actualDeviceCount })
-      
-      // Set filtersLoading to false immediately after successful processing
-      // This ensures the UI updates even if sessionStorage caching fails
-      setFiltersLoading(false)
+      // DISABLED: sessionStorage caching - the full devices data is too large (10MB+)
+      // and JSON.stringify blocks the main thread for 30+ seconds
+      // The API response is fast enough that caching isn't worth the UI freeze
+      // If caching is needed in the future, use IndexedDB with async operations
       
       console.log('[INSTALLS PAGE] Filter options loaded successfully:', {
         managedInstalls: data.managedInstalls?.length || 0,
@@ -720,6 +658,17 @@ function InstallsPageContent() {
       })
     }
     
+    // Apply search query filter (search by device name, serial, or asset tag)
+    if (searchQuery) {
+      const lowerQuery = searchQuery.toLowerCase()
+      filtered = filtered.filter(device => {
+        const deviceName = device.deviceName?.toLowerCase() || ''
+        const serial = device.serialNumber?.toLowerCase() || ''
+        const assetTag = device.assetTag?.toLowerCase() || ''
+        return deviceName.includes(lowerQuery) || serial.includes(lowerQuery) || assetTag.includes(lowerQuery)
+      })
+    }
+    
     // Sort data
     filtered.sort((a, b) => {
       let aVal = a[sortColumn]
@@ -735,7 +684,7 @@ function InstallsPageContent() {
     })
     
     return filtered
-  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, sortColumn, sortDirection])
+  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
   
   // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
@@ -841,10 +790,14 @@ function InstallsPageContent() {
   }, [fetchFilterOptions])
 
   // Auto-load Config Report when devices are loaded (default view)
+  // Use setTimeout to defer processing and allow UI to render first
   useEffect(() => {
     if (devices.length > 0 && !isConfigReport && configReportData.length === 0 && !hasGeneratedReport && itemsStatusFilter === 'all') {
-      // Trigger config report as the default view
-      handleConfigReport()
+      // Defer to next frame to allow UI to update first
+      const timeoutId = setTimeout(() => {
+        handleConfigReport()
+      }, 0)
+      return () => clearTimeout(timeoutId)
     }
   }, [devices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
 
@@ -1841,15 +1794,6 @@ function InstallsPageContent() {
             {/* Skeleton Loading State - Shows full page structure while loading */}
             {filtersLoading && (
               <div className="animate-pulse">
-                {/* Skeleton Search Bar */}
-                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                  <div className="flex items-center gap-3">
-                    <div className="relative flex-1 max-w-md">
-                      <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-                    </div>
-                  </div>
-                </div>
-
                 {/* Skeleton Widgets Accordion Header */}
                 <div className="border-b border-gray-200 dark:border-gray-700">
                   <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800">
@@ -1974,6 +1918,15 @@ function InstallsPageContent() {
                   </div>
                 </div>
 
+                {/* Skeleton Search Bar */}
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+                  <div className="flex items-center gap-3">
+                    <div className="relative flex-1 max-w-md">
+                      <div className="w-full h-10 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Skeleton Table */}
                 <div className="overflow-x-auto max-h-[calc(100vh-400px)] overflow-y-auto rounded-b-xl">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
@@ -2083,77 +2036,12 @@ function InstallsPageContent() {
               </div>
             )}
 
-            {/* Search Input - Always visible when not loading - ABOVE Widgets */}
-            {!filtersLoading && (
-              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                <div className="flex items-center gap-3">
-                  <div className="relative flex-1 max-w-md">
-                    <input
-                      type="text"
-                      placeholder={filtersExpanded ? "Search filters..." : "Search installs, devices, versions..."}
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                    />
-                    <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                    {searchQuery && (
-                      <button
-                        onClick={() => setSearchQuery('')}
-                        className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                        title="Clear search"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                  {/* Clear Filter(s) Button - Show when any filter is active */}
-                  {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
-                    <button
-                      onClick={() => {
-                        setItemsStatusFilter('all')
-                        setDeviceStatusFilter('all')
-                        setInstallStatusFilter('all')
-                        setSearchQuery('')
-                        clearAllFilters()
-                        setSelectedManifest('')
-                        setSelectedSoftwareRepo('')
-                        setSelectedMunkiVersion('')
-                        setSelectedCimianVersion('')
-                      }}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                      Clear Filter(s)
-                    </button>
-                  )}
-                  {/* Reset Report Button - Only show for generated reports when NO widget filters are active */}
-                  {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
-                    <button
-                      onClick={handleResetReport}
-                      className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Reset Report
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
             {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}
             {isConfigReport && !isGeneratingReport && (
               itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 ||
               (itemsStatusFilter === 'all' && configReportData.length > 0)
             ) && (
-            <div className="border-b border-gray-200 dark:border-gray-700">
+            <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
               {/* Widgets Accordion Header */}
               <button
                 onClick={() => setWidgetsExpanded(!widgetsExpanded)}
@@ -3096,7 +2984,7 @@ function InstallsPageContent() {
 
           {/* Filters Accordion - Hide when in generate report mode since items are already expanded */}
           {!filtersLoading && !isGeneratingReport && (
-            <div className={hasGeneratedReport && installs.length > 0 ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+            <div className={filtersExpanded || (hasGeneratedReport && installs.length > 0) ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
               {/* Accordion Header */}
               <button
                 onClick={() => setFiltersExpanded(!filtersExpanded)}
@@ -3169,8 +3057,8 @@ function InstallsPageContent() {
                 {/* Inventory Filter Sections - Show from report data when report exists, otherwise from all data */}
                 {(() => {
                   // Use report-specific filters when report is generated, otherwise use all filter options
-                  // Only show filters when there's actual report data to filter
-                  if (installs.length === 0 && !isGeneratingReport) return null
+                  // Show filters when: has report data, OR is generating report, OR is in config report mode
+                  if (installs.length === 0 && !isGeneratingReport && !isConfigReport) return null
                   
                   const activeFilters = installs.length > 0 ? reportFilterOptions : filterOptions
                   const hasAnyFilter = (activeFilters.usages?.length > 0) ||
@@ -3364,7 +3252,8 @@ function InstallsPageContent() {
                     </div>
                   </div>
 
-                  {/* Install Status Filter */}
+                  {/* Install Status Filter - Hide when items widget filter (errors/warnings/pending) is active */}
+                  {itemsStatusFilter === 'all' && (
                   <div className="pb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Install Status
@@ -3437,9 +3326,75 @@ function InstallsPageContent() {
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
                 )}
 
+              </div>
+            </div>
+          )}
+
+          {/* Search Input - Below Filters, connected to the table */}
+          {!filtersLoading && (
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Search installs, devices, versions..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  />
+                  <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      title="Clear search"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+                {/* Clear Filter(s) Button - Show when any filter is active */}
+                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
+                  <button
+                    onClick={() => {
+                      setItemsStatusFilter('all')
+                      setDeviceStatusFilter('all')
+                      setInstallStatusFilter('all')
+                      setSearchQuery('')
+                      clearAllFilters()
+                      setSelectedManifest('')
+                      setSelectedSoftwareRepo('')
+                      setSelectedMunkiVersion('')
+                      setSelectedCimianVersion('')
+                    }}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Clear Filter(s)
+                  </button>
+                )}
+                {/* Reset Report Button - Only show for generated reports when NO widget filters are active */}
+                {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
+                  <button
+                    onClick={handleResetReport}
+                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Reset Report
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -3729,7 +3684,7 @@ function InstallsPageContent() {
 
           {/* Status-Filtered Devices Table - Shows when errors or warnings filter is active */}
           {itemsStatusFilter !== 'all' && !filtersLoading && statusFilteredDevices.length > 0 && (
-            <div>
+            <div className="bg-white dark:bg-gray-800 rounded-b-xl overflow-hidden">
               <div className="px-6 py-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   {itemsStatusFilter === 'errors' ? (
