@@ -195,7 +195,7 @@ export async function GET(request: Request) {
     }
     
     // Return BOTH filter options AND device data to avoid duplicate API calls
-    // OPTIMIZED: Only include essential data to reduce response size (was causing 503 timeouts)
+    // Include full installs structure needed for the page (config, sessions, items, version)
     const devicesWithInstalls = installsDevices.map((device: any) => {
       const m = device.modules || {};
       
@@ -220,38 +220,23 @@ export async function GET(request: Request) {
         }
       }
 
-      // Extract only essential installs data to reduce payload size
-      // Full installs module is ~111KB per device, we only need item names/status
+      // Include full installs data structure as needed by the installs page
+      // The page needs: items (with status), config (ClientIdentifier, SoftwareRepoURL), sessions, version
       const installs = m.installs;
-      const slimInstalls = installs ? {
-        cimian: installs.cimian ? {
-          items: (installs.cimian.items || []).map((item: any) => ({
-            itemName: item.itemName || item.displayName || item.name,
-            currentStatus: item.currentStatus || item.status,
-            latestVersion: item.latestVersion,
-            installedVersion: item.installedVersion,
-            type: item.type || item.itemType
-          }))
-        } : null,
-        lastCheckIn: installs.lastCheckIn,
-        version: installs.version
-      } : null;
 
       return {
         serialNumber: device.serialNumber,
         deviceId: device.deviceId,
         deviceName: device.deviceName,
         lastSeen: device.lastSeen,
+        platform: device.platform,
         modules: {
-          installs: slimInstalls,
-          inventory: inventory ? {
-            deviceName: inventory.deviceName,
-            assetTag: inventory.assetTag,
-            usage: inventory.usage,
-            catalog: inventory.catalog,
-            location: inventory.location,
-            fleet: inventory.fleet,
-            platform: inventory.platform
+          installs: installs || null,
+          inventory: inventory || null,
+          system: m.system ? {
+            operatingSystem: m.system.operatingSystem ? {
+              platform: m.system.operatingSystem.platform
+            } : null
           } : null
         }
       };
