@@ -55,7 +55,9 @@ const EventsTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
     const fetchEvents = async () => {
       try {
         // Use Next.js API route
-        const response = await fetch('/api/events')
+        const response = await fetch('/api/events', {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           // The API returns a direct array of events
@@ -201,7 +203,9 @@ const RecentEventsWidget: React.FC = () => {
     const fetchEvents = async () => {
       try {
         // Use Next.js API route
-        const response = await fetch('/api/events')
+        const response = await fetch('/api/events', {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           // The API returns a direct array of events
@@ -283,7 +287,9 @@ const EventStatsWidget: React.FC = () => {
     const fetchStats = async () => {
       try {
         // Use Next.js API route
-        const response = await fetch('/api/events')
+        const response = await fetch('/api/events', {
+          credentials: 'include'
+        })
         if (response.ok) {
           const data = await response.json()
           // The API returns a direct array of events

@@ -316,7 +316,9 @@ export const OSVersionBarChart: React.FC<OSVersionBarChartProps> = ({ devices, l
       // Don't fetch if we already have devices from props
       if (devices.length === 0 && loading) {
         try {
-          const response = await fetch('/api/devices?includeOSVersions=true')
+          const response = await fetch('/api/devices?includeOSVersions=true', {
+            credentials: 'include'
+          })
           if (response.ok) {
             const data = await response.json()
             setLocalDevices(data.devices || [])

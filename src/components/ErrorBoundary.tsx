@@ -115,7 +115,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <button
                 onClick={() => {
                   // Use Next.js API route for clearing events (if implemented)
-                  fetch('/api/events', { method: 'DELETE' }).catch(() => null)
+                  fetch('/api/events', { method: 'DELETE', credentials: 'include' }).catch(() => null)
                   // Clear browser storage
                   try {
                     localStorage.clear()

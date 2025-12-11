@@ -75,7 +75,9 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const response = await fetch('/api/devices')
+        const response = await fetch('/api/devices', {
+          credentials: 'include'
+        })
         const data = await response.json()
         
         // FIXED: API returns {devices: [...], count: N} structure

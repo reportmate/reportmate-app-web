@@ -31,7 +31,9 @@ export const ModuleManager: React.FC<ModuleManagerProps> = ({ onClose }) => {
       
       // Load repositories if needed
       if (activeTab === 'repositories') {
-        const response = await fetch('/api/modules/repositories')
+        const response = await fetch('/api/modules/repositories', {
+          credentials: 'include'
+        })
         if (response.ok) {
           setRepositories(await response.json())
         }
