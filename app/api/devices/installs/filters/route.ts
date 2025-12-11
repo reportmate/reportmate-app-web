@@ -44,22 +44,34 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
   const devicesData = await devicesResponse.json();
   const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
   
-  // Fetch detailed data in batches of 50 to avoid overwhelming the API
-  const BATCH_SIZE = 50;
+  // Fetch detailed data in batches - increased batch size for better parallelism
+  // Each device API call takes ~1.5s, so we parallelize aggressively
+  const BATCH_SIZE = 75;
+  const DEVICE_TIMEOUT = 10000; // 10 second timeout per device
   const devices: any[] = [];
   
   for (let i = 0; i < deviceList.length; i += BATCH_SIZE) {
     const batch = deviceList.slice(i, i + BATCH_SIZE);
     const batchPromises = batch.map(async (device: any) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), DEVICE_TIMEOUT);
+      
       try {
         const detailResponse = await fetch(`${API_BASE_URL}/api/device/${device.serialNumber}`, {
           cache: 'no-store',
-          headers
+          headers,
+          signal: controller.signal
         });
+        clearTimeout(timeoutId);
         if (!detailResponse.ok) return null;
         const detailData = await detailResponse.json();
         return detailData.device || detailData;
-      } catch {
+      } catch (err) {
+        clearTimeout(timeoutId);
+        // Log timeout but don't fail the whole batch
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log(`[INSTALLS FILTERS] Timeout fetching device ${device.serialNumber}`);
+        }
         return null;
       }
     });
@@ -183,6 +195,7 @@ export async function GET(request: Request) {
     }
     
     // Return BOTH filter options AND device data to avoid duplicate API calls
+    // OPTIMIZED: Only include essential data to reduce response size (was causing 503 timeouts)
     const devicesWithInstalls = installsDevices.map((device: any) => {
       const m = device.modules || {};
       
@@ -207,14 +220,39 @@ export async function GET(request: Request) {
         }
       }
 
+      // Extract only essential installs data to reduce payload size
+      // Full installs module is ~111KB per device, we only need item names/status
+      const installs = m.installs;
+      const slimInstalls = installs ? {
+        cimian: installs.cimian ? {
+          items: (installs.cimian.items || []).map((item: any) => ({
+            itemName: item.itemName || item.displayName || item.name,
+            currentStatus: item.currentStatus || item.status,
+            latestVersion: item.latestVersion,
+            installedVersion: item.installedVersion,
+            type: item.type || item.itemType
+          }))
+        } : null,
+        lastCheckIn: installs.lastCheckIn,
+        version: installs.version
+      } : null;
+
       return {
         serialNumber: device.serialNumber,
         deviceId: device.deviceId,
         deviceName: device.deviceName,
         lastSeen: device.lastSeen,
         modules: {
-          installs: m.installs || null,
-          inventory: inventory || null
+          installs: slimInstalls,
+          inventory: inventory ? {
+            deviceName: inventory.deviceName,
+            assetTag: inventory.assetTag,
+            usage: inventory.usage,
+            catalog: inventory.catalog,
+            location: inventory.location,
+            fleet: inventory.fleet,
+            platform: inventory.platform
+          } : null
         }
       };
     });
