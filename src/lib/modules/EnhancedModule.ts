@@ -14,9 +14,9 @@ import { ModuleManifest } from './ModuleRegistry'
 /**
  * Extended Module Manifest with additional capabilities
  */
-export interface ExtendedModuleManifest extends ModuleManifest {
-  // Module metadata
-  category?: 'core' | 'device' | 'dashboard' | 'security' | 'reporting' | 'integration'
+export interface ExtendedModuleManifest extends Omit<ModuleManifest, 'category'> {
+  // Module metadata - includes all valid category values
+  category?: 'core' | 'hardware' | 'software' | 'widget' | 'security' | 'integration' | 'device' | 'dashboard' | 'reporting'
   tags?: string[]
   license?: string
   homepage?: string
