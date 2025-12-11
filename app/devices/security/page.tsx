@@ -63,6 +63,7 @@ function SecurityPageContent() {
       try {
         const response = await fetch('/api/modules/security', {
           cache: 'no-store',
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'

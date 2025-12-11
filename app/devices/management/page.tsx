@@ -88,6 +88,7 @@ function ManagementPageContent() {
         // OPTIMIZED: Single consolidated API call for management data with inventory
         const response = await fetch('/api/devices/management', { 
           cache: 'no-store',
+          credentials: 'include',
           headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
         })
         

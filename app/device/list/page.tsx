@@ -27,6 +27,7 @@ export default function DeviceListPage() {
       try {
         const response = await fetch('/api/devices', {
           cache: 'no-store',
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'

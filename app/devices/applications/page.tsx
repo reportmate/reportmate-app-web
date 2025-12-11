@@ -474,6 +474,7 @@ function ApplicationsPageContent() {
         
         const response = await fetch('/api/devices/applications/filters', {
           cache: 'no-store',
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'

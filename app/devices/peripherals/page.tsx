@@ -54,6 +54,7 @@ function PeripheralsPageContent() {
       try {
         const response = await fetch('/api/modules/peripherals', {
           cache: 'no-store',
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'

@@ -35,6 +35,11 @@ interface HardwareRecord {
   architecture?: string
   assetTag?: string
   raw?: any
+  // Aliases for data compatibility
+  gpu?: any[] | object | string | any
+  cpu?: string | object | any
+  model?: string
+  manufacturer?: string
 }
 
 function HardwarePageContent() {
@@ -163,6 +168,7 @@ function HardwarePageContent() {
         // OPTIMIZED: Single consolidated API call for hardware data with device names
         const hardwareResponse = await fetch('/api/devices/hardware', {
           cache: 'no-store',
+          credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
         })
         

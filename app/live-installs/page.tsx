@@ -23,6 +23,7 @@ export default function LiveInstallsPage() {
       
       const response = await fetch('/api/live-installs', {
         cache: 'no-store',
+        credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'

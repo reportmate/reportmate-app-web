@@ -191,6 +191,7 @@ function InstallsPageContent() {
       try {
         const countResponse = await fetch('/api/devices', { 
           cache: 'no-store',
+          credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
         })
         if (countResponse.ok) {
@@ -240,6 +241,7 @@ function InstallsPageContent() {
       
       const response = await fetch('/api/devices/installs/filters', {
         cache: 'no-store',
+        credentials: 'include',
         headers: {
           'Cache-Control': 'no-cache'
         },
@@ -366,7 +368,9 @@ function InstallsPageContent() {
       selectedFleets.forEach(fleet => params.append('fleets', fleet))
       selectedPlatforms.forEach(platform => params.append('platforms', platform))
 
-      const response = await fetch(`/api/devices/installs?${params}`)
+      const response = await fetch(`/api/devices/installs?${params}`, {
+        credentials: 'include'
+      })
       
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -3711,7 +3715,7 @@ function InstallsPageContent() {
                   )}
                   {searchQuery && (
                     <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                      - filtered by "{searchQuery}"
+                      - filtered by &quot;{searchQuery}&quot;
                     </span>
                   )}
                 </h3>
@@ -3751,7 +3755,7 @@ function InstallsPageContent() {
                       const cimianItems = device.modules?.installs?.cimian?.items || []
                       
                       // First filter by status type
-                      let statusFilteredItems = itemsStatusFilter === 'errors'
+                      const statusFilteredItems = itemsStatusFilter === 'errors'
                         ? cimianItems.filter((item: any) => {
                             const status = item.currentStatus?.toLowerCase() || ''
                             return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
