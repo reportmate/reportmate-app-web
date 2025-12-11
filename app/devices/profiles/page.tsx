@@ -54,6 +54,7 @@ function ProfilesPageContent() {
       try {
         const response = await fetch('/api/modules/profiles', {
           cache: 'no-store',
+          credentials: 'include',
           headers: {
             'Cache-Control': 'no-cache',
             'Pragma': 'no-cache'

@@ -44,6 +44,7 @@ function NetworkPageContent() {
         // Use the network API to get device data with network modules
         const response = await fetch('/api/modules/network', {
           cache: 'no-store',
+          credentials: 'include',
           headers: { 'Cache-Control': 'no-cache' }
         })
         
