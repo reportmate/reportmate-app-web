@@ -477,7 +477,7 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
             )}
 
             {/* Clear Filters Button */}
-            {(filters?.architecture?.length > 0 || filters?.catalog?.length > 0 || filters?.usage?.length > 0) && (
+            {((filters?.architecture?.length ?? 0) > 0 || (filters?.catalog?.length ?? 0) > 0 || (filters?.usage?.length ?? 0) > 0) && (
               <button
                 onClick={() => onFilterChange({})}
                 className="w-full px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 rounded transition-colors flex items-center justify-center gap-1.5 mt-2"
