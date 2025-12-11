@@ -115,13 +115,25 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               </span>
             </div>
 
-            {/* Enrollment Type with green pill on right */}
+            {/* Enrollment Type with conditional color */}
             {enrollmentType && (
               <div className="flex items-center justify-between">
                 <span className="text-base font-medium text-gray-900 dark:text-white">Enrollment Type</span>
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                  {enrollmentType}
-                </span>
+                {(() => {
+                  let displayType = enrollmentType
+                  if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
+                  if (displayType === 'Entra Join') displayType = 'Entra Joined'
+                  const isYellow = displayType === 'Domain Joined'
+                  return (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      isYellow 
+                        ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                        : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                    }`}>
+                      {displayType}
+                    </span>
+                  )
+                })()}
               </div>
             )}
 

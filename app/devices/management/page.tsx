@@ -133,25 +133,32 @@ function ManagementPageContent() {
     fetchManagement()
   }, [])
 
-  // Calculate stats for widgets
+  // Calculate stats for widgets (filter out Unknown and N/A)
   const enrollmentStatusCounts = management.reduce((acc, curr) => {
     const status = curr.enrollmentStatus || 'Unknown'
-    acc[status] = (acc[status] || 0) + 1
+    if (status !== 'Unknown' && status !== 'N/A') {
+      acc[status] = (acc[status] || 0) + 1
+    }
     return acc
   }, {} as Record<string, number>)
 
   const enrollmentTypeCounts = management.reduce((acc, curr) => {
-    const type = curr.enrollmentType || 'Unknown'
-    acc[type] = (acc[type] || 0) + 1
+    let type = curr.enrollmentType || 'Unknown'
+    // Normalize labels
+    if (type === 'Hybrid Entra Join') type = 'Domain Joined'
+    if (type === 'Entra Join') type = 'Entra Joined'
+    if (type !== 'Unknown' && type !== 'N/A') {
+      acc[type] = (acc[type] || 0) + 1
+    }
     return acc
   }, {} as Record<string, number>)
 
-  // Get unique providers with counts
+  // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
-    management.map(m => m.provider).filter(Boolean)
+    management.map(m => m.provider).filter(p => p && p !== 'Unknown')
   )).sort()
 
-  // Calculate provider counts
+  // Calculate provider counts (exclude Unknown)
   const providerCounts = providers.reduce((acc, provider) => {
     acc[provider] = management.filter(m => m.provider === provider).length
     return acc
@@ -506,6 +513,7 @@ function ManagementPageContent() {
               'Enrolled': '#10b981', // emerald-500
               'Pending': '#f59e0b', // amber-500
               'Unenrolled': '#ef4444', // red-500
+              'Not Enrolled': '#ef4444', // red-500
               'Error': '#ef4444',
               'default': '#94a3b8' // slate-400
             }}
@@ -518,8 +526,8 @@ function ManagementPageContent() {
             title="Enrollment Type"
             data={Object.entries(enrollmentTypeCounts).map(([label, value]) => ({ label, value }))}
             colors={{
-              'Entra Join': '#10b981', // emerald-500
-              'Hybrid Entra Join': '#f59e0b', // amber-500 (Yellow)
+              'Entra Joined': '#10b981', // emerald-500
+              'Domain Joined': '#f59e0b', // amber-500 (Yellow)
               'AxM Assigned': '#10b981', // emerald-500
               'default': '#8b5cf6' // violet-500
             }}
@@ -750,15 +758,45 @@ function ManagementPageContent() {
                         </span>
                       </td>
                       <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-white">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          mgmt.enrollmentType === 'Entra Join' || mgmt.enrollmentType === 'AxM Assigned'
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : mgmt.enrollmentType === 'Hybrid Entra Join'
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                        }`}>
-                          {mgmt.enrollmentType || '-'}
-                        </span>
+                        <div className="flex flex-col gap-1 items-start">
+                          {(() => {
+                            let displayType = mgmt.enrollmentType || '-'
+                            if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
+                            if (displayType === 'Entra Join') displayType = 'Entra Joined'
+                            return (
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                                displayType === 'Entra Joined' || displayType === 'AxM Assigned'
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : displayType === 'Domain Joined'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                              }`}>
+                                {displayType}
+                              </span>
+                            )
+                          })()}
+                          {/* Show trust issue warning only for Domain Joined (Hybrid Entra Join) with problems */}
+                          {(mgmt.enrollmentType === 'Hybrid Entra Join' || mgmt.enrollmentType === 'Domain Joined') && (() => {
+                            const authStatus = mgmt.raw?.deviceDetails?.deviceAuthStatus
+                            const keySignTest = mgmt.raw?.diagnosticData?.keySignTest
+                            const hasTrustIssue = authStatus === 'FAIL' || keySignTest === 'FAIL' || keySignTest === 'NOT TESTED'
+                            
+                            if (hasTrustIssue) {
+                              return (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
+                                  title={`Auth: ${authStatus || 'N/A'}, KeySign: ${keySignTest || 'N/A'}`}
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                  </svg>
+                                  Trust Issue
+                                </span>
+                              )
+                            }
+                            return null
+                          })()}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                         <div className="flex items-center gap-2 font-mono text-xs">
