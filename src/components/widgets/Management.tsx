@@ -154,13 +154,18 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   // Extract key data from the management structure
   const isEnrolled = management.mdmEnrollment?.isEnrolled || false
   const provider = management.mdmEnrollment?.provider
-  const enrollmentType = management.mdmEnrollment?.enrollmentType
+  const rawEnrollmentType = management.mdmEnrollment?.enrollmentType
   const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
 
   // Device identification information
   const intuneDeviceId = management.deviceDetails?.intuneDeviceId
   const entraObjectId = management.deviceDetails?.entraObjectId
+
+  // Transform enrollment type display name
+  let enrollmentType = rawEnrollmentType
+  if (enrollmentType === 'Hybrid Entra Join') enrollmentType = 'Domain Joined'
+  if (enrollmentType === 'Entra Join') enrollmentType = 'Entra Joined'
 
   // Helper function to get enrollment type color
   const getEnrollmentTypeColor = (type?: string) => {

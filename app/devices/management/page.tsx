@@ -26,6 +26,9 @@ interface Management {
   usage?: string
   catalog?: string
   status?: string
+  assetTag?: string
+  location?: string
+  department?: string
   raw: any
 }
 
@@ -79,6 +82,20 @@ function ManagementPageContent() {
   const [deviceStatusFilter, setDeviceStatusFilter] = useState('all')
   const [usageFilter, setUsageFilter] = useState('all')
   const [catalogFilter, setCatalogFilter] = useState('all')
+  
+  // Sorting state - default to Device column ascending
+  const [sortColumn, setSortColumn] = useState<'device' | 'provider' | 'status' | 'type' | 'deviceId'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Handle column sort click
+  const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     const fetchManagement = async () => {
@@ -118,6 +135,9 @@ function ManagementPageContent() {
             usage: mgmt.usage,
             catalog: mgmt.catalog,
             status: status,
+            assetTag: mgmt.assetTag,
+            location: mgmt.location,
+            department: mgmt.department,
             raw: mgmt.raw || mgmt
           }
         })
@@ -165,29 +185,22 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  // Calculate inventory filter counts
-  const filterCounts = {
-    active: management.filter(m => m.status?.toLowerCase() === 'active').length,
-    stale: management.filter(m => m.status?.toLowerCase() === 'stale').length,
-    missing: management.filter(m => m.status?.toLowerCase() === 'missing').length,
-    assigned: management.filter(m => m.usage?.toLowerCase() === 'assigned').length,
-    shared: management.filter(m => m.usage?.toLowerCase() === 'shared').length,
-    curriculum: management.filter(m => m.catalog?.toLowerCase() === 'curriculum').length,
-    staff: management.filter(m => m.catalog?.toLowerCase() === 'staff').length,
-    faculty: management.filter(m => m.catalog?.toLowerCase() === 'faculty').length,
-    kiosk: management.filter(m => m.catalog?.toLowerCase() === 'kiosk').length,
-  }
-
-  // Filter management
-  const filteredManagement = management.filter(m => {
-    // Search query
+  // Filter management first, then calculate counts based on filtered data
+  const baseFilteredManagement = management.filter(m => {
+    // Search query - includes management and inventory fields
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       const matchesSearch = 
         m.deviceName.toLowerCase().includes(query) ||
         m.serialNumber.toLowerCase().includes(query) ||
         (m.intuneId && m.intuneId.toLowerCase().includes(query)) ||
-        m.provider.toLowerCase().includes(query)
+        m.provider.toLowerCase().includes(query) ||
+        // Inventory fields
+        (m.usage && m.usage.toLowerCase().includes(query)) ||
+        (m.catalog && m.catalog.toLowerCase().includes(query)) ||
+        (m.assetTag && m.assetTag.toLowerCase().includes(query)) ||
+        (m.location && m.location.toLowerCase().includes(query)) ||
+        (m.department && m.department.toLowerCase().includes(query))
       
       if (!matchesSearch) return false
     }
@@ -198,15 +211,69 @@ function ManagementPageContent() {
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
 
-    // Type filter
-    if (typeFilter !== 'all' && m.enrollmentType !== typeFilter) return false
+    // Type filter - map display names back to raw values
+    if (typeFilter !== 'all') {
+      let rawTypeFilter = typeFilter
+      if (typeFilter === 'Domain Joined') rawTypeFilter = 'Hybrid Entra Join'
+      if (typeFilter === 'Entra Joined') rawTypeFilter = 'Entra Join'
+      if (m.enrollmentType !== rawTypeFilter) return false
+    }
 
-    // Inventory filters
+    return true
+  })
+
+  // Calculate inventory filter counts based on data filtered by widgets/search (not inventory filters)
+  const filterCounts = {
+    active: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'active').length,
+    stale: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'stale').length,
+    missing: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'missing').length,
+    assigned: baseFilteredManagement.filter(m => m.usage?.toLowerCase() === 'assigned').length,
+    shared: baseFilteredManagement.filter(m => m.usage?.toLowerCase() === 'shared').length,
+    curriculum: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'curriculum').length,
+    staff: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'staff').length,
+    faculty: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'faculty').length,
+    kiosk: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'kiosk').length,
+  }
+
+  // Apply inventory filters to get final filtered list
+  const filteredManagement = baseFilteredManagement.filter(m => {
     if (deviceStatusFilter !== 'all' && m.status?.toLowerCase() !== deviceStatusFilter) return false
     if (usageFilter !== 'all' && m.usage?.toLowerCase() !== usageFilter) return false
     if (catalogFilter !== 'all' && m.catalog?.toLowerCase() !== catalogFilter) return false
-
     return true
+  }).sort((a, b) => {
+    // Apply sorting
+    let aValue: string = ''
+    let bValue: string = ''
+    
+    switch (sortColumn) {
+      case 'device':
+        aValue = a.deviceName?.toLowerCase() || ''
+        bValue = b.deviceName?.toLowerCase() || ''
+        break
+      case 'provider':
+        aValue = a.provider?.toLowerCase() || ''
+        bValue = b.provider?.toLowerCase() || ''
+        break
+      case 'status':
+        aValue = a.enrollmentStatus?.toLowerCase() || ''
+        bValue = b.enrollmentStatus?.toLowerCase() || ''
+        break
+      case 'type':
+        aValue = a.enrollmentType?.toLowerCase() || ''
+        bValue = b.enrollmentType?.toLowerCase() || ''
+        break
+      case 'deviceId':
+        aValue = a.intuneId?.toLowerCase() || ''
+        bValue = b.intuneId?.toLowerCase() || ''
+        break
+    }
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
   })
 
   // Helper for Donut Chart
@@ -544,16 +611,11 @@ function ManagementPageContent() {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                   MDM enrollment and configuration • {filteredManagement.length} devices
-                  {(providerFilter !== 'all' || enrollmentStatusFilter !== 'all' || typeFilter !== 'all' || deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
-                    <span className="ml-2 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded-full">
-                      Filtered
-                    </span>
-                  )}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 {/* Clear Filters Button */}
-                {(providerFilter !== 'all' || enrollmentStatusFilter !== 'all' || typeFilter !== 'all' || deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
+                {(providerFilter !== 'all' || enrollmentStatusFilter !== 'all' || typeFilter !== 'all' || deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all' || searchQuery !== '') && (
                   <button
                     onClick={() => {
                       setProviderFilter('all')
@@ -562,8 +624,9 @@ function ManagementPageContent() {
                       setDeviceStatusFilter('all')
                       setUsageFilter('all')
                       setCatalogFilter('all')
+                      setSearchQuery('')
                     }}
-                    className="text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 underline"
+                    className="px-3 py-1.5 text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800 transition-colors"
                   >
                     Clear filters
                   </button>
@@ -697,11 +760,71 @@ function ManagementPageContent() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-56 bg-gray-50 dark:bg-gray-700">Device</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-44 bg-gray-50 dark:bg-gray-700">Provider</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36 bg-gray-50 dark:bg-gray-700">Status</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40 bg-gray-50 dark:bg-gray-700">Type</th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-72 bg-gray-50 dark:bg-gray-700">Device ID</th>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-56 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('provider')}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-44 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Provider
+                      {sortColumn === 'provider' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('status')}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Status
+                      {sortColumn === 'status' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('type')}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Type
+                      {sortColumn === 'type' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('deviceId')}
+                    className="px-3 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-72 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device ID
+                      {sortColumn === 'deviceId' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -728,8 +851,19 @@ function ManagementPageContent() {
                           <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{mgmt.deviceName}</div>
                             <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              <span>{mgmt.serialNumber}</span>
-                              <CopyButton value={mgmt.serialNumber} size="sm" />
+                              <span className="inline-flex items-center gap-0.5">
+                                {mgmt.serialNumber}
+                                <CopyButton value={mgmt.serialNumber} size="sm" />
+                              </span>
+                              {mgmt.assetTag && (
+                                <>
+                                  <span className="text-gray-400 dark:text-gray-500">•</span>
+                                  <span className="inline-flex items-center gap-0.5">
+                                    {mgmt.assetTag}
+                                    <CopyButton value={mgmt.assetTag} size="sm" />
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </Link>
