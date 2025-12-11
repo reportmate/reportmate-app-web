@@ -44,11 +44,14 @@ async function fetchAllDevicesWithModules(API_BASE_URL: string, isLocalhost: boo
   const devicesData = await devicesResponse.json();
   const deviceList = Array.isArray(devicesData.devices) ? devicesData.devices : [];
   
-  // Fetch detailed data in batches - increased batch size for better parallelism
-  // Each device API call takes ~1.5s, so we parallelize aggressively
-  const BATCH_SIZE = 75;
-  const DEVICE_TIMEOUT = 10000; // 10 second timeout per device
+  // Fetch detailed data in batches
+  // Reduced batch size to avoid network congestion causing timeouts
+  // Increased timeout to handle slower responses under load
+  const BATCH_SIZE = 25;
+  const DEVICE_TIMEOUT = 30000; // 30 second timeout per device
   const devices: any[] = [];
+  
+  console.log(`[INSTALLS FILTERS] Fetching ${deviceList.length} devices in batches of ${BATCH_SIZE}`);
   
   for (let i = 0; i < deviceList.length; i += BATCH_SIZE) {
     const batch = deviceList.slice(i, i + BATCH_SIZE);
