@@ -1,10 +1,10 @@
 import React from 'react';
 
 interface NetworkData {
-  hostname: string;
-  connectionType: string;
+  hostname?: string;
+  connectionType?: string;
   ssid?: string | null;
-  signalStrength?: string | null;
+  signalStrength?: string | number | null;
   service?: string;
   status?: number;
   ethernet?: string;
