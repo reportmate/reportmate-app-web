@@ -211,6 +211,60 @@ function SystemPageContent() {
   const [systems, setSystems] = useState<SystemDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [platformFilter, setPlatformFilter] = useState('all')
+  const [activationFilter, setActivationFilter] = useState('all')
+  
+  // Filters accordion state
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  
+  // Widgets accordion state
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'uptime' | 'lastSeen'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Toggle functions for filters
+  const toggleUsage = (usage: string) => {
+    setSelectedUsages(prev => 
+      prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
+    )
+  }
+  
+  const toggleCatalog = (catalog: string) => {
+    setSelectedCatalogs(prev => 
+      prev.includes(catalog) ? prev.filter(c => c !== catalog) : [...prev, catalog]
+    )
+  }
+  
+  const toggleLocation = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
+    )
+  }
+  
+  const clearAllFilters = () => {
+    setSelectedUsages([])
+    setSelectedCatalogs([])
+    setSelectedLocations([])
+    setPlatformFilter('all')
+    setActivationFilter('all')
+    setSearchQuery('')
+  }
+  
+  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
+    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
   const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
@@ -236,11 +290,43 @@ function SystemPageContent() {
     systems.map(s => s.operatingSystem).filter(Boolean)
   )).sort()
 
+  // Extract unique filter options from devices (inventory data)
+  const filterOptions = {
+    usages: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.usage).filter(Boolean)
+    )).sort() as string[],
+    catalogs: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.catalog).filter(Boolean)
+    )).sort() as string[],
+    locations: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.location).filter(Boolean)
+    )).sort() as string[]
+  }
+
   // Filter systems
   const filteredSystems = systems.filter(s => {
+    // Find the corresponding device from the main devices API to get inventory data
+    const deviceFromMainAPI = devices.find(d => 
+      d.deviceId === s.deviceId || 
+      d.serialNumber === s.serialNumber
+    )
+    const inventory = deviceFromMainAPI?.modules?.inventory
+    
     if (platformFilter !== 'all') {
       if (s.operatingSystem !== platformFilter) return false
     }
+    
+    // Filter by activation status
+    if (activationFilter !== 'all') {
+      const isActivated = s.raw?.operatingSystem?.activation?.isActivated
+      if (activationFilter === 'activated' && !isActivated) return false
+      if (activationFilter === 'not-activated' && isActivated !== false) return false
+    }
+    
+    // Inventory-based filters
+    if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
     
     return true
   })
@@ -277,6 +363,45 @@ function SystemPageContent() {
     }
   })
 
+  // Create devices formatted for OS Version Widget from systems data
+  // This maps the raw system module data to the format expected by OSVersionBarChart
+  const devicesForOSWidget = systems.map(sys => {
+    const osInfo = sys.raw?.operatingSystem
+    // Detect platform from OS name
+    const osName = osInfo?.name?.toLowerCase() || sys.operatingSystem?.toLowerCase() || ''
+    let platform = 'Unknown'
+    if (osName.includes('windows') || osName.includes('microsoft')) {
+      platform = 'Windows'
+    } else if (osName.includes('macos') || osName.includes('mac os') || osName.includes('darwin')) {
+      platform = 'macOS'
+    }
+    
+    return {
+      deviceId: sys.deviceId,
+      serialNumber: sys.serialNumber,
+      name: sys.deviceName,
+      lastSeen: sys.lastSeen,
+      status: 'active',
+      totalEvents: 0,
+      lastEventTime: sys.lastSeen,
+      platform: platform,
+      // Map OS data to the format expected by OSVersionBarChart
+      osVersion: osInfo ? {
+        name: osInfo.name,
+        version: osInfo.version,
+        build: osInfo.build,
+        edition: osInfo.edition,
+        displayVersion: osInfo.displayVersion,
+        featureUpdate: osInfo.featureUpdate
+      } : undefined,
+      modules: {
+        system: {
+          operatingSystem: osInfo
+        }
+      }
+    }
+  })
+
   // Apply search filter after processing (so we search the correct device names)
   const searchFilteredSystems = processedSystems.filter(sys => {
     if (searchQuery.trim()) {
@@ -287,6 +412,33 @@ function SystemPageContent() {
       )
     }
     return true
+  }).sort((a, b) => {
+    let aValue: string | number = ''
+    let bValue: string | number = ''
+    
+    switch (sortColumn) {
+      case 'device':
+        aValue = a.deviceName?.toLowerCase() || ''
+        bValue = b.deviceName?.toLowerCase() || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'os':
+        aValue = a.operatingSystem?.toLowerCase() || ''
+        bValue = b.operatingSystem?.toLowerCase() || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'version':
+        aValue = a.osVersion?.toLowerCase() || ''
+        bValue = b.osVersion?.toLowerCase() || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'uptime':
+        aValue = a.uptime || 0
+        bValue = b.uptime || 0
+        return sortDirection === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue)
+      case 'lastSeen':
+        aValue = a.lastSeen || ''
+        bValue = b.lastSeen || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+    }
+    return 0
   })
 
   if (loading) {
@@ -374,6 +526,16 @@ function SystemPageContent() {
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System Information • {searchFilteredSystems.length} devices</h2>
               </div>
               <div className="flex items-center gap-4">
+                {/* Activation Filter */}
+                <select
+                  value={activationFilter}
+                  onChange={(e) => setActivationFilter(e.target.value)}
+                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
+                >
+                  <option value="all">All Activation Status</option>
+                  <option value="activated">Activated</option>
+                  <option value="not-activated">Not Activated</option>
+                </select>
                 {/* Platform Filter */}
                 <select
                   value={platformFilter}
@@ -385,49 +547,287 @@ function SystemPageContent() {
                     <option key={os} value={os}>{os}</option>
                   ))}
                 </select>
+                
+                {/* Export to CSV Button */}
+                <button
+                  onClick={() => {
+                    // Build CSV from filtered data only
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Operating System', 'Version', 'Build', 'Edition', 'Uptime', 'Boot Time', 'Last Seen']
+                    const rows = searchFilteredSystems.map(s => {
+                      const uptimeStr = s.uptime ? `${Math.floor(s.uptime / 86400)}d ${Math.floor((s.uptime % 86400) / 3600)}h` : ''
+                      return [
+                        s.deviceName || '',
+                        s.serialNumber || '',
+                        s.assetTag || '',
+                        s.operatingSystem || '',
+                        s.osVersion || '',
+                        s.buildNumber || '',
+                        s.raw?.operatingSystem?.edition || '',
+                        uptimeStr,
+                        s.bootTime || '',
+                        s.lastSeen || ''
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                    })
+                    
+                    const csv = [headers.join(','), ...rows].join('\n')
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = `system-report-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  title="Export filtered devices to CSV"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export CSV
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Analytics Charts Section */}
-          <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="space-y-6">
+          {/* Widgets Accordion - OS Version Charts */}
+          <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+            {/* Widgets Accordion Header */}
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Widgets Content - Collapsible */}
+          {widgetsExpanded && (
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               {/* OS Version Charts - Side by Side */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
-                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
+                <OSVersionWidget devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
+                <OSVersionWidget devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
               </div>
             </div>
+          )}
+
+          {/* Filters Accordion Section */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters</span>
+                {totalActiveFilters > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                    {totalActiveFilters} active
+                  </span>
+                )}
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {filtersExpanded && (
+              <div className="px-6 pb-4 space-y-4">
+                {/* Usage Filter */}
+                {filterOptions.usages.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.usages.map(usage => (
+                        <button
+                          key={usage}
+                          onClick={() => toggleUsage(usage)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedUsages.includes(usage)
+                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {usage}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Catalog Filter */}
+                {filterOptions.catalogs.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.catalogs.map(catalog => (
+                        <button
+                          key={catalog}
+                          onClick={() => toggleCatalog(catalog)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedCatalogs.includes(catalog)
+                              ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {catalog}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Location Filter */}
+                {filterOptions.locations.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.locations.map(location => (
+                        <button
+                          key={location}
+                          onClick={() => toggleLocation(location)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedLocations.includes(location)
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {location}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Clear All Filters */}
+                {totalActiveFilters > 0 && (
+                  <div className="pt-2">
+                    <button
+                      onClick={clearAllFilters}
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
+                    >
+                      Clear all filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Search Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search by device name or serial number..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Search by device name or serial number..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
+              {(totalActiveFilters > 0 || searchQuery) && (
+                <button
+                  onClick={clearAllFilters}
+                  className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-24rem)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
-                <tr className="sticky top-0 z-20 bg-gray-50 dark:bg-gray-700">
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Operating System</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Version</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Uptime</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Locale</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Last Seen</th>
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
+                <tr>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('os')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Operating System
+                      {sortColumn === 'os' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('version')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Version
+                      {sortColumn === 'version' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('uptime')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Uptime
+                      {sortColumn === 'uptime' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('lastSeen')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Seen
+                      {sortColumn === 'lastSeen' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -453,7 +853,7 @@ function SystemPageContent() {
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sys.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
                               {sys.serialNumber}
                               {sys.assetTag ? ` | ${sys.assetTag}` : ''}
                             </div>
@@ -462,8 +862,15 @@ function SystemPageContent() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white font-medium">
-                            {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
+                          <div className="flex items-center gap-2">
+                            <span className="text-gray-900 dark:text-white font-medium">
+                              {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
+                            </span>
+                            {sys.raw?.operatingSystem?.activation?.isActivated === false && (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                Unlicensed
+                              </span>
+                            )}
                           </div>
                           <div className="text-gray-500 dark:text-gray-400">
                             {sys.systemInfo.operatingSystem.displayVersion || sys.systemInfo.operatingSystem.version || sys.osVersion || null}
@@ -498,11 +905,6 @@ function SystemPageContent() {
                           ) : (
                             <div className="text-gray-500 dark:text-gray-400">Unknown</div>
                           )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {sys.systemInfo.operatingSystem.locale || 'Unknown'}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
