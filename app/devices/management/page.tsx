@@ -118,6 +118,12 @@ function ManagementPageContent() {
         const combinedData = (Array.isArray(managementList) ? managementList : []).map((mgmt: any) => {
           const status = calculateDeviceStatus(mgmt.lastSeen)
           
+          // Normalize provider - "Microsoft Intune (Co-managed)" -> "Microsoft Intune"
+          let provider = mgmt.provider || 'Unknown'
+          if (provider.startsWith('Microsoft Intune')) {
+            provider = 'Microsoft Intune'
+          }
+          
           return {
             id: mgmt.serialNumber || mgmt.deviceId,
             deviceId: mgmt.deviceId,
@@ -125,7 +131,7 @@ function ManagementPageContent() {
             serialNumber: mgmt.serialNumber,
             lastSeen: mgmt.lastSeen,
             collectedAt: mgmt.collectedAt || mgmt.lastSeen,
-            provider: mgmt.provider || 'Unknown',
+            provider: provider,
             enrollmentStatus: mgmt.enrollmentStatus || 'Unknown',
             enrollmentType: mgmt.enrollmentType || 'Unknown',
             intuneId: mgmt.intuneId || 'N/A',
@@ -168,11 +174,18 @@ function ManagementPageContent() {
     // Normalize labels
     if (type === 'Hybrid Entra Join') type = 'Domain Joined'
     if (type === 'Entra Join') type = 'Entra Joined'
+    // Include all types except Unknown and N/A
     if (type !== 'Unknown' && type !== 'N/A') {
       acc[type] = (acc[type] || 0) + 1
     }
     return acc
   }, {} as Record<string, number>)
+
+  // Count Broken Trust as a subset indicator (devices with trustStatus === 'Broken')
+  const brokenTrustCount = management.filter(m => {
+    const trustStatus = m.raw?.domainTrust?.trustStatus
+    return trustStatus === 'Broken'
+  }).length
 
   // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
@@ -213,10 +226,20 @@ function ManagementPageContent() {
 
     // Type filter - map display names back to raw values
     if (typeFilter !== 'all') {
-      let rawTypeFilter = typeFilter
-      if (typeFilter === 'Domain Joined') rawTypeFilter = 'Hybrid Entra Join'
-      if (typeFilter === 'Entra Joined') rawTypeFilter = 'Entra Join'
-      if (m.enrollmentType !== rawTypeFilter) return false
+      // Special handling for Broken Trust filter - ONLY check trustStatus === 'Broken'
+      if (typeFilter === 'Broken Trust') {
+        const trustStatus = m.raw?.domainTrust?.trustStatus
+        if (trustStatus !== 'Broken') return false
+      } else if (typeFilter === 'Domain Joined') {
+        // Domain Joined filter shows ALL domain-joined devices (including broken)
+        const enrollmentType = m.enrollmentType
+        const isDomainJoined = enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined'
+        if (!isDomainJoined) return false
+      } else {
+        let rawTypeFilter = typeFilter
+        if (typeFilter === 'Entra Joined') rawTypeFilter = 'Entra Join'
+        if (m.enrollmentType !== rawTypeFilter) return false
+      }
     }
 
     return true
@@ -589,13 +612,26 @@ function ManagementPageContent() {
             selectedFilter={enrollmentStatusFilter}
           />
 
-          {/* Widget 3: Enrollment Type Donut */}
+          {/* Widget 3: Enrollment Type Donut - Broken Trust shown as subset of Domain Joined */}
           <DonutChart 
             title="Enrollment Type"
-            data={Object.entries(enrollmentTypeCounts).map(([label, value]) => ({ label, value }))}
+            data={[
+              // Show enrollment types in order: Entra Joined, Domain Joined, then Broken Trust at bottom
+              ...Object.entries(enrollmentTypeCounts)
+                .sort(([a], [b]) => {
+                  // Entra Joined first, Domain Joined second
+                  if (a === 'Entra Joined') return -1
+                  if (b === 'Entra Joined') return 1
+                  return a.localeCompare(b)
+                })
+                .map(([label, value]) => ({ label, value })),
+              // Broken Trust last (at bottom of legend) - subset indicator
+              ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : [])
+            ]}
             colors={{
               'Entra Joined': '#10b981', // emerald-500
-              'Domain Joined': '#f59e0b', // amber-500 (Yellow)
+              'Domain Joined': '#f59e0b', // amber-500 (Yellow) - healthy domain joined
+              'Broken Trust': '#ef4444', // red-500 - broken trust domain joined
               'AxM Assigned': '#10b981', // emerald-500
               'default': '#8b5cf6' // violet-500
             }}
@@ -647,6 +683,49 @@ function ManagementPageContent() {
                     className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
                   />
                 </div>
+                
+                {/* Export to CSV Button */}
+                <button
+                  onClick={() => {
+                    // Build CSV from filtered data only
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Intune Device ID', 'Tenant', 'Trust Status']
+                    const rows = filteredManagement.map(m => {
+                      let displayType = m.enrollmentType || ''
+                      if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
+                      if (displayType === 'Entra Join') displayType = 'Entra Joined'
+                      const trustStatus = m.raw?.domainTrust?.trustStatus || ''
+                      return [
+                        m.deviceName || '',
+                        m.serialNumber || '',
+                        m.assetTag || '',
+                        m.provider || '',
+                        m.enrollmentStatus || '',
+                        displayType,
+                        m.intuneId || '',
+                        m.tenantName || '',
+                        trustStatus
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                    })
+                    
+                    const csv = [headers.join(','), ...rows].join('\n')
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = `management-report-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  title="Export filtered devices to CSV"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export CSV
+                </button>
               </div>
             </div>
           </div>
@@ -845,7 +924,7 @@ function ManagementPageContent() {
                     <tr key={mgmt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-3 py-1.5 whitespace-nowrap">
                         <Link 
-                          href={`/device/${mgmt.deviceId}`}
+                          href={`/device/${mgmt.serialNumber}#management`}
                           className="flex items-center hover:text-yellow-600 dark:hover:text-yellow-400"
                         >
                           <div className="flex-1">
@@ -912,20 +991,22 @@ function ManagementPageContent() {
                           })()}
                           {/* Show trust issue warning only for Domain Joined (Hybrid Entra Join) with problems */}
                           {(mgmt.enrollmentType === 'Hybrid Entra Join' || mgmt.enrollmentType === 'Domain Joined') && (() => {
-                            const authStatus = mgmt.raw?.deviceDetails?.deviceAuthStatus
-                            const keySignTest = mgmt.raw?.diagnosticData?.keySignTest
-                            const hasTrustIssue = authStatus === 'FAIL' || keySignTest === 'FAIL' || keySignTest === 'NOT TESTED'
+                            // Check domainTrust.trustStatus - API returns 'Healthy' or 'Broken'
+                            const domainTrust = mgmt.raw?.domainTrust
+                            const trustStatus = domainTrust?.trustStatus
+                            const secureChannelValid = domainTrust?.secureChannelValid
+                            const hasTrustIssue = trustStatus === 'Broken' || secureChannelValid === false
                             
                             if (hasTrustIssue) {
                               return (
                                 <span 
                                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
-                                  title={`Auth: ${authStatus || 'N/A'}, KeySign: ${keySignTest || 'N/A'}`}
+                                  title={`Trust: ${trustStatus || 'Unknown'}, Secure Channel: ${secureChannelValid === true ? 'Valid' : secureChannelValid === false ? 'Invalid' : 'Unknown'}`}
                                 >
                                   <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                                   </svg>
-                                  Trust Issue
+                                  Broken
                                 </span>
                               )
                             }

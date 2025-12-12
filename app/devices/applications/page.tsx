@@ -1439,9 +1439,9 @@ function ApplicationsPageContent() {
                 </div>
               )}
 
-              <div className="overflow-x-auto">
+              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
               <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                   <tr>
                     <th 
                       className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
@@ -1570,8 +1570,11 @@ function ApplicationsPageContent() {
                             <div className="text-sm text-gray-900 dark:text-white font-medium">
                               {app.deviceName}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
                               {app.serialNumber}
+                              {app.assetTag && (
+                                <span className="ml-1">| {app.assetTag}</span>
+                              )}
                             </div>
                           </Link>
                         </td>

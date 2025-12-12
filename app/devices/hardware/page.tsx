@@ -150,6 +150,7 @@ function HardwarePageContent() {
     setSelectedProcessors([])
     setSelectedGraphics([])
     setSelectedPlatforms([])
+    setSearchQuery('')
   }
   
   const searchParams = useSearchParams()

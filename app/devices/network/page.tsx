@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
+import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { Copy } from "lucide-react"
 
 interface NetworkDevice {
@@ -32,6 +33,60 @@ function NetworkPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless'>('all')
   const searchParams = useSearchParams()
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'device' | 'ip' | 'mac' | 'network'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Filters accordion state
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Toggle functions for filters
+  const toggleUsage = (usage: string) => {
+    setSelectedUsages(prev => 
+      prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
+    )
+  }
+  
+  const toggleCatalog = (catalog: string) => {
+    setSelectedCatalogs(prev => 
+      prev.includes(catalog) ? prev.filter(c => c !== catalog) : [...prev, catalog]
+    )
+  }
+  
+  const toggleLocation = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
+    )
+  }
+  
+  const clearAllFilters = () => {
+    setSelectedUsages([])
+    setSelectedCatalogs([])
+    setSelectedLocations([])
+    setConnectionFilter('all')
+    setSearchQuery('')
+  }
+  
+  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
+    (connectionFilter !== 'all' ? 1 : 0)
+
+  // Use useDeviceData hook to get devices with inventory data
+  const { devices } = useDeviceData({
+    includeModuleData: false
+  })
 
   useEffect(() => {
     const urlSearch = searchParams.get('search')
@@ -90,7 +145,27 @@ function NetworkPageContent() {
     }
   })
 
+  // Extract unique filter options from devices (inventory data)
+  const filterOptions = {
+    usages: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.usage).filter(Boolean)
+    )).sort() as string[],
+    catalogs: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.catalog).filter(Boolean)
+    )).sort() as string[],
+    locations: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.location).filter(Boolean)
+    )).sort() as string[]
+  }
+
   const filteredNetworkDevices = processedNetworkDevices.filter(n => {
+    // Find the corresponding device from the main devices API to get inventory data
+    const deviceFromMainAPI = devices.find(d => 
+      d.deviceId === n.deviceId || 
+      d.serialNumber === n.serialNumber
+    )
+    const inventory = deviceFromMainAPI?.modules?.inventory
+
     // Connection type filter
     if (connectionFilter !== 'all') {
       const connectionType = n.networkInfo.connectionType?.toLowerCase() || ''
@@ -104,6 +179,11 @@ function NetworkPageContent() {
         }
       }
     }
+
+    // Inventory-based filters
+    if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
 
     // Search query filter
     if (searchQuery.trim()) {
@@ -126,6 +206,34 @@ function NetworkPageContent() {
       )
     }
     return true
+  }).sort((a, b) => {
+    let aValue: string = ''
+    let bValue: string = ''
+    
+    switch (sortColumn) {
+      case 'device':
+        aValue = a.deviceName?.toLowerCase() || ''
+        bValue = b.deviceName?.toLowerCase() || ''
+        break
+      case 'ip':
+        aValue = a.networkInfo.ipAddress?.toLowerCase() || ''
+        bValue = b.networkInfo.ipAddress?.toLowerCase() || ''
+        break
+      case 'mac':
+        aValue = a.networkInfo.macAddress?.toLowerCase() || ''
+        bValue = b.networkInfo.macAddress?.toLowerCase() || ''
+        break
+      case 'network':
+        aValue = a.networkInfo.ssid?.toLowerCase() || a.networkInfo.connectionType?.toLowerCase() || ''
+        bValue = b.networkInfo.ssid?.toLowerCase() || b.networkInfo.connectionType?.toLowerCase() || ''
+        break
+    }
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
   })
 
   // Helper function to copy text to clipboard
@@ -319,13 +427,11 @@ function NetworkPageContent() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
         <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden">
+          {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Network interfaces and connectivity • {filteredNetworkDevices.length} devices
-                </p>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration • {filteredNetworkDevices.length} devices</h2>
               </div>
               <div className="flex items-center gap-4">
                 {/* Connection Type Filters */}
@@ -351,23 +457,169 @@ function NetworkPageContent() {
                     Wireless
                   </button>
                 </div>
-
-                {/* Search Input */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search devices, IPs, MACs, DNS, asset tags..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-96 md:w-[32rem] pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
+                
+                {/* Export to CSV Button */}
+                <button
+                  onClick={() => {
+                    // Build CSV from filtered data only
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS']
+                    const rows = filteredNetworkDevices.map(n => {
+                      const ipv4 = getIPv4Address(n.networkInfo.ipAddress)
+                      return [
+                        n.deviceName || '',
+                        n.serialNumber || '',
+                        n.assetTag || '',
+                        ipv4 || n.networkInfo.ipAddress || '',
+                        n.networkInfo.macAddress || '',
+                        n.networkInfo.connectionType || '',
+                        n.networkInfo.ssid || '',
+                        n.networkInfo.dnsAddress || ''
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                    })
+                    
+                    const csv = [headers.join(','), ...rows].join('\n')
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                    const url = URL.createObjectURL(blob)
+                    const link = document.createElement('a')
+                    link.href = url
+                    link.download = `network-report-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(link)
+                    link.click()
+                    document.body.removeChild(link)
+                    URL.revokeObjectURL(url)
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                  title="Export filtered devices to CSV"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                  Export CSV
+                </button>
               </div>
+            </div>
+          </div>
+
+          {/* Filters Accordion Section */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters</span>
+                {totalActiveFilters > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                    {totalActiveFilters} active
+                  </span>
+                )}
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {filtersExpanded && (
+              <div className="px-6 pb-4 space-y-4">
+                {/* Usage Filter */}
+                {filterOptions.usages.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.usages.map(usage => (
+                        <button
+                          key={usage}
+                          onClick={() => toggleUsage(usage)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedUsages.includes(usage)
+                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {usage}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Catalog Filter */}
+                {filterOptions.catalogs.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.catalogs.map(catalog => (
+                        <button
+                          key={catalog}
+                          onClick={() => toggleCatalog(catalog)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedCatalogs.includes(catalog)
+                              ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {catalog}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Location Filter */}
+                {filterOptions.locations.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.locations.map(location => (
+                        <button
+                          key={location}
+                          onClick={() => toggleLocation(location)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedLocations.includes(location)
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {location}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Search Section */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search devices, IPs, MACs, DNS, asset tags..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+              {(totalActiveFilters > 0 || searchQuery) && (
+                <button
+                  onClick={clearAllFilters}
+                  className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
+                >
+                  Clear Filters
+                </button>
+              )}
             </div>
           </div>
 
@@ -375,12 +627,60 @@ function NetworkPageContent() {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-52">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56">DNS Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36">IP Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44">MAC Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40">Network</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Protocol/Band</th>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-52 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56 bg-gray-50 dark:bg-gray-700">DNS Address</th>
+                  <th 
+                    onClick={() => handleSort('ip')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      IP Address
+                      {sortColumn === 'ip' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('mac')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      MAC Address
+                      {sortColumn === 'mac' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('network')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Network
+                      {sortColumn === 'network' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700">Protocol/Band</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">

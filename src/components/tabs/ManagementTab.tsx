@@ -244,9 +244,9 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Trust Status</span>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      management.domainTrust.trustStatus === 'Success' || management.domainTrust.trustStatus === 'Trusted'
+                      management.domainTrust.trustStatus === 'Healthy' || management.domainTrust.trustStatus === 'Success' || management.domainTrust.trustStatus === 'Trusted'
                         ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                        : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                     }`}>
                       {management.domainTrust.trustStatus}
                     </span>

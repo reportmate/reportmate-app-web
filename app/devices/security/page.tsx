@@ -57,6 +57,19 @@ function SecurityPageContent() {
   const [security, setSecurity] = useState<Security[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [protectionFilter, setProtectionFilter] = useState('all')
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'device' | 'lastSeen'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     const fetchSecurity = async () => {
@@ -106,6 +119,26 @@ function SecurityPageContent() {
     }
     
     return true
+  }).sort((a, b) => {
+    let aValue: string = ''
+    let bValue: string = ''
+    
+    switch (sortColumn) {
+      case 'device':
+        aValue = a.deviceName?.toLowerCase() || ''
+        bValue = b.deviceName?.toLowerCase() || ''
+        break
+      case 'lastSeen':
+        aValue = a.lastSeen || ''
+        bValue = b.lastSeen || ''
+        break
+    }
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
   })
 
   if (loading) {
@@ -232,16 +265,40 @@ function SecurityPageContent() {
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Protection</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Boot Security</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Access Control</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Secure Shell</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Protection</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Boot Security</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Access Control</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Secure Shell</th>
+                  <th 
+                    onClick={() => handleSort('lastSeen')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Seen
+                      {sortColumn === 'lastSeen' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -267,7 +324,12 @@ function SecurityPageContent() {
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sec.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{sec.serialNumber}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                              {sec.serialNumber}
+                              {(sec as any).assetTag && (
+                                <span className="ml-1">| {(sec as any).assetTag}</span>
+                              )}
+                            </div>
                           </div>
                         </Link>
                       </td>

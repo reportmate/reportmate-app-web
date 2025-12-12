@@ -48,6 +48,19 @@ function ProfilesPageContent() {
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [organizationFilter, setOrganizationFilter] = useState('all')
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'device' | 'profile' | 'organization' | 'installDate' | 'lastSeen'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     const fetchProfiles = async () => {
@@ -101,6 +114,38 @@ function ProfilesPageContent() {
     }
     
     return true
+  }).sort((a, b) => {
+    let aValue: string = ''
+    let bValue: string = ''
+    
+    switch (sortColumn) {
+      case 'device':
+        aValue = a.deviceName?.toLowerCase() || ''
+        bValue = b.deviceName?.toLowerCase() || ''
+        break
+      case 'profile':
+        aValue = a.displayName?.toLowerCase() || ''
+        bValue = b.displayName?.toLowerCase() || ''
+        break
+      case 'organization':
+        aValue = a.organization?.toLowerCase() || ''
+        bValue = b.organization?.toLowerCase() || ''
+        break
+      case 'installDate':
+        aValue = a.installDate || ''
+        bValue = b.installDate || ''
+        break
+      case 'lastSeen':
+        aValue = a.lastSeen || ''
+        bValue = b.lastSeen || ''
+        break
+    }
+    
+    if (sortDirection === 'asc') {
+      return aValue.localeCompare(bValue)
+    } else {
+      return bValue.localeCompare(aValue)
+    }
   })
 
   if (loading) {
@@ -228,16 +273,76 @@ function ProfilesPageContent() {
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Profile</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Organization</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Install Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('profile')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Profile
+                      {sortColumn === 'profile' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('organization')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Organization
+                      {sortColumn === 'organization' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Status</th>
+                  <th 
+                    onClick={() => handleSort('installDate')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Install Date
+                      {sortColumn === 'installDate' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('lastSeen')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Seen
+                      {sortColumn === 'lastSeen' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -263,7 +368,12 @@ function ProfilesPageContent() {
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{profile.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{profile.serialNumber}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                              {profile.serialNumber}
+                              {(profile as any).assetTag && (
+                                <span className="ml-1">| {(profile as any).assetTag}</span>
+                              )}
+                            </div>
                           </div>
                         </Link>
                       </td>
