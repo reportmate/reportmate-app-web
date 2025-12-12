@@ -39,6 +39,14 @@ export interface ScheduledTask {
   status: string
 }
 
+export interface ActivationInfo {
+  isActivated?: boolean
+  status?: string
+  statusCode?: number
+  partialProductKey?: string
+  licenseType?: string
+}
+
 export interface OperatingSystemInfo {
   name?: string
   version?: string
@@ -50,6 +58,7 @@ export interface OperatingSystemInfo {
   timeZone?: string
   activeKeyboardLayout?: string
   featureUpdate?: string
+  activation?: ActivationInfo
 }
 
 export interface SystemInfo {
@@ -188,7 +197,15 @@ export function extractSystem(deviceModules: any): SystemInfo {
       // Mac stores keyboard layouts as array in systemDetails
       activeKeyboardLayout: os.activeKeyboardLayout || 
         (systemDetails.keyboardLayouts?.length > 0 ? systemDetails.keyboardLayouts.join(', ') : ''),
-      featureUpdate: os.featureUpdate || ''
+      featureUpdate: os.featureUpdate || '',
+      // Windows activation status
+      activation: os.activation ? {
+        isActivated: os.activation.isActivated,
+        status: os.activation.status,
+        statusCode: os.activation.statusCode,
+        partialProductKey: os.activation.partialProductKey,
+        licenseType: os.activation.licenseType
+      } : undefined
     }
   }
 

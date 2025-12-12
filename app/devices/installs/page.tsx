@@ -170,6 +170,7 @@ function InstallsPageContent() {
     setSelectedRooms([])
     setSelectedFleets([])
     setSelectedPlatforms([])
+    setSearchQuery('')
   }
 
   // Fetch filter options

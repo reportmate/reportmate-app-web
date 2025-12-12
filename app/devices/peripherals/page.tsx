@@ -48,6 +48,19 @@ function PeripheralsPageContent() {
   const [peripherals, setPeripherals] = useState<Peripheral[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [deviceTypeFilter, setDeviceTypeFilter] = useState('all')
+  
+  // Sorting state
+  const [sortColumn, setSortColumn] = useState<'device' | 'total' | 'lastSeen'>('device')
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  const handleSort = (column: typeof sortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
 
   useEffect(() => {
     const fetchPeripherals = async () => {
@@ -113,6 +126,23 @@ function PeripheralsPageContent() {
     )
 
     return matchesSearch && matchesFilter
+  }).sort((a, b) => {
+    switch (sortColumn) {
+      case 'device':
+        const aName = a.deviceName?.toLowerCase() || ''
+        const bName = b.deviceName?.toLowerCase() || ''
+        return sortDirection === 'asc' ? aName.localeCompare(bName) : bName.localeCompare(aName)
+      case 'total':
+        const aTotal = getTotalDevices(a)
+        const bTotal = getTotalDevices(b)
+        return sortDirection === 'asc' ? aTotal - bTotal : bTotal - aTotal
+      case 'lastSeen':
+        const aDate = a.lastSeen || ''
+        const bDate = b.lastSeen || ''
+        return sortDirection === 'asc' ? aDate.localeCompare(bDate) : bDate.localeCompare(aDate)
+      default:
+        return 0
+    }
   })
 
   if (loading) {
@@ -245,17 +275,53 @@ function PeripheralsPageContent() {
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">USB Devices</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Bluetooth</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Printers</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Other Devices</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Total</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                  <th 
+                    onClick={() => handleSort('device')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Device
+                      {sortColumn === 'device' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">USB Devices</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Bluetooth</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Printers</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Other Devices</th>
+                  <th 
+                    onClick={() => handleSort('total')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Total
+                      {sortColumn === 'total' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('lastSeen')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Seen
+                      {sortColumn === 'lastSeen' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -281,7 +347,12 @@ function PeripheralsPageContent() {
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{peripheral.deviceName}</div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">{peripheral.serialNumber}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                              {peripheral.serialNumber}
+                              {(peripheral as any).assetTag && (
+                                <span className="ml-1">| {(peripheral as any).assetTag}</span>
+                              )}
+                            </div>
                           </div>
                         </Link>
                       </td>
