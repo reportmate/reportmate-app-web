@@ -187,6 +187,13 @@ function ManagementPageContent() {
     return trustStatus === 'Broken'
   }).length
 
+  // Count Unconfirmed Trust - Domain Joined devices without domainTrust data yet
+  const unconfirmedTrustCount = management.filter(m => {
+    const isDomainJoined = m.enrollmentType === 'Hybrid Entra Join' || m.enrollmentType === 'Domain Joined'
+    const hasDomainTrust = m.raw?.domainTrust != null
+    return isDomainJoined && !hasDomainTrust
+  }).length
+
   // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
     management.map(m => m.provider).filter(p => p && p !== 'Unknown')
@@ -230,6 +237,11 @@ function ManagementPageContent() {
       if (typeFilter === 'Broken Trust') {
         const trustStatus = m.raw?.domainTrust?.trustStatus
         if (trustStatus !== 'Broken') return false
+      } else if (typeFilter === 'Unconfirmed') {
+        // Unconfirmed filter - Domain Joined devices without domainTrust data
+        const isDomainJoined = m.enrollmentType === 'Hybrid Entra Join' || m.enrollmentType === 'Domain Joined'
+        const hasDomainTrust = m.raw?.domainTrust != null
+        if (!isDomainJoined || hasDomainTrust) return false
       } else if (typeFilter === 'Domain Joined') {
         // Domain Joined filter shows ALL domain-joined devices (including broken)
         const enrollmentType = m.enrollmentType
@@ -612,11 +624,11 @@ function ManagementPageContent() {
             selectedFilter={enrollmentStatusFilter}
           />
 
-          {/* Widget 3: Enrollment Type Donut - Broken Trust shown as subset of Domain Joined */}
+          {/* Widget 3: Enrollment Type Donut - Trust status shown as subset indicators */}
           <DonutChart 
             title="Enrollment Type"
             data={[
-              // Show enrollment types in order: Entra Joined, Domain Joined, then Broken Trust at bottom
+              // Show enrollment types in order: Entra Joined, Domain Joined, then trust status indicators
               ...Object.entries(enrollmentTypeCounts)
                 .sort(([a], [b]) => {
                   // Entra Joined first, Domain Joined second
@@ -625,13 +637,16 @@ function ManagementPageContent() {
                   return a.localeCompare(b)
                 })
                 .map(([label, value]) => ({ label, value })),
-              // Broken Trust last (at bottom of legend) - subset indicator
+              // Unconfirmed (orange) - devices without domainTrust data
+              ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : []),
+              // Broken Trust (red) - devices with broken trust
               ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : [])
             ]}
             colors={{
               'Entra Joined': '#10b981', // emerald-500
-              'Domain Joined': '#f59e0b', // amber-500 (Yellow) - healthy domain joined
-              'Broken Trust': '#ef4444', // red-500 - broken trust domain joined
+              'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
+              'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
+              'Broken Trust': '#ef4444', // red-500 - broken trust
               'AxM Assigned': '#10b981', // emerald-500
               'default': '#8b5cf6' // violet-500
             }}
@@ -989,14 +1004,31 @@ function ManagementPageContent() {
                               </span>
                             )
                           })()}
-                          {/* Show trust issue warning only for Domain Joined (Hybrid Entra Join) with problems */}
+                          {/* Show trust status indicator for Domain Joined (Hybrid Entra Join) devices */}
                           {(mgmt.enrollmentType === 'Hybrid Entra Join' || mgmt.enrollmentType === 'Domain Joined') && (() => {
                             // Check domainTrust.trustStatus - API returns 'Healthy' or 'Broken'
                             const domainTrust = mgmt.raw?.domainTrust
+                            
+                            // No domainTrust data yet = Unconfirmed (orange)
+                            if (!domainTrust) {
+                              return (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" 
+                                  title="Trust status not yet reported by client"
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                  Unconfirmed
+                                </span>
+                              )
+                            }
+                            
                             const trustStatus = domainTrust?.trustStatus
                             const secureChannelValid = domainTrust?.secureChannelValid
                             const hasTrustIssue = trustStatus === 'Broken' || secureChannelValid === false
                             
+                            // Broken trust = red pill
                             if (hasTrustIssue) {
                               return (
                                 <span 
