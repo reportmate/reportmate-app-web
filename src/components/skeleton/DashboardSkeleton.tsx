@@ -99,7 +99,7 @@ const NewClientsWidgetSkeleton: React.FC = () => (
 
 // Recent Events Widget Skeleton
 const RecentEventsWidgetSkeleton: React.FC = () => (
-  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[600px] flex flex-col">
+  <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[582px] flex flex-col">
     <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
       <div className="flex items-center justify-between">
         <div>
@@ -327,8 +327,8 @@ export const DashboardSkeleton: React.FC = () => {
             {/* Device Status Widget */}
             <StatusWidgetSkeleton />
 
-            {/* Error and Warning Stats Cards */}
-            <div className="grid grid-cols-1 gap-4">
+            {/* Error and Warning Stats Cards - Side by Side */}
+            <div className="grid grid-cols-2 gap-4">
               <StatsCardSkeleton />
               <StatsCardSkeleton />
             </div>

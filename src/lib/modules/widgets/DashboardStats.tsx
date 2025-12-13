@@ -70,7 +70,7 @@ const StatsWidget: React.FC<StatsWidgetProps> = ({ value, label, icon, color, hr
     return (
       <Link 
         href={href}
-        className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group block"
+        className="bg-white dark:bg-gray-800 py-7 px-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 hover:shadow-md dark:hover:border-gray-600 transition-all duration-200 cursor-pointer group block"
       >
         {content}
       </Link>
@@ -78,7 +78,7 @@ const StatsWidget: React.FC<StatsWidgetProps> = ({ value, label, icon, color, hr
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+    <div className="bg-white dark:bg-gray-800 py-7 px-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
       {content}
     </div>
   )
@@ -124,7 +124,7 @@ export const WarningStatsWidget: React.FC<{
 
   if (isLoading || warningCount === null) {
     return (
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 py-7 px-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
             <div className="w-6 h-6 text-gray-400 dark:text-gray-500">
@@ -178,7 +178,7 @@ export const ErrorStatsWidget: React.FC<{
 
   if (isLoading || errorCount === null) {
     return (
-      <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 py-7 px-6 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center">
             <div className="w-6 h-6 text-gray-400 dark:text-gray-500">
