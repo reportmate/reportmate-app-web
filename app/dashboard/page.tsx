@@ -494,9 +494,9 @@ export default function Dashboard() {
               <StatusWidget devices={devices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* Error and Warning Stats Cards */}
+            {/* Error and Warning Stats Cards - Side by Side */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-2 gap-4">
                 <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} />
                 <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} />
               </div>
