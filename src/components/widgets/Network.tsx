@@ -112,8 +112,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     wifiSignalStrength: network.signalStrength,
     // Enhanced data for active connection
     activeDnsServers: network.activeDnsServers || [],
-    activeNetbiosName: network.activeNetbiosName,
-    activeNetbiosType: network.activeNetbiosType,
     dnsAddress: network.dnsAddress
   }
   
@@ -124,8 +122,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     hasNetworkModule: !!device.modules?.network,
     networkData: network,
     activeConnectionData: activeConnectionData,
-    activeDnsCount: activeConnectionData.activeDnsServers?.length || 0,
-    activeNetbios: activeConnectionData.activeNetbiosName
+    activeDnsCount: activeConnectionData.activeDnsServers?.length || 0
   })
   
   const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown'
@@ -170,24 +167,15 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
               )}
             </div>
 
-            {/* IP Address and NetBios - Side by side */}
-            <div className="grid grid-cols-2 gap-4">
-              {activeConnectionData.ipAddress && (
-                <Stat 
-                  label="IP Address" 
-                  value={activeConnectionData.ipAddress} 
-                  isMono 
-                  showCopyButton
-                />
-              )}
-              {activeConnectionData.activeNetbiosName && (
-                <Stat 
-                  label="NetBios" 
-                  value={activeConnectionData.activeNetbiosName} 
-                  showCopyButton={false}
-                />
-              )}
-            </div>
+            {/* IP Address - Full width */}
+            {activeConnectionData.ipAddress && (
+              <Stat 
+                label="IP Address" 
+                value={activeConnectionData.ipAddress} 
+                isMono 
+                showCopyButton
+              />
+            )}
 
             {/* MAC Address - Full width */}
             {activeConnectionData.macAddress && (
