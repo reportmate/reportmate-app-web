@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { normalizeEventKind, severityToBadgeClasses } from '../lib/events/normalize';
 import { CopyButton } from './ui/CopyButton';
 
@@ -9,6 +9,8 @@ interface EventDto {
   raw: Record<string, unknown> | string;
   kind?: string;
   ts?: string;
+  isBundle?: boolean;
+  count?: number;
 }
 
 // Type for payload objects that might have various properties
@@ -73,10 +75,12 @@ const formatTimestamp = (ts?: string): string => {
 
 export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
-  const eventsPerPage = 10;
+  const [visibleCount, setVisibleCount] = useState(15);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  const EVENTS_PER_LOAD = 10;
 
   // Valid event categories - filter out everything else
   const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success'];
@@ -86,11 +90,38 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     !event.kind || VALID_EVENT_KINDS.includes(event.kind.toLowerCase())
   );
 
-  // Calculate pagination
-  const totalPages = Math.ceil(filteredEvents.length / eventsPerPage);
-  const startIndex = (currentPage - 1) * eventsPerPage;
-  const endIndex = startIndex + eventsPerPage;
-  const currentEvents = filteredEvents.slice(startIndex, endIndex);
+  // Get currently visible events (lazy loaded)
+  const visibleEvents = filteredEvents.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredEvents.length;
+
+  // Load more events callback
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    // Small delay for smooth UX
+    setTimeout(() => {
+      setVisibleCount(prev => Math.min(prev + EVENTS_PER_LOAD, filteredEvents.length));
+      setIsLoadingMore(false);
+    }, 150);
+  }, [isLoadingMore, hasMore, filteredEvents.length]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, loadMore]);
 
   // Helper function to format JSON for display with NO truncation
   // Function to fetch full payload lazily from dedicated endpoint
@@ -233,8 +264,31 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       
       // Handle bundled events with multiple payloads
       if (payload.isBundle && payload.payloads) {
+        // Extract module names from all payloads
+        const moduleNames = new Set<string>()
+        payload.payloads.forEach((item: any) => {
+          const p = item.payload
+          if (p?.modules && Array.isArray(p.modules)) {
+            p.modules.forEach((mod: string) => moduleNames.add(mod))
+          } else if (p?.modules_processed && Array.isArray(p.modules_processed)) {
+            p.modules_processed.forEach((mod: string) => moduleNames.add(mod))
+          } else if (p?.moduleData && typeof p.moduleData === 'object') {
+            Object.keys(p.moduleData).forEach((mod: string) => moduleNames.add(mod))
+          }
+          // Detect Installs module by its characteristic keys
+          if (p?.full_installs_data || p?.module_status || (p?.session_id && (p?.success_count !== undefined || p?.error_count !== undefined))) {
+            moduleNames.add('installs')
+          }
+        })
+        
         let result = `Bundle Summary:\n`
         result += `- Event Count: ${payload.count}\n`
+        if (moduleNames.size > 0) {
+          const capitalizedModules = Array.from(moduleNames).map(mod => 
+            mod.charAt(0).toUpperCase() + mod.slice(1)
+          ).sort()
+          result += `- Modules: ${capitalizedModules.join(', ')}\n`
+        }
         result += `- Message: ${payload.message}\n\n`
         result += `Individual Event Payloads:\n`
         result += `${'='.repeat(50)}\n\n`
@@ -245,9 +299,35 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           if (item.error) {
             result += `Error: ${item.error}\n`
           } else {
-            result += typeof item.payload === 'string' 
-              ? item.payload 
-              : JSON.stringify(item.payload, null, 2)
+            const payloadData = item.payload
+            // Check if we have actual module data
+            if (payloadData?.moduleData) {
+              // Show metadata summary
+              if (payloadData.modules) {
+                result += `Module(s): ${Array.isArray(payloadData.modules) ? payloadData.modules.join(', ') : payloadData.modules}\n`
+              }
+              if (payloadData.collectionType) {
+                result += `Collection Type: ${payloadData.collectionType}\n`
+              }
+              result += `\n--- Module Data ---\n`
+              result += JSON.stringify(payloadData.moduleData, null, 2)
+            } else if (payloadData?.full_installs_data || payloadData?.module_status) {
+              // This is an Installs module event
+              result += `Module(s): Installs\n`
+              if (payloadData.run_type) {
+                result += `Run Type: ${payloadData.run_type}\n`
+              }
+              if (payloadData.session_id) {
+                result += `Session ID: ${payloadData.session_id}\n`
+              }
+              result += `\n--- Installs Data ---\n`
+              result += JSON.stringify(payloadData, null, 2)
+            } else {
+              // Fallback to raw payload display
+              result += typeof payloadData === 'string' 
+                ? payloadData 
+                : JSON.stringify(payloadData, null, 2)
+            }
           }
           result += `\n\n`
         })
@@ -255,6 +335,21 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         return result
       }
       
+      // For single events with module data
+      if (payload.moduleData) {
+        let result = ``
+        if (payload.modules) {
+          result += `Module(s): ${Array.isArray(payload.modules) ? payload.modules.join(', ') : payload.modules}\n`
+        }
+        if (payload.collectionType) {
+          result += `Collection Type: ${payload.collectionType}\n`
+        }
+        result += `\n--- Module Data ---\n`
+        result += JSON.stringify(payload.moduleData, null, 2)
+        return result
+      }
+      
+      // Plain JSON for anything else
       return JSON.stringify(payload, null, 2)
     } catch (_error) {
       console.error('[DEVICE EVENTS SIMPLE] Failed to format payload for display:', _error)
@@ -417,47 +512,41 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         </div>
       ) : (
         <>
-          {/* Pagination Controls - Top */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredEvents.length)} of {filteredEvents.length} events
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Event count indicator */}
+          <div className="flex items-center justify-between text-sm text-gray-500 dark:text-gray-400 px-1">
+            <span>Showing {visibleEvents.length} of {filteredEvents.length} events</span>
+            {hasMore && <span className="text-xs">Scroll for more</span>}
+          </div>
 
-          {currentEvents.map(ev => (
+          {visibleEvents.map(ev => {
+            // Get individual event IDs for bundles
+            const bundledEventIds = ev.isBundle && ev.raw && typeof ev.raw === 'object' && 'bundledEvents' in ev.raw
+              ? (ev.raw as { bundledEvents?: string[] }).bundledEvents || []
+              : [];
+            
+            return (
             <article key={ev.id} className="rounded-lg bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 p-4 w-full max-w-full overflow-hidden min-w-0">
               <header className="flex justify-between items-center gap-4 min-w-0">
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
                   {/* Event Type Pill */}
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} flex-shrink-0`}>
                     {normalizeEventKind(ev.kind || '')}
                   </span>
                   
-                  {/* Event ID Badge */}
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
-                    #{ev.id}
-                  </span>
+                  {/* Event ID Badges - Show individual IDs for bundles */}
+                  {ev.isBundle && bundledEventIds.length > 0 ? (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {bundledEventIds.map((eventId: string) => (
+                        <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
+                          #{eventId}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
+                      #{ev.id}
+                    </span>
+                  )}
                   
                   {/* Event Message - Hidden on mobile (sm and below) */}
                   <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
@@ -533,32 +622,24 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                 </div>
               )}
             </article>
-          ))}
+          )})}
 
-          {/* Pagination Controls - Bottom */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3">
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                  disabled={currentPage === 1}
-                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
-                  disabled={currentPage === totalPages}
-                  className="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
+          {/* Infinite scroll trigger */}
+          <div ref={loadMoreRef} className="py-4">
+            {isLoadingMore && (
+              <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+                <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span className="text-sm">Loading more events...</span>
               </div>
-            </div>
-          )}
+            )}
+            {!hasMore && filteredEvents.length > 15 && (
+              <div className="text-center text-sm text-gray-400 dark:text-gray-500">
+                All {filteredEvents.length} events loaded
+              </div>
+            )}
+          </div>
         </>
       )}
     </div>

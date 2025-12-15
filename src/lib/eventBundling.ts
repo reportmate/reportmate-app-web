@@ -200,6 +200,10 @@ function createBundleMessage(events: FleetEvent[], kinds: string[]): string {
     } else if (Array.isArray(payloadObj?.metadata?.enabledModules)) {
       payloadObj.metadata.enabledModules.forEach((mod: string) => moduleNames.add(mod))
     }
+    // Detect Installs module by its characteristic payload keys
+    if (payloadObj?.full_installs_data || payloadObj?.module_status || payloadObj?.session_id) {
+      moduleNames.add('installs')
+    }
   })
   
   // If we found module names, use them even for mixed events
@@ -376,8 +380,16 @@ export function formatPayloadPreview(payload: Record<string, unknown> | string |
     const keys = Object.keys(payloadObj)
     if (keys.length === 0) return 'Empty event data'
     
-    // **PRIORITY 8: Handle Cimian/installs events (session_id, run_type patterns)**
+    // **PRIORITY 8: Handle Cimian/installs events (full_installs_data, session_id, run_type patterns)**
+    if (keys.includes('full_installs_data') || keys.includes('module_status')) {
+      // This is an Installs module event
+      return 'Installs data reported'
+    }
     if (keys.includes('session_id') || keys.includes('run_type') || keys.includes('runType')) {
+      // Also check if this looks like an installs event with session data
+      if (keys.includes('success_count') || keys.includes('error_count') || keys.includes('warning_count')) {
+        return 'Installs data reported'
+      }
       const runType = payloadObj.run_type || payloadObj.runType
       if (runType) {
         const runTypeStr = String(runType).charAt(0).toUpperCase() + String(runType).slice(1).toLowerCase()
