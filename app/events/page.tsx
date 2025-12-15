@@ -273,8 +273,31 @@ function EventsPageContent() {
       
       // Handle bundled events with multiple payloads
       if (payload.isBundle && payload.payloads) {
+        // Extract module names from all payloads
+        const moduleNames = new Set<string>()
+        payload.payloads.forEach((item: any) => {
+          const p = item.payload
+          if (p?.modules && Array.isArray(p.modules)) {
+            p.modules.forEach((mod: string) => moduleNames.add(mod))
+          } else if (p?.modules_processed && Array.isArray(p.modules_processed)) {
+            p.modules_processed.forEach((mod: string) => moduleNames.add(mod))
+          } else if (p?.moduleData && typeof p.moduleData === 'object') {
+            Object.keys(p.moduleData).forEach((mod: string) => moduleNames.add(mod))
+          }
+          // Detect Installs module by its characteristic keys
+          if (p?.full_installs_data || p?.module_status || (p?.session_id && (p?.success_count !== undefined || p?.error_count !== undefined))) {
+            moduleNames.add('installs')
+          }
+        })
+        
         let result = `Bundle Summary:\n`
         result += `- Event Count: ${payload.count}\n`
+        if (moduleNames.size > 0) {
+          const capitalizedModules = Array.from(moduleNames).map(mod => 
+            mod.charAt(0).toUpperCase() + mod.slice(1)
+          ).sort()
+          result += `- Modules: ${capitalizedModules.join(', ')}\n`
+        }
         result += `- Event Types: ${(payload.bundledKinds || []).join(', ')}\n`
         result += `- Message: ${payload.message}\n\n`
         result += `Individual Event Payloads:\n`
@@ -286,9 +309,21 @@ function EventsPageContent() {
           if (item.error) {
             result += `Error: ${item.error}\n`
           } else {
-            result += typeof item.payload === 'string' 
-              ? item.payload 
-              : JSON.stringify(item.payload, null, 2)
+            const payloadData = item.payload
+            // Check if this is an Installs module event
+            if (payloadData?.full_installs_data || payloadData?.module_status) {
+              result += `Module(s): Installs\n`
+              if (payloadData.run_type) {
+                result += `Run Type: ${payloadData.run_type}\n`
+              }
+              if (payloadData.session_id) {
+                result += `Session ID: ${payloadData.session_id}\n`
+              }
+              result += `\n--- Installs Data ---\n`
+            }
+            result += typeof payloadData === 'string' 
+              ? payloadData 
+              : JSON.stringify(payloadData, null, 2)
           }
           result += `\n\n`
         })
