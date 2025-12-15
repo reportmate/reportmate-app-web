@@ -42,50 +42,47 @@ export const ModuleLoadingState: React.FC<ModuleLoadingStateProps> = ({
   
   if (state === 'loading') {
     return (
-      <div className="space-y-6">
-        {/* Header */}
+      <div className="space-y-6 animate-pulse">
+        {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <div className={`w-12 h-12 ${colors.bg} rounded-lg flex items-center justify-center`}>
-              {icon ? (
-                <svg className={`w-6 h-6 ${colors.text}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={icon} />
-                </svg>
-              ) : (
-                <div className={`w-6 h-6 border-2 ${colors.text} border-t-transparent rounded-full animate-spin`}></div>
-              )}
+            <div className={`w-12 h-12 ${colors.bg} rounded-lg`}></div>
+            <div className="space-y-2">
+              <div className="h-7 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div className="h-4 w-56 bg-gray-200 dark:bg-gray-700 rounded"></div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                {moduleName.charAt(0).toUpperCase() + moduleName.slice(1)}
-              </h1>
-              <p className="text-base text-gray-600 dark:text-gray-400">Loading module data...</p>
-            </div>
+          </div>
+          <div className="text-right space-y-2">
+            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
           </div>
         </div>
         
-        {/* Loading state */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-12">
-          <div className="max-w-md mx-auto text-center space-y-6">
-            {/* Animated loading icon */}
-            <div className="w-16 h-16 mx-auto">
-              <div className={`w-full h-full border-4 ${colors.border} border-t-transparent rounded-full animate-spin`}></div>
+        {/* Stats Cards Skeleton */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map(i => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+              <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
             </div>
-            
-            {/* Loading message */}
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                Loading {moduleName} data...
-              </h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Please wait while we fetch the module information
-              </p>
-            </div>
-            
-            {/* Progress animation */}
-            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1 overflow-hidden">
-              <div className={`h-full ${colors.bg} animate-pulse`} style={{ width: '60%' }}></div>
-            </div>
+          ))}
+        </div>
+
+        {/* Table Skeleton */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+            <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+          <div className="p-6 space-y-4">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="flex items-center gap-4">
+                <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
+              </div>
+            ))}
           </div>
         </div>
       </div>

@@ -1046,14 +1046,7 @@ export default function DeviceDetailPage() {
 
         {/* Profiles Tab - Progressive loading */}
         <div className={activeTab === 'profiles' ? 'block' : 'hidden'}>
-          {isModuleLoading('profiles') ? (
-            <ModuleLoadingState 
-              moduleName="profiles" 
-              state="loading" 
-              icon="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              accentColor="indigo"
-            />
-          ) : isModuleError('profiles') ? (
+          {isModuleError('profiles') ? (
             <ModuleLoadingState 
               moduleName="profiles" 
               state="error" 
@@ -1076,14 +1069,7 @@ export default function DeviceDetailPage() {
 
         {/* Applications Tab - Progressive loading */}
         <div className={activeTab === 'applications' ? 'block' : 'hidden'}>
-          {isModuleLoading('applications') ? (
-            <ModuleLoadingState 
-              moduleName="applications" 
-              state="loading" 
-              icon="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"
-              accentColor="blue"
-            />
-          ) : isModuleError('applications') ? (
+          {isModuleError('applications') ? (
             <ModuleLoadingState 
               moduleName="applications" 
               state="error" 
@@ -1111,14 +1097,7 @@ export default function DeviceDetailPage() {
 
         {/* System Tab - Progressive loading */}
         <div className={activeTab === 'system' ? 'block' : 'hidden'}>
-          {isModuleLoading('system') ? (
-            <ModuleLoadingState 
-              moduleName="system" 
-              state="loading" 
-              icon="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-              accentColor="purple"
-            />
-          ) : isModuleError('system') ? (
+          {isModuleError('system') ? (
             <ModuleLoadingState 
               moduleName="system" 
               state="error" 
@@ -1146,14 +1125,7 @@ export default function DeviceDetailPage() {
 
         {/* Network Tab - Progressive loading */}
         <div className={activeTab === 'network' ? 'block' : 'hidden'}>
-          {isModuleLoading('network') ? (
-            <ModuleLoadingState 
-              moduleName="network" 
-              state="loading" 
-              icon="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"
-              accentColor="teal"
-            />
-          ) : isModuleError('network') ? (
+          {isModuleError('network') ? (
             <ModuleLoadingState 
               moduleName="network" 
               state="error" 
@@ -1176,14 +1148,7 @@ export default function DeviceDetailPage() {
 
         {/* Security Tab - Progressive loading */}
         <div className={activeTab === 'security' ? 'block' : 'hidden'}>
-          {isModuleLoading('security') ? (
-            <ModuleLoadingState 
-              moduleName="security" 
-              state="loading" 
-              icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              accentColor="red"
-            />
-          ) : isModuleError('security') ? (
+          {isModuleError('security') ? (
             <ModuleLoadingState 
               moduleName="security" 
               state="error" 
@@ -1211,14 +1176,7 @@ export default function DeviceDetailPage() {
 
         {/* Events Tab - Progressive loading */}
         <div className={activeTab === 'events' ? 'block' : 'hidden'}>
-          {isModuleLoading('events') ? (
-            <ModuleLoadingState 
-              moduleName="events" 
-              state="loading" 
-              icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-              accentColor="monochrome"
-            />
-          ) : isModuleError('events') ? (
+          {isModuleError('events') ? (
             <ModuleLoadingState 
               moduleName="events" 
               state="error" 

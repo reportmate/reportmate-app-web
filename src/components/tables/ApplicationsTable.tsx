@@ -5,6 +5,17 @@ import { formatRelativeTime } from '../../lib/time';
 const PAGE_SIZE = 100;
 const INITIAL_VISIBLE = 50;
 
+// Usage data for an application
+interface ApplicationUsage {
+  launchCount: number;
+  totalSeconds: number;
+  lastUsed?: string;
+  firstSeen?: string;
+  users?: string[];
+  uniqueUserCount?: number;
+  averageSessionSeconds?: number;
+}
+
 interface ApplicationInfo {
   id: string;
   name: string;
@@ -27,6 +38,7 @@ interface ApplicationInfo {
   description?: string;
   status?: string;
   startType?: string;
+  usage?: ApplicationUsage;
 }
 
 interface ApplicationsData {
@@ -36,6 +48,16 @@ interface ApplicationsData {
   runningApps?: number;
   stoppedApps?: number;
   installedApps: ApplicationInfo[];
+}
+
+// Helper to format duration
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return '-';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.round((seconds % 3600) / 60);
+  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
 }
 
 interface ApplicationsTableProps {
@@ -124,18 +146,36 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
   }, [filteredApps, visibleCount]);
 
   const hasMore = visibleCount < filteredApps.length;
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-  // Load more when scrolling near bottom
-  const handleScroll = useCallback(() => {
-    const container = scrollContainerRef.current;
-    if (!container || !hasMore) return;
-
-    const { scrollTop, scrollHeight, clientHeight } = container;
-    // Load more when within 200px of bottom
-    if (scrollHeight - scrollTop - clientHeight < 200) {
+  // Load more callback for infinite scroll
+  const loadMore = useCallback(() => {
+    if (isLoadingMore || !hasMore) return;
+    setIsLoadingMore(true);
+    // Small delay for smooth UX
+    setTimeout(() => {
       setVisibleCount(prev => Math.min(prev + PAGE_SIZE, filteredApps.length));
+      setIsLoadingMore(false);
+    }, 100);
+  }, [isLoadingMore, hasMore, filteredApps.length]);
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !isLoadingMore) {
+          loadMore();
+        }
+      },
+      { threshold: 0.1, rootMargin: '100px' }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
     }
-  }, [hasMore, filteredApps.length]);
+
+    return () => observer.disconnect();
+  }, [hasMore, isLoadingMore, loadMore]);
 
   // Reset visible count when search changes
   useEffect(() => {
@@ -205,19 +245,10 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
           </div>
         </div>
         
-        {/* Show filtered count */}
-        {(searchTerm || filteredApps.length > 0) && (
-          <div className="px-6 py-2 bg-gray-50 dark:bg-gray-900 text-sm text-gray-600 dark:text-gray-400">
-            Showing {visibleApps.length} of {filteredApps.length} applications
-            {searchTerm && ` (filtered from ${data.totalApps})`}
-          </div>
-        )}
-        
-        {/* Table with overlay scrolling */}
+        {/* Table with overlay scrolling - infinite scroll */}
         <div 
           ref={scrollContainerRef}
-          className="h-[600px] overflow-auto"
-          onScroll={handleScroll}
+          className="max-h-[calc(100vh-300px)] min-h-[400px] overflow-auto"
         >
           <table className="w-full min-w-full">
             <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
@@ -225,19 +256,24 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Publisher</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Used</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Time</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Launches</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Users</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {visibleApps.length === 0 && searchTerm ? (
                 <tr>
-                  <td colSpan={4} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No applications found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
               ) : (
                 visibleApps.map((app, index) => {
                   const uniqueKey = `${app.name || 'unknown'}-${app.version || 'unknown'}-${app.publisher || 'unknown'}-${index}`;
+                  const hasUsage = app.usage && app.usage.launchCount > 0;
+                  
                   return (
                   <tr key={uniqueKey} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                     <td className="px-6 py-4">
@@ -268,18 +304,51 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
                       </div>
                       {app.signed_by && (
                         <div className="text-xs text-green-600 dark:text-green-400">
-                          ✓ Signed
+                          Signed
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {app.installDate ? formatRelativeTime(app.installDate) : 'Unknown'}
+                        {hasUsage && app.usage?.lastUsed 
+                          ? formatRelativeTime(app.usage.lastUsed) 
+                          : <span className="text-gray-400">-</span>}
                       </div>
-                      {app.size && (
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {hasUsage 
+                          ? formatDuration(app.usage!.totalSeconds)
+                          : <span className="text-gray-400">-</span>}
+                      </div>
+                      {hasUsage && app.usage?.averageSessionSeconds && app.usage.averageSessionSeconds > 0 && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {app.size}
+                          avg: {formatDuration(app.usage.averageSessionSeconds)}
                         </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {hasUsage 
+                          ? app.usage!.launchCount.toLocaleString()
+                          : <span className="text-gray-400">-</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {hasUsage && app.usage?.uniqueUserCount ? (
+                        <div>
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {app.usage.uniqueUserCount} user{app.usage.uniqueUserCount > 1 ? 's' : ''}
+                          </div>
+                          {app.usage.users && app.usage.users.length > 0 && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate max-w-[150px]" title={app.usage.users.join(', ')}>
+                              {app.usage.users.slice(0, 2).map(u => u.split('\\').pop()).join(', ')}
+                              {app.usage.users.length > 2 && ` +${app.usage.users.length - 2}`}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
                   </tr>
@@ -288,10 +357,17 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               )}
             </tbody>
           </table>
-          {/* Load more indicator */}
-          {hasMore && (
-            <div ref={loadMoreRef} className="px-6 py-4 text-center text-sm text-gray-500 dark:text-gray-400">
-              Scroll for more... ({filteredApps.length - visibleApps.length} remaining)
+          {/* Load more sentinel for IntersectionObserver */}
+          <div ref={loadMoreRef} className="h-4" />
+          {isLoadingMore && (
+            <div className="px-6 py-3 text-center">
+              <div className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Loading more...
+              </div>
             </div>
           )}
         </div>

@@ -297,53 +297,48 @@ function NetworkPageContent() {
               </div>
             </div>
 
-            <div className="overflow-y-auto overflow-x-hidden h-[calc(100vh-280px)]">
+            <div className="overflow-y-auto h-[calc(100vh-280px)]">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
-                    <th className="px-4 py-3 w-52"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3 w-56"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3 w-36"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-4 py-3 w-48"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-48"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-32"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+                    <th className="px-6 py-3 w-40"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
                     <th className="px-6 py-3 w-44"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3 w-40"><div className="h-4 w-18 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-                    <th className="px-6 py-3"><div className="h-4 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {[...Array(8)].map((_, i) => (
                     <tr key={i}>
-                      <td className="px-4 py-3 w-52">
+                      <td className="px-4 py-3 w-48">
                         <div className="flex flex-col justify-center h-12 space-y-1">
                           <div className="h-4 w-36 bg-gray-300 dark:bg-gray-600 rounded"></div>
                           <div className="h-3 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 w-56">
+                      <td className="px-6 py-3 w-48">
                         <div className="flex items-center gap-2 h-12">
                           <div className="h-4 w-40 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
                           <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 w-36">
+                      <td className="px-6 py-3 w-32">
                         <div className="flex items-center gap-2 h-12">
                           <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
                           <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 w-44">
+                      <td className="px-6 py-3 w-40">
                         <div className="flex items-center gap-2 h-12">
                           <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
                           <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 w-40">
-                        <div className="flex items-center h-12">
+                      <td className="px-6 py-3 w-44">
+                        <div className="flex flex-col justify-center h-12 space-y-1">
                           <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3">
-                        <div className="flex items-center h-12">
-                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-3 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
                         </div>
                       </td>
                     </tr>
@@ -450,7 +445,7 @@ function NetworkPageContent() {
                     onClick={() => setConnectionFilter(connectionFilter === 'wireless' ? 'all' : 'wireless')}
                     className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
                       connectionFilter === 'wireless'
-                        ? 'bg-blue-100 border-blue-300 text-blue-800 dark:bg-blue-900 dark:border-blue-700 dark:text-blue-200'
+                        ? 'bg-teal-100 border-teal-300 text-teal-800 dark:bg-teal-900 dark:border-teal-700 dark:text-teal-200'
                         : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
                     }`}
                   >
@@ -515,12 +510,12 @@ function NetworkPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
             
@@ -623,13 +618,13 @@ function NetworkPageContent() {
             </div>
           </div>
 
-          <div className="overflow-y-auto overflow-x-hidden h-[calc(100vh-280px)]">
+          <div className="overflow-y-auto h-[calc(100vh-280px)]">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th 
                     onClick={() => handleSort('device')}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-52 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-48 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Device
@@ -640,10 +635,10 @@ function NetworkPageContent() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56 bg-gray-50 dark:bg-gray-700">DNS Address</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-48 bg-gray-50 dark:bg-gray-700">DNS Address</th>
                   <th 
                     onClick={() => handleSort('ip')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-32 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       IP Address
@@ -656,7 +651,7 @@ function NetworkPageContent() {
                   </th>
                   <th 
                     onClick={() => handleSort('mac')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       MAC Address
@@ -669,10 +664,10 @@ function NetworkPageContent() {
                   </th>
                   <th 
                     onClick={() => handleSort('network')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
-                      Network
+                      Connection
                       {sortColumn === 'network' && (
                         <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -680,13 +675,12 @@ function NetworkPageContent() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-700">Protocol/Band</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredNetworkDevices.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
                       </svg>
@@ -700,18 +694,35 @@ function NetworkPageContent() {
                     
                     return (
                       <tr key={networkDevice.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-4 py-3 w-52">
+                        <td className="px-4 py-3 w-48">
                           <div className="flex flex-col justify-center h-12">
                             <Link
                               href={`/device/${encodeURIComponent(networkDevice.deviceId)}#network`}
-                              className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm leading-tight truncate max-w-48"
+                              className="font-medium text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 text-sm leading-tight truncate max-w-44"
                             >
                               {networkDevice.deviceName || 'Unknown Device'}
                             </Link>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight truncate max-w-48">
-                              {networkDevice.serialNumber}
+                            <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight">
+                              <span className="truncate max-w-32">{networkDevice.serialNumber}</span>
+                              <button
+                                onClick={() => copyToClipboard(networkDevice.serialNumber)}
+                                className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                title="Copy serial number"
+                              >
+                                <Copy size={10} />
+                              </button>
                               {networkDevice.assetTag && (
-                                <span> | {networkDevice.assetTag}</span>
+                                <>
+                                  <span>|</span>
+                                  <span className="truncate max-w-20">{networkDevice.assetTag}</span>
+                                  <button
+                                    onClick={() => copyToClipboard(networkDevice.assetTag!)}
+                                    className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                    title="Copy asset tag"
+                                  >
+                                    <Copy size={10} />
+                                  </button>
+                                </>
                               )}
                             </div>
                           </div>
@@ -765,24 +776,31 @@ function NetworkPageContent() {
                           </div>
                         </td>
                         <td className="px-6 py-3">
-                          <div className="flex items-center h-12">
-                            <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                              {(networkDevice.networkInfo.connectionType && 
+                          <div className="flex flex-col justify-center h-12">
+                            {(() => {
+                              // Detect connection types
+                              const hasWired = networkDevice.networkInfo.connectionType && 
                                 (networkDevice.networkInfo.connectionType.toLowerCase().includes('ethernet') || 
-                                 networkDevice.networkInfo.connectionType.toLowerCase().includes('wired'))) 
-                                ? '' 
-                                : (networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName || 'N/A')}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-3">
-                          <div className="flex items-center h-12">
-                            <span className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
-                              {(() => {
-                                // Try to get protocol/band from various sources
-                                let protocolBand = null;
-                                
-                                // First try direct fields
+                                 networkDevice.networkInfo.connectionType.toLowerCase().includes('wired'));
+                              
+                              const hasWireless = networkDevice.networkInfo.ssid || 
+                                networkDevice.networkInfo.networkName ||
+                                (networkDevice.networkInfo.connectionType && 
+                                 networkDevice.networkInfo.connectionType.toLowerCase().includes('wireless'));
+                              
+                              // Build connection display
+                              let connections = [];
+                              if (hasWired) connections.push('Wired');
+                              if (hasWireless) {
+                                const ssid = networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName;
+                                connections.push(ssid ? ssid : 'Wireless');
+                              }
+                              
+                              const connectionDisplay = connections.length > 0 ? connections.join(' + ') : 'N/A';
+                              
+                              // Get protocol/band for wireless
+                              let protocolBand = null;
+                              if (hasWireless) {
                                 if (networkDevice.networkInfo.protocol) {
                                   protocolBand = networkDevice.networkInfo.protocol;
                                 } else if (networkDevice.networkInfo.band) {
@@ -793,12 +811,10 @@ function NetworkPageContent() {
                                   protocolBand = networkDevice.networkInfo.frequency;
                                 }
                                 
-                                // If not found, try to get from active interface
                                 if (!protocolBand && networkDevice.networkInfo.interfaces && Array.isArray(networkDevice.networkInfo.interfaces)) {
                                   const activeInterface = networkDevice.networkInfo.interfaces.find((iface: any) => 
                                     iface.isActive || iface.status === 'Active' || iface.status === 'Connected'
                                   );
-                                  
                                   if (activeInterface) {
                                     if (activeInterface.wirelessProtocol && activeInterface.wirelessBand) {
                                       protocolBand = `${activeInterface.wirelessProtocol} - ${activeInterface.wirelessBand}`;
@@ -810,15 +826,20 @@ function NetworkPageContent() {
                                   }
                                 }
                                 
-                                // Clean up the display format
                                 if (protocolBand) {
-                                  // Replace patterns like " (2.4 GHz (6))" with " - 2.4 GHz (6)"
                                   protocolBand = protocolBand.replace(/\s+\(([^)]+)\)$/, ' - $1');
                                 }
-                                
-                                return protocolBand && protocolBand !== 'N/A' ? protocolBand : '';
-                              })()}
-                            </span>
+                              }
+                              
+                              return (
+                                <>
+                                  <span className="text-sm text-gray-900 dark:text-white">{connectionDisplay}</span>
+                                  {protocolBand && protocolBand !== 'N/A' && (
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">{protocolBand}</span>
+                                  )}
+                                </>
+                              );
+                            })()}
                           </div>
                         </td>
                       </tr>
