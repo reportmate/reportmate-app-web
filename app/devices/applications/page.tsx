@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for applications page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense, useMemo } from "react"
+import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
@@ -37,6 +37,70 @@ interface ApplicationItem {
   raw?: any
 }
 
+// Utilization-specific interfaces
+interface UtilizationApp {
+  name: string
+  totalSeconds: number
+  totalHours: number
+  launchCount: number
+  deviceCount: number
+  userCount: number
+  lastUsed: string | null
+  firstUsed: string | null
+  devices: string[]
+  users: string[]
+  isSingleUser: boolean
+}
+
+interface TopUser {
+  username: string
+  totalSeconds: number
+  totalHours: number
+  launchCount: number
+  appsUsed: number
+  devicesUsed: number
+}
+
+interface SingleUserApp {
+  name: string
+  totalHours: number
+}
+
+interface UnusedApp {
+  name: string
+  deviceCount: number
+  daysSinceUsed: number
+}
+
+interface UtilizationSummary {
+  totalAppsTracked: number
+  totalUsageHours: number
+  totalLaunches: number
+  uniqueUsers: number
+  uniqueDevices: number
+  singleUserAppCount: number
+  unusedAppCount: number
+}
+
+interface UtilizationData {
+  status: string
+  applications: UtilizationApp[]
+  topUsers: TopUser[]
+  singleUserApps: SingleUserApp[]
+  unusedApps: UnusedApp[]
+  summary: UtilizationSummary
+  filters: {
+    days: number
+    applicationNames: string[]
+    usages: string[]
+    catalogs: string[]
+    locations: string[]
+    minHours: number | null
+    minLaunches: number | null
+  }
+  lastUpdated: string
+}
+
 interface FilterOptions {
   applicationNames: string[]
   usages: string[]
@@ -51,6 +115,18 @@ interface VersionAnalysis {
   [appName: string]: {
     [version: string]: number
   }
+}
+
+// Format duration from seconds to human readable
+function formatDuration(totalSeconds: number): string {
+  if (!totalSeconds || totalSeconds <= 0) return '0m'
+  
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  
+  if (hours === 0) return `${minutes}m`
+  if (minutes === 0) return `${hours}h`
+  return `${hours}h ${minutes}m`
 }
 
 // Ultra-robust application name normalization based on real-world data patterns
@@ -302,8 +378,15 @@ function ApplicationsPageContent() {
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [filtersExpanded, setFiltersExpanded] = useState(true)
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [sortColumn, setSortColumn] = useState<'device' | 'application' | 'version' | 'vendor' | 'usage' | 'catalog' | 'location'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Utilization report state (unified report - includes both inventory and usage data)
+  const [utilizationData, setUtilizationData] = useState<UtilizationData | null>(null)
+  const [utilizationDays, setUtilizationDays] = useState<number>(30)
+  const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
+  const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -319,6 +402,7 @@ function ApplicationsPageContent() {
   const [lastAppliedFilters, setLastAppliedFilters] = useState<string>('')
   
   const searchParams = useSearchParams()
+
 
   // Initialize search query and filters from URL parameters
   useEffect(() => {
@@ -656,6 +740,218 @@ function ApplicationsPageContent() {
     }
   }
 
+  // Load utilization report data (also loads inventory for version analysis)
+  // Optional daysOverride parameter for when period selector changes before state updates
+  const handleLoadUtilization = async (daysOverride?: number | React.MouseEvent) => {
+    // Handle case where MouseEvent is passed from button onClick
+    const effectiveDays = typeof daysOverride === 'number' ? daysOverride : utilizationDays
+    try {
+      setLoading(true)
+      setError(null)
+      setFiltersExpanded(false)
+      
+      // Clear search field when generating report
+      setSearchQuery('')
+      
+      // Start simple progress indicator (0 to 100)
+      setLoadingProgress({ current: 0, total: 100 })
+      
+      console.log('[APPLICATIONS PAGE] Loading utilization and inventory data...')
+      
+      // Build params for both endpoints
+      const selectedAppsParam = selectedApplications.length > 0 
+        ? selectedApplications.join(',') 
+        : ''
+      
+      // Load inventory data first (for version analysis) - 0-30%
+      if (selectedApplications.length > 0) {
+        setLoadingMessage('Loading inventory data for version analysis...')
+        setLoadingProgress({ current: 10, total: 100 })
+        const inventoryParams = new URLSearchParams()
+        inventoryParams.set('applicationNames', selectedAppsParam)
+        
+        const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
+        console.log('[APPLICATIONS PAGE] Fetching inventory:', inventoryUrl)
+        
+        try {
+          const inventoryResponse = await fetch(inventoryUrl, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          })
+          
+          setLoadingProgress({ current: 25, total: 100 })
+          
+          if (inventoryResponse.ok) {
+            const inventoryData = await inventoryResponse.json()
+            if (Array.isArray(inventoryData)) {
+              setApplications(inventoryData)
+              console.log(`✅ Loaded ${inventoryData.length} inventory items for version analysis`)
+            }
+          }
+        } catch (invError) {
+          console.warn('Failed to load inventory data:', invError)
+          // Continue even if inventory fails - utilization is more important
+        }
+      }
+      
+      setLoadingProgress({ current: 30, total: 100 })
+      setLoadingMessage('Loading application usage data...')
+      console.log('Selections:', {
+        days: effectiveDays,
+        applications: selectedApplications.length,
+        usages: selectedUsages.length,
+        catalogs: selectedCatalogs.length
+      })
+      
+      // Build query params for utilization endpoint - 30-90%
+      const params = new URLSearchParams()
+      params.set('days', effectiveDays.toString())
+      
+      if (selectedApplications.length > 0) {
+        params.set('applicationNames', selectedApplications.join(','))
+      }
+      if (selectedUsages.length > 0) {
+        params.set('usages', selectedUsages.join(','))
+      }
+      if (selectedCatalogs.length > 0) {
+        params.set('catalogs', selectedCatalogs.join(','))
+      }
+      if (selectedLocations.length > 0) {
+        params.set('locations', selectedLocations.join(','))
+      }
+      
+      const url = `/api/devices/applications/usage?${params.toString()}`
+      console.log('[APPLICATIONS PAGE] Fetching utilization:', url)
+      
+      setLoadingProgress({ current: 40, total: 100 })
+      
+      const response = await fetch(url, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      })
+      
+      setLoadingProgress({ current: 80, total: 100 })
+      
+      if (!response.ok) {
+        throw new Error(`Failed to load utilization data: ${response.status}`)
+      }
+      
+      const data: UtilizationData = await response.json()
+      
+      setLoadingProgress({ current: 85, total: 100 })
+      
+      if (data.status === 'unavailable') {
+        setError(data.message || 'Usage tracking not yet deployed')
+        setUtilizationData(null)
+      } else {
+        setUtilizationData(data)
+        
+        // Load inventory data for version analysis AFTER getting utilization data
+        // Get unique app names from the report to fetch their version info
+        if (data.applications && data.applications.length > 0) {
+          setLoadingMessage('Loading version data...')
+          setLoadingProgress({ current: 90, total: 100 })
+          
+          // Get all app names from the utilization report
+          const appNamesForInventory = data.applications.map(app => app.name).slice(0, 100) // Limit to 100 apps
+          
+          try {
+            const inventoryParams = new URLSearchParams()
+            inventoryParams.set('applicationNames', appNamesForInventory.join(','))
+            
+            const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
+            console.log('[APPLICATIONS PAGE] Fetching inventory for version analysis:', appNamesForInventory.length, 'apps')
+            
+            const inventoryResponse = await fetch(inventoryUrl, {
+              cache: 'no-store',
+              headers: { 'Cache-Control': 'no-cache' }
+            })
+            
+            if (inventoryResponse.ok) {
+              const inventoryData = await inventoryResponse.json()
+              if (Array.isArray(inventoryData)) {
+                setApplications(inventoryData)
+                console.log(`✅ Loaded ${inventoryData.length} inventory items for version analysis`)
+              }
+            }
+          } catch (invError) {
+            console.warn('Failed to load inventory data for versions:', invError)
+            // Non-critical - continue without version data
+          }
+        }
+        
+        setLoadingProgress({ current: 100, total: 100 })
+        setLoadingMessage('Complete!')
+        console.log(`✅ Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked`)
+      }
+      
+      // Save current filter state
+      const currentFilters = JSON.stringify({
+        days: effectiveDays,
+        applications: selectedApplications,
+        usages: selectedUsages,
+        catalogs: selectedCatalogs,
+        locations: selectedLocations
+      })
+      setLastAppliedFilters(currentFilters)
+      
+    } catch (error) {
+      console.error('❌ Failed to load utilization data:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+      // Reset progress after brief delay so completion shows
+      setTimeout(() => setLoadingProgress({ current: 0, total: 0 }), 500)
+    }
+  }
+
+  // Sort utilization applications
+  const sortedUtilizationApps = useMemo(() => {
+    if (!utilizationData?.applications) return []
+    
+    return [...utilizationData.applications].sort((a, b) => {
+      let compareResult = 0
+      
+      switch (utilizationSortColumn) {
+        case 'name':
+          compareResult = a.name.localeCompare(b.name)
+          break
+        case 'totalHours':
+          compareResult = (a.totalHours || 0) - (b.totalHours || 0)
+          break
+        case 'launchCount':
+          compareResult = (a.launchCount || 0) - (b.launchCount || 0)
+          break
+        case 'deviceCount':
+          compareResult = (a.deviceCount || 0) - (b.deviceCount || 0)
+          break
+        case 'userCount':
+          compareResult = (a.userCount || 0) - (b.userCount || 0)
+          break
+        case 'lastUsed':
+          const dateA = a.lastUsed ? new Date(a.lastUsed).getTime() : 0
+          const dateB = b.lastUsed ? new Date(b.lastUsed).getTime() : 0
+          compareResult = dateA - dateB
+          break
+      }
+      
+      return utilizationSortDirection === 'asc' ? compareResult : -compareResult
+    })
+  }, [utilizationData?.applications, utilizationSortColumn, utilizationSortDirection])
+
+  const handleUtilizationSort = (column: typeof utilizationSortColumn) => {
+    if (utilizationSortColumn === column) {
+      setUtilizationSortDirection(utilizationSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setUtilizationSortColumn(column)
+      setUtilizationSortDirection('desc')
+    }
+  }
+
   // Filter applications for display (client-side filtering for real-time updates)
   const filteredApplications = applications.filter(app => {
     // First filter: exclude junk applications
@@ -805,6 +1101,7 @@ function ApplicationsPageContent() {
 
   const resetReport = () => {
     setApplications([])
+    setUtilizationData(null)
     setSelectedApplications([])
     setSelectedUsages([])
     setSelectedCatalogs([])
@@ -815,6 +1112,7 @@ function ApplicationsPageContent() {
     setSearchQuery('')
     setError(null)
     setFiltersExpanded(true)
+    setLastAppliedFilters('')
   }
 
   // Filter applications dropdown based on search and sort by popularity
@@ -955,27 +1253,46 @@ function ApplicationsPageContent() {
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          
+
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Applications Report {filteredApplications.length > 0 && `(${filteredApplications.length})`}
-                {hasActiveFilters && applications.length > 0 && (
-                  <span className="text-sm font-normal text-gray-500 dark:text-gray-400 ml-2">
-                    (filtered)
-                  </span>
-                )}
+                Applications Report
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {applications.length === 0 
-                  ? 'Loading all applications data...'
-                  : `Showing ${filteredApplications.length} of ${applications.length} applications`
+                {utilizationData 
+                  ? `${utilizationData.summary.totalAppsTracked} apps tracked across ${utilizationData.summary.uniqueDevices} devices`
+                  : 'Generate report to see application inventory and usage analytics'
                 }
               </p>
             </div>
             
             <div className="flex items-center gap-4">
+              {/* Time Period Selector - Only show after report is generated */}
+              {utilizationData && (
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600 dark:text-gray-400">Period:</label>
+                  <select
+                    value={utilizationDays}
+                    onChange={(e) => {
+                      const newDays = parseInt(e.target.value)
+                      setUtilizationDays(newDays)
+                      // Auto-reload if report is already loaded - pass new days directly
+                      if (utilizationData) {
+                        handleLoadUtilization(newDays)
+                      }
+                    }}
+                    className="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                  >
+                    <option value={7}>Last 7 days</option>
+                    <option value={30}>Last 30 days</option>
+                    <option value={90}>Last 90 days</option>
+                    <option value={365}>Last year</option>
+                  </select>
+                </div>
+              )}
+              
               {/* Generate Report Button with Loading Spinner */}
               <div className="flex items-center gap-3">
                 {/* Loading Spinner - Left of Button */}
@@ -987,7 +1304,9 @@ function ApplicationsPageContent() {
                 )}
 
                 {/* Clear All Selections Button - Show when selections are active and NO report loaded */}
-                {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && !loading && applications.length === 0 && (
+                {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && 
+                 !loading && 
+                 !utilizationData && (
                   <button
                     onClick={clearAllFilters}
                     className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
@@ -999,27 +1318,28 @@ function ApplicationsPageContent() {
                 {/* Generate Report Button - Hide when loading */}
                 {!loading && (
                   <button
-                    onClick={handleLoadAll}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
+                    onClick={handleLoadUtilization}
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-blue-600 hover:bg-blue-700"
                   >
                     {(() => {
                       // Check if filters have changed since last generation
                       const currentFilters = JSON.stringify({
+                        days: utilizationDays,
                         applications: selectedApplications,
                         usages: selectedUsages,
                         catalogs: selectedCatalogs,
-                        locations: selectedLocations,
-                        rooms: selectedRooms,
-                        fleets: selectedFleets
+                        locations: selectedLocations
                       })
                       const filtersChanged = lastAppliedFilters && lastAppliedFilters !== currentFilters
-                      return filtersChanged ? 'Update Report' : 'Generate Report'
+                      
+                      if (filtersChanged && utilizationData) return 'Update Report'
+                      return 'Generate Report'
                     })()}
                   </button>
                 )}
 
                 {/* Reset Button - Show after report is generated */}
-                {applications.length > 0 && !loading && (
+                {utilizationData && !loading && (
                   <button
                     onClick={resetReport}
                     className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
@@ -1033,37 +1353,29 @@ function ApplicationsPageContent() {
               </div>
               
               {/* Export CSV Button */}
-              {filteredApplications.length > 0 && (
+              {utilizationData && utilizationData.applications.length > 0 && (
                 <button
                   onClick={() => {
                     const csvContent = [
-                      ['Device Name', 'Serial Number', 'Application', 'Version', 'Vendor', 'Category', 'Usage', 'Catalog', 'Room', 'Fleet', 'Last Seen'].join(','),
-                      ...sortedApplications.map(app => [
-                        app.deviceName,
-                        app.serialNumber,
+                      ['Application', 'Total Hours', 'Launches', 'Devices', 'Users', 'Last Used', 'Single User'].join(','),
+                      ...sortedUtilizationApps.map(app => [
                         app.name,
-                        app.version || '',
-                        app.vendor || '',
-                        app.category || '',
-                        app.usage || '',
-                        app.catalog || '',
-                        app.room || '',
-                        app.fleet || '',
-                        formatRelativeTime(app.lastSeen)
+                        app.totalHours.toFixed(1),
+                        app.launchCount,
+                        app.deviceCount,
+                        app.userCount,
+                        app.lastUsed || '',
+                        app.isSingleUser ? 'Yes' : 'No'
                       ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
                     ].join('\n')
                     
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                     const link = document.createElement('a')
-                    const url = URL.createObjectURL(blob)
-                    link.setAttribute('href', url)
-                    link.setAttribute('download', `applications-report-${new Date().toISOString().split('T')[0]}.csv`)
-                    link.style.visibility = 'hidden'
-                    document.body.appendChild(link)
+                    link.href = URL.createObjectURL(blob)
+                    link.download = `applications-report-${utilizationDays}days-${new Date().toISOString().split('T')[0]}.csv`
                     link.click()
-                    document.body.removeChild(link)
                   }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1271,41 +1583,34 @@ function ApplicationsPageContent() {
 
                 </div>
 
-                {/* Room Filter Cloud - Full Width */}
+                {/* Locations Filter Cloud - Full Width */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Room {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
+                      Locations {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
                     </h3>
                   </div>
-                  <div className="h-20 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
-                    <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1">
                       {filterOptions.rooms
                         .filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .slice(0, 200).map(room => (
+                        .map(room => (
                         <button
                           key={room}
                           onClick={() => toggleRoom(room)}
-                          className={`px-2 py-1 text-xs rounded-full border transition-colors ${
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedRooms.includes(room)
-                              ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
+                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                           }`}
                         >
                           {room}
                         </button>
                       ))}
-                      {filterOptions.rooms.filter(room => room.toLowerCase().includes(searchQuery.toLowerCase())).length > 200 && (
-                        <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          +{filterOptions.rooms.filter(room => room.toLowerCase().includes(searchQuery.toLowerCase())).length - 200} more (search to filter)
-                        </span>
-                      )}
                       {filterOptions.rooms.length === 0 && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          No room data available
+                          No location data available
                         </span>
                       )}
-                    </div>
                   </div>
                 </div>
 
@@ -1354,285 +1659,460 @@ function ApplicationsPageContent() {
           )}
           
 
-
-          {/* Content Area */}
-          {applications.length > 0 ? (
+          {/* Report Content - Shows utilization data with inventory info */}
+          {utilizationData && (
             <>
-              {/* Version Analysis Section */}
-              {filteredApplications.length > 0 && (
-                <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                    Version Analysis
+              {/* Widgets Accordion - Collapsible section */}
+              {(utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
+                <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+                  {/* Widgets Accordion Header */}
+                  <button
+                    onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+                    className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg 
+                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                        fill="none" 
+                        stroke="currentColor" 
+                        viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+                    </div>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {widgetsExpanded ? 'Click to collapse' : 'Click to expand'}
+                    </span>
+                  </button>
+                </div>
+              )}
+
+              {/* Widgets Content - Collapsible */}
+              {widgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
+              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              
+              {/* Summary Cards - Inside Widgets Accordion */}
+              <div className="px-6 py-4 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-100 dark:border-gray-700">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {utilizationData.summary.totalAppsTracked}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Apps Tracked</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                      {utilizationData.summary.uniqueUsers}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Unique Users</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                      {utilizationData.summary.uniqueDevices}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Devices</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+                      {utilizationData.summary.singleUserAppCount}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Single-User Apps</div>
+                  </div>
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                      {utilizationData.summary.unusedAppCount}
+                    </div>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">Unused Apps</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Version Distribution - Inside Widgets Accordion - Horizontal Scrollable */}
+              {Object.keys(versionAnalysis).length > 0 && (
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
+                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                    </svg>
+                    Version Distribution
                   </h3>
-                  <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {Object.entries(versionAnalysis).map(([appName, versions]) => (
-                      <div key={appName} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-                        <h4 className="font-medium text-gray-900 dark:text-white mb-3 truncate" title={appName}>
-                          {appName}
-                        </h4>
-                        <div className="space-y-2">
-                          {Object.entries(versions)
-                            .sort(([versionA], [versionB]) => {
-                              // Sort by version number (descending - newest first)
-                              // Handle 'Unknown' versions by putting them at the bottom
-                              if (versionA === 'Unknown') return 1
-                              if (versionB === 'Unknown') return -1
-                              
-                              // Parse version numbers for proper sorting
-                              const parseVersion = (v: string) => {
-                                const parts = v.split('.').map(p => {
-                                  const num = parseInt(p.replace(/[^\d]/g, ''), 10)
-                                  return isNaN(num) ? 0 : num
-                                })
-                                return parts
-                              }
-                              
-                              const partsA = parseVersion(versionA)
-                              const partsB = parseVersion(versionB)
-                              
-                              // Compare each part of the version number
-                              for (let i = 0; i < Math.max(partsA.length, partsB.length); i++) {
-                                const a = partsA[i] || 0
-                                const b = partsB[i] || 0
-                                if (a !== b) return b - a // Descending order (newest first)
-                              }
-                              
-                              return 0
-                            })
-                            .map(([version, count]) => (
-                            <div key={version} className="flex items-center justify-between">
-                              <button 
-                                onClick={() => toggleVersion(`${appName}:${version}`)}
-                                className={`text-sm truncate flex-1 mr-2 text-left px-2 py-1 rounded ${
-                                  selectedVersions.includes(`${appName}:${version}`) 
-                                    ? 'bg-primary text-primary-foreground' 
-                                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                                title={`Filter by ${appName} ${version} (${count} devices)`}
-                              >
-                                {version}
-                              </button>
-                              <div className="flex items-center gap-2">
-                                <div className="bg-gray-200 dark:bg-gray-700 rounded-full h-2 flex-1 min-w-[60px]">
-                                  <div 
-                                    className="bg-blue-500 h-2 rounded-full" 
-                                    style={{ 
-                                      width: `${(count / Math.max(...Object.values(versions))) * 100}%` 
-                                    }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white min-w-[30px] text-right">
-                                  {count}
-                                </span>
-                              </div>
+                  {/* Horizontal scrollable container for many apps */}
+                  <div className="flex overflow-x-auto gap-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
+                    {Object.keys(versionAnalysis)
+                      .map(appName => {
+                        const versions = versionAnalysis[appName]
+                        const sortedVersions = Object.entries(versions)
+                          .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                        const total = Object.values(versions).reduce((sum, count) => sum + count, 0)
+                        
+                        return (
+                          <div 
+                            key={appName} 
+                            className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                          >
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>
+                                {appName}
+                              </h4>
+                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
+                                {total} device{total !== 1 ? 's' : ''}
+                              </span>
                             </div>
-                          ))}
+                            {/* Scrollable version list with max height */}
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {sortedVersions.map(([version, count]) => {
+                                const percentage = Math.round((count / total) * 100)
+                                return (
+                                  <div key={version} className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
+                                    <div className="flex items-center justify-between mb-1">
+                                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                                        v{version}
+                                      </span>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {count} ({percentage}%)
+                                      </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
+                                      <div 
+                                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
+                                        style={{ width: `${percentage}%` }}
+                                      ></div>
+                                    </div>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      })}
+                  </div>
+                  {Object.keys(versionAnalysis).length === 0 && (
+                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                      No version data available
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Widgets Grid */}
+              <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Users Widget */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Top Users by Usage
+                  </h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {utilizationData.topUsers.slice(0, 10).map((user, idx) => (
+                      <div key={user.username} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                            idx < 3 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="text-sm text-gray-900 dark:text-white truncate">{user.username}</span>
                         </div>
-                        <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-4">
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {formatDuration(user.totalSeconds)}
+                          </span>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            Total: {Object.values(versions).reduce((a, b) => a + b, 0)} installations
+                            {user.appsUsed} apps
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {utilizationData.topUsers.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No user data available</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Single-User Apps Widget */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                    Single-User Applications
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Apps used by only one person - may indicate specialized tools or license inefficiency</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {utilizationData.singleUserApps.slice(0, 15).map((app) => (
+                      <div key={app.name} className="flex items-center justify-between">
+                        <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
+                        <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400 ml-2">
+                          {app.totalHours.toFixed(1)}h
+                        </span>
+                      </div>
+                    ))}
+                    {utilizationData.singleUserApps.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">No single-user apps detected</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Unused Apps Widget */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    Unused Applications ({utilizationDays} days)
+                  </h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Installed but not used - candidates for removal or license reclamation</p>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {utilizationData.unusedApps.slice(0, 15).map((app) => (
+                      <div key={app.name} className="flex items-center justify-between">
+                        <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                          {app.deviceCount} devices
+                        </span>
+                      </div>
+                    ))}
+                    {utilizationData.unusedApps.length === 0 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400">All installed apps have been used</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Top Apps by Time Widget */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Most Used by Time
+                  </h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {utilizationData.applications.slice(0, 10).map((app, idx) => (
+                      <div key={app.name} className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
+                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400 ml-2">
+                            {formatDuration(app.totalSeconds)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div 
+                              className="bg-blue-500 h-2 rounded-full"
+                              style={{ 
+                                width: `${utilizationData.applications[0]?.totalSeconds ? (app.totalSeconds / utilizationData.applications[0].totalSeconds) * 100 : 0}%` 
+                              }}
+                            />
+                          </div>
+                          <span className="text-xs text-gray-500 dark:text-gray-400 w-16 text-right">
+                            {app.deviceCount} dev
                           </span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
+              </div>
+              </div>
               )}
 
+              {/* Utilization Data Table */}
               <div className="overflow-auto max-h-[calc(100vh-24rem)]">
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
-                  <tr>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('application')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Application
-                        {sortColumn === 'application' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('device')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Device
-                        {sortColumn === 'device' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('version')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Version
-                        {sortColumn === 'version' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('vendor')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Publisher
-                        {sortColumn === 'vendor' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('usage')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Usage
-                        {sortColumn === 'usage' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('catalog')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Catalog
-                        {sortColumn === 'catalog' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                    <th 
-                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                      onClick={() => handleSort('location')}
-                    >
-                      <div className="flex items-center gap-1">
-                        Location
-                        {sortColumn === 'location' && (
-                          <svg className={`w-4 h-4 transition-transform ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                          </svg>
-                        )}
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {sortedApplications.length === 0 ? (
+                <table className="w-full">
+                  <thead className="bg-blue-50 dark:bg-blue-900/30 sticky top-0 z-10">
                     <tr>
-                      <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                        <div className="flex flex-col items-center justify-center">
-                          <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                          <p className="text-lg font-medium mb-1">No applications found</p>
-                          <p className="text-sm">Try adjusting your search or selection criteria.</p>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Application
+                          {utilizationSortColumn === 'name' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
                         </div>
-                      </td>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Versions
+                      </th>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('totalHours')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Total Time
+                          {utilizationSortColumn === 'totalHours' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('launchCount')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Launches
+                          {utilizationSortColumn === 'launchCount' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('deviceCount')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Devices
+                          {utilizationSortColumn === 'deviceCount' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('userCount')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Users
+                          {utilizationSortColumn === 'userCount' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('lastUsed')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Last Used
+                          {utilizationSortColumn === 'lastUsed' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Status
+                      </th>
                     </tr>
-                  ) : (
-                    sortedApplications.map((app) => (
-                      <tr key={app.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="min-w-0">
-                            <div className="font-medium text-gray-900 dark:text-white truncate">
-                              {normalizeAppName(app.name) || app.name}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                              {app.architecture !== 'Unknown' && app.architecture}
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <Link
-                            href={`/device/${encodeURIComponent(app.serialNumber)}`}
-                            className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors"
-                          >
-                            <div className="text-sm text-gray-900 dark:text-white font-medium">
-                              {app.deviceName}
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              {app.serialNumber}
-                              {app.assetTag && (
-                                <span className="ml-1">| {app.assetTag}</span>
-                              )}
-                            </div>
-                          </Link>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white font-mono">
-                            {app.version || '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {app.publisher !== 'Unknown' ? app.publisher : '-'}
-                          </div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          {app.usage ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              app.usage.toLowerCase() === 'assigned' 
-                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            }`}>
-                              {app.usage}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          {app.catalog ? (
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                              app.catalog.toLowerCase() === 'curriculum' 
-                                ? 'bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200'
-                                : app.catalog.toLowerCase() === 'staff'
-                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200'
-                                : app.catalog.toLowerCase() === 'faculty'
-                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                : app.catalog.toLowerCase() === 'kiosk'
-                                ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                            }`}>
-                              {app.catalog}
-                            </span>
-                          ) : (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
-                          )}
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="text-sm text-gray-900 dark:text-white">
-                            {app.location || '-'}
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {sortedUtilizationApps.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center justify-center">
+                            <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <p className="text-lg font-medium mb-1">No usage data found</p>
+                            <p className="text-sm">Try adjusting the time period or filters.</p>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      sortedUtilizationApps.map((app) => (
+                        <tr key={app.name} className="hover:bg-blue-50 dark:hover:bg-blue-900/10">
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="font-medium text-gray-900 dark:text-white truncate max-w-xs" title={app.name}>
+                              {app.name}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            {/* Show versions from versionAnalysis - use normalized name for lookup */}
+                            {(() => {
+                              const normalizedAppName = normalizeAppName(app.name)
+                              const versions = versionAnalysis[normalizedAppName] || versionAnalysis[app.name]
+                              if (!versions || Object.keys(versions).length === 0) {
+                                return <span className="text-xs text-gray-400">-</span>
+                              }
+                              const sortedVersions = Object.entries(versions)
+                                .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                              const totalDevices = Object.values(versions).reduce((sum, count) => sum + count, 0)
+                              if (sortedVersions.length === 1) {
+                                return (
+                                  <span className="text-xs text-gray-700 dark:text-gray-300">
+                                    v{sortedVersions[0][0]}
+                                  </span>
+                                )
+                              }
+                              return (
+                                <div className="flex flex-col gap-0.5">
+                                  {sortedVersions.slice(0, 3).map(([version, count]) => (
+                                    <span key={version} className="text-xs text-gray-700 dark:text-gray-300">
+                                      v{version} <span className="text-gray-400">({count})</span>
+                                    </span>
+                                  ))}
+                                  {sortedVersions.length > 3 && (
+                                    <span className="text-xs text-gray-400">+{sortedVersions.length - 3} more</span>
+                                  )}
+                                </div>
+                              )
+                            })()}
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                              {formatDuration(app.totalSeconds)}
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {app.totalHours.toFixed(1)} hours
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {app.launchCount.toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {app.deviceCount}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {app.userCount}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm text-gray-900 dark:text-white">
+                              {app.lastUsed ? formatRelativeTime(app.lastUsed) : '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 lg:px-6 py-4">
+                            {app.isSingleUser ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                Single User
+                              </span>
+                            ) : app.userCount > 5 ? (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                Popular
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                Normal
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </>
-          ) : null}
+          )}
         </div>
       </div>
     </div>
