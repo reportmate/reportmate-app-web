@@ -215,7 +215,7 @@ export const EventsTab: React.FC<EventsTabProps> = ({ device, events }) => {
         )}
       </div>
 
-      {/* Event Statistics */}
+      {/* Event Statistics - Last 100 Events */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">{eventsByKind.success || 0}</div>
