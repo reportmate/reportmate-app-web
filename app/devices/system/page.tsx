@@ -494,10 +494,12 @@ function SystemPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">System</h1>
+                {/* Squircle Icon - Emerald for System */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -631,7 +633,7 @@ function SystemPageContent() {
               className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
                 {totalActiveFilters > 0 && (
                   <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
                     {totalActiveFilters} active
@@ -716,14 +718,14 @@ function SystemPageContent() {
                   </div>
                 )}
                 
-                {/* Clear All Filters */}
+                {/* Clear All Selections */}
                 {totalActiveFilters > 0 && (
                   <div className="pt-2">
                     <button
                       onClick={clearAllFilters}
                       className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                     >
-                      Clear all filters
+                      Clear all selections
                     </button>
                   </div>
                 )}
@@ -753,7 +755,7 @@ function SystemPageContent() {
                   onClick={clearAllFilters}
                   className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
                 >
-                  Clear Filters
+                  Clear Selections
                 </button>
               )}
             </div>
@@ -849,7 +851,7 @@ function SystemPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
                           href={`/device/${sys.deviceId}#system`}
-                          className="flex items-center hover:text-purple-600 dark:hover:text-purple-400"
+                          className="flex items-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sys.deviceName}</div>

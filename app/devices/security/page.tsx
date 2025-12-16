@@ -201,10 +201,12 @@ function SecurityPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Security</h1>
+                {/* Squircle Icon - Red for Security */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -320,7 +322,7 @@ function SecurityPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
                           href={`/device/${sec.deviceId}`}
-                          className="flex items-center hover:text-red-600 dark:hover:text-red-400"
+                          className="flex items-center text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{sec.deviceName}</div>
