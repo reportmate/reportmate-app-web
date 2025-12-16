@@ -265,6 +265,24 @@ export default function DeviceDetailPage() {
   const tabsContainerRef = useRef<HTMLElement>(null)
   const [copySuccess, setCopySuccess] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
+  const [showReportsDropdown, setShowReportsDropdown] = useState(false)
+  const [showActionsDropdown, setShowActionsDropdown] = useState(false)
+  const reportsDropdownRef = useRef<HTMLDivElement>(null)
+  const actionsDropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(event.target as Node)) {
+        setShowReportsDropdown(false)
+      }
+      if (actionsDropdownRef.current && !actionsDropdownRef.current.contains(event.target as Node)) {
+        setShowActionsDropdown(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
   
   // Helper function to get accent color classes for tabs
   const getTabAccentColors = (accentColor: string, isActive: boolean) => {
@@ -646,32 +664,6 @@ export default function DeviceDetailPage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
-                {/* Breadcrumbs with sliding hover effect */}
-                <div className="hidden sm:flex items-center gap-2">
-                  <Link
-                    href="/"
-                    className="group flex items-center gap-1 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all duration-200"
-                  >
-                    <svg className="w-4 h-4 transform scale-110 origin-bottom" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                    </svg>
-                    <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[100px] transition-all duration-300 ease-in-out">Dashboard</span>
-                  </Link>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <Link
-                    href="/devices"
-                    className="group flex items-center gap-1 text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-all duration-200"
-                  >
-                    <svg className="w-4 h-4 transform scale-110 origin-bottom" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
-                    <span className="max-w-0 overflow-hidden whitespace-nowrap group-hover:max-w-[100px] transition-all duration-300 ease-in-out">Devices</span>
-                  </Link>
-                </div>
-                <div className="hidden sm:block h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
                   <h1 className="text-lg font-bold text-gray-900 dark:text-white">
                     {deviceInfo.name}
@@ -682,7 +674,7 @@ export default function DeviceDetailPage() {
                     {(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) && (
                       <button
                         onClick={() => copyPillValue(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag || '')}
-                        className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className="group relative hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                         title="Click to copy asset tag"
                       >
                         <span className="truncate max-w-[100px]">{deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag}</span>
@@ -691,7 +683,7 @@ export default function DeviceDetailPage() {
                     {(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber) && (
                       <button
                         onClick={() => copyPillValue(deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber || '')}
-                        className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                        className="group relative hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                         title="Click to copy serial number"
                       >
                         <span className="truncate max-w-[130px]">{deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber}</span>
@@ -720,210 +712,309 @@ export default function DeviceDetailPage() {
                       return (
                         <button
                           onClick={() => copyPillValue(ipAddress)}
-                          className="group relative inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                          className="group relative hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-mono font-medium justify-center transition-all duration-200 cursor-pointer bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                           title="Click to copy IP address"
                         >
                           <span className="truncate max-w-[140px]">{ipAddress}</span>
                         </button>
                       )
                     })()}
+                    {/* Last seen pill - now in left section with other pills, hidden on tablet */}
+                    <span className="hidden lg:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200">Last seen {formatRelativeTime(deviceInfo.lastSeen)}</span>
                   </div>
                 </div>
               </div>
               
-              {/* Last seen, status pill, and action buttons - hidden on mobile */}
-              <div className="hidden sm:flex items-center gap-4 pr-4">
-                <div className="flex items-center gap-2 text-2sm text-gray-600 dark:text-gray-400">
-                  {/* Subtle version indicator dot */}
-                  {deviceInfo.clientVersion && (
-                    <div className="group relative">
-                      <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 cursor-help" />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
-                        ReportMate v{deviceInfo.clientVersion}
-                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
-                      </div>
+              {/* Status pill and action buttons */}
+              <div className="flex items-center gap-1.5 pr-2 sm:pr-4">
+                {/* Subtle version indicator dot */}
+                {deviceInfo.clientVersion && (
+                  <div className="group relative hidden sm:block">
+                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 dark:bg-blue-400 cursor-help" />
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 dark:bg-gray-700 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none whitespace-nowrap z-10">
+                      ReportMate v{deviceInfo.clientVersion}
+                      <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
+                  </div>
+                )}
+                {/* Status pill for Archived/Stale/Missing devices - hidden on mobile */}
+                {(() => {
+                  // Check if device is archived first
+                  const isArchived = deviceInfo.archived === true
+                  if (isArchived) {
+                    return (
+                      <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                        Archived
+                      </span>
+                    )
+                  }
+                  
+                  const lastSeenDate = deviceInfo.lastSeen ? new Date(deviceInfo.lastSeen) : null
+                  if (!lastSeenDate) return null
+                  
+                  const now = new Date()
+                  const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
+                  
+                  if (hoursSinceLastSeen > 72) {
+                    return (
+                      <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                        Missing
+                      </span>
+                    )
+                  } else if (hoursSinceLastSeen > 24) {
+                    return (
+                      <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                        Stale
+                      </span>
+                    )
+                  }
+                  return null
+                })()}
+                
+                {/* Navigation Buttons - Static icons with title on hover */}
+                <Link
+                  href="/"
+                  className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200"
+                  title="Dashboard"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                  </svg>
+                </Link>
+                <Link
+                  href="/devices"
+                  className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200"
+                  title="Devices"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </Link>
+                <Link
+                  href="/events"
+                  className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200"
+                  title="Events"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </Link>
+                
+{/* Reports Dropdown */}
+                <div className="relative" ref={reportsDropdownRef}>
+                  <button
+                    onClick={() => setShowReportsDropdown(!showReportsDropdown)}
+                    className="flex items-center justify-center gap-1 px-2 py-1.5 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200"
+                    title="View Reports"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <svg className={`w-3 h-3 transition-transform ${showReportsDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showReportsDropdown && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                      <Link href="/devices/installs" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 hover:text-emerald-700 dark:hover:text-emerald-300">
+                        <svg className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Installs
+                      </Link>
+                      <Link href="/devices/applications" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-300">
+                        <svg className="w-4 h-4 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 12.2H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V10.2a2 2 0 00-2-2M5 12.2V10.2a2 2 0 012-2m0 0V6.2a2 2 0 012-2h6a2 2 0 012 2v2M7 8.2h10" />
+                        </svg>
+                        Applications
+                      </Link>
+                      <Link href="/devices/profiles" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-violet-50 dark:hover:bg-violet-900/30 hover:text-violet-700 dark:hover:text-violet-300">
+                        <svg className="w-4 h-4 text-violet-600 dark:text-violet-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        Profiles
+                      </Link>
+                      <Link href="/devices/management" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:text-yellow-700 dark:hover:text-yellow-300">
+                        <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                        Management
+                      </Link>
+                      <Link href="/devices/hardware" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-orange-50 dark:hover:bg-orange-900/30 hover:text-orange-700 dark:hover:text-orange-300">
+                        <svg className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                        </svg>
+                        Hardware
+                      </Link>
+                      <Link href="/devices/peripherals" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 hover:text-cyan-700 dark:hover:text-cyan-300">
+                        <svg className="w-4 h-4 text-cyan-600 dark:text-cyan-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z" />
+                        </svg>
+                        Peripherals
+                      </Link>
+                      <Link href="/devices/system" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300">
+                        <svg className="w-4 h-4 text-purple-600 dark:text-purple-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                        System
+                      </Link>
+                      <Link href="/devices/security" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-red-50 dark:hover:bg-red-900/30 hover:text-red-700 dark:hover:text-red-300">
+                        <svg className="w-4 h-4 text-red-600 dark:text-red-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Security
+                      </Link>
+                      <Link href="/devices/network" className="flex items-center gap-3 px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-teal-50 dark:hover:bg-teal-900/30 hover:text-teal-700 dark:hover:text-teal-300">
+                        <svg className="w-4 h-4 text-teal-600 dark:text-teal-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+                        </svg>
+                        Network
+                      </Link>
                     </div>
                   )}
-                  {/* Status pill for Archived/Stale/Missing devices - moved before Last seen */}
-                  {(() => {
-                    // Check if device is archived first
-                    const isArchived = deviceInfo.archived === true
-                    if (isArchived) {
-                      return (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                          Archived
-                        </span>
-                      )
-                    }
-                    
-                    const lastSeenDate = deviceInfo.lastSeen ? new Date(deviceInfo.lastSeen) : null
-                    if (!lastSeenDate) return null
-                    
-                    const now = new Date()
-                    const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-                    
-                    if (hoursSinceLastSeen > 72) {
-                      return (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                          Missing
-                        </span>
-                      )
-                    } else if (hoursSinceLastSeen > 24) {
-                      return (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                          Stale
-                        </span>
-                      )
-                    }
-                    return null
-                  })()}
-                  <span>Last seen {formatRelativeTime(deviceInfo.lastSeen)}</span>
                 </div>
-                
-                {/* Remote access button */}
-                {(() => {
-                  // Get active network interface IP address
-                  const getActiveIPAddress = () => {
-                    // Check for active network interface first
-                    if (deviceInfo.modules?.network?.interfaces) {
-                      const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
-                        iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
-                      )
-                      if (activeInterface) {
-                        // Find IPv4 address (not IPv6)
-                        const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
-                          /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
-                        )
-                        if (ipv4) return ipv4
-                      }
-                    }
-                    
-                    // Fallback to processed network data
-                    return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
-                  }
-                  
-                  // Get OS platform for protocol selection
-                  const getRemoteProtocol = () => {
-                    // Try multiple paths for OS information
-                    const os = deviceInfo.os || 
-                              deviceInfo.system?.operatingSystem?.name || 
-                              deviceInfo.modules?.system?.operatingSystem?.name || 
-                              deviceInfo.modules?.system?.operatingSystem?.productName || ''
-                    
-                    const osLower = os.toLowerCase()
-                    
-                    if (osLower.includes('windows')) {
-                      return 'rdp'
-                    } else if (osLower.includes('mac') || osLower.includes('darwin') || osLower.includes('macos')) {
-                      return 'vnc'
-                    }
-                    
-                    // No fallback - return null for unknown platforms
-                    return null
-                  }
-                  
-                  const ipAddress = getActiveIPAddress()
-                  const protocol = getRemoteProtocol()
-                  
-                  // Only show if we have both IP address and known platform
-                  if (!ipAddress || !protocol) return null
-                  
-                  return (
-                    <button
-                      onClick={() => {
-                        const remoteUrl = `${protocol}://${ipAddress}`
-                        window.location.href = remoteUrl
-                      }}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900 dark:hover:text-purple-300"
-                      title={`Connect via ${protocol.toUpperCase()} to ${ipAddress}`}
-                    >
-                      <svg
-                        className="w-4 h-4"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        aria-hidden="true"
+
+                {/* Actions Dropdown (Ellipsis) */}
+                <div className="relative" ref={actionsDropdownRef}>
+                  <button
+                    onClick={() => setShowActionsDropdown(!showActionsDropdown)}
+                    className="flex items-center justify-center w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-all duration-200"
+                    title="More Actions"
+                  >
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="5" cy="12" r="2" />
+                      <circle cx="12" cy="12" r="2" />
+                      <circle cx="19" cy="12" r="2" />
+                    </svg>
+                  </button>
+                  {showActionsDropdown && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50">
+                      {/* Copy Link */}
+                      <button
+                        onClick={() => {
+                          handleCopyShareableLink()
+                          setShowActionsDropdown(false)
+                        }}
+                        className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/30 hover:text-yellow-700 dark:hover:text-yellow-300"
                       >
-                        <path d="M10 10h4"/>
-                        <path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/>
-                        <path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/>
-                        <path d="M 22 16 L 2 16"/>
-                        <path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/>
-                        <path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/>
-                      </svg>
-                      <span>Remote</span>
-                    </button>
-                  )
-                })()}
-                
-                {/* Open Shell button */}
-                {(() => {
-                  // Get active network interface IP address
-                  const getActiveIPAddress = () => {
-                    if (deviceInfo.modules?.network?.interfaces) {
-                      const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
-                        iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
-                      )
-                      if (activeInterface) {
-                        const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
-                          /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                        {copySuccess ? (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                            </svg>
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </button>
+                      
+                      {/* Shell (SSH) */}
+                      {(() => {
+                        const getActiveIPAddress = () => {
+                          if (deviceInfo.modules?.network?.interfaces) {
+                            const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
+                              iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
+                            )
+                            if (activeInterface) {
+                              const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
+                                /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                              )
+                              if (ipv4) return ipv4
+                            }
+                          }
+                          return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
+                        }
+                        
+                        const ipAddress = getActiveIPAddress()
+                        if (!ipAddress) return null
+                        
+                        return (
+                          <button
+                            onClick={() => {
+                              window.location.href = `ssh://${ipAddress}`
+                              setShowActionsDropdown(false)
+                            }}
+                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-cyan-50 dark:hover:bg-cyan-900/30 hover:text-cyan-700 dark:hover:text-cyan-300"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            <span>Shell</span>
+                          </button>
                         )
-                        if (ipv4) return ipv4
-                      }
-                    }
-                    return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
-                  }
-                  
-                  const ipAddress = getActiveIPAddress()
-                  if (!ipAddress) return null
-                  
-                  return (
-                    <button
-                      onClick={() => {
-                        const sshUrl = `ssh://${ipAddress}`
-                        window.location.href = sshUrl
-                      }}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900 dark:hover:text-cyan-300"
-                      title={`Open SSH shell to ${ipAddress}`}
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      <span>Shell</span>
-                    </button>
-                  )
-                })()}
-                
-                {/* Copy shareable link button */}
-                <button
-                  onClick={handleCopyShareableLink}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
-                    copySuccess 
-                      ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300' 
-                      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 hover:bg-yellow-100 hover:text-yellow-700 dark:hover:bg-yellow-900 dark:hover:text-yellow-300'
-                  }`}
-                  title={`Copy shareable link using ${(deviceInfo.assetTag || deviceInfo.modules?.inventory?.assetTag) ? 'asset tag' : 'serial number'}`}
-                >
-                  {copySuccess ? (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span>Copied!</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      <span>Link</span>
-                    </>
+                      })()}
+                      
+                      {/* Remote (RDP/VNC) */}
+                      {(() => {
+                        const getActiveIPAddress = () => {
+                          if (deviceInfo.modules?.network?.interfaces) {
+                            const activeInterface = deviceInfo.modules.network.interfaces.find((iface: any) => 
+                              iface.isActive && iface.ipAddresses && iface.ipAddresses.length > 0
+                            )
+                            if (activeInterface) {
+                              const ipv4 = activeInterface.ipAddresses.find((ip: string) => 
+                                /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
+                              )
+                              if (ipv4) return ipv4
+                            }
+                          }
+                          return deviceInfo.network?.ipAddress || deviceInfo.ipAddress
+                        }
+                        
+                        const getRemoteProtocol = () => {
+                          const os = deviceInfo.os || 
+                                    deviceInfo.system?.operatingSystem?.name || 
+                                    deviceInfo.modules?.system?.operatingSystem?.name || 
+                                    deviceInfo.modules?.system?.operatingSystem?.productName || ''
+                          const osLower = os.toLowerCase()
+                          if (osLower.includes('windows')) return 'rdp'
+                          if (osLower.includes('mac') || osLower.includes('darwin') || osLower.includes('macos')) return 'vnc'
+                          return null
+                        }
+                        
+                        const ipAddress = getActiveIPAddress()
+                        const protocol = getRemoteProtocol()
+                        
+                        if (!ipAddress || !protocol) return null
+                        
+                        return (
+                          <button
+                            onClick={() => {
+                              window.location.href = `${protocol}://${ipAddress}`
+                              setShowActionsDropdown(false)
+                            }}
+                            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-purple-50 dark:hover:bg-purple-900/30 hover:text-purple-700 dark:hover:text-purple-300"
+                          >
+                            <svg
+                              className="w-4 h-4"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
+                              <path d="M10 10h4"/>
+                              <path d="M19 7V4a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v3"/>
+                              <path d="M20 21a2 2 0 0 0 2-2v-3.851c0-1.39-2-2.962-2-4.829V8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v11a2 2 0 0 0 2 2z"/>
+                              <path d="M 22 16 L 2 16"/>
+                              <path d="M4 21a2 2 0 0 1-2-2v-3.851c0-1.39 2-2.962 2-4.829V8a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v11a2 2 0 0 1-2 2z"/>
+                              <path d="M9 7V4a1 1 0 0 0-1-1H6a1 1 0 0 0-1 1v3"/>
+                            </svg>
+                            <span>Remote</span>
+                          </button>
+                        )
+                      })()}
+                    </div>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1016,14 +1107,7 @@ export default function DeviceDetailPage() {
 
         {/* Installs Tab - Progressive loading */}
         <div className={activeTab === 'installs' ? 'block' : 'hidden'}>
-          {isModuleLoading('installs') ? (
-            <ModuleLoadingState 
-              moduleName="installs" 
-              state="loading" 
-              icon="M12 6v6m0 0v6m0-6h6m-6 0H6"
-              accentColor="emerald"
-            />
-          ) : isModuleError('installs') ? (
+          {isModuleError('installs') ? (
             <ModuleLoadingState 
               moduleName="installs" 
               state="error" 

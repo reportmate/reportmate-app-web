@@ -205,10 +205,12 @@ function PeripheralsPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Peripherals</h1>
+                {/* Squircle Icon - Violet to Cyan for Peripherals */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-cyan-600 dark:from-violet-600 dark:to-cyan-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z" />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -343,7 +345,7 @@ function PeripheralsPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
                           href={`/device/${peripheral.deviceId}`}
-                          className="flex items-center hover:text-cyan-600 dark:hover:text-cyan-400"
+                          className="flex items-center text-cyan-600 hover:text-cyan-800 dark:text-cyan-400 dark:hover:text-cyan-300"
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{peripheral.deviceName}</div>
