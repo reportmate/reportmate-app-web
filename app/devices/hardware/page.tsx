@@ -901,10 +901,12 @@ function HardwarePageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Hardware Report</h1>
+                {/* Squircle Icon - Cyan for Hardware */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -1080,7 +1082,7 @@ function HardwarePageContent() {
                         onClick={clearAllFilters}
                         className="px-3 py-1 text-xs font-medium bg-yellow-100 hover:bg-yellow-200 dark:bg-yellow-900 dark:hover:bg-yellow-800 text-yellow-800 dark:text-yellow-200 rounded-full transition-colors"
                       >
-                        Clear Filters
+                        Clear Selections
                       </button>
                     )}
                   </div>
@@ -1159,7 +1161,7 @@ function HardwarePageContent() {
                         <td className="px-4 py-4 min-w-0">
                           <Link
                             href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`}
-                            className="font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-xs"
+                            className="font-medium text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 text-xs"
                           >
                             {hw.deviceName || hw.serialNumber || 'Unknown Device'}
                           </Link>

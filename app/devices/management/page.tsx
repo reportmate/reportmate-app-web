@@ -87,6 +87,10 @@ function ManagementPageContent() {
   const [sortColumn, setSortColumn] = useState<'device' | 'provider' | 'status' | 'type' | 'deviceId'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
+  // Accordion states
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  
   // Handle column sort click
   const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
     if (sortColumn === column) {
@@ -124,6 +128,21 @@ function ManagementPageContent() {
             provider = 'Microsoft Intune'
           }
           
+          // BUGFIX: Determine enrollmentType from deviceState (source of truth)
+          // The mdmEnrollment.enrollmentType was incorrectly set in older client versions
+          const deviceState = mgmt.raw?.deviceState
+          let enrollmentType = mgmt.enrollmentType || 'Unknown'
+          if (deviceState) {
+            // Use deviceState flags as the authoritative source
+            if (deviceState.domainJoined && deviceState.entraJoined) {
+              enrollmentType = 'Hybrid Entra Join'
+            } else if (deviceState.entraJoined) {
+              enrollmentType = 'Entra Joined'
+            } else if (deviceState.domainJoined) {
+              enrollmentType = 'Domain Joined'
+            }
+          }
+          
           return {
             id: mgmt.serialNumber || mgmt.deviceId,
             deviceId: mgmt.deviceId,
@@ -133,7 +152,7 @@ function ManagementPageContent() {
             collectedAt: mgmt.collectedAt || mgmt.lastSeen,
             provider: provider,
             enrollmentStatus: mgmt.enrollmentStatus || 'Unknown',
-            enrollmentType: mgmt.enrollmentType || 'Unknown',
+            enrollmentType: enrollmentType,
             intuneId: mgmt.intuneId || 'N/A',
             tenantName: mgmt.tenantName || '',
             isEnrolled: mgmt.isEnrolled || false,
@@ -181,15 +200,18 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  // Count Broken Trust as a subset indicator (devices with trustStatus === 'Broken')
+  // Count Broken Trust - Domain-joined devices with trustStatus === 'Broken'
+  // Use deviceState.domainJoined as source of truth (not enrollmentType)
   const brokenTrustCount = management.filter(m => {
+    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const trustStatus = m.raw?.domainTrust?.trustStatus
-    return trustStatus === 'Broken'
+    return isDomainJoined && trustStatus === 'Broken'
   }).length
 
   // Count Unconfirmed Trust - Domain Joined devices without domainTrust data yet
+  // Use deviceState.domainJoined as source of truth
   const unconfirmedTrustCount = management.filter(m => {
-    const isDomainJoined = m.enrollmentType === 'Hybrid Entra Join' || m.enrollmentType === 'Domain Joined'
+    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const hasDomainTrust = m.raw?.domainTrust != null
     return isDomainJoined && !hasDomainTrust
   }).length
@@ -233,24 +255,28 @@ function ManagementPageContent() {
 
     // Type filter - map display names back to raw values
     if (typeFilter !== 'all') {
-      // Special handling for Broken Trust filter - ONLY check trustStatus === 'Broken'
+      const deviceState = m.raw?.deviceState
+      const isDomainJoined = deviceState?.domainJoined === true
+      
+      // Special handling for Broken Trust filter - must be domain-joined with broken trust
       if (typeFilter === 'Broken Trust') {
         const trustStatus = m.raw?.domainTrust?.trustStatus
-        if (trustStatus !== 'Broken') return false
+        // Only show as Broken Trust if device is domain-joined AND trust is broken
+        if (!isDomainJoined || trustStatus !== 'Broken') return false
       } else if (typeFilter === 'Unconfirmed') {
         // Unconfirmed filter - Domain Joined devices without domainTrust data
-        const isDomainJoined = m.enrollmentType === 'Hybrid Entra Join' || m.enrollmentType === 'Domain Joined'
         const hasDomainTrust = m.raw?.domainTrust != null
         if (!isDomainJoined || hasDomainTrust) return false
       } else if (typeFilter === 'Domain Joined') {
-        // Domain Joined filter shows ALL domain-joined devices (including broken)
-        const enrollmentType = m.enrollmentType
-        const isDomainJoined = enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined'
+        // Domain Joined filter shows ALL domain-joined devices (use deviceState as source of truth)
         if (!isDomainJoined) return false
+      } else if (typeFilter === 'Entra Joined') {
+        // Entra Joined filter - cloud-only devices (Entra but NOT domain-joined)
+        const isEntraOnly = deviceState?.entraJoined === true && !isDomainJoined
+        if (!isEntraOnly) return false
       } else {
-        let rawTypeFilter = typeFilter
-        if (typeFilter === 'Entra Joined') rawTypeFilter = 'Entra Join'
-        if (m.enrollmentType !== rawTypeFilter) return false
+        // Other filters - match the enrollmentType directly
+        if (m.enrollmentType !== typeFilter) return false
       }
     }
 
@@ -317,18 +343,24 @@ function ManagementPageContent() {
     colors, 
     title,
     onFilter,
-    selectedFilter
+    selectedFilter,
+    nestedItems = []
   }: { 
     data: { label: string; value: number }[]; 
     colors: Record<string, string>; 
     title: string;
     onFilter?: (label: string) => void;
     selectedFilter?: string;
+    nestedItems?: { parentLabel: string; items: { label: string; value: number }[] }[];
   }) => {
     const total = data.reduce((sum, item) => sum + item.value, 0)
     let cumulativePercent = 0
     const radius = 32
     const circumference = 2 * Math.PI * radius
+
+    // Build a map of parent labels to their nested items
+    const nestedMap = new Map<string, { label: string; value: number }[]>()
+    nestedItems.forEach(n => nestedMap.set(n.parentLabel, n.items))
 
     if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
 
@@ -362,22 +394,53 @@ function ManagementPageContent() {
             </svg>
           </div>
           <div className="flex-1 space-y-2">
-            {data.map(item => {
-              const isSelected = selectedFilter === item.label
-              return (
-                <div 
-                  key={item.label} 
-                  className={`flex items-center justify-between text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
-                  onClick={() => onFilter && onFilter(isSelected ? 'all' : item.label)}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
-                    <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={item.label}>{item.label}</span>
-                  </div>
-                  <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
-                </div>
-              )
-            })}
+            {/* Build set of nested item labels to exclude from main legend */}
+            {(() => {
+              const nestedLabels = new Set<string>()
+              nestedItems.forEach(n => n.items.forEach(i => nestedLabels.add(i.label)))
+              
+              return data
+                .filter(item => !nestedLabels.has(item.label)) // Exclude nested items from main list
+                .map(item => {
+                  const isSelected = selectedFilter === item.label
+                  const nested = nestedMap.get(item.label)
+                  return (
+                    <div key={item.label}>
+                      <div 
+                        className={`flex items-center justify-between text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
+                        onClick={() => onFilter && onFilter(isSelected ? 'all' : item.label)}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
+                          <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={item.label}>{item.label}</span>
+                        </div>
+                        <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
+                      </div>
+                      {/* Render nested items indented under parent */}
+                      {nested && nested.length > 0 && (
+                        <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-2">
+                          {nested.map(nestedItem => {
+                            const isNestedSelected = selectedFilter === nestedItem.label
+                            return (
+                              <div 
+                                key={nestedItem.label}
+                                className={`flex items-center justify-between text-xs cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isNestedSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
+                                onClick={() => onFilter && onFilter(isNestedSelected ? 'all' : nestedItem.label)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: colors[nestedItem.label] || colors['default'] || '#cbd5e1' }} />
+                                  <span className="text-gray-500 dark:text-gray-400 truncate max-w-[100px]" title={nestedItem.label}>{nestedItem.label}</span>
+                                </div>
+                                <span className="font-medium text-gray-700 dark:text-gray-300">{nestedItem.value}</span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+            })()}
           </div>
         </div>
       </div>
@@ -462,11 +525,6 @@ function ManagementPageContent() {
                   <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <div className="min-w-0">
-                    <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      Management Report
-                    </h1>
-                  </div>
                 </div>
               </div>
 
@@ -509,11 +567,6 @@ function ManagementPageContent() {
                   <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
-                  <div className="min-w-0">
-                    <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                      Management Report
-                    </h1>
-                  </div>
                 </div>
               </div>
 
@@ -567,13 +620,11 @@ function ManagementPageContent() {
               </Link>
               <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    Management Report
-                  </h1>
+                {/* Squircle Icon - Teal for Management */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 dark:from-yellow-600 dark:to-yellow-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                  </svg>
                 </div>
               </div>
             </div>
@@ -592,70 +643,221 @@ function ManagementPageContent() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        {/* Widgets Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Widget 1: Provider Collection (Swapped) */}
-          <CollectionWidget 
-            title="Providers"
-            data={Object.entries(providerCounts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)}
-            colors={{
-              'Microsoft Intune': 'text-blue-600',
-              'Apple': 'text-gray-600',
-              'default': 'text-purple-600'
-            }}
-            onFilter={setProviderFilter}
-            selectedFilter={providerFilter}
-          />
-
-          {/* Widget 2: Enrollment Status Donut (Swapped) */}
-          <DonutChart 
-            title="Enrollment Status"
-            data={Object.entries(enrollmentStatusCounts).map(([label, value]) => ({ label, value }))}
-            colors={{
-              'Enrolled': '#10b981', // emerald-500
-              'Pending': '#f59e0b', // amber-500
-              'Unenrolled': '#ef4444', // red-500
-              'Not Enrolled': '#ef4444', // red-500
-              'Error': '#ef4444',
-              'default': '#94a3b8' // slate-400
-            }}
-            onFilter={setEnrollmentStatusFilter}
-            selectedFilter={enrollmentStatusFilter}
-          />
-
-          {/* Widget 3: Enrollment Type Donut - Trust status shown as subset indicators */}
-          <DonutChart 
-            title="Enrollment Type"
-            data={[
-              // Show enrollment types in order: Entra Joined, Domain Joined, then trust status indicators
-              ...Object.entries(enrollmentTypeCounts)
-                .sort(([a], [b]) => {
-                  // Entra Joined first, Domain Joined second
-                  if (a === 'Entra Joined') return -1
-                  if (b === 'Entra Joined') return 1
-                  return a.localeCompare(b)
-                })
-                .map(([label, value]) => ({ label, value })),
-              // Unconfirmed (orange) - devices without domainTrust data
-              ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : []),
-              // Broken Trust (red) - devices with broken trust
-              ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : [])
-            ]}
-            colors={{
-              'Entra Joined': '#10b981', // emerald-500
-              'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
-              'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
-              'Broken Trust': '#ef4444', // red-500 - broken trust
-              'AxM Assigned': '#10b981', // emerald-500
-              'default': '#8b5cf6' // violet-500
-            }}
-            onFilter={setTypeFilter}
-            selectedFilter={typeFilter}
-          />
-        </div>
-
         <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          
+          {/* Widgets Accordion */}
+          <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Widgets Content - Collapsible */}
+          {widgetsExpanded && (
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Widget 1: Provider Collection (Swapped) */}
+                <CollectionWidget 
+                  title="Providers"
+                  data={Object.entries(providerCounts).map(([label, value]) => ({ label, value })).sort((a, b) => b.value - a.value)}
+                  colors={{
+                    'Microsoft Intune': 'text-blue-600',
+                    'Apple': 'text-gray-600',
+                    'default': 'text-purple-600'
+                  }}
+                  onFilter={setProviderFilter}
+                  selectedFilter={providerFilter}
+                />
+
+                {/* Widget 2: Enrollment Status Donut (Swapped) */}
+                <DonutChart 
+                  title="Enrollment Status"
+                  data={Object.entries(enrollmentStatusCounts).map(([label, value]) => ({ label, value }))}
+                  colors={{
+                    'Enrolled': '#10b981', // emerald-500
+                    'Pending': '#f59e0b', // amber-500
+                    'Unenrolled': '#ef4444', // red-500
+                    'Not Enrolled': '#ef4444', // red-500
+                    'Error': '#ef4444',
+                    'default': '#94a3b8' // slate-400
+                  }}
+                  onFilter={setEnrollmentStatusFilter}
+                  selectedFilter={enrollmentStatusFilter}
+                />
+
+                {/* Widget 3: Enrollment Type Donut - Trust status shown as subset indicators */}
+                <DonutChart 
+                  title="Enrollment Type"
+                  data={[
+                    // Show enrollment types in order: Entra Joined, Domain Joined, then trust status indicators
+                    ...Object.entries(enrollmentTypeCounts)
+                      .sort(([a], [b]) => {
+                        // Entra Joined first, Domain Joined second
+                        if (a === 'Entra Joined') return -1
+                        if (b === 'Entra Joined') return 1
+                        return a.localeCompare(b)
+                      })
+                      .map(([label, value]) => ({ label, value })),
+                    // Unconfirmed (orange) - devices without domainTrust data - shown in donut, nested in legend
+                    ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : []),
+                    // Broken Trust (red) - devices with broken trust - shown in donut, nested in legend
+                    ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : [])
+                  ]}
+                  colors={{
+                    'Entra Joined': '#10b981', // emerald-500
+                    'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
+                    'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
+                    'Broken Trust': '#ef4444', // red-500 - broken trust
+                    'AxM Assigned': '#10b981', // emerald-500
+                    'default': '#8b5cf6' // violet-500
+                  }}
+                  onFilter={setTypeFilter}
+                  selectedFilter={typeFilter}
+                  nestedItems={[
+                    {
+                      parentLabel: 'Domain Joined',
+                      items: [
+                        // Broken Trust first, then Unconfirmed
+                        ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : []),
+                        ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : [])
+                      ]
+                    }
+                  ]}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Selections Accordion Section */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
+                {(deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-full">
+                    {[deviceStatusFilter, usageFilter, catalogFilter].filter(f => f !== 'all').length} active
+                  </span>
+                )}
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            
+            {filtersExpanded && (
+              <div className="px-6 pb-4 space-y-4">
+                {/* Device Status Filter */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Device Status</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'active', label: 'Active', count: filterCounts.active, color: 'emerald' },
+                      { value: 'stale', label: 'Stale', count: filterCounts.stale, color: 'yellow' },
+                      { value: 'missing', label: 'Missing', count: filterCounts.missing, color: 'red' }
+                    ].filter(opt => opt.count > 0).map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === opt.value ? 'all' : opt.value)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          deviceStatusFilter === opt.value
+                            ? `bg-${opt.color}-100 dark:bg-${opt.color}-900/30 text-${opt.color}-800 dark:text-${opt.color}-200 border-${opt.color}-300 dark:border-${opt.color}-700`
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label} ({opt.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Usage Filter */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'assigned', label: 'Assigned', count: filterCounts.assigned },
+                      { value: 'shared', label: 'Shared', count: filterCounts.shared }
+                    ].filter(opt => opt.count > 0).map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setUsageFilter(usageFilter === opt.value ? 'all' : opt.value)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          usageFilter === opt.value
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label} ({opt.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Catalog Filter */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { value: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum },
+                      { value: 'staff', label: 'Staff', count: filterCounts.staff },
+                      { value: 'faculty', label: 'Faculty', count: filterCounts.faculty },
+                      { value: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk }
+                    ].filter(opt => opt.count > 0).map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => setCatalogFilter(catalogFilter === opt.value ? 'all' : opt.value)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          catalogFilter === opt.value
+                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {opt.label} ({opt.count})
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Clear Selections */}
+                {(deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
+                  <div className="pt-2">
+                    <button
+                      onClick={() => {
+                        setDeviceStatusFilter('all')
+                        setUsageFilter('all')
+                        setCatalogFilter('all')
+                      }}
+                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+                    >
+                      Clear all selections
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -665,7 +867,7 @@ function ManagementPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-3">
-                {/* Clear Filters Button */}
+                {/* Clear Selections Button */}
                 {(providerFilter !== 'all' || enrollmentStatusFilter !== 'all' || typeFilter !== 'all' || deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all' || searchQuery !== '') && (
                   <button
                     onClick={() => {
@@ -679,7 +881,7 @@ function ManagementPageContent() {
                     }}
                     className="px-3 py-1.5 text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800 transition-colors"
                   >
-                    Clear filters
+                    Clear selections
                   </button>
                 )}
                 
@@ -940,7 +1142,7 @@ function ManagementPageContent() {
                       <td className="px-3 py-1.5 whitespace-nowrap">
                         <Link 
                           href={`/device/${mgmt.serialNumber}#management`}
-                          className="flex items-center hover:text-yellow-600 dark:hover:text-yellow-400"
+                          className="flex items-center text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
                         >
                           <div className="flex-1">
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{mgmt.deviceName}</div>

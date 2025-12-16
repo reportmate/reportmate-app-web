@@ -208,10 +208,12 @@ function ProfilesPageContent() {
               </Link>
               <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
               <div className="flex items-center gap-3 min-w-0">
-                <svg className="w-5 h-5 text-pink-600 dark:text-pink-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">Profiles</h1>
+                {/* Squircle Icon - Indigo for Profiles */}
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-violet-600 dark:from-violet-600 dark:to-violet-700 flex items-center justify-center shadow-sm">
+                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
               </div>
             </div>
 
@@ -364,7 +366,7 @@ function ProfilesPageContent() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <Link 
                           href={`/device/${profile.deviceId}`}
-                          className="flex items-center hover:text-violet-600 dark:hover:text-violet-400"
+                          className="flex items-center text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-300"
                         >
                           <div>
                             <div className="text-sm font-medium text-gray-900 dark:text-white">{profile.deviceName}</div>
