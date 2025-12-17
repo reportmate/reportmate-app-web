@@ -212,6 +212,7 @@ function SystemPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [platformFilter, setPlatformFilter] = useState('all')
   const [activationFilter, setActivationFilter] = useState('all')
+  const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
   
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
@@ -260,11 +261,12 @@ function SystemPageContent() {
     setSelectedLocations([])
     setPlatformFilter('all')
     setActivationFilter('all')
+    setFirmwareLicenseFilter('all')
     setSearchQuery('')
   }
   
   const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
-    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0)
+    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
   const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
@@ -321,6 +323,13 @@ function SystemPageContent() {
       const isActivated = s.raw?.operatingSystem?.activation?.isActivated
       if (activationFilter === 'activated' && !isActivated) return false
       if (activationFilter === 'not-activated' && isActivated !== false) return false
+    }
+    
+    // Filter by firmware license (OEM embedded license)
+    if (firmwareLicenseFilter !== 'all') {
+      const hasFirmwareLicense = s.raw?.operatingSystem?.activation?.hasFirmwareLicense
+      if (firmwareLicenseFilter === 'has-firmware' && hasFirmwareLicense !== true) return false
+      if (firmwareLicenseFilter === 'no-firmware' && hasFirmwareLicense !== false) return false
     }
     
     // Inventory-based filters
@@ -537,6 +546,17 @@ function SystemPageContent() {
                   <option value="all">All Activation Status</option>
                   <option value="activated">Activated</option>
                   <option value="not-activated">Not Activated</option>
+                </select>
+                {/* Firmware License Filter */}
+                <select
+                  value={firmwareLicenseFilter}
+                  onChange={(e) => setFirmwareLicenseFilter(e.target.value)}
+                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
+                  title="Filter by firmware-embedded (OEM) license. Devices without OEM licenses may lose activation when migrating from AD to Entra ID."
+                >
+                  <option value="all">All License Types</option>
+                  <option value="has-firmware">Has OEM License</option>
+                  <option value="no-firmware">No OEM License</option>
                 </select>
                 {/* Platform Filter */}
                 <select
@@ -870,6 +890,22 @@ function SystemPageContent() {
                             {sys.raw?.operatingSystem?.activation?.isActivated === false && (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
                                 Unlicensed
+                              </span>
+                            )}
+                            {sys.raw?.operatingSystem?.activation?.hasFirmwareLicense === false && sys.raw?.operatingSystem?.activation?.isActivated !== false && (
+                              <span 
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                                title="No firmware-embedded license. May lose activation when migrating from AD to Entra ID."
+                              >
+                                No OEM License
+                              </span>
+                            )}
+                            {sys.raw?.operatingSystem?.activation?.hasFirmwareLicense === true && (
+                              <span 
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                                title={`Firmware-embedded license detected. Source: ${sys.raw?.operatingSystem?.activation?.licenseSource || 'Firmware'}`}
+                              >
+                                OEM
                               </span>
                             )}
                           </div>
