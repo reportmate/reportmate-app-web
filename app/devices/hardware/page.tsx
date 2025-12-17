@@ -1158,14 +1158,17 @@ function HardwarePageContent() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {filteredHardware.map((hw) => (
                       <tr key={hw.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="px-4 py-4 min-w-0">
+                        <td className="px-4 py-4 min-w-0 max-w-56">
                           <Link
                             href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`}
-                            className="font-medium text-orange-600 hover:text-orange-800 dark:text-orange-400 dark:hover:text-orange-300 text-xs"
+                            className="group block min-w-0"
+                            title={hw.deviceName || hw.serialNumber || 'Unknown Device'}
                           >
-                            {hw.deviceName || hw.serialNumber || 'Unknown Device'}
+                            <span className="font-medium text-orange-600 group-hover:text-orange-800 dark:text-orange-400 dark:group-hover:text-orange-300 text-xs block truncate">
+                              {hw.deviceName || hw.serialNumber || 'Unknown Device'}
+                            </span>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                             {hw.serialNumber}
                             {hw.assetTag ? ` | ${hw.assetTag}` : ''}
                           </div>

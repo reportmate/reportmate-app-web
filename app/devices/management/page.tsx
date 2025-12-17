@@ -1139,28 +1139,27 @@ function ManagementPageContent() {
                 ) : (
                   filteredManagement.map((mgmt) => (
                     <tr key={mgmt.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-3 py-1.5 whitespace-nowrap">
+                      <td className="px-3 py-1.5 max-w-56">
                         <Link 
                           href={`/device/${mgmt.serialNumber}#management`}
-                          className="flex items-center text-yellow-600 hover:text-yellow-800 dark:text-yellow-400 dark:hover:text-yellow-300"
+                          className="group block min-w-0"
+                          title={mgmt.deviceName || 'Unknown Device'}
                         >
-                          <div className="flex-1">
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{mgmt.deviceName}</div>
-                            <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              <span className="inline-flex items-center gap-0.5">
-                                {mgmt.serialNumber}
-                                <CopyButton value={mgmt.serialNumber} size="sm" />
-                              </span>
-                              {mgmt.assetTag && (
-                                <>
-                                  <span className="text-gray-400 dark:text-gray-500">•</span>
-                                  <span className="inline-flex items-center gap-0.5">
-                                    {mgmt.assetTag}
-                                    <CopyButton value={mgmt.assetTag} size="sm" />
-                                  </span>
-                                </>
-                              )}
-                            </div>
+                          <div className="text-sm font-medium text-yellow-600 group-hover:text-yellow-800 dark:text-yellow-400 dark:group-hover:text-yellow-300 truncate">{mgmt.deviceName}</div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
+                            <span className="inline-flex items-center gap-0.5">
+                              {mgmt.serialNumber}
+                              <CopyButton value={mgmt.serialNumber} size="sm" />
+                            </span>
+                            {mgmt.assetTag && (
+                              <>
+                                <span className="text-gray-400 dark:text-gray-500">•</span>
+                                <span className="inline-flex items-center gap-0.5">
+                                  {mgmt.assetTag}
+                                  <CopyButton value={mgmt.assetTag} size="sm" />
+                                </span>
+                              </>
+                            )}
                           </div>
                         </Link>
                       </td>

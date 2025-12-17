@@ -848,17 +848,16 @@ function SystemPageContent() {
                 ) : (
                   searchFilteredSystems.map((sys) => (
                     <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 max-w-56">
                         <Link 
                           href={`/device/${sys.deviceId}#system`}
-                          className="flex items-center text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-300"
+                          className="group block min-w-0"
+                          title={sys.deviceName || 'Unknown Device'}
                         >
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{sys.deviceName}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              {sys.serialNumber}
-                              {sys.assetTag ? ` | ${sys.assetTag}` : ''}
-                            </div>
+                          <div className="text-sm font-medium text-purple-600 group-hover:text-purple-800 dark:text-purple-400 dark:group-hover:text-purple-300 truncate">{sys.deviceName}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                            {sys.serialNumber}
+                            {sys.assetTag ? ` | ${sys.assetTag}` : ''}
                           </div>
                         </Link>
                       </td>

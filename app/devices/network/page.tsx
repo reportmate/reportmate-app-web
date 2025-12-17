@@ -626,7 +626,7 @@ function NetworkPageContent() {
                 <tr>
                   <th 
                     onClick={() => handleSort('device')}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-48 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Device
@@ -696,13 +696,16 @@ function NetworkPageContent() {
                     
                     return (
                       <tr key={networkDevice.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-4 py-3 w-48">
-                          <div className="flex flex-col justify-center h-12">
+                        <td className="px-4 py-3 w-56">
+                          <div className="flex flex-col justify-center h-12 min-w-0">
                             <Link
                               href={`/device/${encodeURIComponent(networkDevice.deviceId)}#network`}
-                              className="font-medium text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 text-sm leading-tight truncate max-w-44"
+                              className="group block min-w-0"
+                              title={networkDevice.deviceName || 'Unknown Device'}
                             >
-                              {networkDevice.deviceName || 'Unknown Device'}
+                              <span className="font-medium text-teal-600 group-hover:text-teal-800 dark:text-teal-400 dark:group-hover:text-teal-300 text-sm leading-tight block truncate">
+                                {networkDevice.deviceName || 'Unknown Device'}
+                              </span>
                             </Link>
                             <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight">
                               <span className="truncate max-w-32">{networkDevice.serialNumber}</span>
