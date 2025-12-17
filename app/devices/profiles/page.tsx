@@ -363,19 +363,18 @@ function ProfilesPageContent() {
                 ) : (
                   filteredProfiles.map((profile) => (
                     <tr key={`${profile.deviceId}-${profile.profileIdentifier}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 max-w-56">
                         <Link 
                           href={`/device/${profile.deviceId}`}
-                          className="flex items-center text-violet-600 hover:text-violet-800 dark:text-violet-400 dark:hover:text-violet-300"
+                          className="group block min-w-0"
+                          title={profile.deviceName || 'Unknown Device'}
                         >
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{profile.deviceName}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              {profile.serialNumber}
-                              {(profile as any).assetTag && (
-                                <span className="ml-1">| {(profile as any).assetTag}</span>
-                              )}
-                            </div>
+                          <div className="text-sm font-medium text-violet-600 group-hover:text-violet-800 dark:text-violet-400 dark:group-hover:text-violet-300 truncate">{profile.deviceName}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                            {profile.serialNumber}
+                            {(profile as any).assetTag && (
+                              <span className="ml-1">| {(profile as any).assetTag}</span>
+                            )}
                           </div>
                         </Link>
                       </td>

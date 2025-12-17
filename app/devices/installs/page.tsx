@@ -3460,15 +3460,18 @@ function InstallsPageContent() {
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredInstalls.map((install) => (
                     <tr key={install.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
+                      <td className="px-6 py-4 max-w-56">
+                        <div className="flex flex-col min-w-0">
                           <Link
                             href={`/device/${install.serialNumber}`}
-                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                            className="group block min-w-0"
+                            title={install.deviceName || 'Unknown Device'}
                           >
-                            {install.deviceName}
+                            <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
+                              {install.deviceName}
+                            </span>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 truncate">
                             <span>{install.serialNumber}</span>
                             {install.assetTag && (
                               <>
@@ -3597,15 +3600,18 @@ function InstallsPageContent() {
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                   {filteredConfigData.map((device) => (
                     <tr key={device.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                      <td className="px-4 py-3">
-                        <div className="flex flex-col">
+                      <td className="px-4 py-3 max-w-56">
+                        <div className="flex flex-col min-w-0">
                           <Link 
                             href={`/device/${device.serialNumber}`}
-                            className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                            className="group block min-w-0"
+                            title={device.deviceName || 'Unknown Device'}
                           >
-                            {device.deviceName}
+                            <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
+                              {device.deviceName}
+                            </span>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                             {device.serialNumber}
                             {device.assetTag && <span className="ml-2 text-gray-400">• {device.assetTag}</span>}
                           </div>
@@ -3774,12 +3780,18 @@ function InstallsPageContent() {
                       
                       return (
                         <tr key={device.serialNumber} className="hover:bg-gray-50 dark:hover:bg-gray-800">
-                          <td className="px-4 py-3">
-                            <div>
-                              <Link href={`/device/${device.serialNumber}`} className="text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300 font-medium">
-                                {device.modules?.inventory?.deviceName || device.serialNumber}
+                          <td className="px-4 py-3 max-w-56">
+                            <div className="min-w-0">
+                              <Link 
+                                href={`/device/${device.serialNumber}`} 
+                                className="group block min-w-0"
+                                title={device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown Device'}
+                              >
+                                <span className="text-emerald-600 group-hover:text-emerald-800 dark:text-emerald-400 dark:group-hover:text-emerald-300 font-medium block truncate">
+                                  {device.modules?.inventory?.deviceName || device.serialNumber}
+                                </span>
                               </Link>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                                 {device.serialNumber}
                                 {device.modules?.inventory?.assetTag && (
                                   <span className="ml-2 text-gray-400 dark:text-gray-500">• {device.modules.inventory.assetTag}</span>

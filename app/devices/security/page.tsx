@@ -319,19 +319,18 @@ function SecurityPageContent() {
                 ) : (
                   filteredSecurity.map((sec) => (
                     <tr key={sec.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 max-w-56">
                         <Link 
                           href={`/device/${sec.deviceId}`}
-                          className="flex items-center text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                          className="group block min-w-0"
+                          title={sec.deviceName || 'Unknown Device'}
                         >
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{sec.deviceName}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                              {sec.serialNumber}
-                              {(sec as any).assetTag && (
-                                <span className="ml-1">| {(sec as any).assetTag}</span>
-                              )}
-                            </div>
+                          <div className="text-sm font-medium text-red-600 group-hover:text-red-800 dark:text-red-400 dark:group-hover:text-red-300 truncate">{sec.deviceName}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                            {sec.serialNumber}
+                            {(sec as any).assetTag && (
+                              <span className="ml-1">| {(sec as any).assetTag}</span>
+                            )}
                           </div>
                         </Link>
                       </td>
