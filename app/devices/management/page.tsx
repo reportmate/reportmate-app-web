@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation"
 import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { CopyButton } from "../../../src/components/ui/CopyButton"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface Management {
   id: string
@@ -34,34 +35,81 @@ interface Management {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-8">
-      {/* Widgets Skeleton */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {[...Array(3)].map((_, i) => (
-          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 h-48 animate-pulse">
-            <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-6"></div>
-            <div className="flex items-center justify-center h-24">
-              <div className="w-24 h-24 rounded-full border-4 border-gray-200 dark:border-gray-700"></div>
-            </div>
+    <div>
+      {/* Widgets Accordion Skeleton - Match exact accordion structure */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 animate-pulse">
+          <div className="flex items-center gap-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
           </div>
-        ))}
+          <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+      
+      {/* Widgets Content Skeleton - Match exact spacing with px-6 py-6 and bg-white */}
+      <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+              {/* Widget Title */}
+              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-3"></div>
+              
+              {/* Donut Chart Layout - exact same structure as actual DonutChart */}
+              <div className="flex items-start gap-6">
+                {/* Chart Circle - same size as actual donut (w-32 h-32) */}
+                <div className="relative w-32 h-32 flex-shrink-0">
+                  <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                </div>
+                
+                {/* Legend Items */}
+                <div className="flex-1 space-y-2">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded flex-1 max-w-[80px]"></div>
+                      </div>
+                      <div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded ml-2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Filters Accordion Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 animate-pulse">
+          <div className="flex items-center gap-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+          </div>
+          <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
       </div>
 
       {/* Table Skeleton */}
-      <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-        </div>
-        <div className="p-4 space-y-4">
-          {[...Array(15)].map((_, i) => (
-            <div key={i} className="flex items-center space-x-4 py-1">
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/6"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/6"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/6"></div>
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+      <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+        <div className="min-w-full">
+          <div className="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
+            <div className="flex space-x-8">
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24"></div>
             </div>
-          ))}
+          </div>
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {[...Array(15)].map((_, i) => (
+              <div key={i} className="px-3 py-3 flex space-x-8">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28"></div>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
@@ -78,10 +126,14 @@ function ManagementPageContent() {
   const [enrollmentStatusFilter, setEnrollmentStatusFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   
-  // Inventory filters
-  const [deviceStatusFilter, setDeviceStatusFilter] = useState('all')
-  const [usageFilter, setUsageFilter] = useState('all')
-  const [catalogFilter, setCatalogFilter] = useState('all')
+  // Shared filter states
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   
   // Sorting state - default to Device column ascending
   const [sortColumn, setSortColumn] = useState<'device' | 'provider' | 'status' | 'type' | 'deviceId'>('device')
@@ -90,6 +142,79 @@ function ManagementPageContent() {
   // Accordion states
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  
+  // Donut chart expanded states
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  
+  // Toggle category expansion
+  const toggleCategory = (categoryLabel: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryLabel)) {
+        newSet.delete(categoryLabel)
+      } else {
+        newSet.add(categoryLabel)
+      }
+      return newSet
+    })
+  }
+
+  // Filter toggle functions
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    )
+  }
+  
+  const toggleCatalog = (catalog: string) => {
+    setSelectedCatalogs(prev => 
+      prev.includes(catalog) ? prev.filter(c => c !== catalog) : [...prev, catalog]
+    )
+  }
+  
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev => 
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+    )
+  }
+  
+  const toggleLocation = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
+    )
+  }
+  
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev => 
+      prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+  
+  const togglePlatform = (platform: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
+    )
+  }
+  
+  const toggleUsage = (usage: string) => {
+    setSelectedUsages(prev => 
+      prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
+    )
+  }
+  
+  const clearAllFilters = () => {
+    setSelectedStatuses([])
+    setSelectedCatalogs([])
+    setSelectedAreas([])
+    setSelectedLocations([])
+    setSelectedFleets([])
+    setSelectedPlatforms([])
+    setSelectedUsages([])
+    setProviderFilter('all')
+    setEnrollmentStatusFilter('all')
+    setTypeFilter('all')
+    setSearchQuery('')
+  }
   
   // Handle column sort click
   const handleSort = (column: 'device' | 'provider' | 'status' | 'type' | 'deviceId') => {
@@ -200,6 +325,17 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
+  // Create filter options for shared DeviceFilters component
+  const filterOptions: FilterOptions = {
+    statuses: [...new Set(management.map(m => m.status).filter(Boolean))].sort(),
+    catalogs: [...new Set(management.map(m => m.catalog).filter(Boolean))].sort(),
+    areas: [], // Add areas when available in data
+    locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
+    fleets: [], // Add fleets when available in data  
+    platforms: [...new Set(management.map(m => m.raw?.system?.operatingSystem?.name || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
+    usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
+  }
+
   // Count Broken Trust - Domain-joined devices with trustStatus === 'Broken'
   // Use deviceState.domainJoined as source of truth (not enrollmentType)
   const brokenTrustCount = management.filter(m => {
@@ -214,6 +350,14 @@ function ManagementPageContent() {
     const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const hasDomainTrust = m.raw?.domainTrust != null
     return isDomainJoined && !hasDomainTrust
+  }).length
+
+  // Count Valid Trust - Domain Joined devices with healthy/valid trust status
+  const trustValidCount = management.filter(m => {
+    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
+    const trustStatus = m.raw?.domainTrust?.trustStatus
+    const hasDomainTrust = m.raw?.domainTrust != null
+    return isDomainJoined && hasDomainTrust && trustStatus !== 'Broken'
   }).length
 
   // Get unique providers with counts (filter out Unknown)
@@ -296,11 +440,16 @@ function ManagementPageContent() {
     kiosk: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'kiosk').length,
   }
 
-  // Apply inventory filters to get final filtered list
+  // Apply shared filters to get final filtered list
   const filteredManagement = baseFilteredManagement.filter(m => {
-    if (deviceStatusFilter !== 'all' && m.status?.toLowerCase() !== deviceStatusFilter) return false
-    if (usageFilter !== 'all' && m.usage?.toLowerCase() !== usageFilter) return false
-    if (catalogFilter !== 'all' && m.catalog?.toLowerCase() !== catalogFilter) return false
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(m.status || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(m.catalog || '')) return false
+    if (selectedUsages.length > 0 && !selectedUsages.includes(m.usage || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(m.location || '')) return false
+    if (selectedPlatforms.length > 0) {
+      const platform = m.raw?.system?.operatingSystem?.name || ''
+      if (!selectedPlatforms.includes(platform)) return false
+    }
     return true
   }).sort((a, b) => {
     // Apply sorting
@@ -337,7 +486,7 @@ function ManagementPageContent() {
     }
   })
 
-  // Helper for Donut Chart
+  // Helper for Donut Chart with Collapsible Nested Items
   const DonutChart = ({ 
     data, 
     colors, 
@@ -353,24 +502,49 @@ function ManagementPageContent() {
     selectedFilter?: string;
     nestedItems?: { parentLabel: string; items: { label: string; value: number }[] }[];
   }) => {
-    const total = data.reduce((sum, item) => sum + item.value, 0)
-    let cumulativePercent = 0
-    const radius = 32
-    const circumference = 2 * Math.PI * radius
-
     // Build a map of parent labels to their nested items
     const nestedMap = new Map<string, { label: string; value: number }[]>()
     nestedItems.forEach(n => nestedMap.set(n.parentLabel, n.items))
+    
+    // Build set of nested item labels to exclude from main data
+    const nestedLabels = new Set<string>()
+    nestedItems.forEach(n => n.items.forEach(i => nestedLabels.add(i.label)))
+    
+    // For the donut chart, show expanded nested items or collapsed parent items
+    const chartData: { label: string; value: number }[] = []
+    
+    data.forEach(item => {
+      const nested = nestedMap.get(item.label)
+      const isExpanded = expandedCategories.has(item.label)
+      
+      // Skip items that are nested under another parent (they'll be handled by their parent)
+      if (nestedLabels.has(item.label)) {
+        return
+      }
+      
+      if (nested && nested.length > 0 && isExpanded) {
+        // If expanded, show nested items instead of parent
+        chartData.push(...nested)
+      } else {
+        // Show parent item (collapsed or no nested items)
+        chartData.push(item)
+      }
+    })
+    
+    const total = chartData.reduce((sum, item) => sum + item.value, 0)
+    let cumulativePercent = 0
+    const radius = 32
+    const circumference = 2 * Math.PI * radius
 
     if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
 
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
-        <div className="flex items-center gap-6">
+        <div className="flex items-start gap-6">
           <div className="relative w-32 h-32 flex-shrink-0">
             <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
-              {data.map((item) => {
+              {chartData.map((item) => {
                 const percent = item.value / total
                 const strokeDasharray = `${percent * circumference} ${circumference}`
                 const strokeDashoffset = -cumulativePercent * circumference
@@ -404,20 +578,41 @@ function ManagementPageContent() {
                 .map(item => {
                   const isSelected = selectedFilter === item.label
                   const nested = nestedMap.get(item.label)
+                  const hasNested = nested && nested.length > 0
+                  const isExpanded = expandedCategories.has(item.label)
+                  
                   return (
                     <div key={item.label}>
-                      <div 
-                        className={`flex items-center justify-between text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
-                        onClick={() => onFilter && onFilter(isSelected ? 'all' : item.label)}
-                      >
-                        <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-between text-sm">
+                        {/* Parent item with expand/collapse if it has nested items */}
+                        <div 
+                          className={`flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
+                          onClick={() => {
+                            if (hasNested) {
+                              toggleCategory(item.label)
+                            } else if (onFilter) {
+                              onFilter(isSelected ? 'all' : item.label)
+                            }
+                          }}
+                        >
                           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
                           <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={item.label}>{item.label}</span>
+                          {hasNested && (
+                            <svg 
+                              className={`w-3 h-3 text-gray-400 transition-transform ml-auto ${isExpanded ? 'rotate-90' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          )}
                         </div>
-                        <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
+                        <span className="font-medium text-gray-900 dark:text-white ml-2">{item.value}</span>
                       </div>
-                      {/* Render nested items indented under parent */}
-                      {nested && nested.length > 0 && (
+                      
+                      {/* Render nested items when expanded */}
+                      {hasNested && isExpanded && (
                         <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-2">
                           {nested.map(nestedItem => {
                             const isNestedSelected = selectedFilter === nestedItem.label
@@ -540,7 +735,29 @@ function ManagementPageContent() {
           </div>
         </header>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <LoadingSkeleton />
+          <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden animate-pulse">
+            
+            {/* Title Section with Loading Progress */}
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-6 w-48 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
+                  <div className="h-4 w-64 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {/* Search Field */}
+                  <div className="relative flex-1 max-w-md">
+                    <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                  </div>
+                  
+                  {/* Export Button */}
+                  <div className="h-7 w-32 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
+                </div>
+              </div>
+            </div>
+            
+            <LoadingSkeleton />
+          </div>
         </div>
       </div>
     )
@@ -645,6 +862,90 @@ function ManagementPageContent() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
           
+          {/* Title Section */}
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Enrollment status and type, providers, and configurations • {filteredManagement.length} devices
+                </p>
+              </div>
+              {loading ? (
+                /* Loading Progress Bar */
+                <div className="flex-1 min-w-0 ml-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                          Loading management data...
+                        </p>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div className="bg-blue-600 h-2 rounded-full transition-all duration-1000 ease-out animate-pulse w-2/3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  {/* Search Field */}
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search devices"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  {/* Export to CSV Button */}
+                  <button
+                    onClick={() => {
+                      // Build CSV from filtered data only
+                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Usage', 'Catalog', 'Location']
+                      const rows = filteredManagement.map(m => [
+                        m.deviceName || '',
+                        m.serialNumber || '',
+                        m.assetTag || '',
+                        m.provider || '',
+                        m.enrollmentStatus || '',
+                        m.enrollmentType || '',
+                        m.usage || '',
+                        m.catalog || '',
+                        m.location || ''
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      
+                      const csv = [headers.join(','), ...rows].join('\n')
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                      const url = URL.createObjectURL(blob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `management-report-${new Date().toISOString().split('T')[0]}.csv`
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                      URL.revokeObjectURL(url)
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                    title="Export filtered devices to CSV"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export to CSV
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+          
           {/* Widgets Accordion */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
             <button
@@ -721,6 +1022,7 @@ function ManagementPageContent() {
                     'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
                     'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
                     'Broken Trust': '#ef4444', // red-500 - broken trust
+                    'Trust Valid': '#eab308', // yellow-500 - valid trust
                     'AxM Assigned': '#10b981', // emerald-500
                     'default': '#8b5cf6' // violet-500
                   }}
@@ -730,7 +1032,8 @@ function ManagementPageContent() {
                     {
                       parentLabel: 'Domain Joined',
                       items: [
-                        // Broken Trust first, then Unconfirmed
+                        // Trust Valid first, then Broken Trust, then Unconfirmed
+                        ...(trustValidCount > 0 ? [{ label: 'Trust Valid', value: trustValidCount }] : []),
                         ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : []),
                         ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : [])
                       ]
@@ -741,316 +1044,31 @@ function ManagementPageContent() {
             </div>
           )}
 
-          {/* Selections Accordion Section */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {(deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-teal-100 dark:bg-teal-900/30 text-teal-700 dark:text-teal-300 rounded-full">
-                    {[deviceStatusFilter, usageFilter, catalogFilter].filter(f => f !== 'all').length} active
-                  </span>
-                )}
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            
-            {filtersExpanded && (
-              <div className="px-6 pb-4 space-y-4">
-                {/* Device Status Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Device Status</div>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: 'active', label: 'Active', count: filterCounts.active, color: 'emerald' },
-                      { value: 'stale', label: 'Stale', count: filterCounts.stale, color: 'yellow' },
-                      { value: 'missing', label: 'Missing', count: filterCounts.missing, color: 'red' }
-                    ].filter(opt => opt.count > 0).map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === opt.value ? 'all' : opt.value)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          deviceStatusFilter === opt.value
-                            ? `bg-${opt.color}-100 dark:bg-${opt.color}-900/30 text-${opt.color}-800 dark:text-${opt.color}-200 border-${opt.color}-300 dark:border-${opt.color}-700`
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label} ({opt.count})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Usage Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: 'assigned', label: 'Assigned', count: filterCounts.assigned },
-                      { value: 'shared', label: 'Shared', count: filterCounts.shared }
-                    ].filter(opt => opt.count > 0).map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setUsageFilter(usageFilter === opt.value ? 'all' : opt.value)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          usageFilter === opt.value
-                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label} ({opt.count})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Catalog Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { value: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum },
-                      { value: 'staff', label: 'Staff', count: filterCounts.staff },
-                      { value: 'faculty', label: 'Faculty', count: filterCounts.faculty },
-                      { value: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk }
-                    ].filter(opt => opt.count > 0).map(opt => (
-                      <button
-                        key={opt.value}
-                        onClick={() => setCatalogFilter(catalogFilter === opt.value ? 'all' : opt.value)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          catalogFilter === opt.value
-                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {opt.label} ({opt.count})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Clear Selections */}
-                {(deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all') && (
-                  <div className="pt-2">
-                    <button
-                      onClick={() => {
-                        setDeviceStatusFilter('all')
-                        setUsageFilter('all')
-                        setCatalogFilter('all')
-                      }}
-                      className="text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
-                    >
-                      Clear all selections
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {/* Shared Device Filters Component */}
+          <DeviceFilters
+            filterOptions={filterOptions}
+            selectedStatuses={selectedStatuses}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedPlatforms={selectedPlatforms}
+            selectedUsages={selectedUsages}
+            onStatusToggle={toggleStatus}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onPlatformToggle={togglePlatform}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
 
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  MDM enrollment and configuration • {filteredManagement.length} devices
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                {/* Clear Selections Button */}
-                {(providerFilter !== 'all' || enrollmentStatusFilter !== 'all' || typeFilter !== 'all' || deviceStatusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all' || searchQuery !== '') && (
-                  <button
-                    onClick={() => {
-                      setProviderFilter('all')
-                      setEnrollmentStatusFilter('all')
-                      setTypeFilter('all')
-                      setDeviceStatusFilter('all')
-                      setUsageFilter('all')
-                      setCatalogFilter('all')
-                      setSearchQuery('')
-                    }}
-                    className="px-3 py-1.5 text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 rounded-lg hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800 transition-colors"
-                  >
-                    Clear selections
-                  </button>
-                )}
-                
-                {/* Search */}
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Search management..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                  />
-                </div>
-                
-                {/* Export to CSV Button */}
-                <button
-                  onClick={() => {
-                    // Build CSV from filtered data only
-                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Provider', 'Enrollment Status', 'Enrollment Type', 'Intune Device ID', 'Tenant', 'Trust Status']
-                    const rows = filteredManagement.map(m => {
-                      let displayType = m.enrollmentType || ''
-                      if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
-                      if (displayType === 'Entra Join') displayType = 'Entra Joined'
-                      const trustStatus = m.raw?.domainTrust?.trustStatus || ''
-                      return [
-                        m.deviceName || '',
-                        m.serialNumber || '',
-                        m.assetTag || '',
-                        m.provider || '',
-                        m.enrollmentStatus || '',
-                        displayType,
-                        m.intuneId || '',
-                        m.tenantName || '',
-                        trustStatus
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
-                    })
-                    
-                    const csv = [headers.join(','), ...rows].join('\n')
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                    const url = URL.createObjectURL(blob)
-                    const link = document.createElement('a')
-                    link.href = url
-                    link.download = `management-report-${new Date().toISOString().split('T')[0]}.csv`
-                    document.body.appendChild(link)
-                    link.click()
-                    document.body.removeChild(link)
-                    URL.revokeObjectURL(url)
-                  }}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  title="Export filtered devices to CSV"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export CSV
-                </button>
-              </div>
-            </div>
-          </div>
+
           
-          {/* Inventory Filters */}
-          <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
-            <nav className="flex flex-wrap gap-2 items-center">
-              {/* Status Filters */}
-              {[
-                { key: 'active', label: 'Active', count: filterCounts.active, type: 'status', colors: 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-600 dark:hover:bg-emerald-800' },
-                { key: 'stale', label: 'Stale', count: filterCounts.stale, type: 'status', colors: 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-600 dark:hover:bg-amber-800' },
-                { key: 'missing', label: 'Missing', count: filterCounts.missing, type: 'status', colors: 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-800' },
-              ].map((filter) => {
-                const isActive = deviceStatusFilter === filter.key
-                
-                return (
-                  <button
-                    key={filter.key}
-                    onClick={() => setDeviceStatusFilter(deviceStatusFilter === filter.key ? 'all' : filter.key)}
-                    className={`${
-                      isActive
-                        ? filter.colors
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                    } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                  >
-                    <span>{filter.label}</span>
-                    <span className={`${
-                      isActive 
-                        ? 'bg-white/20 text-current'
-                        : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                    } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                      {filter.count}
-                    </span>
-                  </button>
-                )
-              })}
-              
-              {/* Separator - Status/Usage */}
-              <div className="flex items-center px-2">
-                <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
-              </div>
-              
-              {/* Usage Filters */}
-              {[
-                { key: 'assigned', label: 'Assigned', count: filterCounts.assigned, type: 'usage', colors: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800' },
-                { key: 'shared', label: 'Shared', count: filterCounts.shared, type: 'usage', colors: 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800' },
-              ].map((filter) => {
-                const isActive = usageFilter === filter.key
-                
-                return (
-                  <button
-                    key={filter.key}
-                    onClick={() => setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)}
-                    className={`${
-                      isActive
-                        ? filter.colors
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                    } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                  >
-                    <span>{filter.label}</span>
-                    <span className={`${
-                      isActive 
-                        ? 'bg-white/20 text-current'
-                        : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                    } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                      {filter.count}
-                    </span>
-                  </button>
-                )
-              })}
-              
-              {/* Separator - Usage/Catalog */}
-              <div className="flex items-center px-2">
-                <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
-              </div>
-              
-              {/* Catalog Filters */}
-              {[
-                { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum, type: 'catalog', colors: 'bg-teal-100 text-teal-700 border-teal-300 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-600 dark:hover:bg-teal-800' },
-                { key: 'staff', label: 'Staff', count: filterCounts.staff, type: 'catalog', colors: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800' },
-                { key: 'faculty', label: 'Faculty', count: filterCounts.faculty, type: 'catalog', colors: 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800' },
-                { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk, type: 'catalog', colors: 'bg-cyan-100 text-cyan-700 border-cyan-300 hover:bg-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-600 dark:hover:bg-cyan-800' },
-              ].map((filter) => {
-                const isActive = catalogFilter === filter.key
-                
-                return (
-                  <button
-                    key={filter.key}
-                    onClick={() => setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)}
-                    className={`${
-                      isActive
-                        ? filter.colors
-                        : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                    } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                  >
-                    <span>{filter.label}</span>
-                    <span className={`${
-                      isActive 
-                        ? 'bg-white/20 text-current'
-                        : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                    } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                      {filter.count}
-                    </span>
-                  </button>
-                )
-              })}
-            </nav>
-          </div>
+
 
           <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
