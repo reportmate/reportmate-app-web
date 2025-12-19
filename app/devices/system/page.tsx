@@ -534,7 +534,10 @@ function SystemPageContent() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System Information • {searchFilteredSystems.length} devices</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System Information</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  OS versions, activation status, and system uptime • {searchFilteredSystems.length} devices
+                </p>
               </div>
               <div className="flex items-center gap-4">
                 {/* Activation Filter */}
