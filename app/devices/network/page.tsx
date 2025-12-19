@@ -288,11 +288,19 @@ function NetworkPageContent() {
                   <div className="h-4 w-64 bg-gray-300 dark:bg-gray-600 rounded"></div>
                 </div>
                 <div className="flex items-center gap-4">
+                  {/* Connection Type Filter Buttons */}
                   <div className="flex items-center gap-2">
-                    <div className="h-8 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                    <div className="h-8 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                    <div className="h-7 w-14 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
+                    <div className="h-7 w-20 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
                   </div>
-                  <div className="h-8 w-48 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                  
+                  {/* Search Field */}
+                  <div className="relative flex-1 max-w-md">
+                    <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                  </div>
+                  
+                  {/* Export Button */}
+                  <div className="h-7 w-28 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
                 </div>
               </div>
             </div>
@@ -428,72 +436,109 @@ function NetworkPageContent() {
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration • {filteredNetworkDevices.length} devices</h2>
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  IP addresses, MAC addresses, and connectivity status • {filteredNetworkDevices.length} devices
+                </p>
               </div>
-              <div className="flex items-center gap-4">
-                {/* Connection Type Filters */}
-                <div className="flex items-center gap-2">
+              {loading ? (
+                /* Loading Progress Bar */
+                <div className="flex-1 min-w-0 ml-6">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                          Loading network data...
+                        </p>
+                      </div>
+                      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                        <div className="bg-teal-600 h-2 rounded-full transition-all duration-1000 ease-out animate-pulse w-2/3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-4">
+                  {/* Connection Type Filters */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setConnectionFilter(connectionFilter === 'wired' ? 'all' : 'wired')}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                        connectionFilter === 'wired'
+                          ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Wired
+                    </button>
+                    <button
+                      onClick={() => setConnectionFilter(connectionFilter === 'wireless' ? 'all' : 'wireless')}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
+                        connectionFilter === 'wireless'
+                          ? 'bg-teal-100 border-teal-300 text-teal-800 dark:bg-teal-900 dark:border-teal-700 dark:text-teal-200'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Wireless
+                    </button>
+                  </div>
+                  
+                  {/* Search Field */}
+                  <div className="relative flex-1 max-w-md">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search devices, IPs, MACs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    />
+                  </div>
+                  
+                  {/* Export to CSV Button */}
                   <button
-                    onClick={() => setConnectionFilter(connectionFilter === 'wired' ? 'all' : 'wired')}
-                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                      connectionFilter === 'wired'
-                        ? 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900 dark:border-green-700 dark:text-green-200'
-                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
-                    }`}
+                    onClick={() => {
+                      // Build CSV from filtered data only
+                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS']
+                      const rows = filteredNetworkDevices.map(n => {
+                        const ipv4 = getIPv4Address(n.networkInfo.ipAddress)
+                        return [
+                          n.deviceName || '',
+                          n.serialNumber || '',
+                          n.assetTag || '',
+                          ipv4 || n.networkInfo.ipAddress || '',
+                          n.networkInfo.macAddress || '',
+                          n.networkInfo.connectionType || '',
+                          n.networkInfo.ssid || '',
+                          n.networkInfo.dnsAddress || ''
+                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
+                      })
+                      
+                      const csv = [headers.join(','), ...rows].join('\n')
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                      const url = URL.createObjectURL(blob)
+                      const link = document.createElement('a')
+                      link.href = url
+                      link.download = `network-report-${new Date().toISOString().split('T')[0]}.csv`
+                      document.body.appendChild(link)
+                      link.click()
+                      document.body.removeChild(link)
+                      URL.revokeObjectURL(url)
+                    }}
+                    className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                    title="Export filtered devices to CSV"
                   >
-                    Wired
-                  </button>
-                  <button
-                    onClick={() => setConnectionFilter(connectionFilter === 'wireless' ? 'all' : 'wireless')}
-                    className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
-                      connectionFilter === 'wireless'
-                        ? 'bg-teal-100 border-teal-300 text-teal-800 dark:bg-teal-900 dark:border-teal-700 dark:text-teal-200'
-                        : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
-                    }`}
-                  >
-                    Wireless
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Export to CSV
                   </button>
                 </div>
-                
-                {/* Export to CSV Button */}
-                <button
-                  onClick={() => {
-                    // Build CSV from filtered data only
-                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS']
-                    const rows = filteredNetworkDevices.map(n => {
-                      const ipv4 = getIPv4Address(n.networkInfo.ipAddress)
-                      return [
-                        n.deviceName || '',
-                        n.serialNumber || '',
-                        n.assetTag || '',
-                        ipv4 || n.networkInfo.ipAddress || '',
-                        n.networkInfo.macAddress || '',
-                        n.networkInfo.connectionType || '',
-                        n.networkInfo.ssid || '',
-                        n.networkInfo.dnsAddress || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
-                    })
-                    
-                    const csv = [headers.join(','), ...rows].join('\n')
-                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-                    const url = URL.createObjectURL(blob)
-                    const link = document.createElement('a')
-                    link.href = url
-                    link.download = `network-report-${new Date().toISOString().split('T')[0]}.csv`
-                    document.body.appendChild(link)
-                    link.click()
-                    document.body.removeChild(link)
-                    URL.revokeObjectURL(url)
-                  }}
-                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
-                  title="Export filtered devices to CSV"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                  Export CSV
-                </button>
-              </div>
+              )}
             </div>
           </div>
 
@@ -603,7 +648,7 @@ function NetworkPageContent() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search devices, IPs, MACs, DNS, asset tags..."
+                  placeholder="Search devices"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -794,7 +839,7 @@ function NetworkPageContent() {
                                  networkDevice.networkInfo.connectionType.toLowerCase().includes('wireless'));
                               
                               // Build connection display
-                              let connections = [];
+                              const connections: string[] = [];
                               if (hasWired) connections.push('Wired');
                               if (hasWireless) {
                                 const ssid = networkDevice.networkInfo.ssid || networkDevice.networkInfo.networkName;
