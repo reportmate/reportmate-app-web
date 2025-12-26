@@ -28,8 +28,10 @@ export function DeviceSearchField({
   const [suggestions, setSuggestions] = useState<Device[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 })
   const inputRef = useRef<HTMLInputElement>(null)
   const suggestionsRef = useRef<HTMLDivElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Global keyboard shortcut (Ctrl/Cmd + K) to focus search
   useEffect(() => {
@@ -83,6 +85,16 @@ export function DeviceSearchField({
         setSuggestions(filteredDevices)
         setShowSuggestions(filteredDevices.length > 0)
         setSelectedIndex(-1)
+        
+        // Update dropdown position
+        if (containerRef.current && filteredDevices.length > 0) {
+          const rect = containerRef.current.getBoundingClientRect()
+          setDropdownPosition({
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width
+          })
+        }
       }
     } catch (error) {
       console.error('Error searching devices:', error)
@@ -227,21 +239,37 @@ export function DeviceSearchField({
   const actualPlaceholder = placeholder
 
   return (
-    <div className={`relative ${className}`}>
+    <div ref={containerRef} className={`relative ${className}`}>
       <form onSubmit={handleSubmit} className="relative">
         <div className="relative">
           <input
             ref={inputRef}
             type="text"
+            name="search"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
             onFocus={() => {
               if (suggestions.length > 0) {
                 setShowSuggestions(true)
+                // Update position on focus
+                if (containerRef.current) {
+                  const rect = containerRef.current.getBoundingClientRect()
+                  setDropdownPosition({
+                    top: rect.bottom + 4,
+                    left: rect.left,
+                    width: rect.width
+                  })
+                }
               }
             }}
             placeholder={actualPlaceholder}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck="false"
+            data-form-type="other"
+            data-lpignore="true"
             className="w-full pl-10 pr-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors"
           />
           
@@ -262,7 +290,13 @@ export function DeviceSearchField({
       {showSuggestions && suggestions.length > 0 && (
         <div 
           ref={suggestionsRef}
-          className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-64 overflow-y-auto"
+          style={{
+            position: 'fixed',
+            top: `${dropdownPosition.top}px`,
+            left: `${dropdownPosition.left}px`,
+            width: `${dropdownPosition.width}px`
+          }}
+          className="z-[300] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-64 overflow-y-auto"
         >
           {suggestions.map((device, index) => (
             <button
@@ -290,7 +324,7 @@ export function DeviceSearchField({
                     </span>
                     {device.assetTag && (
                       <>
-                        <span>•</span>
+                        <span></span>
                         <span className="font-medium">
                           {getHighlightedText(device.assetTag, searchQuery)}
                         </span>
