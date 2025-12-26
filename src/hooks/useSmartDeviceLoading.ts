@@ -94,7 +94,7 @@ export function useSmartDeviceLoading(deviceId: string) {
         
       } catch (error) {
         if (cancelled) return
-        console.error(`[SMART LOAD] ❌ Error loading InfoTab:`, error)
+        console.error(`[SMART LOAD] Error loading InfoTab:`, error)
         setInfoError(error instanceof Error ? error.message : String(error))
         setInfoLoading(false)
       }
@@ -180,7 +180,7 @@ export function useSmartDeviceLoading(deviceId: string) {
           
         } catch (error) {
           if (cancelled) return
-          console.error(`[SMART LOAD] ❌ Error loading ${moduleName}:`, error)
+          console.error(`[SMART LOAD] Error loading ${moduleName}:`, error)
           
           setModuleStates(prev => ({
             ...prev,
@@ -267,7 +267,7 @@ export function useSmartDeviceLoading(deviceId: string) {
       }
       
     } catch (error) {
-      console.error(`[SMART LOAD] ❌ On-demand load failed for ${moduleName}:`, error)
+      console.error(`[SMART LOAD] On-demand load failed for ${moduleName}:`, error)
       
       setModuleStates(prev => ({
         ...prev,

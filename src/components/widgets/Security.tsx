@@ -26,7 +26,7 @@ interface SecurityWidgetProps {
 
 export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   // Debug logging to see exactly what data we're getting
-  console.log('🔐 SecurityWidget DEBUG:', {
+  console.log('SecurityWidget DEBUG:', {
     deviceName: device?.name,
     hasModules: !!device?.modules,
     hasModulesSecurity: !!device?.modules?.security,
@@ -42,7 +42,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   // Parse PowerShell objects to proper JavaScript objects
   const security = convertPowerShellObjects(rawSecurity)
   
-  console.log('🔐 SecurityWidget PARSED:', {
+  console.log('SecurityWidget PARSED:', {
     parsedWindowsHello: security?.windowsHello,
     parsedCredentialProviders: security?.windowsHello?.credentialProviders
   })

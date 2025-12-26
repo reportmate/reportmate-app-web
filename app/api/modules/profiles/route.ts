@@ -6,7 +6,7 @@ export const revalidate = 0
 
 /**
  * Profiles API Route - Proxy to FastAPI
- * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
+ * Architecture: Next.js (proxy) FastAPI (data layer) PostgreSQL
  */
 export async function GET() {
   try {

@@ -38,7 +38,7 @@ interface ProfilesTabProps {
 function ensureProfilesArray(data: any): ProfileInfo[] {
   if (!data) return []
   if (Array.isArray(data)) return data
-  console.warn('⚠️ Profiles data is not an array:', typeof data, data)
+  console.warn('Profiles data is not an array:', typeof data, data)
   return []
 }
 

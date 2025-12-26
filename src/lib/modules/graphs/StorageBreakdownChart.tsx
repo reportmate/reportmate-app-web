@@ -174,7 +174,7 @@ export function StorageBreakdownChart({
       if (!memory) return 'Unknown'
       const memGb = parseFloat(memory)
       if (isNaN(memGb)) return 'Unknown'
-      if (memGb <= 8) return '≤8 GB'
+      if (memGb <= 8) return '8 GB'
       if (memGb <= 16) return '9-16 GB'
       if (memGb <= 32) return '17-32 GB'
       if (memGb <= 64) return '33-64 GB'

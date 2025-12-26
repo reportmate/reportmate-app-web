@@ -18,7 +18,7 @@ export interface ModuleStatus {
  * 
  * Manages lazy loading of device modules in priority order:
  * 1. Info tab modules (loaded immediately)
- * 2. Background progressive loading (hardware → events → installs → ...)
+ * 2. Background progressive loading (hardware events installs ...)
  * 3. On-demand loading (when user clicks unloaded tab)
  * 
  * @param deviceId - Device identifier (serial number, UUID, or asset tag)
@@ -77,7 +77,7 @@ export function useProgressiveModuleLoading(
       }
       
       // Set loading state
-      console.log(`[PROGRESSIVE] 🔄 Loading module '${moduleName}' for device ${deviceId}`)
+      console.log(`[PROGRESSIVE] Loading module '${moduleName}' for device ${deviceId}`)
       return {
         ...prev,
         [moduleName]: { state: 'loading', data: null, error: null }
@@ -104,7 +104,7 @@ export function useProgressiveModuleLoading(
         throw new Error(result.error || 'Failed to load module')
       }
       
-      console.log(`[PROGRESSIVE] ✅ Module '${moduleName}' loaded successfully`)
+      console.log(`[PROGRESSIVE] Module '${moduleName}' loaded successfully`)
       
       // Update state with loaded data
       setModuleStates(prev => ({
@@ -130,7 +130,7 @@ export function useProgressiveModuleLoading(
       return result.data
       
     } catch (error) {
-      console.error(`[PROGRESSIVE] ❌ Error loading module '${moduleName}':`, error)
+      console.error(`[PROGRESSIVE] Error loading module '${moduleName}':`, error)
       
       const errorMessage = error instanceof Error ? error.message : String(error)
       
@@ -167,7 +167,7 @@ export function useProgressiveModuleLoading(
           loadNextInQueue()
         }, 100)
       } catch (error) {
-        console.error(`[PROGRESSIVE] ❌ Background load failed for module '${nextModule}':`, error)
+        console.error(`[PROGRESSIVE] Background load failed for module '${nextModule}':`, error)
         // Continue to next module even if this one fails
         isBackgroundLoading.current = false
         loadNextInQueue()
@@ -203,7 +203,7 @@ export function useProgressiveModuleLoading(
       setInfoLoading(true)
       setInfoError(null)
       
-      console.log(`[PROGRESSIVE] 🚀 Loading fast info data for device ${deviceId}`)
+      console.log(`[PROGRESSIVE] Loading fast info data for device ${deviceId}`)
       
       try {
         const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/info`)
@@ -225,7 +225,7 @@ export function useProgressiveModuleLoading(
           throw new Error(result.error || 'Failed to load device info')
         }
         
-        console.log(`[PROGRESSIVE] ✅ Fast info data loaded successfully`)
+        console.log(`[PROGRESSIVE] Fast info data loaded successfully`)
         
         // Process data through mapDeviceData to ensure proper structure
         const processedDevice = mapDeviceData(result.device)
@@ -266,7 +266,7 @@ export function useProgressiveModuleLoading(
         
       } catch (error) {
         if (cancelled) return
-        console.error(`[PROGRESSIVE] ❌ Error loading info:`, error)
+        console.error(`[PROGRESSIVE] Error loading info:`, error)
         setInfoError(error instanceof Error ? error.message : String(error))
         setInfoLoading(false)
       }

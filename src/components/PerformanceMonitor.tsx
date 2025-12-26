@@ -78,10 +78,10 @@ export function PerformanceMonitor() {
         >
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">
-              {showWarning ? '⚠️ ' : '📊 '}Memory: {stats.memory?.usedJSHeapSize || 0}MB ({memoryUsagePercent}%)
+              {showWarning ? '' : ''}Memory: {stats.memory?.usedJSHeapSize || 0}MB ({memoryUsagePercent}%)
             </span>
             <span className="text-xs">
-              {isExpanded ? '▼' : '▶'}
+              {isExpanded ? '' : ''}
             </span>
           </div>
         </button>
@@ -118,7 +118,7 @@ export function PerformanceMonitor() {
                 <div key={name} className="text-xs">
                   {name}: {data.active.length} active
                   {data.active.length > 5 && (
-                    <span className="text-red-300 ml-1">⚠️</span>
+                    <span className="text-red-300 ml-1"></span>
                   )}
                 </div>
               ))}

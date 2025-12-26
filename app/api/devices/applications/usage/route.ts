@@ -6,7 +6,7 @@ export const revalidate = 0
 
 /**
  * Fleet Application Usage/Utilization API Route - Proxy to FastAPI
- * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
+ * Architecture: Next.js (proxy) FastAPI (data layer) PostgreSQL
  * 
  * Returns aggregated application usage data for fleet-wide utilization reporting:
  * - Top applications by usage time

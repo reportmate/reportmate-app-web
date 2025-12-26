@@ -141,13 +141,13 @@ export function MemoryBreakdownChart({
       return device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
-             // 🚨🚨🚨 NO FAKE DATA - Return null for unknown models 🚨🚨🚨
+             // NO FAKE DATA - Return null for unknown models
              null
     }
 
     const getDeviceType = (device: Device): string | null => {
       const model = getDeviceModel(device)
-      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      // NO FAKE DATA - Return null for devices without model info
       if (!model) return null
       
       if (model.toLowerCase().includes('macbook') || model.toLowerCase().includes('imac') || model.toLowerCase().includes('mac')) {

@@ -1,7 +1,7 @@
 /**
  * API Authentication Utilities
  * 
- * Provides shared authentication logic for frontend→API communication.
+ * Provides shared authentication logic for frontendAPI communication.
  * 
  * Authentication priority (for server-side API calls):
  * 1. API_INTERNAL_SECRET - Shared secret for container-to-container auth (preferred)

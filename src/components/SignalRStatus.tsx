@@ -19,7 +19,7 @@ export function SignalRStatus({ connectionStatus, mounted }: SignalRStatusProps)
   const getStatusConfig = () => {
     if (!mounted) {
       return {
-        icon: '⏳',
+        icon: '',
         title: 'Initializing',
         color: 'text-gray-600 dark:text-gray-400',
         bg: 'bg-gray-100 dark:bg-gray-800'
@@ -29,14 +29,14 @@ export function SignalRStatus({ connectionStatus, mounted }: SignalRStatusProps)
     switch (connectionStatus) {
       case 'connected':
         return {
-          icon: '🟢',
+          icon: '',
           title: 'SignalR Connected',
           color: 'text-green-600 dark:text-green-400',
           bg: 'bg-green-50 dark:bg-green-900/20'
         }
       case 'polling':
         return {
-          icon: '🔄',
+          icon: '',
           title: 'HTTP Polling Active',
           color: 'text-blue-600 dark:text-blue-400',
           bg: 'bg-blue-50 dark:bg-blue-900/20'
@@ -44,14 +44,14 @@ export function SignalRStatus({ connectionStatus, mounted }: SignalRStatusProps)
       case 'connecting':
       case 'reconnecting':
         return {
-          icon: '🟡',
+          icon: '',
           title: 'Connecting...',
           color: 'text-yellow-600 dark:text-yellow-400',
           bg: 'bg-yellow-50 dark:bg-yellow-900/20'
         }
       default:
         return {
-          icon: '🔴',
+          icon: '',
           title: 'Connection Failed',
           color: 'text-red-600 dark:text-red-400',
           bg: 'bg-red-50 dark:bg-red-900/20'

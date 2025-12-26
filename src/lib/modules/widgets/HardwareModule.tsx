@@ -320,7 +320,7 @@ const StorageDetailsWidget: React.FC<DeviceWidgetProps> = ({ deviceId }) => {
                     {device.name || `Drive ${index + 1}`}
                   </h4>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {device.type || 'Unknown'} • {device.fileSystem || 'Unknown FS'}
+                    {device.type || 'Unknown'} {device.fileSystem || 'Unknown FS'}
                   </p>
                 </div>
                 <div className="text-right">

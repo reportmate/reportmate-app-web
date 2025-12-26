@@ -92,7 +92,7 @@ const EventRow = memo(({
       {/* Time */}
       <div className="w-32 flex-shrink-0 text-right">
         <span className="text-xs text-gray-500 dark:text-gray-400">
-          {mounted ? formatRelativeTime(event.ts) : '—'}
+          {mounted ? formatRelativeTime(event.ts) : ''}
         </span>
       </div>
     </div>

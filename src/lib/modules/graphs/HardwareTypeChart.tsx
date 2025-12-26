@@ -78,14 +78,14 @@ export function HardwareTypeChart({
       return device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
-             // 🚨🚨🚨 NO FAKE DATA - Return null for unknown models 🚨🚨🚨
+             // NO FAKE DATA - Return null for unknown models
              null
     }
 
     // Helper function to determine device type
     const getDeviceType = (device: Device): string | null => {
       const model = getModelName(device)
-      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      // NO FAKE DATA - Return null for devices without model info
       if (!model) return null
       
       const modelLower = model.toLowerCase()
@@ -137,17 +137,17 @@ export function HardwareTypeChart({
         return processor.name || processor.model || processor.brand || null
       }
 
-      // 🚨🚨🚨 NO FAKE DATA - Return null for unknown processors 🚨🚨🚨
+      // NO FAKE DATA - Return null for unknown processors
       return null
     }
 
     // Helper function to get memory range
     const getMemoryRange = (device: Device): string | null => {
       const memory = (device as any).memory
-      if (!memory) return null // 🚨🚨🚨 NO FAKE DATA - Return null for unknown memory 🚨🚨🚨
+      if (!memory) return null // NO FAKE DATA - Return null for unknown memory
       const memGb = parseFloat(memory)
       if (isNaN(memGb)) return null
-      if (memGb <= 8) return '≤8 GB'
+      if (memGb <= 8) return '8 GB'
       if (memGb <= 16) return '9-16 GB'
       if (memGb <= 32) return '17-32 GB'
       if (memGb <= 64) return '33-64 GB'
@@ -166,7 +166,7 @@ export function HardwareTypeChart({
     // Helper function to get platform
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' | null => {
       const model = getModelName(device)
-      // 🚨🚨🚨 NO FAKE DATA - Return null for devices without model info 🚨🚨🚨
+      // NO FAKE DATA - Return null for devices without model info
       if (!model) return null
       
       if (model.toLowerCase().includes('macbook') || 
@@ -184,14 +184,14 @@ export function HardwareTypeChart({
       // Platform filter
       if (globalSelectedPlatforms.length > 0) {
         const platform = getDevicePlatform(device)
-        // 🚨🚨🚨 NO FAKE DATA - Skip devices without platform info 🚨🚨🚨
+        // NO FAKE DATA - Skip devices without platform info
         if (!platform || !globalSelectedPlatforms.includes(platform)) return false
       }
 
       // Processor filter
       if (globalSelectedProcessors.length > 0) {
         const processor = getProcessorName(device)
-        // 🚨🚨🚨 NO FAKE DATA - Skip devices without real processor info 🚨🚨🚨
+        // NO FAKE DATA - Skip devices without real processor info
         if (!processor || !globalSelectedProcessors.includes(processor)) return false
       }
 
@@ -204,14 +204,14 @@ export function HardwareTypeChart({
       // Device type filter
       if (globalSelectedDeviceTypes.length > 0) {
         const deviceType = getDeviceType(device)
-        // 🚨🚨🚨 NO FAKE DATA - Skip devices without device type info 🚨🚨🚨
+        // NO FAKE DATA - Skip devices without device type info
         if (!deviceType || !globalSelectedDeviceTypes.includes(deviceType)) return false
       }
 
       // Memory range filter
       if (globalSelectedMemoryRanges.length > 0) {
         const memoryRange = getMemoryRange(device)
-        // 🚨🚨🚨 NO FAKE DATA - Skip devices without real memory info 🚨🚨🚨
+        // NO FAKE DATA - Skip devices without real memory info
         if (!memoryRange || !globalSelectedMemoryRanges.includes(memoryRange)) return false
       }
 
@@ -229,7 +229,7 @@ export function HardwareTypeChart({
     
     filteredDevices.forEach(device => {
       const model = getModelName(device)
-      // 🚨🚨🚨 NO FAKE DATA - Skip devices without real model info 🚨🚨🚨
+      // NO FAKE DATA - Skip devices without real model info
       if (!model) return
       counts[model] = (counts[model] || 0) + 1
     })

@@ -544,7 +544,7 @@ function InstallsTabSkeleton() {
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              {/* Managed Items: X • Cache: Y MB */}
+              {/* Managed Items: X Cache: Y MB */}
               <div className="flex items-center gap-2">
                 <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                 <div className="h-5 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>

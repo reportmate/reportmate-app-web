@@ -3,7 +3,7 @@
  * This module is imported directly by routes - no HTTP calls needed
  * 
  * OPTIMIZED: Uses bulk /api/devices/installs endpoint instead of 
- * fetching each device individually (349 devices = 42+ seconds → ~10 seconds)
+ * fetching each device individually (349 devices = 42+ seconds ~10 seconds)
  */
 
 import { getInternalApiHeaders } from '@/lib/api-auth'

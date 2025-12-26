@@ -127,7 +127,7 @@ export async function initializeModules(customModuleSources: string[] = []): Pro
   
   // Log enabled modules
   enabled.forEach(moduleManifest => {
-    console.log(`  ✓ ${moduleManifest.name} (${moduleManifest.id})`)
+    console.log(`  ${moduleManifest.name} (${moduleManifest.id})`)
   })
 }
 

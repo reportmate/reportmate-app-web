@@ -128,7 +128,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
             version = versionMatch[1]
           }
         } else {
-          // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
+          // NO FAKE DATA ALLOWED - Skip devices without real OS info
           // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
           return // Skip this device entirely
         }
@@ -179,7 +179,7 @@ const processOSVersions = (devices: Device[], osType: 'macOS' | 'Windows') => {
           displayVersion = osVersion
           groupingKey = osVersion
         } else {
-          // 🚨🚨🚨 NO FAKE DATA ALLOWED - Skip devices without real OS info 🚨🚨🚨
+          // NO FAKE DATA ALLOWED - Skip devices without real OS info
           // Per copilot-instructions.md: "NEVER EVER CREATE FAKE DATA"
           return // Skip this device entirely
         }
