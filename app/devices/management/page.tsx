@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { CopyButton } from "../../../src/components/ui/CopyButton"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
@@ -229,7 +228,7 @@ function ManagementPageContent() {
   useEffect(() => {
     const fetchManagement = async () => {
       try {
-        console.log('🚀 Fetching management data...')
+        console.log('Fetching management data...')
         
         // OPTIMIZED: Single consolidated API call for management data with inventory
         const response = await fetch('/api/devices/management', { 
@@ -241,7 +240,7 @@ function ManagementPageContent() {
         if (!response.ok) throw new Error(`Management API failed: ${response.status}`)
         
         const managementList = await response.json()
-        console.log(`✅ Loaded ${Array.isArray(managementList) ? managementList.length : 0} management records`)
+        console.log(`Loaded ${Array.isArray(managementList) ? managementList.length : 0} management records`)
         
         // Map API response to Management interface
         const combinedData = (Array.isArray(managementList) ? managementList : []).map((mgmt: any) => {
@@ -294,7 +293,7 @@ function ManagementPageContent() {
         
         setManagement(combinedData)
       } catch (err) {
-        console.error('❌ Error fetching management:', err)
+        console.error('Error fetching management:', err)
         setError(err instanceof Error ? err.message : 'An unexpected error occurred')
       } finally {
         setLoading(false)
@@ -702,38 +701,6 @@ function ManagementPageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between h-16">
-              <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-                >
-                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-                </Link>
-                <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-                <div className="hidden lg:flex">
-                  <DevicePageNavigation className="flex items-center gap-2" />
-                </div>
-                <div className="lg:hidden">
-                  <DevicePageNavigation className="flex items-center gap-2" />
-                </div>
-              </div>
-            </div>
-          </div>
-        </header>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden animate-pulse">
             
@@ -823,43 +790,6 @@ function ManagementPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {/* Squircle Icon - Teal for Management */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-yellow-500 to-yellow-600 dark:from-yellow-600 dark:to-yellow-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
@@ -870,7 +800,7 @@ function ManagementPageContent() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Management Service</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Enrollment status and type, providers, and configurations • {filteredManagement.length} devices
+                  Enrollment status and type, providers, and configurations {filteredManagement.length} devices
                 </p>
               </div>
               {loading ? (
@@ -1193,7 +1123,7 @@ function ManagementPageContent() {
                             </span>
                             {mgmt.assetTag && (
                               <>
-                                <span className="text-gray-400 dark:text-gray-500">•</span>
+                                <span className="text-gray-400 dark:text-gray-500"></span>
                                 <span className="inline-flex items-center gap-0.5">
                                   {mgmt.assetTag}
                                   <CopyButton value={mgmt.assetTag} size="sm" />

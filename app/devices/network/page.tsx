@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { Copy } from "lucide-react"
@@ -117,7 +116,7 @@ function NetworkPageContent() {
         }
         
       } catch (error) {
-        console.error('❌ Failed to fetch network devices:', error)
+        console.error('Failed to fetch network devices:', error)
         setError(error instanceof Error ? error.message : 'Unknown error')
         setNetworkDevices([])
       } finally {
@@ -271,14 +270,6 @@ function NetworkPageContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <header className="bg-white dark:bg-gray-900 border-b animate-pulse">
-          <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
-            <div className="h-5 w-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
-            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <div className="h-5 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div>
-          </div>
-        </header>
-        
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
           <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden animate-pulse">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -404,20 +395,7 @@ function NetworkPageContent() {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <header className="bg-white dark:bg-gray-900 border-b">
-          <div className="max-w-7xl mx-auto px-4 h-16 flex items-center gap-4">
-            <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Dashboard
-            </Link>
-            <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-            <h1 className="text-lg font-semibold text-gray-900 dark:text-white">Network</h1>
-          </div>
-        </header>
-        
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Error Loading Network Data</h2>
             <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
@@ -433,44 +411,6 @@ function NetworkPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-3 min-w-0">
-                {/* Squircle Icon */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation */}
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
         <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden">
@@ -480,7 +420,7 @@ function NetworkPageContent() {
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Network Configuration</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  IP addresses, MAC addresses, and connectivity status • {filteredNetworkDevices.length} devices
+                  IP addresses, MAC addresses, and connectivity status {filteredNetworkDevices.length} devices
                 </p>
               </div>
               {loading ? (

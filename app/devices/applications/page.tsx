@@ -7,7 +7,6 @@ import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from "rea
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
-import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 
 interface ApplicationItem {
   id: string
@@ -592,7 +591,7 @@ function ApplicationsPageContent() {
         const rooms = data.rooms || []
         const fleets = data.fleets || []
         
-        console.log('📊 APPLICATIONS PAGE FILTER OPTIONS LOADED:', {
+        console.log('APPLICATIONS PAGE FILTER OPTIONS LOADED:', {
           devices: actualDeviceCount,
           applicationNames: data.applicationNames?.length || 0,
           usages: usages.length,
@@ -714,7 +713,7 @@ function ApplicationsPageContent() {
         setApplications(data)
         setLoadingProgress({ current: estimatedDevices, total: estimatedDevices })
         setLoadingMessage('Complete!')
-        console.log(`✅ Successfully loaded ${data.length} applications matching selections`)
+        console.log(`Successfully loaded ${data.length} applications matching selections`)
         
         // Save current filter state as last applied
         const currentFilters = JSON.stringify({
@@ -731,7 +730,7 @@ function ApplicationsPageContent() {
       }
       
     } catch (error) {
-      console.error('❌ Failed to load applications:', error)
+      console.error('Failed to load applications:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       setError(errorMessage)
       setLoadingProgress({ current: 0, total: 0 })
@@ -785,7 +784,7 @@ function ApplicationsPageContent() {
             const inventoryData = await inventoryResponse.json()
             if (Array.isArray(inventoryData)) {
               setApplications(inventoryData)
-              console.log(`✅ Loaded ${inventoryData.length} inventory items for version analysis`)
+              console.log(`Loaded ${inventoryData.length} inventory items for version analysis`)
             }
           }
         } catch (invError) {
@@ -874,7 +873,7 @@ function ApplicationsPageContent() {
               const inventoryData = await inventoryResponse.json()
               if (Array.isArray(inventoryData)) {
                 setApplications(inventoryData)
-                console.log(`✅ Loaded ${inventoryData.length} inventory items for version analysis`)
+                console.log(`Loaded ${inventoryData.length} inventory items for version analysis`)
               }
             }
           } catch (invError) {
@@ -885,7 +884,7 @@ function ApplicationsPageContent() {
         
         setLoadingProgress({ current: 100, total: 100 })
         setLoadingMessage('Complete!')
-        console.log(`✅ Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked`)
+        console.log(`Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked`)
       }
       
       // Save current filter state
@@ -899,7 +898,7 @@ function ApplicationsPageContent() {
       setLastAppliedFilters(currentFilters)
       
     } catch (error) {
-      console.error('❌ Failed to load utilization data:', error)
+      console.error('Failed to load utilization data:', error)
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
       setError(errorMessage)
     } finally {
@@ -1204,7 +1203,7 @@ function ApplicationsPageContent() {
                 href="/dashboard"
                 className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
               >
-                ← Back to Dashboard
+                Back to Dashboard
               </Link>
             </div>
           </div>
@@ -1216,43 +1215,6 @@ function ApplicationsPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header - same as devices page */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {/* Squircle Icon - Blue for Applications */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1464,7 +1426,7 @@ function ApplicationsPageContent() {
                       ? (
                         <>
                           {Math.round((loadingProgress.current / loadingProgress.total) * 100)}% complete
-                          {loadingProgress.total > 100 && <span className="ml-2">• {loadingProgress.total} devices</span>}
+                          {loadingProgress.total > 100 && <span className="ml-2">{loadingProgress.total} devices</span>}
                         </>
                       )
                       : 'First load may take 60-90 seconds'
