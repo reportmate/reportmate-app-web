@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -34,19 +35,11 @@ export async function POST(request: Request) {
     let useLocalFallback = false
     
     try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
-      }
-
-      if (managedIdentityId) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-      }
+      // Use internal secret authentication for container-to-container communication
+      const headers = getInternalApiHeaders()
+      headers['Content-Type'] = 'application/json'
 
       // Forward the request to Azure Functions /api/device endpoint
-      // Use Azure Managed Identity for authentication (no passphrase needed for internal Azure-to-Azure communication)
       response = await fetch(`${apiBaseUrl}/api/device`, {
         method: 'POST',
         headers,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -139,23 +140,8 @@ export async function GET(
     const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
     console.log('[DEVICE API] 🌐 About to fetch from Azure Functions:', azureFunctionsUrl)
     
-    // Get managed identity principal ID from Azure Container Apps
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-
-    // Build headers with authentication for localhost
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-    
-    // Add passphrase authentication if configured (prioritize over Managed Identity)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[DEVICE API] 🔑 Added passphrase authentication')
-    } else if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
     
     const response = await fetch(azureFunctionsUrl, {
       cache: 'no-store',

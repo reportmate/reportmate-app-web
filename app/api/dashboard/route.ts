@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -53,15 +54,9 @@ export async function GET(request: NextRequest) {
     
     console.log('[DASHBOARD API] Fetching consolidated data from:', dashboardUrl)
     
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    }
-    
-    // Add passphrase for FastAPI authentication
-    const passphrase = process.env.REPORTMATE_PASSPHRASE
-    if (passphrase) {
-      headers['X-API-PASSPHRASE'] = passphrase
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
+    headers['Content-Type'] = 'application/json'
 
     const response = await fetch(dashboardUrl, {
       method: 'GET',

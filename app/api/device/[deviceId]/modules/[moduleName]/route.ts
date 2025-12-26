@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -33,24 +34,9 @@ export async function GET(
     
     console.log('[MODULE API] ✅ Using API base URL:', apiBaseUrl)
     
-    // Prepare headers with authentication
-    const isLocalhost = process.env.NODE_ENV === 'development' || apiBaseUrl.includes('localhost')
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-
-    // Prioritize passphrase if available (for local dev or when explicitly configured)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[MODULE API] 🔐 Added passphrase authentication')
-    } else {
-      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-      if (managedIdentityId) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-      }
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
+    console.log('[MODULE API] 🔐 Using authenticated headers')
     
     // Special handling for events module (events are stored separately)
     if (moduleName === 'events') {

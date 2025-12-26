@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -37,23 +38,9 @@ export async function GET(
     // Fetch full device data from FastAPI
     const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
     
-    // Build headers with authentication for localhost
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-    
-    // Add passphrase authentication if configured (prioritize over Managed Identity)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[INFO API] 🔑 Added passphrase authentication')
-    } else {
-      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-      if (managedIdentityId) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-      }
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
+    console.log('[INFO API] 🔑 Using authenticated headers')
     
     const response = await fetch(azureFunctionsUrl, {
       cache: 'no-store',
