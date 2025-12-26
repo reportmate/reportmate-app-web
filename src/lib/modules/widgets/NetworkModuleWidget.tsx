@@ -454,7 +454,7 @@ const VpnOverviewWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
             <div key={index} className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
               <div>
                 <div className="font-medium text-green-900 dark:text-green-100">{vpn.name}</div>
-                <div className="text-sm text-green-700 dark:text-green-300">{vpn.type} • {vpn.server || vpn.serverAddress}</div>
+                <div className="text-sm text-green-700 dark:text-green-300">{vpn.type} {vpn.server || vpn.serverAddress}</div>
               </div>
               <div className="flex items-center">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>

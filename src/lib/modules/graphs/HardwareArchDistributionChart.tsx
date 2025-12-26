@@ -95,7 +95,7 @@ const detectPlatform = (device: Device): string | null => {
     if (os.includes('linux')) return 'Linux'
   }
 
-  // 🚨🚨🚨 NO FAKE DATA - Return null for unknown platforms 🚨🚨🚨
+  // NO FAKE DATA - Return null for unknown platforms
   return null
 }
 

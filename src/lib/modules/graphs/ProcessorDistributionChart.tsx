@@ -188,7 +188,7 @@ export function ProcessorDistributionChart({
       if (!memory) return 'Unknown'
       const memGb = parseFloat(memory)
       if (isNaN(memGb)) return 'Unknown'
-      if (memGb <= 8) return '≤8 GB'
+      if (memGb <= 8) return '8 GB'
       if (memGb <= 16) return '9-16 GB'
       if (memGb <= 32) return '17-32 GB'
       if (memGb <= 64) return '33-64 GB'
@@ -208,7 +208,7 @@ export function ProcessorDistributionChart({
       const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))
       
       if (storageGB === 0) return 'Unknown'
-      if (storageGB <= 128) return '≤128 GB'
+      if (storageGB <= 128) return '128 GB'
       if (storageGB <= 256) return '129-256 GB'
       if (storageGB <= 512) return '257-512 GB'
       if (storageGB <= 1024) return '513 GB-1 TB'

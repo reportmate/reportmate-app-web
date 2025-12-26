@@ -160,12 +160,12 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
     cores: hardwareModule?.processor?.cores,
     memory: hardwareModule?.memory?.totalPhysical ? formatBytes(safeNumber(hardwareModule.memory.totalPhysical)) : 'Unknown',
     storage: hardwareModule?.storage?.[0]?.capacity && hardwareModule?.storage?.[0]?.freeSpace 
-      ? `${formatBytes(safeNumber(hardwareModule.storage[0].capacity))} • ${formatBytes(safeNumber(hardwareModule.storage[0].freeSpace))} free`
+      ? `${formatBytes(safeNumber(hardwareModule.storage[0].capacity))} ${formatBytes(safeNumber(hardwareModule.storage[0].freeSpace))} free`
       : hardwareModule?.storage?.[0]?.capacity 
         ? formatBytes(safeNumber(hardwareModule.storage[0].capacity))
         : 'Unknown',
     graphics: hardwareModule?.graphics?.name && hardwareModule?.graphics?.memorySize
-      ? `${hardwareModule.graphics.name} • ${hardwareModule.graphics.memorySize} GB VRAM`
+      ? `${hardwareModule.graphics.name} ${hardwareModule.graphics.memorySize} GB VRAM`
       : hardwareModule?.graphics?.name || 'Unknown',
     vram: hardwareModule?.graphics?.memorySize ? `${hardwareModule.graphics.memorySize} GB` : undefined,
     architecture: hardwareModule?.processor?.architecture || 'Unknown',

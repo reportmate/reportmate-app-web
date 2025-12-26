@@ -409,7 +409,7 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
                       )}
                       {pkg.hasInstallLoop && (
                         <div className="text-xs text-orange-600 dark:text-orange-400 font-medium">
-                          ⚠ Install Loop Detected
+                          Install Loop Detected
                         </div>
                       )}
                     </div>
@@ -537,7 +537,7 @@ const CimianSessionsWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isExpande
                   Session {session.session_id}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">
-                  {session.run_type} • {formatRelativeTime(session.start_time)}
+                  {session.run_type} {formatRelativeTime(session.start_time)}
                 </div>
               </div>
               <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${

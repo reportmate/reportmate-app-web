@@ -336,7 +336,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Storage Analysis</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {selectedDevice.name} • {selectedDevice.type} • {formatBytes(selectedDevice.capacity)} Total
+                {selectedDevice.name} {selectedDevice.type} {formatBytes(selectedDevice.capacity)} Total
               </p>
             </div>
             
@@ -421,7 +421,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
             <div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Directory Breakdown</h3>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {sortedDirectories.length} root directories • Sorted by size • Click donut segments or legend to expand
+                {sortedDirectories.length} root directories Sorted by size Click donut segments or legend to expand
               </div>
             </div>
             

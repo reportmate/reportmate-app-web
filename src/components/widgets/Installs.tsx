@@ -121,7 +121,7 @@ export const InstallsWidget: React.FC<InstallsWidgetProps> = ({ device }) => {
                   <div className="text-xs text-gray-500 dark:text-gray-400">
                     {formatInstallType(install.type)}
                     {install.version && ` v${install.version}`}
-                    {install.duration && ` • ${install.duration}s`}
+                    {install.duration && ` ${install.duration}s`}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 ml-2">

@@ -251,7 +251,7 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
                 Latest Install Session
               </div>
               <div className="text-sm text-gray-600 dark:text-gray-400">
-                {formatRelativeTime(recentSession.startTime)} • {recentSession.runType}
+                {formatRelativeTime(recentSession.startTime)} {recentSession.runType}
               </div>
             </div>
             <div className={`font-medium ${getStatusColor(recentSession.status)}`}>
@@ -308,7 +308,7 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
                 {session.sessionId}
               </div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {formatRelativeTime(session.startTime)} • {session.runType}
+                {formatRelativeTime(session.startTime)} {session.runType}
               </div>
             </div>
             <div className="text-right">

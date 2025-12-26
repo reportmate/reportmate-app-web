@@ -195,7 +195,7 @@ export default function DeviceListPage() {
                         {device.model || 'Unknown Model'}
                       </p>
                       <p className="text-xs text-gray-400 dark:text-gray-500">
-                        {device.os || 'Unknown OS'} • Serial: {device.serialNumber}
+                        {device.os || 'Unknown OS'} Serial: {device.serialNumber}
                       </p>
                       {device.lastSeen && (
                         <p className="text-xs text-gray-400 dark:text-gray-500">
@@ -234,9 +234,9 @@ export default function DeviceListPage() {
                 Live Device Data
               </h3>
               <div className="mt-2 text-sm text-blue-700 dark:text-blue-300">
-                <p>• All device information is fetched from the Azure Functions API</p>
-                <p>• Device details include hardware info, applications, security settings, and events</p>
-                <p>• Click on any device to view detailed information across different tabs</p>
+                <p>All device information is fetched from the Azure Functions API</p>
+                <p>Device details include hardware info, applications, security settings, and events</p>
+                <p>Click on any device to view detailed information across different tabs</p>
               </div>
             </div>
           </div>

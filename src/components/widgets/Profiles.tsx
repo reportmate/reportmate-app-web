@@ -98,7 +98,7 @@ export const ProfilesWidget: React.FC<ProfilesWidgetProps> = ({ device }) => {
             {profile.name}
           </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            {profile.organization && `${profile.organization} • `}
+            {profile.organization && `${profile.organization} `}
             {profile.type || 'Configuration Profile'}
           </div>
           {profile.status && (

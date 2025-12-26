@@ -124,7 +124,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const management = convertPowerShellObjects(rawManagement)
 
   // Debug logging to see what data we're getting
-  console.log('🔧 ManagementWidget DEBUG:', {
+  console.log('ManagementWidget DEBUG:', {
     deviceName: device?.name,
     hasModules: !!device.modules,
     hasManagement: !!management,

@@ -4,10 +4,10 @@ This directory contains smart deployment scripts for the ReportMate container ap
 
 ## Available Scripts
 
-### 🐧 Linux/macOS: `deploy.sh`
+### Linux/macOS: `deploy.sh`
 Bash script for Unix-based systems.
 
-### 🪟 Windows: `deploy.ps1` 
+### Windows: `deploy.ps1` 
 PowerShell script for Windows systems.
 
 ## Quick Start
@@ -32,14 +32,14 @@ PowerShell script for Windows systems.
 
 ## Features
 
-✅ **Smart Build Detection** - Only rebuilds when source files change  
-✅ **Force Build Option** - Override smart detection  
-✅ **Skip Build/Deploy** - Build-only or deploy-only modes  
-✅ **Dry Run Mode** - See what would happen without making changes  
-✅ **Health Checks** - Verify deployment success  
-✅ **Verbose Logging** - Detailed debug information  
-✅ **Auto-tagging** - Timestamp + git hash tags  
-✅ **Azure Integration** - Direct Container Apps deployment  
+**Smart Build Detection** - Only rebuilds when source files change  
+**Force Build Option** - Override smart detection  
+**Skip Build/Deploy** - Build-only or deploy-only modes  
+**Dry Run Mode** - See what would happen without making changes  
+**Health Checks** - Verify deployment success  
+**Verbose Logging** - Detailed debug information  
+**Auto-tagging** - Timestamp + git hash tags  
+**Azure Integration** - Direct Container Apps deployment  
 
 ## Prerequisites
 

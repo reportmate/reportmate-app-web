@@ -470,7 +470,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
           const parts = []
           if (payloadObj.message) parts.push(payloadObj.message)
           
-          const summary = parts.join(' • ')
+          const summary = parts.join(' ')
           return summary.length > 100 ? summary.substring(0, 100) + '...' : summary || 'System event'
         }
         

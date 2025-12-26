@@ -562,10 +562,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       type: 'cimian',
       lastSeenInSession: item.lastSeenInSession || installs.lastCheckIn || installs.collectedAt || ''
     }))
-    console.log('[INSTALLS MODULE] ✅ PROCESSING CIMIAN.ITEMS - COUNT:', installs.cimian.items.length)
+    console.log('[INSTALLS MODULE] PROCESSING CIMIAN.ITEMS - COUNT:', installs.cimian.items.length)
   } else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
     packagesToProcess = installs.recentInstalls
-    console.log('[INSTALLS MODULE] 🔍 PROCESSING RECENT INSTALLS - COUNT:', installs.recentInstalls.length)
+    console.log('[INSTALLS MODULE] PROCESSING RECENT INSTALLS - COUNT:', installs.recentInstalls.length)
   } else if (installs.cimian?.pendingPackages && Array.isArray(installs.cimian.pendingPackages) && installs.cimian.pendingPackages.length > 0) {
     // FALLBACK: If no items or recentInstalls, create package objects from cimian.pendingPackages
     packagesToProcess = installs.cimian.pendingPackages.map((pkgName: string) => ({
@@ -577,12 +577,12 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       id: pkgName,
       lastSeenInSession: installs.lastCheckIn || installs.collectedAt || ''
     }))
-    console.log('[INSTALLS MODULE] 🔄 FALLBACK TO CIMIAN PENDING PACKAGES:', {
+    console.log('[INSTALLS MODULE] FALLBACK TO CIMIAN PENDING PACKAGES:', {
       pendingPackages: installs.cimian.pendingPackages,
       processedCount: packagesToProcess.length
     })
   } else {
-    console.log('[INSTALLS MODULE] ⚠️ NO PACKAGE DATA FOUND:', {
+    console.log('[INSTALLS MODULE] NO PACKAGE DATA FOUND:', {
       hasRecentInstalls: !!installs.recentInstalls,
       recentInstallsLength: installs.recentInstalls?.length || 0,
       hasCimianItems: !!installs.cimian?.items,
@@ -594,7 +594,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   
   if (packagesToProcess.length > 0) {
     for (const item of packagesToProcess) {
-      console.log('[INSTALLS MODULE] 🔍 RAW ITEM STRUCTURE:', {
+      console.log('[INSTALLS MODULE] RAW ITEM STRUCTURE:', {
         fullItem: JSON.stringify(item, null, 2),
         name: item.name,
         status: item.status,
@@ -614,7 +614,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         // For Cimian, if the raw status indicates pending/error/warning, trust it
         if (standardizedRawStatus === 'Pending' || standardizedRawStatus === 'Error' || standardizedRawStatus === 'Warning') {
           finalStatus = standardizedRawStatus
-          console.log('[INSTALLS MODULE] 🔄 CIMIAN STATUS OVERRIDE - TRUSTING RAW STATUS:', {
+          console.log('[INSTALLS MODULE] CIMIAN STATUS OVERRIDE - TRUSTING RAW STATUS:', {
             name: item.name,
             rawStatus: item.status,
             standardizedStatus: standardizedRawStatus,
@@ -626,7 +626,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           // Only use version comparison as fallback for unclear statuses
           if (item.version === item.installedVersion) {
             finalStatus = 'Installed'
-            console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FALLBACK - INSTALLED:', {
+            console.log('[INSTALLS MODULE] CIMIAN VERSION FALLBACK - INSTALLED:', {
               name: item.name,
               version: item.version,
               installed: item.installedVersion,
@@ -635,7 +635,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
             })
           } else {
             finalStatus = 'Pending'
-            console.log('[INSTALLS MODULE] 🔄 CIMIAN VERSION FALLBACK - PENDING UPDATE:', {
+            console.log('[INSTALLS MODULE] CIMIAN VERSION FALLBACK - PENDING UPDATE:', {
               name: item.name,
               version: item.version,
               installed: item.installedVersion,
@@ -646,7 +646,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         } else {
           // No version info, use standardized status
           finalStatus = standardizedRawStatus
-          console.log('[INSTALLS MODULE] 🔄 CIMIAN NO VERSION INFO - USING STANDARDIZED:', {
+          console.log('[INSTALLS MODULE] CIMIAN NO VERSION INFO - USING STANDARDIZED:', {
             name: item.name,
             rawStatus: item.status,
             finalStatus: finalStatus
@@ -655,7 +655,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       } else {
         // For non-Cimian packages, use the standardized status
         finalStatus = standardizeInstallStatus(item.status)
-        console.log('[INSTALLS MODULE] 🔍 STATUS STANDARDIZATION:', {
+        console.log('[INSTALLS MODULE] STATUS STANDARDIZATION:', {
           name: item.name,
           rawStatus: item.status,
           rawStatusType: typeof item.status,
@@ -664,7 +664,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         })
       }
       
-      console.log('[INSTALLS MODULE] 🔍 FINAL STATUS MAPPING:', {
+      console.log('[INSTALLS MODULE] FINAL STATUS MAPPING:', {
         raw: item.status,
         final: finalStatus,
         name: item.name,
@@ -702,7 +702,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           }
         })
         
-        console.log('[INSTALLS MODULE] ✅ Added lastError for package:', {
+        console.log('[INSTALLS MODULE] Added lastError for package:', {
           packageName: item.name,
           error: item.lastError,
           timestamp: item.lastUpdate,
@@ -722,7 +722,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           }
         })
         
-        console.log('[INSTALLS MODULE] ✅ Added lastWarning for package:', {
+        console.log('[INSTALLS MODULE] Added lastWarning for package:', {
           packageName: item.name,
           warning: item.lastWarning,
           timestamp: item.lastUpdate,
@@ -751,7 +751,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       })
     }
   } else {
-    console.log('[INSTALLS MODULE] 📦 NO PACKAGES TO PROCESS - Creating empty install info')
+    console.log('[INSTALLS MODULE] NO PACKAGES TO PROCESS - Creating empty install info')
   }
 
   // Add system-level warnings for packages with known issues
@@ -768,7 +768,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           runType: 'manual'
         }
       })
-      console.log('[INSTALLS MODULE] 🚨 Added DotNetRuntime architecture warning for package with failureCount:', pkg.failureCount || 0)
+      console.log('[INSTALLS MODULE] Added DotNetRuntime architecture warning for package with failureCount:', pkg.failureCount || 0)
     }
   }
 
@@ -800,7 +800,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
 
-  console.log('[INSTALLS MODULE] ✅ Updated status counts after adding warnings/errors:', statusCounts)
+  console.log('[INSTALLS MODULE] Updated status counts after adding warnings/errors:', statusCounts)
 
   // Extract run type and duration from latest session WITH ACTIVITY
   // Prioritize sessions that actually did something (installs/updates/failures) over quick checkonly runs
@@ -950,7 +950,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       (session.totalActions > 0 || session.packagesFailed > 0 || session.failures > 0)
     )
     
-    console.log('[INSTALLS MODULE] 🎯 FILTERING TO LATEST COMPLETED SESSION ONLY:', {
+    console.log('[INSTALLS MODULE] FILTERING TO LATEST COMPLETED SESSION ONLY:', {
       totalSessions: installs.recentSessions.length,
       latestCompletedFound: !!latestCompletedSession,
       latestCompletedSessionId: latestCompletedSession?.sessionId,
@@ -961,7 +961,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     
     // Only process errors from the latest COMPLETED session
     if (latestCompletedSession) {
-      console.log('[INSTALLS MODULE] ✅ Processing errors from latest completed session:', {
+      console.log('[INSTALLS MODULE] Processing errors from latest completed session:', {
         sessionId: latestCompletedSession.sessionId,
         status: latestCompletedSession.status,
         failures: latestCompletedSession.failures,
@@ -973,7 +973,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       // Note: Removed system-level warnings for pending packages 
       // These are just noise since users can see package statuses directly
     } else {
-      console.log('[INSTALLS MODULE] ⚠️ No completed sessions found - no session errors to report')
+      console.log('[INSTALLS MODULE] No completed sessions found - no session errors to report')
     }
   }
 
@@ -990,7 +990,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     }
   }
   
-  console.log('[INSTALLS MODULE] ✅ Latest completed session only - Errors/Warnings:', {
+  console.log('[INSTALLS MODULE] Latest completed session only - Errors/Warnings:', {
     sessionErrors: sessionErrors.length,
     sessionWarnings: sessionWarnings.length,
     packageErrors: packageErrors.length,

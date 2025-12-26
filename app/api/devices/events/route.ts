@@ -6,7 +6,7 @@ export const revalidate = 0
 
 /**
  * Bulk Events API Route - Proxy to FastAPI
- * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
+ * Architecture: Next.js (proxy) FastAPI (data layer) PostgreSQL
  */
 export async function GET(request: Request) {
   // Check authentication

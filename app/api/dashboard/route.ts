@@ -14,7 +14,7 @@ export const revalidate = 0
  * - Recent events for the widget
  * 
  * This eliminates multiple separate API calls from the dashboard,
- * dramatically improving load time (3 calls → 1).
+ * dramatically improving load time (3 calls 1).
  */
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()

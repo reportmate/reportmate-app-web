@@ -601,7 +601,7 @@ const SecurityTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                       </div>
                       <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{update.title}</div>
                       <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                        Status: {update.status} • Installed: {update.installDate ? new Date(update.installDate).toLocaleDateString() : 'Unknown'}
+                        Status: {update.status} Installed: {update.installDate ? new Date(update.installDate).toLocaleDateString() : 'Unknown'}
                       </div>
                     </div>
                   </div>
@@ -639,7 +639,7 @@ const SecurityTab: React.FC<{ deviceId: string }> = ({ deviceId }) => {
                     </div>
                     <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">{event.message}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                      Level: {event.level} • {formatRelativeTime(event.timestamp)}
+                      Level: {event.level} {formatRelativeTime(event.timestamp)}
                     </div>
                   </div>
                 </div>

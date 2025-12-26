@@ -78,16 +78,16 @@ export interface ProcessedDeviceInfo {
  */
 export function validateDeviceStructure(rawDevice: any): void {
   if (!rawDevice) {
-    throw new Error('🚨 VALIDATION FAILED: No device data provided')
+    throw new Error('VALIDATION FAILED: No device data provided')
   }
   
   if (!rawDevice.modules) {
-    console.error('🚨 STRUCTURE VIOLATION: Device data missing modules object', {
+    console.error('STRUCTURE VIOLATION: Device data missing modules object', {
       deviceId: rawDevice.deviceId,
       serialNumber: rawDevice.serialNumber,
       availableKeys: Object.keys(rawDevice)
     })
-    throw new Error('🚨 Device data missing required modules structure')
+    throw new Error('Device data missing required modules structure')
   }
 }
 

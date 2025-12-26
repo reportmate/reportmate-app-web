@@ -406,11 +406,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 {/* Progress Text */}
                 <div className="flex items-center justify-center text-xs text-gray-600 dark:text-gray-400 space-x-1">
                   <span className="font-medium">{loadingProgress.current} / {loadingProgress.total}</span>
-                  <span>•</span>
+                  <span></span>
                   <span>{Math.round((loadingProgress.current / loadingProgress.total) * 100)}%</span>
                   {loadingMessage && (
                     <>
-                      <span>•</span>
+                      <span></span>
                       <span className="text-blue-600 dark:text-blue-400 font-medium">{loadingMessage}</span>
                     </>
                   )}
