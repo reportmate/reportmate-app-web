@@ -77,9 +77,9 @@ export class ErrorBoundary extends Component<Props, State> {
               <div className="bg-blue-50 dark:bg-blue-900 p-3 rounded-md mb-4">
                 <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">Quick Recovery Steps:</h4>
                 <ul className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
-                  <li>• Click &quot;Clear Data &amp; Reload&quot; to remove problematic events</li>
-                  <li>• Try the &quot;Reload Dashboard&quot; button for a fresh start</li>
-                  <li>• Check Windows client configuration to reduce payload sizes</li>
+                  <li>Click &quot;Clear Data &amp; Reload&quot; to remove problematic events</li>
+                  <li>Try the &quot;Reload Dashboard&quot; button for a fresh start</li>
+                  <li>Check Windows client configuration to reduce payload sizes</li>
                 </ul>
               </div>
               

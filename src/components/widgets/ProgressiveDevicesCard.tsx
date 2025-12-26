@@ -145,8 +145,7 @@ export const ProgressiveDevicesCard: React.FC = () => {
               href="/devices"
               className="block text-center p-3 text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors text-sm font-medium"
             >
-              View all {devices.length} devices →
-            </Link>
+              View all {devices.length} devices             </Link>
           )}
         </div>
       </div>

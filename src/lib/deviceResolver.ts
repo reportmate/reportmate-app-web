@@ -140,7 +140,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
     // First, try exact match on serial number (most common case)
     let device = devices.find((d: any) => d.serialNumber === identifier)
     if (device) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Found exact serial number match: ${identifier}`)
+      console.log(`[DEVICE RESOLVER SERVER] Found exact serial number match: ${identifier}`)
       return {
         found: true,
         serialNumber: identifier,
@@ -152,7 +152,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
     // Then try UUID matches
   device = devices.find((d: any) => d.deviceId === identifier || d.id === identifier)
     if (device && device.serialNumber) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved UUID ${identifier} → serial number: ${device.serialNumber}`)
+      console.log(`[DEVICE RESOLVER SERVER] Resolved UUID ${identifier} serial number: ${device.serialNumber}`)
       return {
         found: true,
         serialNumber: device.serialNumber,
@@ -164,7 +164,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
     // Then try asset tag at top level
   device = devices.find((d: any) => d.assetTag === identifier)
     if (device && device.serialNumber) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Asset Tag ${identifier} → serial number: ${device.serialNumber}`)
+      console.log(`[DEVICE RESOLVER SERVER] Resolved Asset Tag ${identifier} serial number: ${device.serialNumber}`)
       return {
         found: true,
         serialNumber: device.serialNumber,
@@ -176,7 +176,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
     // Check for asset tag in modules.inventory
   device = devices.find((d: any) => d.modules?.inventory?.assetTag === identifier)
     if (device && device.serialNumber) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Asset Tag (inventory) ${identifier} → serial number: ${device.serialNumber}`)
+      console.log(`[DEVICE RESOLVER SERVER] Resolved Asset Tag (inventory) ${identifier} serial number: ${device.serialNumber}`)
       return {
         found: true,
         serialNumber: device.serialNumber,
@@ -194,7 +194,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
       d.modules?.inventory?.computer_name === identifier
     )
     if (device && device.serialNumber) {
-      console.log(`[DEVICE RESOLVER SERVER] ✅ Resolved Device Name ${identifier} → serial number: ${device.serialNumber}`)
+      console.log(`[DEVICE RESOLVER SERVER] Resolved Device Name ${identifier} serial number: ${device.serialNumber}`)
       return {
         found: true,
         serialNumber: device.serialNumber,
@@ -203,7 +203,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
       }
     }
     
-    console.log(`[DEVICE RESOLVER SERVER] ❌ No device found for identifier: ${identifier}`)
+    console.log(`[DEVICE RESOLVER SERVER] No device found for identifier: ${identifier}`)
     return {
       found: false,
       originalIdentifier: identifier,

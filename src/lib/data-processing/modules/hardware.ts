@@ -81,7 +81,7 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     const totalGB = Math.round(mainDrive.capacity / (1024*1024*1024))
     const freeGB = Math.round((mainDrive.freeSpace || 0) / (1024*1024*1024))
     hardwareInfo.storage = freeGB > 0 
-      ? `${totalGB} GB ${mainDrive.type || 'Drive'} • ${freeGB} GB free` 
+      ? `${totalGB} GB ${mainDrive.type || 'Drive'} ${freeGB} GB free` 
       : `${totalGB} GB ${mainDrive.type || 'Drive'}`
   }
 

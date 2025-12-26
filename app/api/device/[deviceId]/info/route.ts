@@ -24,12 +24,12 @@ export async function GET(
 ) {
   try {
     const { deviceId } = await params
-    console.log('[INFO API] 🎯 Fast info fetch for device:', deviceId)
+    console.log('[INFO API] Fast info fetch for device:', deviceId)
 
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
-      console.error('[INFO API] ❌ API_BASE_URL not configured')
+      console.error('[INFO API] API_BASE_URL not configured')
       return NextResponse.json({
         error: 'API configuration error'
       }, { status: 500 })
@@ -40,7 +40,7 @@ export async function GET(
     
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
-    console.log('[INFO API] 🔑 Using authenticated headers')
+    console.log('[INFO API] Using authenticated headers')
     
     const response = await fetch(azureFunctionsUrl, {
       cache: 'no-store',
@@ -81,7 +81,7 @@ export async function GET(
     if (data.success && data.device && data.device.modules) {
       const infoData = extractInfoData(data.device.modules)
       
-      console.log('[INFO API] ✅ Successfully extracted info data')
+      console.log('[INFO API] Successfully extracted info data')
       
       // Return the SAME structure as full endpoint, just with fewer modules
       // This ensures mapDeviceData() works correctly

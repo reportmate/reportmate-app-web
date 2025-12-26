@@ -341,7 +341,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{graphicsName}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {graphicsManufacturer} • {graphicsMemorySize ? `${graphicsMemorySize}GB VRAM` : 'Unknown VRAM'}
+              {graphicsManufacturer} {graphicsMemorySize ? `${graphicsMemorySize}GB VRAM` : 'Unknown VRAM'}
             </div>
           </div>
           
@@ -355,7 +355,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">{npuName}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {npuManufacturer} • {npuComputeUnits ? `${npuComputeUnits} TOPS` : 'Unknown TOPS'}
+                {npuManufacturer} {npuComputeUnits ? `${npuComputeUnits} TOPS` : 'Unknown TOPS'}
               </div>
             </div>
           )}
@@ -370,7 +370,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{formatBytes(totalMemory)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {memoryModuleType} • {memoryModuleManufacturer}
+              {memoryModuleType} {memoryModuleManufacturer}
             </div>
           </div>
           
@@ -385,7 +385,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               {storageDevices[0] ? formatBytes(storageDevices[0].capacity) : 'Unknown'}
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {storageDevices[0]?.type || 'Unknown'} • {storageDevices[0]?.health || 'Unknown'} Health
+              {storageDevices[0]?.type || 'Unknown'} {storageDevices[0]?.health || 'Unknown'} Health
             </div>
           </div>
           
@@ -398,10 +398,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 </div>
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">
-                {`${Math.round(batteryChargePercent)}% • ${batteryHealth}`}
+                {`${Math.round(batteryChargePercent)}% ${batteryHealth}`}
               </div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {`${batteryCycleCount} cycles • ${batteryIsCharging ? 'Charging' : 'Not charging'}`}
+                {`${batteryCycleCount} cycles ${batteryIsCharging ? 'Charging' : 'Not charging'}`}
               </div>
             </div>
           )}
@@ -417,7 +417,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.wireless.name) || 'Unknown'}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {safeString(hardwareData.wireless.manufacturer)} • {safeString(hardwareData.wireless.protocol) || 'Unknown Protocol'}
+                {safeString(hardwareData.wireless.manufacturer)} {safeString(hardwareData.wireless.protocol) || 'Unknown Protocol'}
               </div>
               <div className="text-xs text-gray-400 dark:text-gray-600 mt-1">
                 Status: {safeString(hardwareData.wireless.status)}
@@ -435,7 +435,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">{safeString(hardwareData.bluetooth.name) || 'Unknown'}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {safeString(hardwareData.bluetooth.manufacturer)} • {safeString(hardwareData.bluetooth.bluetoothVersion) ? `v${safeString(hardwareData.bluetooth.bluetoothVersion)}` : 'Unknown Version'}
+                {safeString(hardwareData.bluetooth.manufacturer)} {safeString(hardwareData.bluetooth.bluetoothVersion) ? `v${safeString(hardwareData.bluetooth.bluetoothVersion)}` : 'Unknown Version'}
               </div>
               <div className="text-xs text-gray-400 dark:text-gray-600 mt-1">
                 Status: {safeString(hardwareData.bluetooth.status)}

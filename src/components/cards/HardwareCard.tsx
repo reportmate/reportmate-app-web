@@ -63,7 +63,7 @@ export const HardwareCard: React.FC<HardwareCardProps> = ({ data }) => {
         {data.temperature && (
           <div className="flex justify-between items-center">
             <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Temperature</span>
-            <span className="text-sm text-gray-900 dark:text-white">{data.temperature}°C</span>
+            <span className="text-sm text-gray-900 dark:text-white">{data.temperature}C</span>
           </div>
         )}
       </div>

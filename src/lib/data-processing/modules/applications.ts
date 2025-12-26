@@ -46,10 +46,17 @@ export function extractApplications(deviceModules: any): ApplicationInfo {
 
   const apps = deviceModules.applications
   
+  // Determine application source - check multiple possible locations
+  const appSource = apps.installed_applications || 
+                    apps.installedApplications || 
+                    apps.InstalledApplications ||
+                    apps.applications  // Mac sends as "applications" array
+
   console.log('[APPLICATIONS MODULE] Reading pre-processed applications data:', {
-    hasInstalledApps: !!apps.installed_applications,
-    appCount: apps.installed_applications?.length || 0,
-    hasSummary: !!apps.summary
+    hasInstalledApps: !!appSource,
+    appCount: appSource?.length || 0,
+    hasSummary: !!apps.summary,
+    isMacFormat: Array.isArray(appSource) && appSource.length > 0 && typeof appSource[0] === 'string'
   })
 
   // READER PATTERN: Device should provide summary statistics
@@ -58,20 +65,37 @@ export function extractApplications(deviceModules: any): ApplicationInfo {
   const applications: ApplicationItem[] = []
   const categories: Record<string, number> = {}
 
-  // Process application list - minimal frontend processing
-  if (apps.installed_applications && Array.isArray(apps.installed_applications)) {
-    for (const app of apps.installed_applications) {
-      const appItem: ApplicationItem = {
-        name: app.name || 'Unknown Application',
-        version: app.version || 'Unknown',
-        vendor: app.vendor || app.publisher || 'Unknown',
-        category: app.category || 'Other',
-        installDate: app.install_date || app.installDate || '',
-        lastUsed: app.last_used || app.lastUsed,
-        size: app.size,
-        status: app.status || 'installed',
-        riskLevel: app.risk_level || app.riskLevel,
-        description: app.description
+  // Process application list - handle both Windows (objects) and Mac (strings) formats
+  if (appSource && Array.isArray(appSource)) {
+    for (const app of appSource) {
+      let appItem: ApplicationItem
+      
+      // Check if Mac format (simple string like "Visual Studio Code.app")
+      if (typeof app === 'string') {
+        // Mac format - parse app name from string
+        const appName = app.replace(/\.app$/i, '') // Remove .app suffix
+        appItem = {
+          name: appName,
+          version: '', // Mac doesn't provide version in this format
+          vendor: '', // Mac doesn't provide vendor in this format
+          category: 'Application',
+          installDate: '',
+          status: 'installed'
+        }
+      } else {
+        // Windows/structured format - extract from object
+        appItem = {
+          name: app.name || app.displayName || 'Unknown Application',
+          version: app.version || app.bundle_version || '',
+          vendor: app.vendor || app.publisher || app.signed_by || '',
+          category: app.category || 'Other',
+          installDate: app.install_date || app.installDate || '',
+          lastUsed: app.last_used || app.lastUsed,
+          size: app.size,
+          status: app.status || 'installed',
+          riskLevel: app.risk_level || app.riskLevel,
+          description: app.description
+        }
       }
 
       applications.push(appItem)
