@@ -1,54 +1,8 @@
 import React from 'react'
-import Link from 'next/link'
 
 export const DevicesPageSkeleton: React.FC = () => {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header Skeleton */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Left side - Logo and Title */}
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    All Devices
-                  </h1>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation Buttons Skeleton */}
-              {/* Events Button Skeleton */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
-                <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              </div>
-              
-              {/* Reports Dropdown Skeleton */}
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800">
-                <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="h-4 w-14 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
         {/* Mobile and Tablet View - Cards */}
