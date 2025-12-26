@@ -154,8 +154,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
     if (!enabled) {
       return (
         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
-          —
-        </span>
+                  </span>
       )
     }
 
@@ -237,7 +236,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
               </button>
               
               {dropdownOpen && (
-                <div className="absolute z-50 mt-1 w-full sm:w-48 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                <div className="absolute z-[200] mt-1 w-full sm:w-48 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
                   {filterOptions.map((option) => (
                     <button
                       key={option.value}

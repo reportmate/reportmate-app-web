@@ -19,29 +19,29 @@ export async function GET(
 ) {
   try {
     const { deviceId, moduleName } = await params
-    console.log(`[MODULE API] 🎯 Fetching module '${moduleName}' for device:`, deviceId)
+    console.log(`[MODULE API] Fetching module '${moduleName}' for device:`, deviceId)
 
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
-      console.error('[MODULE API] ❌ API_BASE_URL environment variable not configured')
+      console.error('[MODULE API] API_BASE_URL environment variable not configured')
       return NextResponse.json({
         error: 'API configuration error',
         details: 'API_BASE_URL environment variable not configured'
       }, { status: 500 })
     }
     
-    console.log('[MODULE API] ✅ Using API base URL:', apiBaseUrl)
+    console.log('[MODULE API] Using API base URL:', apiBaseUrl)
     
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
-    console.log('[MODULE API] 🔐 Using authenticated headers')
+    console.log('[MODULE API] Using authenticated headers')
     
     // Special handling for events module (events are stored separately)
     if (moduleName === 'events') {
       const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events`
-      console.log('[MODULE API] 📅 Fetching events from:', eventsUrl)
+      console.log('[MODULE API] Fetching events from:', eventsUrl)
       
       const eventsResponse = await fetch(eventsUrl, {
         cache: 'no-store',
@@ -64,7 +64,7 @@ export async function GET(
       
       const eventsData = await eventsResponse.json()
       
-      console.log(`[MODULE API] ✅ Successfully fetched ${eventsData.events?.length || 0} events`)
+      console.log(`[MODULE API] Successfully fetched ${eventsData.events?.length || 0} events`)
       
       return NextResponse.json({
         success: true,
@@ -79,17 +79,17 @@ export async function GET(
       })
     }
     
-    // Fetch full device data from FastAPI for other modules
-    const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
-    console.log('[MODULE API] 🌐 Fetching from:', azureFunctionsUrl)
+    // Fetch module data directly from the backend module endpoint (more efficient)
+    const moduleUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/modules/${encodeURIComponent(moduleName)}`
+    console.log('[MODULE API] Fetching module directly from:', moduleUrl)
     
-    const response = await fetch(azureFunctionsUrl, {
+    const response = await fetch(moduleUrl, {
       cache: 'no-store',
       headers: headers
     })
     
     if (!response.ok) {
-      console.error('[MODULE API] ❌ FastAPI error:', response.status, response.statusText)
+      console.error('[MODULE API] FastAPI error:', response.status, response.statusText)
       
       if (response.status === 404) {
         return NextResponse.json({
@@ -106,12 +106,30 @@ export async function GET(
 
     const data = await response.json()
     
+    // Handle direct module endpoint response: {success: true, module: "name", data: {...}}
+    if (data.success !== undefined && data.module && data.hasOwnProperty('data')) {
+      console.log(`[MODULE API] Successfully fetched module '${moduleName}' (direct module endpoint)`)
+      
+      // Module endpoint may return data: null if no module data exists
+      return NextResponse.json({
+        success: data.success,
+        module: moduleName,
+        data: data.data
+      }, {
+        headers: {
+          'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+    }
+    
     // Handle nested Azure Functions format: {success: true, device: {modules: {...}}}
     if (data.success && data.device && data.device.modules) {
       const moduleData = data.device.modules[moduleName]
       
       if (!moduleData) {
-        console.log(`[MODULE API] ℹ️  Module '${moduleName}' not found in device data`)
+        console.log(`[MODULE API] Module '${moduleName}' not found in device data`)
         return NextResponse.json({
           success: false,
           error: `Module '${moduleName}' not found`,
@@ -119,7 +137,7 @@ export async function GET(
         }, { status: 404 })
       }
       
-      console.log(`[MODULE API] ✅ Successfully fetched module '${moduleName}'`)
+      console.log(`[MODULE API] Successfully fetched module '${moduleName}'`)
       
       return NextResponse.json({
         success: true,
@@ -136,7 +154,7 @@ export async function GET(
     
     // Handle legacy unified structure
     if (data[moduleName]) {
-      console.log(`[MODULE API] ✅ Successfully fetched module '${moduleName}' (legacy format)`)
+      console.log(`[MODULE API] Successfully fetched module '${moduleName}' (legacy format)`)
       
       return NextResponse.json({
         success: true,
@@ -151,12 +169,12 @@ export async function GET(
       })
     }
     
-    // Module not found
-    console.log(`[MODULE API] ℹ️  Module '${moduleName}' not found in device data`)
+    // Module not found - return what we have for debugging
+    console.log(`[MODULE API] Unexpected response format for '${moduleName}':`, Object.keys(data))
     return NextResponse.json({
       success: false,
-      error: `Module '${moduleName}' not found`,
-      availableModules: Object.keys(data).filter(k => k !== 'metadata' && k !== 'success')
+      error: `Module '${moduleName}' response format unexpected`,
+      responseKeys: Object.keys(data)
     }, { status: 404 })
 
   } catch (error) {
