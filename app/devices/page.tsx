@@ -7,7 +7,6 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
-import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 
@@ -140,7 +139,7 @@ function DevicesPageContent() {
   // Filter inventory based on search query and filters
   const filteredInventory = (() => {
     try {
-      console.log('🔍 Filter function called with inventory:', {
+      console.log('Filter function called with inventory:', {
         isArray: Array.isArray(inventory),
         length: inventory?.length,
         firstItem: inventory?.[0],
@@ -278,7 +277,7 @@ function DevicesPageContent() {
       })
       
       console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items, sorted: ${sorted.length} items`)
-      console.log('🔍 Sample filtered item:', sorted[0])
+      console.log('Sample filtered item:', sorted[0])
       
       return sorted
     } catch (e) {
@@ -406,25 +405,6 @@ function DevicesPageContent() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
-          {/* Header skeleton */}
-          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between h-16">
-                <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
-                  <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-5 h-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                    <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 sm:gap-4">
-                  <div className="h-8 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
-                </div>
-              </div>
-            </div>
-          </header>
-          
           {/* Content skeleton */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -567,7 +547,7 @@ function DevicesPageContent() {
                 href="/dashboard"
                 className="inline-flex items-center px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
               >
-                ← Back to Dashboard
+                Back to Dashboard
               </Link>
             </div>
           </div>
@@ -579,47 +559,6 @@ function DevicesPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Left side - Logo and Title */}
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    All Devices
-                  </h1>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation */}
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" currentPage="devices" />
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" currentPage="devices" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
         {inventory.length === 0 ? (
@@ -803,7 +742,7 @@ function DevicesPageContent() {
                         Device Name
                         {sortColumn === 'deviceName' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -816,7 +755,7 @@ function DevicesPageContent() {
                         Asset Tag
                         {sortColumn === 'assetTag' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -829,7 +768,7 @@ function DevicesPageContent() {
                         Serial Number
                         {sortColumn === 'serialNumber' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -842,7 +781,7 @@ function DevicesPageContent() {
                         Usage
                         {sortColumn === 'usage' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -855,7 +794,7 @@ function DevicesPageContent() {
                         Catalog
                         {sortColumn === 'catalog' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -868,7 +807,7 @@ function DevicesPageContent() {
                         Location
                         {sortColumn === 'location' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -881,7 +820,7 @@ function DevicesPageContent() {
                         Registered
                         {sortColumn === 'createdAt' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -894,7 +833,7 @@ function DevicesPageContent() {
                         Status
                         {sortColumn === 'status' && (
                           <span className="text-gray-400">
-                            {sortDirection === 'asc' ? '↑' : '↓'}
+                            {sortDirection === 'asc' ? '' : ''}
                           </span>
                         )}
                       </button>
@@ -1056,11 +995,9 @@ export default function DevicesPage() {
     <Suspense fallback={
       <div className="min-h-screen bg-gray-50 dark:bg-black">
         <div className="animate-pulse">
-          <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center">
-              <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
-            </div>
-          </header>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8">
+            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
+          </div>
         </div>
       </div>
     }>

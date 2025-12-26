@@ -5,7 +5,6 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { DevicePageNavigation } from "../../../src/components/navigation/DevicePageNavigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
 import { 
   ArchitectureDonutChart, 
@@ -795,8 +794,8 @@ function HardwarePageContent() {
     
     // If storage is a string that contains bullet points, parse it
     if (typeof storage === 'string') {
-      // Check if it's already formatted with bullet point (e.g., "953 GB SSD • 54 GB free")
-      const bulletMatch = storage.match(/^(.+?)\s*•\s*(.+?)\s*free$/i)
+      // Check if it's already formatted with bullet point (e.g., "953 GB SSD 54 GB free")
+      const bulletMatch = storage.match(/^(.+?)\s*\s*(.+?)\s*free$/i)
       if (bulletMatch) {
         return { total: bulletMatch[1].trim(), free: bulletMatch[2].trim() }
       }
@@ -854,44 +853,6 @@ function HardwarePageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-4 min-w-0 flex-1">
-              <Link href="/dashboard" className="flex items-center gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-3 min-w-0">
-                {/* Squircle Icon - Cyan for Hardware */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation */}
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content - Split Layout */}
       <div className="flex h-[calc(100vh-64px)]">
         {/* Left Panel - Charts and Filters (26%) */}
@@ -1198,7 +1159,7 @@ function HardwarePageContent() {
                           {hw.processorCores && (
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               {hw.processorCores} cores
-                              {hw.processorSpeed && ` • ${hw.processorSpeed}`}
+                              {hw.processorSpeed && ` ${hw.processorSpeed}`}
                             </div>
                           )}
                         </td>

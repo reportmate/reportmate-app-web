@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { DevicePageNavigation } from '../../../src/components/navigation/DevicePageNavigation'
 import { formatRelativeTime } from '../../../src/lib/time'
 import { categorizeDevicesByInstallStatus } from '../../../src/hooks/useInstallsData'
 import { calculateDeviceStatus } from '../../../src/lib/data-processing'
@@ -1502,43 +1501,6 @@ function InstallsPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                {/* Squircle Icon - Orange for Installs */}
-                <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 flex items-center justify-center shadow-sm">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -1546,7 +1508,7 @@ function InstallsPageContent() {
 
 
           {/* Header Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-40 bg-white dark:bg-gray-800 rounded-t-xl">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-30 bg-white dark:bg-gray-800 rounded-t-xl">
             <div className="flex items-center gap-4 flex-1 min-w-0">
               {/* Back to Config Report Button - Shows when in Generate Report mode, loading report, or after report generated */}
               {(isGeneratingReport || loading || (hasGeneratedReport && installs.length > 0)) && (
@@ -2481,7 +2443,7 @@ function InstallsPageContent() {
                               }`}
                               title={repo}
                             >
-                              {isSelected && '✓ '}{repoDisplay}
+                              {isSelected && ''}{repoDisplay}
                             </button>
                             <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                               {count}
@@ -2596,7 +2558,7 @@ function InstallsPageContent() {
                                   : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
                               }`}
                             >
-                              {isSelected && '✓ '}{version}
+                              {isSelected && ''}{version}
                             </button>
                             <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                               {data.count} ({percentage}%)
@@ -2717,7 +2679,7 @@ function InstallsPageContent() {
                                   : 'text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400'
                               }`}
                             >
-                              {isSelected && '✓ '}{version}
+                              {isSelected && ''}{version}
                             </button>
                             <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                               {data.count} ({percentage}%)
@@ -2839,7 +2801,7 @@ function InstallsPageContent() {
                                   : 'text-gray-900 dark:text-white hover:text-purple-600 dark:hover:text-purple-400'
                               }`}
                             >
-                              {isSelected && '✓ '}{manifest}
+                              {isSelected && ''}{manifest}
                             </button>
                             <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
                               {data.count}
@@ -3475,7 +3437,7 @@ function InstallsPageContent() {
                             <span>{install.serialNumber}</span>
                             {install.assetTag && (
                               <>
-                                <span className="text-gray-300 dark:text-gray-600">•</span>
+                                <span className="text-gray-300 dark:text-gray-600"></span>
                                 <span>{install.assetTag}</span>
                               </>
                             )}
@@ -3524,13 +3486,13 @@ function InstallsPageContent() {
                       onClick={() => handleSort('deviceName')}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Device {sortColumn === 'deviceName' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Device {sortColumn === 'deviceName' && (sortDirection === 'asc' ? '' : '')}
                     </th>
                     <th 
                       onClick={() => handleSort('totalPackagesManaged')}
                       className="px-2 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      # {sortColumn === 'totalPackagesManaged' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      # {sortColumn === 'totalPackagesManaged' && (sortDirection === 'asc' ? '' : '')}
                     </th>
                     <th 
                       onClick={() => handleSort('installedCount')}
@@ -3581,19 +3543,19 @@ function InstallsPageContent() {
                       onClick={() => handleSort('clientIdentifier')}
                       className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Manifest / Repo {sortColumn === 'clientIdentifier' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Manifest / Repo {sortColumn === 'clientIdentifier' && (sortDirection === 'asc' ? '' : '')}
                     </th>
                     <th 
                       onClick={() => handleSort('lastSeen')}
                       className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Last Seen {sortColumn === 'lastSeen' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Last Seen {sortColumn === 'lastSeen' && (sortDirection === 'asc' ? '' : '')}
                     </th>
                     <th 
                       onClick={() => handleSort('version')}
                       className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
                     >
-                      Version {sortColumn === 'version' && (sortDirection === 'asc' ? '↑' : '↓')}
+                      Version {sortColumn === 'version' && (sortDirection === 'asc' ? '' : '')}
                     </th>
                   </tr>
                 </thead>
@@ -3613,7 +3575,7 @@ function InstallsPageContent() {
                           </Link>
                           <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                             {device.serialNumber}
-                            {device.assetTag && <span className="ml-2 text-gray-400">• {device.assetTag}</span>}
+                            {device.assetTag && <span className="ml-2 text-gray-400">{device.assetTag}</span>}
                           </div>
                         </div>
                       </td>
@@ -3794,7 +3756,7 @@ function InstallsPageContent() {
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
                                 {device.serialNumber}
                                 {device.modules?.inventory?.assetTag && (
-                                  <span className="ml-2 text-gray-400 dark:text-gray-500">• {device.modules.inventory.assetTag}</span>
+                                  <span className="ml-2 text-gray-400 dark:text-gray-500">{device.modules.inventory.assetTag}</span>
                                 )}
                               </div>
                             </div>

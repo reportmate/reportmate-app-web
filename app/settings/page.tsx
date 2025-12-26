@@ -4,82 +4,22 @@
 export const dynamic = 'force-dynamic'
 
 import React, { useState } from 'react'
-import Image from 'next/image'
-import Link from 'next/link'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
-import { VersionDisplay } from '../../src/components/VersionDisplay'
 
 export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations'>('general')
   const [showModuleManager, setShowModuleManager] = useState(false)
 
   const menuItems = [
-    { id: 'general', name: 'General', icon: '⚙️' },
-    { id: 'modules', name: 'Modules', icon: '🧩' },
-    { id: 'security', name: 'Security', icon: '🔒' },
-    { id: 'integrations', name: 'Integrations', icon: '🔗' },
+    { id: 'general', name: 'General', icon: '' },
+    { id: 'modules', name: 'Modules', icon: '' },
+    { id: 'security', name: 'Security', icon: '' },
+    { id: 'integrations', name: 'Integrations', icon: '' },
   ]
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-black border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Brand and Back Navigation */}
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden bg-white flex items-center justify-center">
-                  <Image 
-                    src="/reportmate-logo.png" 
-                    alt="ReportMate" 
-                    width={32}
-                    height={32}
-                    className="object-contain"
-                  />
-                </div>
-                <div>
-                  <h1 className="text-xl font-bold text-gray-900 dark:text-white">
-                    ReportMate
-                  </h1>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 hidden sm:block">
-                    Settings & Configuration
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {/* Navigation and Version */}
-            <div className="flex items-center gap-6">
-              <nav className="flex items-center gap-4">
-                <Link
-                  href="/dashboard"
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/devices"
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Devices
-                </Link>
-                <Link
-                  href="/events"
-                  className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                >
-                  Events
-                </Link>
-              </nav>
-              
-              {/* Container Version Display */}
-              <VersionDisplay />
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
         {/* Draft Implementation Banner */}
         <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
@@ -252,8 +192,7 @@ export default function SettingsPage() {
                           onClick={() => setActiveSection('modules')} 
                           className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 ml-1 underline"
                         >
-                          View modules section below ↓
-                        </button>
+                          View modules section below                         </button>
                       </p>
                     </div>
                     <button
