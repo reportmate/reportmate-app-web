@@ -8,7 +8,6 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
-import { DevicePageNavigation } from "../../src/components/navigation/DevicePageNavigation"
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 
@@ -591,7 +590,7 @@ function EventsPageContent() {
               href="/dashboard"
               className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
             >
-              ← Back to Dashboard
+              Back to Dashboard
             </Link>
           </div>
         </div>
@@ -602,47 +601,6 @@ function EventsPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Header */}
-      <header className="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Left side - Logo and Title */}
-            <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
-              <Link
-                href="/dashboard"
-                className="flex items-center gap-1 sm:gap-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-                <span className="text-xs sm:text-sm font-medium hidden sm:inline">Dashboard</span>
-              </Link>
-              <div className="h-4 sm:h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
-              <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="min-w-0">
-                  <h1 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white truncate">
-                    All Events
-                  </h1>
-                </div>
-              </div>
-            </div>
-
-            {/* Right side - Navigation */}
-            <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
-              {/* Navigation */}
-              <div className="hidden lg:flex">
-                <DevicePageNavigation className="flex items-center gap-2" currentPage="events" />
-              </div>
-
-              {/* Mobile Navigation */}
-              <div className="lg:hidden">
-                <DevicePageNavigation className="flex items-center gap-2" currentPage="events" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
-
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
 
