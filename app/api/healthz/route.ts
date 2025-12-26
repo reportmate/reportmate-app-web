@@ -6,7 +6,9 @@ export async function GET() {
     timestamp: new Date().toISOString(),
     service: 'reportmate-frontend-dev',
     version: '1.0.0',
-    api_proxy: process.env.API_BASE_URL || 'Not configured'
+    api_base_url: process.env.API_BASE_URL || 'Not configured',
+    has_internal_secret: !!process.env.API_INTERNAL_SECRET,
+    node_env: process.env.NODE_ENV
   }, { status: 200 })
 }
 

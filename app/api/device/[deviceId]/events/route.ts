@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 interface DeviceEvent {
   kind?: string
@@ -42,13 +43,10 @@ export async function GET(
     
     try {
       // Try to fetch from Azure Functions if available
+      const headers = getInternalApiHeaders()
       const response = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events`, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        },
+        headers,
         signal: AbortSignal.timeout(10000)
       })
       

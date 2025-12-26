@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // 30-second cache for applications data
 let applicationsCache: {
@@ -53,14 +54,10 @@ export async function GET(_request: NextRequest) {
     try {
       // First, get all devices
       console.log(`[APPLICATIONS API] ${timestamp} - Fetching devices list from ${apiBaseUrl}/api/devices`)
+      const headers = getInternalApiHeaders()
       const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
         cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache',
-          'User-Agent': 'ReportMate-Frontend/1.0',
-          'Accept': 'application/json'
-        }
+        headers
       })
       
       if (!devicesResponse.ok) {
@@ -100,12 +97,7 @@ export async function GET(_request: NextRequest) {
           try {
             const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${deviceSerial}`, {
               cache: 'no-store',
-              headers: {
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'User-Agent': 'ReportMate-Frontend/1.0',
-                'Accept': 'application/json'
-              }
+              headers
             })
             
             if (!deviceResponse.ok) {

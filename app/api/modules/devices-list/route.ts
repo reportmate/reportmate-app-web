@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -11,18 +12,8 @@ export async function GET() {
 
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
     
-    // Add authentication headers
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    } else if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
 
     const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, { headers })
 

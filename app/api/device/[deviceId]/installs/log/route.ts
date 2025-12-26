@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -27,31 +28,15 @@ export async function GET(
       }, { status: 500 })
     }
     
-    // Prepare headers with authentication
-    const isLocalhost = process.env.NODE_ENV === 'development' || apiBaseUrl.includes('localhost')
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'Pragma': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-
-    // For localhost, use passphrase authentication
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-      console.log('[INSTALLS LOG API] Added passphrase authentication')
-    } else {
-      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-      if (managedIdentityId) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-      }
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
     
     const upstreamUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/installs/log`
     console.log('[INSTALLS LOG API] Fetching from:', upstreamUrl)
     
     const response = await fetch(upstreamUrl, {
       cache: 'no-store',
-      headers: headers
+      headers
     })
     
     if (!response.ok) {

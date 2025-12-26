@@ -70,8 +70,12 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
       'User-Agent': 'ReportMate-Middleware/1.0'
     }
     
-    // Add passphrase authentication if configured (prioritize over Managed Identity)
-    if (process.env.REPORTMATE_PASSPHRASE) {
+    // Priority 1: Internal secret for container-to-container authentication (production)
+    if (process.env.API_INTERNAL_SECRET) {
+      headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+    }
+    // Priority 2: Passphrase authentication (local development fallback)
+    else if (process.env.REPORTMATE_PASSPHRASE) {
       headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
     }
     

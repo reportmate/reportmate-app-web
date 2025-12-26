@@ -6,29 +6,11 @@
  * fetching each device individually (349 devices = 42+ seconds → ~10 seconds)
  */
 
+import { getInternalApiHeaders } from '@/lib/api-auth'
+
 // Shared cache with 5 minute TTL
 let cachedInstallRecords: { records: any[], timestamp: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-/**
- * Build authentication headers for FastAPI calls
- */
-function buildAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
-  };
-  
-  if (process.env.REPORTMATE_PASSPHRASE) {
-    headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE;
-  } else {
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID;
-    if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId;
-    }
-  }
-  
-  return headers;
-}
 
 /**
  * Fetch all install records from the FastAPI bulk endpoint
@@ -49,7 +31,8 @@ export async function fetchBulkInstallRecords(): Promise<any[]> {
 
   console.log('[INSTALLS SHARED] Fetching install records from bulk endpoint');
   
-  const headers = buildAuthHeaders();
+  // Use shared authentication headers
+  const headers = getInternalApiHeaders();
   
   // Use the bulk /api/devices/installs endpoint - much faster than individual fetches!
   const response = await fetch(`${API_BASE_URL}/api/devices/installs`, {

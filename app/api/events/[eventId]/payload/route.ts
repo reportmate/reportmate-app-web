@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getInternalApiHeaders, getApiBaseUrl } from '@/lib/api-auth';
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -8,7 +9,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ eventId: string }> }
 ) {
-  const AZURE_FUNCTIONS_BASE_URL = process.env.API_BASE_URL;
+  const AZURE_FUNCTIONS_BASE_URL = getApiBaseUrl();
 
   if (!AZURE_FUNCTIONS_BASE_URL) {
     return NextResponse.json({ error: 'API_BASE_URL environment variable is required' }, { status: 500 });
@@ -17,21 +18,21 @@ export async function GET(
     const { eventId } = await params
     console.log('[EVENT PAYLOAD API] Fetching payload for event:', eventId)
 
-    // Try to fetch from Azure Functions first
+    // Get authentication headers for internal API calls
+    const headers = getInternalApiHeaders()
+    headers['Content-Type'] = 'application/json'
+
     try {
       const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events/${encodeURIComponent(eventId)}/payload`, {
         method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'User-Agent': 'ReportMate-Frontend/1.0'
-        },
+        headers,
         cache: 'no-store',
         signal: AbortSignal.timeout(10000)
       });
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[EVENT PAYLOAD API] Successfully fetched payload from Azure Functions');
+        console.log('[EVENT PAYLOAD API] Successfully fetched payload from API');
         return NextResponse.json(data, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -40,19 +41,30 @@ export async function GET(
           }
         });
       } else {
-        console.log('[EVENT PAYLOAD API] Azure Functions API error:', response.status, response.statusText);
-        // Fall through to local fallback
+        const errorText = await response.text();
+        console.log('[EVENT PAYLOAD API] API error:', response.status, response.statusText, errorText);
+        return NextResponse.json({
+          error: 'Event payload not available',
+          message: `API returned ${response.status}: ${response.statusText}`,
+          eventId: eventId
+        }, { 
+          status: response.status,
+          headers: {
+            'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        });
       }
     } catch (fetchError) {
-      console.log('[EVENT PAYLOAD API] Azure Functions API fetch error:', fetchError instanceof Error ? fetchError.message : String(fetchError));
+      console.log('[EVENT PAYLOAD API] API fetch error:', fetchError instanceof Error ? fetchError.message : String(fetchError));
       
-      // Return error when real API is not available
       return NextResponse.json({
         error: 'Event payload not available',
-        message: 'No real data available from API',
+        message: 'Failed to connect to API',
         eventId: eventId
       }, { 
-        status: 404,
+        status: 503,
         headers: {
           'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
           'Pragma': 'no-cache',
@@ -60,20 +72,6 @@ export async function GET(
         }
       });
     }
-
-    // Return error when real API returns bad response
-    return NextResponse.json({
-      error: 'Event payload not available', 
-      message: 'No real data available from API',
-      eventId: eventId
-    }, { 
-      status: 404,
-      headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
-        'Pragma': 'no-cache',
-        'Expires': '0'
-      }
-    });
 
   } catch (error) {
     console.error('[EVENT PAYLOAD API] Error fetching event payload:', error);

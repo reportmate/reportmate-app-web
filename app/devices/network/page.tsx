@@ -317,8 +317,29 @@ function NetworkPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {[...Array(8)].map((_, i) => (
-                    <tr key={i}>
+                  {error ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center">
+                          <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <p className="text-base font-medium text-gray-900 dark:text-white mb-2">Failed to load network data</p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{error}</p>
+                          <button 
+                            onClick={() => window.location.reload()} 
+                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : loading ? (
+                    [...Array(8)].map((_, i) => (
+                      <tr key={i}>
                       <td className="px-4 py-3 w-48">
                         <div className="flex flex-col justify-center h-12 space-y-1">
                           <div className="h-4 w-36 bg-gray-300 dark:bg-gray-600 rounded"></div>
@@ -350,7 +371,26 @@ function NetworkPageContent() {
                         </div>
                       </td>
                     </tr>
-                  ))}
+                    ))
+                  ) : filteredNetwork.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-12 text-center">
+                        <div className="flex flex-col items-center">
+                          <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
+                          </svg>
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No network data found</h3>
+                          <p className="text-sm text-gray-500 dark:text-gray-400">No network data matches your current search.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredNetwork.map((net) => (
+                      <tr key={net.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-4 py-4">Network Data Placeholder</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -360,6 +400,7 @@ function NetworkPageContent() {
     )
   }
 
+  /* Commented out full-page error - using inline table error instead
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -388,6 +429,7 @@ function NetworkPageContent() {
       </div>
     )
   }
+  */
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">

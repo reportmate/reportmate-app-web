@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -20,20 +21,9 @@ export async function GET() {
     const fastApiUrl = `${API_BASE_URL}/api/devices/profiles`
     console.log(`[PROFILES API] Calling: ${fastApiUrl}`)
     
-    // Get managed identity principal ID from Azure Container Apps
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-    
-    // For localhost, use passphrase authentication
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    
-    // Prioritize passphrase if available (for local dev or when explicitly configured)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    } else if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
+    headers['Content-Type'] = 'application/json'
     
     const response = await fetch(fastApiUrl, {
       method: 'GET',

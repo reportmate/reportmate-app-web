@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -28,12 +29,10 @@ export async function GET(
     const apiUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/package-history`
     
     console.log('[PACKAGE HISTORY API] Using API URL:', apiUrl)
+    const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl, {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
+      headers
     })
     
     if (!response.ok) {

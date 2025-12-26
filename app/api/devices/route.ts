@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -118,21 +119,8 @@ export async function GET(request: NextRequest) {
     const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
     console.log('[DEVICES API] Fetching from FastAPI:', devicesUrl)
     
-    // Get managed identity principal ID from Azure Container Apps
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-    
-    // For localhost, use passphrase authentication
-    const headers: Record<string, string> = {
-      'Cache-Control': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-    
-    // Prioritize passphrase if available (for local dev or when explicitly configured)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    } else if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
     
     const response = await fetch(devicesUrl, {
       cache: 'no-store',
