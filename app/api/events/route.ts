@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Cache for API responses (30 second cache)
 let eventsCache: NormalizedEvent[] = []
@@ -84,22 +85,9 @@ export async function GET(request: Request) {
     // Determine if running on localhost
     const isLocalhost = request.headers.get('host')?.includes('localhost') || request.headers.get('host')?.includes('127.0.0.1')
 
-    // Get managed identity principal ID from Azure Container Apps
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-    
-    // Prepare headers with authentication
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache',
-      'User-Agent': 'ReportMate-Frontend/1.0'
-    }
-    
-    // Prioritize passphrase if available (for local dev or when explicitly configured)
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    } else if (managedIdentityId) {
-      headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-    }
+    // Use shared authentication headers
+    const headers = getInternalApiHeaders()
+    headers['Content-Type'] = 'application/json'
 
     // For pagination with date filters, we need fresh data each time
     // Only use cache for limit=50 and offset=0 with no date filters (dashboard requests)
@@ -213,6 +201,9 @@ export async function GET(request: Request) {
           const filteredEvents = normalizedEvents.filter((event: NormalizedEvent) => 
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           );
+          
+          console.log('[EVENTS API] Events before filter:', normalizedEvents.length, 'After filter:', filteredEvents.length);
+          console.log('[EVENTS API] Sample event kinds:', normalizedEvents.slice(0, 5).map((e: any) => ({ id: e.id, kind: e.kind, kindLower: e.kind?.toLowerCase(), isValid: VALID_EVENT_KINDS.includes(e.kind?.toLowerCase()) })));
           
           const filteredData = {
             success: true, // Always include success field for frontend compatibility

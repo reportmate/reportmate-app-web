@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -33,12 +34,10 @@ export async function GET(
     apiUrl.searchParams.set('offset', offset.toString())
     
     console.log('[INSTALL SESSIONS API] Using API URL:', apiUrl.toString())
+    const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl.toString(), {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
+      headers
     })
     
     if (!response.ok) {
