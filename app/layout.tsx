@@ -7,6 +7,7 @@ import { EdgeThemeFix } from "../src/components/edge-theme-fix";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
+import { AppToolbar } from "../src/components/navigation/AppToolbar";
 
 // Force dynamic rendering to ensure middleware runs
 export const dynamic = 'force-dynamic'
@@ -19,13 +20,37 @@ export const metadata: Metadata = {
   description: "Real-time fleet monitoring and event tracking",
 };
 
-export default function RootLayout({
+async function getDevices() {
+  try {
+    const apiUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+    const response = await fetch(`${apiUrl}/api/devices`, {
+      cache: 'no-store',
+      headers: {
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache'
+      }
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      return Array.isArray(data) ? data : (data.devices || [])
+    }
+  } catch (error) {
+    console.error('[Layout] Failed to fetch devices:', error)
+  }
+  return []
+}
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   // For development, completely bypass all authentication
   const isDevelopment = process.env.NODE_ENV === 'development'
+  
+  // Fetch devices for search preloading
+  const devices = await getDevices()
   
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
@@ -115,10 +140,14 @@ export default function RootLayout({
               <ErrorBoundary>
                 {isDevelopment ? (
                   // Development: No AutoAuth component
-                  children
+                  <>
+                    <AppToolbar preloadedDevices={devices} />
+                    {children}
+                  </>
                 ) : (
                   // Production: Full authentication with AutoAuth
                   <AutoAuth>
+                    <AppToolbar preloadedDevices={devices} />
                     {children}
                   </AutoAuth>
                 )}
