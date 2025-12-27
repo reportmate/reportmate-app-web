@@ -5,13 +5,17 @@
 
 import React from 'react'
 import { StorageVisualization } from '../storage'
+import { CopyButton } from '../ui/CopyButton'
 
 interface HardwareData {
   model?: unknown;
   manufacturer?: unknown;
+  formFactor?: 'desktop' | 'laptop' | string;  // Mac: desktop/laptop based on model
   memory?: {
     totalPhysical?: unknown;
     availablePhysical?: unknown;
+    type?: string;  // Mac: LPDDR5, etc.
+    manufacturer?: string;  // Mac: Hynix, Samsung, etc.
     modules?: Array<{
       type?: unknown;
       manufacturer?: unknown;
@@ -21,10 +25,13 @@ interface HardwareData {
     }>;
   };
   processor?: {
+    name?: unknown;
     architecture?: unknown;
     cores?: unknown;
     logicalProcessors?: unknown;
     maxSpeed?: unknown;
+    performanceCores?: number;  // Mac: P-cores count
+    efficiencyCores?: number;  // Mac: E-cores count
   };
   battery?: {
     cycleCount?: unknown;
@@ -32,18 +39,39 @@ interface HardwareData {
     health?: unknown;
     isCharging?: unknown;
     estimatedRuntime?: unknown;
+    items?: unknown[];  // Mac: empty array for desktop
   };
   graphics?: {
     name?: unknown;
     manufacturer?: unknown;
     memorySize?: unknown;
+    cores?: number;  // Mac: GPU core count
+    metalSupport?: string;  // Mac: Metal version support
+    bus?: string;  // Mac: Builtin, PCIe, etc.
+    deviceType?: string;  // Mac: GPU, Display, etc.
   };
   npu?: {
     name?: unknown;
     manufacturer?: unknown;
     computeUnits?: unknown;
     compute_units?: unknown;
+    cores?: number;  // Mac: Neural Engine cores
+    performance_tops?: string;  // Mac: TOPS rating
   };
+  displays?: Array<{
+    name?: string;
+    serialNumber?: string;
+    resolution?: string;
+    scaledResolution?: string;
+    displayType?: string;
+    firmwareVersion?: string;
+    isMainDisplay?: boolean | number;
+    online?: boolean | number;
+    mirror?: boolean | number;
+    ambientBrightnessEnabled?: boolean | number;
+    type?: 'internal' | 'external';
+    connectionType?: string;
+  }>;
   wireless?: {
     name?: unknown;
     manufacturer?: unknown;
@@ -187,8 +215,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const storageDevices = allStorageDevices.filter((drive: any) => 
     (drive.capacity && drive.capacity > 0) && (drive.freeSpace && drive.freeSpace > 0)
   )
-  const totalStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) || 0
-  const freeStorage = storageDevices.reduce((total: number, drive: any) => total + (drive.freeSpace || 0), 0) || 0
+  // Filter to internal drives only for storage overview (exclude external/backup drives)
+  const internalDrives = storageDevices.filter((drive: any) => drive.isInternal !== false)
+  const totalStorage = internalDrives.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) || 0
+  const freeStorage = internalDrives.reduce((total: number, drive: any) => total + (drive.freeSpace || 0), 0) || 0
   const totalMemory = safeNumber(hardwareData.memory?.totalPhysical) || 0
   const availableMemory = safeNumber(hardwareData.memory?.availablePhysical) || 0
   const usedMemory = totalMemory - availableMemory
@@ -203,6 +233,32 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
+  // Mac-specific: Memory type and manufacturer can be at top level (for unified memory)
+  const memoryType = hardwareData.memory?.type || memoryModuleType
+  const memoryManufacturer = hardwareData.memory?.manufacturer || memoryModuleManufacturer
+  
+  // Mac-specific: Processor performance/efficiency cores
+  const processorCores = safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)
+  const performanceCores = safeNumber(hardwareData.processor?.performanceCores)
+  const efficiencyCores = safeNumber(hardwareData.processor?.efficiencyCores)
+  const hasAppleSilicon = performanceCores > 0 && efficiencyCores > 0
+  
+  // Mac-specific: Graphics enhancements
+  const graphicsCores = safeNumber(hardwareData.graphics?.cores)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport)
+  
+  // Mac-specific: NPU enhancements
+  const npuCores = safeNumber(hardwareData.npu?.cores)
+  const npuTops = safeString(hardwareData.npu?.performance_tops)
+  
+  // Mac-specific: Form factor (desktop vs laptop) for hiding battery
+  const formFactor = hardwareData.formFactor as string | undefined
+  const isDesktop = formFactor === 'desktop'
+  
+  // Mac-specific: Displays array
+  const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
+  const hasDisplays = displays.length > 0
+  
   const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount)
   const batteryChargePercent = safeNumber(hardwareData.battery?.chargePercent)
   const batteryHealth = safeString(hardwareData.battery?.health)
@@ -210,7 +266,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const batteryEstimatedRuntime = typeof hardwareData.battery?.estimatedRuntime === 'string'
     ? hardwareData.battery.estimatedRuntime
     : ''
-  const hasBattery = Boolean(hardwareData.battery)
+  // Battery logic: Mac desktops have empty items array, so check for actual battery data
+  const batteryItems = Array.isArray(hardwareData.battery?.items) ? hardwareData.battery.items : null
+  const hasBatteryData = batteryItems ? batteryItems.length > 0 : Boolean(hardwareData.battery)
+  const hasBattery = !isDesktop && hasBatteryData && (batteryCycleCount > 0 || batteryChargePercent > 0)
   const hasBatteryCycleCount = batteryCycleCount > 0
   const batteryRuntimeDisplay = batteryEstimatedRuntime ? formatRuntime(batteryEstimatedRuntime) : 'Unknown'
 
@@ -256,18 +315,20 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           <div className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
             {safeString(hardwareData.model) || 'Unknown'}
           </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Manufacturer</div>
-              <div className="text-sm text-gray-900 dark:text-white font-medium">
-                {safeString(hardwareData.manufacturer) || 'Unknown Manufacturer'}
+          <div className="flex flex-wrap gap-x-8 gap-y-2">
+            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+              <div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">Identifier: </span>
+                <span className="text-sm text-gray-900 dark:text-white font-mono">
+                  {safeString(hardwareData.model_identifier)}
+                </span>
               </div>
-            </div>
+            )}
             <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">Hardware UUID</div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono">
-                {device?.modules?.inventory?.uuid || device?.deviceId || 'Unknown'}
-              </div>
+              <span className="text-sm text-gray-500 dark:text-gray-400">Manufacturer: </span>
+              <span className="text-sm text-gray-900 dark:text-white font-medium">
+                {safeString(hardwareData.manufacturer) || 'Unknown'}
+              </span>
             </div>
           </div>
         </div>
@@ -283,7 +344,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           </div>
         </div>
 
-        {/* Battery or Memory Usage */}
+        {/* Battery Cycles (laptops) or Total Memory (desktops) */}
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col justify-end">
           {hasBattery ? (
             <>
@@ -300,11 +361,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           ) : (
             <>
               <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                {memoryUsagePercent}%
+                {formatBytes(totalMemory)}
               </div>
-              <div className="text-base text-gray-500 dark:text-gray-400">Memory Used</div>
+              <div className="text-base text-gray-500 dark:text-gray-400">Memory</div>
               <div className="text-sm text-gray-400 dark:text-gray-500 mt-1">
-                {formatBytes(usedMemory)} / {formatBytes(totalMemory)}
+                {memoryType && memoryType !== 'Unknown' ? memoryType : ''} {memoryManufacturer && memoryManufacturer !== 'Unknown' ? memoryManufacturer : 'Unified Memory'}
               </div>
             </>
           )}
@@ -314,7 +375,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {/* Detailed Hardware Information */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
         <div className="mb-8">
-          <h3 className="text-2xl font-bold text-gray-900 dark:text-white">Hardware Specifications</h3>
+          <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Hardware Specifications</h3>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-500 dark:text-gray-400">UUID:</span>
+            <span className="text-sm text-gray-900 dark:text-white font-mono">
+              {device?.modules?.inventory?.uuid || device?.deviceId || 'Unknown'}
+            </span>
+            {(device?.modules?.inventory?.uuid || device?.deviceId) && (
+              <CopyButton value={device?.modules?.inventory?.uuid || device?.deviceId || ''} size="sm" />
+            )}
+          </div>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-base">
@@ -328,7 +398,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{safeProcessorName(hardwareData.processor)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)} cores @ {safeNumber(hardwareData.processor?.maxSpeed)}GHz
+              {hasAppleSilicon 
+                ? `${processorCores} cores (${performanceCores}P + ${efficiencyCores}E)`
+                : `${processorCores} cores${safeNumber(hardwareData.processor?.maxSpeed) ? ` @ ${safeNumber(hardwareData.processor?.maxSpeed)}GHz` : ''}`
+              }
             </div>
           </div>
           
@@ -341,7 +414,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{graphicsName}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {graphicsManufacturer} {graphicsMemorySize ? `${graphicsMemorySize}GB VRAM` : 'Unknown VRAM'}
+              {graphicsCores > 0 
+                ? `${graphicsCores} cores${graphicsMetalSupport && graphicsMetalSupport !== 'Unknown' ? ` • ${graphicsMetalSupport}` : ''}`
+                : `${graphicsManufacturer} ${graphicsMemorySize ? `${graphicsMemorySize}GB VRAM` : 'Unknown VRAM'}`
+              }
             </div>
           </div>
           
@@ -355,7 +431,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-gray-600 dark:text-gray-400 mb-2">{npuName}</div>
               <div className="text-sm text-gray-500 dark:text-gray-500">
-                {npuManufacturer} {npuComputeUnits ? `${npuComputeUnits} TOPS` : 'Unknown TOPS'}
+                {npuCores > 0 
+                  ? `${npuCores} cores${npuTops && npuTops !== 'Unknown' ? ` • ${npuTops} TOPS` : ''}`
+                  : `${npuManufacturer} ${npuComputeUnits ? `${npuComputeUnits} TOPS` : 'Unknown TOPS'}`
+                }
               </div>
             </div>
           )}
@@ -370,7 +449,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             <div className="text-gray-600 dark:text-gray-400 mb-2">{formatBytes(totalMemory)}</div>
             <div className="text-sm text-gray-500 dark:text-gray-500">
-              {memoryModuleType} {memoryModuleManufacturer}
+              {memoryType && memoryType !== 'Unknown' ? memoryType : memoryModuleType} {memoryManufacturer && memoryManufacturer !== 'Unknown' ? memoryManufacturer : memoryModuleManufacturer}
             </div>
           </div>
           
@@ -389,8 +468,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
           </div>
           
-          {/* 6. Battery - Only show if available */}
-          {hardwareData.battery && (
+          {/* 6. Battery - Only show if NOT a desktop and has battery data */}
+          {hasBattery && (
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="px-3 py-1 bg-green-100 dark:bg-green-900 rounded-lg">
@@ -475,13 +554,92 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
       </div>
 
+      {/* Displays Information - Show connected displays */}
+      {hasDisplays && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Displays</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Connected display devices and their specifications
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Display</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Resolution</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Serial Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Firmware</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {displays.map((display, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-8 w-8 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
+                          <svg className="h-4 w-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <rect x="2" y="3" width="20" height="14" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                            <line x1="8" y1="21" x2="16" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                            <line x1="12" y1="17" x2="12" y2="21" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {display.name || 'Unknown Display'}
+                            {display.isMainDisplay ? <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Main)</span> : ''}
+                          </div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {display.type === 'internal' ? 'Built-in' : 'External'} {display.displayType || ''}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900 dark:text-gray-100">{display.resolution || 'Unknown'}</div>
+                      {display.scaledResolution && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400">Scaled: {display.scaledResolution}</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {display.displayType || display.connectionType || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900 dark:text-gray-100">
+                      <span className="inline-flex items-center gap-1">
+                        {display.serialNumber || 'N/A'}
+                        {display.serialNumber && <CopyButton value={display.serialNumber} size="sm" />}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {display.firmwareVersion || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        display.online ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                      }`}>
+                        <div className={`w-2 h-2 rounded-full mr-1.5 ${display.online ? 'bg-green-400' : 'bg-gray-400'}`}></div>
+                        {display.online ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Storage Visualization - Enhanced with hierarchical drill-down */}
       {storageDevices && storageDevices.length > 0 && (
         <StorageVisualization storageDevices={storageDevices} />
       )}
 
-      {/* Battery Information - Only show for laptops (devices with battery data) */}
-      {hardwareData.battery && (
+      {/* Battery Information - Only show for laptops (devices with actual battery data, not desktops) */}
+      {hasBattery && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Battery Information</h3>
