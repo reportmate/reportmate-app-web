@@ -2,9 +2,10 @@ import React, { useEffect, useState, useMemo } from 'react'
 
 interface DeviceDetailSkeletonProps {
   activeTab?: string
+  isMac?: boolean // Optional: if true, show unified memory layout; if false, show Windows layout; if undefined, show generic
 }
 
-export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: DeviceDetailSkeletonProps) {
+export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isMac }: DeviceDetailSkeletonProps) {
   const [activeTab, setActiveTab] = useState(initialActiveTab)
   const [loadingMessage, setLoadingMessage] = useState('Fetching device information...')
   const [deviceNameWidth, setDeviceNameWidth] = useState('w-48')
@@ -244,7 +245,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info' }: D
         {activeTab === 'applications' && <ApplicationsTabSkeleton />}
         {activeTab === 'management' && <ManagementTabSkeleton />}
         {activeTab === 'system' && <SystemTabSkeleton />}
-        {activeTab === 'hardware' && <HardwareTabSkeleton />}
+        {activeTab === 'hardware' && <HardwareTabSkeleton isMac={isMac} />}
         {activeTab === 'network' && <NetworkTabSkeleton />}
         {activeTab === 'security' && <SecurityTabSkeleton />}
         {activeTab === 'events' && <EventsTabSkeleton />}
@@ -384,38 +385,246 @@ function InfoTabSkeleton() {
   )
 }
 
-function HardwareTabSkeleton() {
+function HardwareTabSkeleton({ isMac }: { isMac?: boolean }) {
+  // If isMac is undefined, show unified layout (default to Mac-like for modern hardware)
+  const showUnified = isMac !== false
+  
   return (
     <div className="space-y-6">
-      {/* Hardware overview cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {['Processor', 'Memory', 'Storage', 'Graphics'].map((title, i) => (
-          <div key={title} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" style={{ animationDelay: `${i * 0.1}s` }}></div>
-            <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
-            <div className="h-3 w-full bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
-          </div>
-        ))}
+      {/* System info skeleton */}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-gray-500 dark:text-gray-400">
+        <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        <div className="text-gray-300 dark:text-gray-600">›</div>
+        <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        <div className="text-gray-300 dark:text-gray-600">›</div>
+        <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
       </div>
 
-      {/* Detailed hardware info */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+      {showUnified ? (
+        /* Unified Memory Architecture Layout (Mac) */
+        <>
+          {/* Chip title */}
+          <div className="mb-3 ml-8 flex items-baseline gap-2">
+            <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+
+          {/* 50/50 split layout */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {/* Left side - Unified chip container with dashed border */}
+            <div className="col-span-2 bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border-2 border-gray-200 dark:border-gray-700 border-dashed">
+              <div className="grid grid-cols-2 gap-4">
+                {/* CPU Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-red-200 dark:bg-red-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* Memory Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-yellow-200 dark:bg-yellow-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* GPU Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-green-200 dark:bg-green-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* NPU Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-pink-200 dark:bg-pink-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right side - Other cards without border */}
+            <div className="col-span-2 p-4">
+              <div className="grid grid-cols-2 gap-4">
+                {/* Storage Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-blue-200 dark:bg-blue-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* Battery Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-green-200 dark:bg-green-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* Wireless Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-cyan-200 dark:bg-cyan-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+
+                {/* Bluetooth Card */}
+                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="w-5 h-5 bg-indigo-200 dark:bg-indigo-900 rounded animate-pulse"></div>
+                    <div className="h-4 w-18 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                  <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        /* Non-Unified Layout (Windows) */
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {['Processor', 'Memory', 'Storage', 'Graphics', 'Battery', 'Wireless', 'Bluetooth', 'Network'].map((title, i) => (
+            <div key={title} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <div className={`w-5 h-5 rounded animate-pulse ${
+                  i === 0 ? 'bg-red-200 dark:bg-red-900' :
+                  i === 1 ? 'bg-yellow-200 dark:bg-yellow-900' :
+                  i === 2 ? 'bg-blue-200 dark:bg-blue-900' :
+                  i === 3 ? 'bg-green-200 dark:bg-green-900' :
+                  i === 4 ? 'bg-green-200 dark:bg-green-900' :
+                  i === 5 ? 'bg-cyan-200 dark:bg-cyan-900' :
+                  i === 6 ? 'bg-indigo-200 dark:bg-indigo-900' :
+                  'bg-purple-200 dark:bg-purple-900'
+                }`}></div>
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              <div className="h-7 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          ))}
         </div>
-        <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {[1, 2].map((col) => (
-              <div key={col} className="space-y-4">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className="flex justify-between items-center">
-                    <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05}s` }}></div>
-                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${(col - 1) * 0.1 + i * 0.05}s` }}></div>
+      )}
+
+      {/* Display cards skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-5 h-5 bg-purple-200 dark:bg-purple-900 rounded animate-pulse"></div>
+          <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+              <div className="flex items-end gap-12 mb-3">
+                <div className="flex gap-2">
+                  <div className="h-5 w-20 bg-blue-200 dark:bg-blue-900 rounded-full animate-pulse"></div>
+                  <div className="h-5 w-20 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[1, 2, 3, 4].map((j) => (
+                  <div key={j} className="space-y-1">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                   </div>
                 ))}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Storage Analysis skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+        <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-4"></div>
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="flex-1 h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Battery Information table skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                {['Cycle Count', 'Health', 'Charge Status', 'Runtime', 'Temperature'].map((header) => (
+                  <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800">
+              <tr>
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <td key={i} className="px-6 py-4 whitespace-nowrap">
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </td>
+                ))}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Memory Modules table skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                {['Location', 'Type', 'Capacity', 'Speed', 'Manufacturer'].map((header) => (
+                  <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+              {[1, 2].map((i) => (
+                <tr key={i}>
+                  {[1, 2, 3, 4, 5].map((j) => (
+                    <td key={j} className="px-6 py-4 whitespace-nowrap">
+                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

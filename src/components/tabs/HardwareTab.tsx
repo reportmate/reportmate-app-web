@@ -471,7 +471,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <Bluetooth className="w-5 h-5 text-indigo-500" />
                       <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
                     </div>
-                    <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? `v${bluetoothVersion}` : 'N/A'}</div>
+                    <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
                     <div className="text-sm text-gray-900 dark:text-white">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
                   </div>
                 </div>
@@ -584,7 +584,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <Bluetooth className="w-5 h-5 text-indigo-500" />
                 <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
               </div>
-              <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? `v${bluetoothVersion}` : 'N/A'}</div>
+              <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
             </div>
 
@@ -679,7 +679,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       </div>
 
       {/* Battery Information Section */}
-      {hasBattery && hardwareData.battery?.items && Array.isArray(hardwareData.battery.items) && hardwareData.battery.items.length > 0 && (
+      {hasBattery && hardwareData.battery && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <Battery className="w-6 h-6 text-gray-500" />
@@ -690,57 +690,80 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Property</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
+                    {hardwareData.battery.isCharging !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    )}
+                    {hardwareData.battery.health !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Health</th>
+                    )}
+                    {hardwareData.battery.cycleCount !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle Count</th>
+                    )}
+                    {hardwareData.battery.chargePercent !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Charge</th>
+                    )}
+                    {hardwareData.battery.estimatedRuntime !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Runtime</th>
+                    )}
+                    {hardwareData.battery.designCapacity !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Design Capacity</th>
+                    )}
+                    {hardwareData.battery.currentCapacity !== undefined && (
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Capacity</th>
+                    )}
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {hardwareData.battery.items.map((item: any, index: number) => (
-                    <React.Fragment key={index}>
-                      {item.cycleCount !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Cycle Count</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.cycleCount}</td>
-                        </tr>
-                      )}
-                      {item.health !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Health</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.health}</td>
-                        </tr>
-                      )}
-                      {item.chargePercent !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Charge</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{Math.round(item.chargePercent)}%</td>
-                        </tr>
-                      )}
-                      {item.isCharging !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Charging Status</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.isCharging ? 'Charging' : 'Not Charging'}</td>
-                        </tr>
-                      )}
-                      {item.estimatedRuntime !== undefined && item.estimatedRuntime > 0 && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Estimated Runtime</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{Math.round(item.estimatedRuntime)} minutes</td>
-                        </tr>
-                      )}
-                      {item.designCapacity !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Design Capacity</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.designCapacity} mAh</td>
-                        </tr>
-                      )}
-                      {item.currentCapacity !== undefined && (
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">Current Capacity</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{item.currentCapacity} mAh</td>
-                        </tr>
-                      )}
-                    </React.Fragment>
-                  ))}
+                <tbody>
+                  <tr>
+                    {hardwareData.battery.isCharging !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.isCharging ? 'Charging' : 'Not Charging'}</td>
+                    )}
+                    {hardwareData.battery.health !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.health}</td>
+                    )}
+                    {hardwareData.battery.cycleCount !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        <div className="flex flex-col gap-2">
+                          <div className="font-medium">{hardwareData.battery.cycleCount} / 1000</div>
+                          <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all ${
+                                hardwareData.battery.cycleCount > 900 
+                                  ? 'bg-red-500' 
+                                  : hardwareData.battery.cycleCount > 800 
+                                  ? 'bg-yellow-500' 
+                                  : 'bg-green-500'
+                              }`}
+                              style={{ width: `${Math.min((hardwareData.battery.cycleCount / 1000) * 100, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                      </td>
+                    )}
+                    {hardwareData.battery.chargePercent !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{Math.round(hardwareData.battery.chargePercent)}%</td>
+                    )}
+                    {hardwareData.battery.estimatedRuntime !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {(() => {
+                          const runtime = hardwareData.battery.estimatedRuntime.toString();
+                          const match = runtime.match(/^(\d+):(\d+):(\d+)/);
+                          if (match) {
+                            const hours = parseInt(match[1]);
+                            const minutes = parseInt(match[2]);
+                            return `${hours}h ${minutes}m`;
+                          }
+                          return runtime;
+                        })()}
+                      </td>
+                    )}
+                    {hardwareData.battery.designCapacity !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.designCapacity} mAh</td>
+                    )}
+                    {hardwareData.battery.currentCapacity !== undefined && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.currentCapacity} mAh</td>
+                    )}
+                  </tr>
                 </tbody>
               </table>
             </div>
