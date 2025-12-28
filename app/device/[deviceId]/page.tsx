@@ -569,9 +569,26 @@ export default function DeviceDetailPage() {
 
   // Early returns AFTER all useEffects are defined
   if (infoLoading || isResolving) {
+    // Determine if device is Mac based on available info during loading
+    // Check localStorage or URL for hints about device platform
+    const isMac = typeof window !== 'undefined' && (() => {
+      try {
+        // Try to get cached device info from sessionStorage
+        const cachedInfo = sessionStorage.getItem(`device-${deviceId}`)
+        if (cachedInfo) {
+          const parsed = JSON.parse(cachedInfo)
+          const os = parsed?.os || parsed?.system?.operatingSystem?.name || ''
+          return os.toLowerCase().includes('mac') || os.toLowerCase().includes('darwin')
+        }
+      } catch (e) {
+        // Ignore parsing errors
+      }
+      return undefined // Let skeleton default to unified layout
+    })()
+    
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <DeviceDetailSkeleton />
+        <DeviceDetailSkeleton isMac={isMac} />
       </div>
     )
   }
