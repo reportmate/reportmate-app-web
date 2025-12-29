@@ -336,33 +336,36 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {/* Unified Card with Everything */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
         
-        {/* Top System Info Row - Dynamic width, labels above */}
-        <div className="flex flex-wrap items-start gap-8 mb-6">
-          {/* Manufacturer */}
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Manufacturer</div>
-            <div className="text-xl font-bold text-gray-900 dark:text-white">
-              {safeString(hardwareData.manufacturer) || 'Unknown'}
+        {/* System Identity Section - Bordered box inside card */}
+        <div className="border-2 border-gray-200 dark:border-gray-700 rounded-lg p-4 mb-6 bg-white dark:bg-gray-800">
+          <div className="flex flex-wrap items-start gap-8">
+            {/* Manufacturer */}
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Manufacturer</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                {safeString(hardwareData.manufacturer) || 'Unknown'}
+              </div>
             </div>
-          </div>
-          
-          {/* Model */}
-          <div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model</div>
-            <div className="text-xl font-bold text-gray-900 dark:text-white">
-              {safeString(hardwareData.model) || 'Unknown'}
+            
+            {/* Model */}
+            <div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model</div>
+              <div className="text-xl font-bold text-gray-900 dark:text-white">
+                {safeString(hardwareData.model) || 'Unknown'}
+              </div>
             </div>
-          </div>
-          
-          {/* Identifier */}
-          {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+            
+            {/* Identifier */}
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
               <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                {safeString(hardwareData.model_identifier)}
+                {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' 
+                  ? safeString(hardwareData.model_identifier)
+                  : '-'
+                }
               </div>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Hardware Grid */}
@@ -370,7 +373,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           <>
             {/* Full-Width Chip Title */}
             <div className="mb-3 ml-5 flex items-baseline gap-2">
-              <h3 className="text-lg font-bold text-gray-900 dark:text-white">{processorName} Chip</h3>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">{processorName} Chip</h3>
               <span className="text-xs text-gray-500 dark:text-gray-400">Unified Memory Architecture</span>
             </div>
             
