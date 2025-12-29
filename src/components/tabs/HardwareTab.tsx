@@ -356,15 +356,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             
             {/* Identifier */}
-            <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
-              <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' 
-                  ? safeString(hardwareData.model_identifier)
-                  : '-'
-                }
+            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+              <div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
+                <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
+                  {safeString(hardwareData.model_identifier)}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
