@@ -301,7 +301,10 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
     return paths
   }
 
-  const totalUsedSpace = sortedDirectories.reduce((sum, dir) => sum + dir.size, 0)
+  // Calculate used space from system-reported values (capacity - free) instead of summing directories
+  // This accounts for APFS snapshots, system-protected files, file system overhead, and other space
+  // that the client cannot enumerate directly
+  const totalUsedSpace = selectedDevice.capacity - selectedDevice.freeSpace
   const usedPercentage = Math.round((totalUsedSpace / selectedDevice.capacity) * 100)
 
   return (
