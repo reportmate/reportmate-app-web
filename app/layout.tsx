@@ -7,7 +7,7 @@ import { EdgeThemeFix } from "../src/components/edge-theme-fix";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
-import { AppToolbar } from "../src/components/navigation/AppToolbar";
+import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
 export const dynamic = 'force-dynamic'
@@ -163,15 +163,15 @@ export default async function RootLayout({
               <ErrorBoundary>
                 {isDevelopment ? (
                   // Development: No AutoAuth component
-                  <>
-                    <AppToolbar preloadedDevices={devices} />
+                  <ToolbarWrapper preloadedDevices={devices}>
                     {children}
-                  </>
+                  </ToolbarWrapper>
                 ) : (
                   // Production: Full authentication with AutoAuth
                   <AutoAuth>
-                    <AppToolbar preloadedDevices={devices} />
-                    {children}
+                    <ToolbarWrapper preloadedDevices={devices}>
+                      {children}
+                    </ToolbarWrapper>
                   </AutoAuth>
                 )}
               </ErrorBoundary>
