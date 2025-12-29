@@ -433,10 +433,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   {/* Storage */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
-                      <HardDrive className="w-5 h-5 text-blue-500" />
+                      <HardDrive className="w-5 h-5 text-purple-500" />
                       <h4 className="font-semibold text-gray-900 dark:text-white">Storage</h4>
                     </div>
-                    <div className="text-2xl font-bold text-blue-500 mb-1">{formatBytes(totalStorage)}</div>
+                    <div className="text-2xl font-bold text-purple-500 mb-1">{formatBytes(totalStorage)}</div>
                     <div className="text-sm text-gray-900 dark:text-white mb-1">{Math.round((freeStorage / totalStorage) * 100)}% Free</div>
                   </div>
 
@@ -458,20 +458,20 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   {/* Wireless */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
-                      <Wifi className="w-5 h-5 text-cyan-500" />
+                      <Wifi className="w-5 h-5 text-teal-500" />
                       <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
                     </div>
-                    <div className="text-2xl font-bold text-cyan-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : 'N/A'}</div>
+                    <div className="text-2xl font-bold text-teal-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : 'N/A'}</div>
                     <div className="text-sm text-gray-900 dark:text-white">{wifiVersion !== 'Unknown' ? wifiVersion : (wirelessAvailable ? 'Available' : 'Not Available')}</div>
                   </div>
 
                   {/* Bluetooth */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
-                      <Bluetooth className="w-5 h-5 text-indigo-500" />
+                      <Bluetooth className="w-5 h-5 text-blue-500" />
                       <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
                     </div>
-                    <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
+                    <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
                     <div className="text-sm text-gray-900 dark:text-white">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
                   </div>
                 </div>
@@ -514,10 +514,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             {/* Storage */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 mb-2">
-                <HardDrive className="w-5 h-5 text-blue-500" />
+                <HardDrive className="w-5 h-5 text-purple-500" />
                 <h4 className="font-semibold text-gray-900 dark:text-white">Storage</h4>
               </div>
-              <div className="text-2xl font-bold text-blue-500 mb-1">{formatBytes(totalStorage)}</div>
+              <div className="text-2xl font-bold text-purple-500 mb-1">{formatBytes(totalStorage)}</div>
               <div className="text-sm text-gray-900 dark:text-white mb-1">{formatBytes(freeStorage)} Free</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">{internalDrives[0]?.type || 'Internal'}</div>
             </div>
@@ -581,10 +581,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             {/* Bluetooth */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 mb-2">
-                <Bluetooth className="w-5 h-5 text-indigo-500" />
+                <Bluetooth className="w-5 h-5 text-blue-500" />
                 <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
               </div>
-              <div className="text-2xl font-bold text-indigo-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
+              <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
             </div>
 
@@ -677,6 +677,102 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
           <div className="text-center py-8 text-gray-500">No storage devices detected</div>
         )}
       </div>
+
+      {/* Storage Devices Section - Show when multiple drives with capacity > 0 */}
+      {(() => {
+        const validDrives = storageDevices.filter((drive: any) => 
+          drive.capacity && safeNumber(drive.capacity) > 0
+        );
+        return validDrives.length > 1 ? (
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <HardDrive className="w-6 h-6 text-gray-500" />
+              Storage Devices
+            </h3>
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Device Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capacity</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Free Space</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">File System</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Health</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interface</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {validDrives.map((drive: any, index: number) => {
+                      const capacity = safeNumber(drive.capacity);
+                      const freeSpace = safeNumber(drive.freeSpace);
+                      const usedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
+                      const health = safeString(drive.health);
+                      
+                      return (
+                        <tr key={index}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {safeString(drive.name) && safeString(drive.name) !== 'Unknown' ? safeString(drive.name) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {safeString(drive.deviceName) && safeString(drive.deviceName) !== 'Unknown' ? safeString(drive.deviceName) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {safeString(drive.type) && safeString(drive.type) !== 'Unknown' ? safeString(drive.type) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {formatBytes(capacity)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex flex-col gap-1">
+                              <div>{formatBytes(freeSpace)} ({100 - usedPercent}% free)</div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
+                                <div 
+                                  className={`h-1.5 rounded-full transition-all ${
+                                    usedPercent > 90 
+                                      ? 'bg-red-500' 
+                                      : usedPercent > 75 
+                                      ? 'bg-yellow-500' 
+                                      : 'bg-green-500'
+                                  }`}
+                                  style={{ width: `${usedPercent}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {safeString(drive.fileSystem) && safeString(drive.fileSystem) !== 'Unknown' ? safeString(drive.fileSystem) : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {health !== 'Unknown' ? (
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                health === 'Good' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : health === 'Warning'
+                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              }`}>
+                                {health}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {safeString(drive.interface) && safeString(drive.interface) !== 'Unknown' ? safeString(drive.interface) : '-'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        ) : null;
+      })()}
 
       {/* Battery Information Section */}
       {hasBattery && hardwareData.battery && (
@@ -797,16 +893,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {safeString(module.location) || `Slot ${index + 1}`}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {safeString(module.type) || 'Unknown'}
+                        {safeString(module.type) && safeString(module.type) !== 'Unknown' ? safeString(module.type) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {formatBytes(safeNumber(module.capacity) * 1024 * 1024)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {module.speed ? `${safeString(module.speed)} MHz` : 'Unknown'}
+                        {module.speed ? `${safeString(module.speed)} MHz` : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {safeString(module.manufacturer) || 'Unknown'}
+                        {safeString(module.manufacturer) && safeString(module.manufacturer) !== 'Unknown' ? safeString(module.manufacturer) : '-'}
                       </td>
                     </tr>
                   ))}
