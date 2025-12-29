@@ -1,141 +1,151 @@
 'use client'
 
-import { getProviders, signIn, getSession } from 'next-auth/react'
-import { useEffect, useState, Suspense } from 'react'
+import { signIn, getSession } from 'next-auth/react'
+import { useEffect, useState, Suspense, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { getProviderDisplayName, getProviderIconConfig } from '@/lib/auth-client'
-
-interface Provider {
-  id: string
-  name: string
-  type: string
-}
 
 function SignInContent() {
-  const [providers, setProviders] = useState<Record<string, Provider> | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [signingIn, setSigningIn] = useState<string | null>(null)
+  const [status, setStatus] = useState<'checking' | 'redirecting' | 'error'>('checking')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || '/dashboard'
   const error = searchParams.get('error')
+  const hasTriggeredSignIn = useRef(false)
 
   useEffect(() => {
-    // Clear any error parameters from the URL to prevent error display
+    // Clear any error parameters from the URL
     if (error) {
-      console.log('[SIGNIN] Clearing error parameter:', error)
-      const url = new URL(window.location.href)
-      url.searchParams.delete('error')
-      window.history.replaceState({}, '', url.toString())
-    }
-  }, [error])
-
-  useEffect(() => {
-    (async () => {
-      // Check if user is already signed in
-      const session = await getSession()
-      if (session) {
-        router.push(callbackUrl)
-        return
-      }
-
-      // Get available providers
-      const res = await getProviders()
-      setProviders(res)
-      setIsLoading(false)
-    })()
-  }, [callbackUrl, router])
-
-  const handleSignIn = async (providerId: string) => {
-    setSigningIn(providerId)
-    
-    try {
-      // Clear any existing errors before signing in
+      console.log('[SIGNIN] Error parameter detected:', error)
       const url = new URL(window.location.href)
       url.searchParams.delete('error')
       window.history.replaceState({}, '', url.toString())
       
-      await signIn(providerId, { 
-        callbackUrl,
-        redirect: true // Changed to true to ensure proper redirect
-      })
-    } catch (error) {
-      console.error('Sign in error:', error)
-      setSigningIn(null)
+      // If we've had repeated errors, show manual sign-in option
+      const errorCount = parseInt(sessionStorage.getItem('signin-error-count') || '0')
+      if (errorCount >= 2) {
+        setErrorMessage('Authentication is having issues. Please try again.')
+        setStatus('error')
+        sessionStorage.setItem('signin-error-count', '0')
+        return
+      }
+      sessionStorage.setItem('signin-error-count', String(errorCount + 1))
     }
-  }
+  }, [error])
 
-
-
-  const renderProviderIcon = (providerId: string) => {
-    const iconConfig = getProviderIconConfig(providerId)
+  useEffect(() => {
+    // Prevent double trigger
+    if (hasTriggeredSignIn.current) return
     
-    if (iconConfig.type === 'outline') {
-      return (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox={iconConfig.viewBox}>
-          {(iconConfig.paths as string[]).map((path, index) => (
-            <path 
-              key={index}
-              strokeLinecap="round" 
-              strokeLinejoin="round" 
-              strokeWidth={iconConfig.strokeWidth || 2} 
-              d={path} 
-            />
-          ))}
-        </svg>
-      )
-    } else if (iconConfig.type === 'svg' && Array.isArray(iconConfig.paths) && typeof iconConfig.paths[0] === 'object') {
-      // Google provider with multiple colored paths
-      return (
-        <svg className="w-5 h-5" viewBox={iconConfig.viewBox}>
-          {(iconConfig.paths as Array<{fill: string, d: string}>).map((pathObj, index) => (
-            <path key={index} fill={pathObj.fill} d={pathObj.d} />
-          ))}
-        </svg>
-      )
-    } else {
-      // Simple SVG with single path
-      return (
-        <svg className="w-5 h-5" viewBox={iconConfig.viewBox} fill={iconConfig.fill || "currentColor"}>
-          {(iconConfig.paths as string[]).map((path, index) => (
-            <path key={index} d={path} />
-          ))}
-        </svg>
-      )
+    const autoSignIn = async () => {
+      try {
+        // Check if user is already signed in
+        const session = await getSession()
+        if (session) {
+          console.log('[SIGNIN] Already authenticated, redirecting...')
+          router.push(callbackUrl)
+          return
+        }
+
+        // Not authenticated - auto-redirect to Azure AD SSO
+        console.log('[SIGNIN] Not authenticated, auto-redirecting to Azure AD SSO...')
+        setStatus('redirecting')
+        hasTriggeredSignIn.current = true
+        
+        // Use signIn with redirect: true to let NextAuth handle the redirect properly
+        await signIn('azure-ad', { 
+          callbackUrl,
+          redirect: true
+        })
+      } catch (err) {
+        console.error('[SIGNIN] Auto sign-in error:', err)
+        setErrorMessage('Failed to initiate sign-in. Please try again.')
+        setStatus('error')
+        hasTriggeredSignIn.current = false
+      }
+    }
+
+    // Small delay to prevent flash if already authenticated
+    const timeoutId = setTimeout(autoSignIn, 100)
+    return () => clearTimeout(timeoutId)
+  }, [callbackUrl, router])
+
+  const handleManualSignIn = async () => {
+    setStatus('redirecting')
+    setErrorMessage(null)
+    sessionStorage.setItem('signin-error-count', '0')
+    
+    try {
+      await signIn('azure-ad', { 
+        callbackUrl,
+        redirect: true 
+      })
+    } catch (err) {
+      console.error('[SIGNIN] Manual sign-in error:', err)
+      setErrorMessage('Failed to initiate sign-in. Please try again.')
+      setStatus('error')
     }
   }
 
-  if (isLoading) {
+  // Show error state with manual sign-in option
+  if (status === 'error') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-md w-full space-y-8">
-          <div className="animate-pulse">
-            {/* Logo skeleton */}
+          <div>
             <div className="flex justify-center mb-8">
-              <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <Image
+                src="/reportmate-logo.png"
+                alt="ReportMate"
+                width={240}
+                height={96}
+                className="h-24 w-auto dark:brightness-0 dark:invert"
+                priority
+              />
             </div>
-            {/* Title skeleton */}
-            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto mb-4"></div>
-            {/* Button skeletons */}
-            <div className="space-y-3">
-              <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-              <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+            
+            <div className="text-center">
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                Welcome to ReportMate
+              </h1>
+              <h2 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
+                Fleet Live Reporting Dashboard
+              </h2>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
+              <p className="text-sm text-yellow-800 dark:text-yellow-200 text-center">
+                {errorMessage}
+              </p>
+            </div>
+          )}
+
+          <button
+            onClick={handleManualSignIn}
+            className="group relative w-full flex justify-center py-4 px-6 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 transition-all duration-200 shadow-sm hover:shadow-md"
+          >
+            <span className="absolute left-0 inset-y-0 flex items-center pl-4">
+              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" viewBox="0 0 23 23" fill="currentColor">
+                <path d="M0 0h11v11H0zM12 0h11v11H12zM0 12h11v11H0zM12 12h11v11H12z"/>
+              </svg>
+            </span>
+            <span className="font-semibold">
+              Sign in with Microsoft Entra ID
+            </span>
+          </button>
         </div>
       </div>
     )
   }
 
-  // Explicitly log that we're not showing any errors
-  console.log('[SIGNIN] Rendering signin page - no error display logic active')
-
+  // Show loading/redirecting state
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full space-y-8">
         <div>
-          {/* ReportMate Logo - Large and Prominent */}
           <div className="flex justify-center mb-8">
             <Image
               src="/reportmate-logo.png"
@@ -147,7 +157,6 @@ function SignInContent() {
             />
           </div>
           
-          {/* Welcome Text */}
           <div className="text-center">
             <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
               Welcome to ReportMate
@@ -158,66 +167,12 @@ function SignInContent() {
           </div>
         </div>
 
-        <div className="mt-8 space-y-4">
-          {providers && Object.values(providers)
-            .filter(provider => provider.id !== 'credentials') // Show OAuth providers first
-            .map((provider) => (
-            <button
-              key={provider.id}
-              onClick={() => handleSignIn(provider.id)}
-              disabled={signingIn === provider.id}
-              className="group relative w-full flex justify-center py-4 px-6 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
-            >
-              <span className="absolute left-0 inset-y-0 flex items-center pl-4">
-                {signingIn === provider.id ? (
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400"></div>
-                ) : (
-                  <div className="text-blue-600 dark:text-blue-400">
-                    {renderProviderIcon(provider.id)}
-                  </div>
-                )}
-              </span>
-              <span className="font-semibold">
-                Sign in with {getProviderDisplayName(provider.id)}
-              </span>
-            </button>
-          ))}
-
-          {/* Credentials provider (if enabled) */}
-          {providers?.credentials && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-gray-600" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400">Or continue with</span>
-                </div>
-              </div>
-              <div className="mt-6">
-                <button
-                  onClick={() => handleSignIn('credentials')}
-                  disabled={signingIn === 'credentials'}
-                  className="group relative w-full flex justify-center py-4 px-6 border border-gray-300 dark:border-gray-600 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-900 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm hover:shadow-md"
-                >
-                  <span className="absolute left-0 inset-y-0 flex items-center pl-4">
-                    {signingIn === 'credentials' ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600 dark:border-blue-400"></div>
-                    ) : (
-                      <div className="text-blue-600 dark:text-blue-400">
-                        {renderProviderIcon('credentials')}
-                      </div>
-                    )}
-                  </span>
-                  <span className="font-semibold">
-                    Sign in with Email & Password
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 dark:border-blue-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">
+            {status === 'checking' ? 'Checking authentication...' : 'Redirecting to Microsoft sign-in...'}
+          </p>
         </div>
-
       </div>
     </div>
   )
@@ -229,15 +184,11 @@ export default function SignIn() {
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="max-w-md w-full space-y-8">
           <div className="animate-pulse">
-            {/* Logo skeleton */}
             <div className="flex justify-center mb-8">
               <div className="h-24 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
             </div>
-            {/* Title skeleton */}
             <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4 mx-auto mb-4"></div>
-            {/* Button skeletons */}
             <div className="space-y-3">
-              <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
               <div className="h-14 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
             </div>
           </div>
