@@ -26,7 +26,8 @@ export const metadata: Metadata = {
       { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
     ],
     apple: [
-      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png", media: "(prefers-color-scheme: light)" },
+      { url: "/apple-touch-icon-dark.png", sizes: "180x180", type: "image/png", media: "(prefers-color-scheme: dark)" },
       { url: "/apple-touch-icon-152x152.png", sizes: "152x152", type: "image/png" },
       { url: "/apple-touch-icon-167x167.png", sizes: "167x167", type: "image/png" },
       { url: "/apple-touch-icon-120x120.png", sizes: "120x120", type: "image/png" },
@@ -39,7 +40,7 @@ export const metadata: Metadata = {
   },
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#0ea5e9" },
-    { media: "(prefers-color-scheme: dark)", color: "#0ea5e9" },
+    { media: "(prefers-color-scheme: dark)", color: "#0c4a6e" },
   ],
 };
 
@@ -77,6 +78,13 @@ export default async function RootLayout({
   
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
+      <head>
+        {/* Enhanced Safari Web App support with dark mode icons (macOS Sequoia) */}
+        <link rel="mask-icon" href="/mask-icon.svg" color="#0ea5e9" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="format-detection" content="telephone=no" />
+      </head>
       <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
         <script 
           dangerouslySetInnerHTML={{
