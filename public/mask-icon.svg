@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Simplified monochrome version of ReportMate icon for Safari mask-icon -->
+  <g transform="translate(100, 100)">
+    <!-- Laptop base -->
+    <path d="M 200 300 L 200 650 L 650 650 L 650 300 Z" fill="currentColor"/>
+    <!-- Screen content - clipboard/report representation -->
+    <rect x="250" y="350" width="350" height="250" rx="10" fill="white"/>
+    <!-- Chart bars -->
+    <rect x="280" y="500" width="40" height="80" fill="currentColor"/>
+    <rect x="340" y="470" width="40" height="110" fill="currentColor"/>
+    <rect x="400" y="520" width="40" height="60" fill="currentColor"/>
+    <!-- Pie chart circle -->
+    <circle cx="520" cy="450" r="50" fill="currentColor"/>
+  </g>
+</svg>

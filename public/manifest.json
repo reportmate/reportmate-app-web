@@ -31,6 +31,14 @@
       "purpose": "any maskable"
     }
   ],
+  "dark_icons": [
+    {
+      "src": "/apple-touch-icon-dark.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
   "categories": ["business", "productivity"],
   "screenshots": [],
   "shortcuts": [
