@@ -65,21 +65,27 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     bootTime: system?.operatingSystem?.bootTime
   }
 
-  // Memory processing
+  // Memory processing - supports both snake_case (Mac osquery) and camelCase (Windows)
   if (hardware.memory) {
-    if (hardware.memory.totalPhysical) {
-      hardwareInfo.memory = `${Math.round(hardware.memory.totalPhysical / (1024*1024*1024))} GB`
+    // Mac sends physical_memory, Windows sends totalPhysical
+    const totalMem = hardware.memory.physical_memory ?? hardware.memory.totalPhysical
+    if (totalMem) {
+      hardwareInfo.memory = `${Math.round(totalMem / (1024*1024*1024))} GB`
     }
     if (hardware.memory.availablePhysical) {
       hardwareInfo.availableRAM = `${Math.round(hardware.memory.availablePhysical / (1024*1024*1024))} GB`
     }
   }
 
-  // Storage processing
+  // Storage processing - supports both snake_case (Mac osquery) and camelCase (Windows)
   if (hardware.storage?.[0]) {
     const mainDrive = hardware.storage[0]
-    const totalGB = Math.round(mainDrive.capacity / (1024*1024*1024))
-    const freeGB = Math.round((mainDrive.freeSpace || 0) / (1024*1024*1024))
+    // Mac sends size, Windows sends capacity
+    const capacity = mainDrive.size ?? mainDrive.capacity
+    // Mac sends free_space, Windows sends freeSpace
+    const freeSpace = mainDrive.free_space ?? mainDrive.freeSpace
+    const totalGB = Math.round(capacity / (1024*1024*1024))
+    const freeGB = Math.round((freeSpace || 0) / (1024*1024*1024))
     hardwareInfo.storage = freeGB > 0 
       ? `${totalGB} GB ${mainDrive.type || 'Drive'} ${freeGB} GB free` 
       : `${totalGB} GB ${mainDrive.type || 'Drive'}`
@@ -99,12 +105,15 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     hardwareInfo.npuComputeUnits = hardware.npu.computeUnits
   }
 
-  // Battery processing
+  // Battery processing - supports both osquery snake_case (Mac) and legacy camelCase (Windows)
   if (hardware.battery) {
-    hardwareInfo.batteryLevel = hardware.battery.chargePercent
+    // osquery uses percent_remaining, Windows uses chargePercent
+    hardwareInfo.batteryLevel = hardware.battery.percent_remaining ?? hardware.battery.chargePercent
     hardwareInfo.batteryHealth = hardware.battery.health
-    hardwareInfo.batteryCycleCount = hardware.battery.cycleCount
-    hardwareInfo.isCharging = hardware.battery.isCharging
+    // osquery uses cycle_count, Windows uses cycleCount
+    hardwareInfo.batteryCycleCount = hardware.battery.cycle_count ?? hardware.battery.cycleCount
+    // osquery uses charging (0/1), Windows uses isCharging (boolean)
+    hardwareInfo.isCharging = hardware.battery.charging === 1 || hardware.battery.isCharging === true
   }
 
   // Performance metrics
