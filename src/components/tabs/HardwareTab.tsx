@@ -31,6 +31,9 @@ interface HardwareData {
   formFactor?: 'desktop' | 'laptop' | string;
   model_identifier?: unknown;
   memory?: {
+    // snake_case (Mac osquery)
+    physical_memory?: unknown;
+    // camelCase (Windows)
     totalPhysical?: unknown;
     availablePhysical?: unknown;
     type?: string;
@@ -47,17 +50,34 @@ interface HardwareData {
     name?: unknown;
     architecture?: unknown;
     cores?: unknown;
+    // snake_case (Mac osquery)
+    logical_cores?: unknown;
+    performance_cores?: number;
+    efficiency_cores?: number;
+    // camelCase (Windows)
     logicalProcessors?: unknown;
     maxSpeed?: unknown;
     performanceCores?: number;
     efficiencyCores?: number;
   };
   battery?: {
+    // osquery snake_case fields (Mac)
+    cycle_count?: unknown;
+    percent_remaining?: unknown;
+    charging?: unknown;
+    minutes_until_empty?: unknown;
+    minutes_to_full_charge?: unknown;
+    max_capacity?: unknown;
+    current_capacity?: unknown;
+    designed_capacity?: unknown;
+    // Legacy camelCase fields (Windows)
     cycleCount?: unknown;
     chargePercent?: unknown;
     health?: unknown;
     isCharging?: unknown;
     estimatedRuntime?: unknown;
+    designCapacity?: unknown;
+    currentCapacity?: unknown;
     items?: unknown[];
   };
   graphics?: {
@@ -65,6 +85,10 @@ interface HardwareData {
     manufacturer?: unknown;
     memorySize?: unknown;
     cores?: number;
+    // snake_case (Mac osquery)
+    metal_support?: string;
+    device_type?: string;
+    // camelCase (Windows)
     metalSupport?: string;
     bus?: string;
     deviceType?: string;
@@ -77,8 +101,40 @@ interface HardwareData {
     cores?: number;
     performance_tops?: string;
   };
+  storage?: Array<{
+    name?: string;
+    // snake_case (Mac osquery)
+    size?: number;
+    free_space?: number;
+    file_system?: string;
+    is_internal?: boolean | number;
+    smart_status?: string;
+    purgeable_space?: number;
+    device_name?: string;
+    // camelCase (Windows)
+    capacity?: number;
+    freeSpace?: number;
+    fileSystem?: string;
+    isInternal?: boolean | number;
+    smartStatus?: string;
+    purgeableSpace?: number;
+    deviceName?: string;
+    type?: string;
+    interface?: string;
+    health?: string;
+    [key: string]: unknown;
+  }>;
   displays?: Array<{
     name?: string;
+    // snake_case (Mac osquery)
+    serial_number?: string;
+    scaled_resolution?: string;
+    display_type?: string;
+    firmware_version?: string;
+    is_main_display?: boolean | number;
+    ambient_brightness_enabled?: boolean | number;
+    connection_type?: string;
+    // camelCase (Windows)
     serialNumber?: string;
     resolution?: string;
     scaledResolution?: string;
@@ -240,17 +296,31 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     )
   }
 
-  // Data Extraction
+  // Data Extraction - Support both snake_case (Mac osquery) and camelCase (Windows)
   const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
-  const storageDevices = allStorageDevices.filter((drive: any) => 
-    (drive.capacity && drive.capacity > 0) && (drive.freeSpace && drive.freeSpace > 0)
-  )
-  // Only count INTERNAL drives (isInternal: 1)
-  const internalDrives = storageDevices.filter((drive: any) => drive.isInternal === 1 || drive.isInternal === true)
-  const totalStorage = internalDrives.reduce((total: number, drive: any) => total + (drive.capacity || 0), 0) || 0
-  const freeStorage = internalDrives.reduce((total: number, drive: any) => total + (drive.freeSpace || 0), 0) || 0
+  const storageDevices = allStorageDevices.filter((drive: any) => {
+    // Support both size (Mac) and capacity (Windows)
+    const capacity = drive.size ?? drive.capacity
+    // Support both free_space (Mac) and freeSpace (Windows)
+    const freeSpace = drive.free_space ?? drive.freeSpace
+    return (capacity && capacity > 0) && (freeSpace && freeSpace > 0)
+  })
+  // Only count INTERNAL drives - support both is_internal (Mac) and isInternal (Windows)
+  const internalDrives = storageDevices.filter((drive: any) => {
+    const isInternal = drive.is_internal ?? drive.isInternal
+    return isInternal === 1 || isInternal === true
+  })
+  const totalStorage = internalDrives.reduce((total: number, drive: any) => {
+    const capacity = drive.size ?? drive.capacity ?? 0
+    return total + capacity
+  }, 0) || 0
+  const freeStorage = internalDrives.reduce((total: number, drive: any) => {
+    const freeSpace = drive.free_space ?? drive.freeSpace ?? 0
+    return total + freeSpace
+  }, 0) || 0
   
-  const totalMemory = safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
@@ -259,16 +329,19 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   
   const processorName = safeProcessorName(hardwareData.processor)
   const processorArchitecture = safeString(hardwareData.processor?.architecture)
-  const processorCores = safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logicalProcessors)
-  const performanceCores = safeNumber(hardwareData.processor?.performanceCores)
-  const efficiencyCores = safeNumber(hardwareData.processor?.efficiencyCores)
+  // Support both logical_cores (Mac) and logicalProcessors (Windows)
+  const processorCores = safeNumber(hardwareData.processor?.cores) || safeNumber(hardwareData.processor?.logical_cores) || safeNumber(hardwareData.processor?.logicalProcessors)
+  // Support both performance_cores/efficiency_cores (Mac) and performanceCores/efficiencyCores (Windows)
+  const performanceCores = safeNumber(hardwareData.processor?.performance_cores) || safeNumber(hardwareData.processor?.performanceCores)
+  const efficiencyCores = safeNumber(hardwareData.processor?.efficiency_cores) || safeNumber(hardwareData.processor?.efficiencyCores)
   const hasAppleSilicon = performanceCores > 0 && efficiencyCores > 0
   
   const graphicsName = safeString(hardwareData.graphics?.name)
   const graphicsManufacturer = safeString(hardwareData.graphics?.manufacturer)
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport)
+  // Support both metal_support (Mac) and metalSupport (Windows)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
   
   const npuName = safeString(hardwareData.npu?.name)
   const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
@@ -280,11 +353,15 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
   const hasDisplays = displays.length > 0
   
-  const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount)
-  const batteryChargePercent = safeNumber(hardwareData.battery?.chargePercent)
+  // Support both osquery snake_case (Mac) and camelCase (Windows)
+  const batteryCycleCount = safeNumber(hardwareData.battery?.cycle_count) || safeNumber(hardwareData.battery?.cycleCount)
+  const batteryChargePercent = safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
   const batteryHealth = safeString(hardwareData.battery?.health)
-  const batteryIsCharging = Boolean(hardwareData.battery?.isCharging)
-  const batteryEstimatedRuntime = typeof hardwareData.battery?.estimatedRuntime === 'string' ? hardwareData.battery.estimatedRuntime : ''
+  const batteryIsCharging = hardwareData.battery?.charging === 1 || Boolean(hardwareData.battery?.isCharging)
+  // osquery: minutes_until_empty, Windows: estimatedRuntime
+  const batteryEstimatedRuntime = hardwareData.battery?.minutes_until_empty 
+    ? `${hardwareData.battery.minutes_until_empty} min`
+    : (typeof hardwareData.battery?.estimatedRuntime === 'string' ? hardwareData.battery.estimatedRuntime : '')
   const batteryItems = Array.isArray(hardwareData.battery?.items) ? hardwareData.battery.items : null
   const formFactor = hardwareData.formFactor as string | undefined
   const isDesktop = formFactor === 'desktop'
@@ -603,7 +680,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             Displays
           </h3>
           <div className="space-y-4">
-            {displays.map((display, index) => (
+            {displays.map((display, index) => {
+              // Support both snake_case (Mac osquery) and camelCase (Windows)
+              const displaySerialNumber = display.serial_number ?? display.serialNumber
+              const displayType = display.display_type ?? display.displayType
+              const displayFirmwareVersion = display.firmware_version ?? display.firmwareVersion
+              const displayIsMainDisplay = display.is_main_display ?? display.isMainDisplay
+              
+              return (
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-end gap-12">
                   {/* Left: Icon + Title */}
@@ -616,7 +700,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {display.name || 'Unknown Display'}
                       </h4>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {display.type === 'internal' ? 'Built-in' : 'External'} {display.displayType}
+                        {display.type === 'internal' ? 'Built-in' : 'External'} {displayType}
                       </div>
                     </div>
                   </div>
@@ -630,25 +714,25 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
                       <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
-                        {display.serialNumber ? (
+                        {displaySerialNumber ? (
                           <>
-                            <span>{display.serialNumber}</span>
-                            <CopyButton value={display.serialNumber} size="sm" />
+                            <span>{displaySerialNumber}</span>
+                            <CopyButton value={displaySerialNumber} size="sm" />
                           </>
                         ) : 'N/A'}
                       </div>
                     </div>
-                    {display.firmwareVersion && (
+                    {displayFirmwareVersion && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Firmware</div>
-                        <div className="text-base text-gray-900 dark:text-white">{display.firmwareVersion}</div>
+                        <div className="text-base text-gray-900 dark:text-white">{displayFirmwareVersion}</div>
                       </div>
                     )}
                   </div>
 
                   {/* Right: Badges - Horizontal with Main Display left, Connected right */}
                   <div className="flex flex-row gap-2 flex-shrink-0">
-                    {display.isMainDisplay === 1 || display.isMainDisplay === true ? (
+                    {displayIsMainDisplay === 1 || displayIsMainDisplay === true ? (
                       <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-medium rounded whitespace-nowrap text-center">
                         Main Display
                       </span>
@@ -662,7 +746,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   </div>
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       )}
@@ -682,9 +766,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
       {/* Storage Devices Section - Show when multiple drives with capacity > 0 */}
       {(() => {
-        const validDrives = storageDevices.filter((drive: any) => 
-          drive.capacity && safeNumber(drive.capacity) > 0
-        );
+        const validDrives = storageDevices.filter((drive: any) => {
+          // Support both size (Mac) and capacity (Windows)
+          const driveCapacity = drive.size ?? drive.capacity
+          return driveCapacity && safeNumber(driveCapacity) > 0
+        });
         return validDrives.length > 1 ? (
           <div className="space-y-4">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -708,8 +794,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {validDrives.map((drive: any, index: number) => {
-                      const capacity = safeNumber(drive.capacity);
-                      const freeSpace = safeNumber(drive.freeSpace);
+                      // Support both snake_case (Mac osquery) and camelCase (Windows)
+                      const capacity = safeNumber(drive.size ?? drive.capacity);
+                      const freeSpace = safeNumber(drive.free_space ?? drive.freeSpace);
+                      const fileSystem = safeString(drive.file_system ?? drive.fileSystem);
+                      const deviceName = safeString(drive.device_name ?? drive.deviceName);
                       const usedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
                       const health = safeString(drive.health);
                       
@@ -719,7 +808,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                             {safeString(drive.name) && safeString(drive.name) !== 'Unknown' ? safeString(drive.name) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {safeString(drive.deviceName) && safeString(drive.deviceName) !== 'Unknown' ? safeString(drive.deviceName) : '-'}
+                            {deviceName && deviceName !== 'Unknown' ? deviceName : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {safeString(drive.type) && safeString(drive.type) !== 'Unknown' ? safeString(drive.type) : '-'}
@@ -745,7 +834,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {safeString(drive.fileSystem) && safeString(drive.fileSystem) !== 'Unknown' ? safeString(drive.fileSystem) : '-'}
+                            {fileSystem && fileSystem !== 'Unknown' ? fileSystem : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {health !== 'Unknown' ? (
@@ -788,78 +877,69 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                   <tr>
-                    {hardwareData.battery.isCharging !== undefined && (
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    )}
-                    {hardwareData.battery.health !== undefined && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    {batteryHealth && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Health</th>
                     )}
-                    {hardwareData.battery.cycleCount !== undefined && (
+                    {batteryCycleCount > 0 && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Cycle Count</th>
                     )}
-                    {hardwareData.battery.chargePercent !== undefined && (
+                    {batteryChargePercent > 0 && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Charge</th>
                     )}
-                    {hardwareData.battery.estimatedRuntime !== undefined && (
+                    {batteryEstimatedRuntime && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Runtime</th>
                     )}
-                    {hardwareData.battery.designCapacity !== undefined && (
+                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Design Capacity</th>
                     )}
-                    {hardwareData.battery.currentCapacity !== undefined && (
+                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Capacity</th>
                     )}
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    {hardwareData.battery.isCharging !== undefined && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.isCharging ? 'Charging' : 'Not Charging'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{batteryIsCharging ? 'Charging' : 'Not Charging'}</td>
+                    {batteryHealth && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{batteryHealth}</td>
                     )}
-                    {hardwareData.battery.health !== undefined && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.health}</td>
-                    )}
-                    {hardwareData.battery.cycleCount !== undefined && (
+                    {batteryCycleCount > 0 && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                         <div className="flex flex-col gap-2">
-                          <div className="font-medium">{hardwareData.battery.cycleCount} / 1000</div>
+                          <div className="font-medium">{batteryCycleCount} / 1000</div>
                           <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                             <div 
                               className={`h-2 rounded-full transition-all ${
-                                hardwareData.battery.cycleCount > 900 
+                                batteryCycleCount > 900 
                                   ? 'bg-red-500' 
-                                  : hardwareData.battery.cycleCount > 800 
+                                  : batteryCycleCount > 800 
                                   ? 'bg-yellow-500' 
                                   : 'bg-green-500'
                               }`}
-                              style={{ width: `${Math.min((hardwareData.battery.cycleCount / 1000) * 100, 100)}%` }}
+                              style={{ width: `${Math.min((batteryCycleCount / 1000) * 100, 100)}%` }}
                             ></div>
                           </div>
                         </div>
                       </td>
                     )}
-                    {hardwareData.battery.chargePercent !== undefined && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{Math.round(hardwareData.battery.chargePercent)}%</td>
+                    {batteryChargePercent > 0 && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{Math.round(batteryChargePercent)}%</td>
                     )}
-                    {hardwareData.battery.estimatedRuntime !== undefined && (
+                    {batteryEstimatedRuntime && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {(() => {
-                          const runtime = hardwareData.battery.estimatedRuntime.toString();
-                          const match = runtime.match(/^(\d+):(\d+):(\d+)/);
-                          if (match) {
-                            const hours = parseInt(match[1]);
-                            const minutes = parseInt(match[2]);
-                            return `${hours}h ${minutes}m`;
-                          }
-                          return runtime;
-                        })()}
+                        {batteryEstimatedRuntime}
                       </td>
                     )}
-                    {hardwareData.battery.designCapacity !== undefined && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.designCapacity} mAh</td>
+                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
+                      </td>
                     )}
-                    {hardwareData.battery.currentCapacity !== undefined && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{hardwareData.battery.currentCapacity} mAh</td>
+                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        {safeNumber(hardwareData.battery.current_capacity) || safeNumber(hardwareData.battery.currentCapacity)} mAh
+                      </td>
                     )}
                   </tr>
                 </tbody>
