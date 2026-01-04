@@ -76,18 +76,19 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
   console.log('[NETWORK MODULE] Found network module with keys:', Object.keys(network))
 
-  // Extract active connection information
-  if (network.activeConnection) {
-    const active = network.activeConnection
-    networkInfo.ipAddress = active.ipAddress
-    networkInfo.macAddress = active.macAddress
+  // Extract active connection information - support both snake_case (new) and camelCase (legacy)
+  const activeConnection = network.active_connection || network.activeConnection
+  if (activeConnection) {
+    const active = activeConnection
+    networkInfo.ipAddress = active.ip_address || active.ipAddress
+    networkInfo.macAddress = active.mac_address || active.macAddress
     networkInfo.gateway = active.gateway
-    networkInfo.connectionType = active.connectionType
-    networkInfo.interfaceName = active.interfaceName || active.friendlyName
-    networkInfo.ssid = active.activeWifiSsid
-    networkInfo.signalStrength = active.wifiSignalStrength
-    networkInfo.vpnName = active.vpnName
-    networkInfo.vpnActive = active.isVpnActive
+    networkInfo.connectionType = active.connection_type || active.connectionType
+    networkInfo.interfaceName = active.interface_name || active.interfaceName || active.friendly_name || active.friendlyName
+    networkInfo.ssid = active.active_wifi_ssid || active.activeWifiSsid
+    networkInfo.signalStrength = active.wifi_signal_strength || active.wifiSignalStrength
+    networkInfo.vpnName = active.vpn_name || active.vpnName
+    networkInfo.vpnActive = active.is_vpn_active || active.isVpnActive
   }
 
   // Extract DNS information
@@ -220,24 +221,25 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       }
 
       // Normalize status - map "Up" to active status
-      const isActive = iface.isActive === true || isUp
-      const normalizedStatus = isUp ? (iface.isActive ? 'Active' : 'Connected') : 'Disconnected'
+      const isActive = iface.isActive === true || iface.is_active === true || isUp
+      const normalizedStatus = isUp ? (isActive ? 'Active' : 'Connected') : 'Disconnected'
 
+      // Support both snake_case (new osquery) and camelCase (legacy) field names
       return {
-        name: iface.name || iface.friendlyName || 'Unknown',
-        friendlyName: iface.friendlyName,
+        name: iface.name || iface.friendly_name || iface.friendlyName || 'Unknown',
+        friendlyName: iface.friendly_name || iface.friendlyName,
         ipAddress: displayAddress,
         ipAddresses: ipAddresses,
-        macAddress: iface.macAddress,
+        macAddress: iface.mac_address || iface.macAddress,
         type: iface.type,
         status: normalizedStatus,
         isActive: isActive,
         mtu: iface.mtu,
-        bytesSent: iface.bytesSent,
-        bytesReceived: iface.bytesReceived,
-        linkSpeed: iface.linkSpeed,
-        wirelessProtocol: iface.wirelessProtocol,
-        wirelessBand: iface.wirelessBand
+        bytesSent: iface.bytes_sent || iface.bytesSent,
+        bytesReceived: iface.bytes_received || iface.bytesReceived,
+        linkSpeed: iface.link_speed || iface.linkSpeed,
+        wirelessProtocol: iface.wireless_protocol || iface.wirelessProtocol,
+        wirelessBand: iface.wireless_band || iface.wirelessBand
       }
     })
 
