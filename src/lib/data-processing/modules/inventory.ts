@@ -20,6 +20,7 @@ export interface InventoryInfo {
 /**
  * Extract inventory information from device modules
  * MODULAR: Self-contained inventory data processing
+ * Supports both snake_case (osquery/new) and camelCase (legacy) formats
  */
 export function extractInventory(inventoryData: any): InventoryInfo {
   if (!inventoryData) {
@@ -31,27 +32,33 @@ export function extractInventory(inventoryData: any): InventoryInfo {
   const inventory = inventoryData.inventory || inventoryData
   
   console.log('[INVENTORY MODULE] Processing inventory data:', {
-    hasDeviceName: !!inventory.deviceName,
+    hasDeviceName: !!(inventory.device_name || inventory.deviceName),
     hasLocation: !!inventory.location,
-    hasAssetTag: !!inventory.assetTag,
+    hasAssetTag: !!(inventory.asset_tag || inventory.assetTag),
     hasOwner: !!inventory.owner,
-    deviceName: inventory.deviceName,
+    deviceName: inventory.device_name || inventory.deviceName,
     rawData: inventory
   })
 
   const inventoryInfo: InventoryInfo = {}
 
-  // Basic inventory fields
-  if (inventory.deviceName) inventoryInfo.deviceName = inventory.deviceName
+  // Basic inventory fields - support both snake_case (new) and camelCase (legacy)
+  const deviceName = inventory.device_name || inventory.deviceName
+  const assetTag = inventory.asset_tag || inventory.assetTag
+  const serialNumber = inventory.serial_number || inventory.serialNumber
+  const purchaseDate = inventory.purchase_date || inventory.purchaseDate
+  const warrantyExpiration = inventory.warranty_expiration || inventory.warrantyExpiration
+
+  if (deviceName) inventoryInfo.deviceName = deviceName
   if (inventory.location) inventoryInfo.location = inventory.location
-  if (inventory.assetTag) inventoryInfo.assetTag = inventory.assetTag
+  if (assetTag) inventoryInfo.assetTag = assetTag
   if (inventory.department) inventoryInfo.department = inventory.department
   if (inventory.owner) inventoryInfo.owner = inventory.owner
-  if (inventory.purchaseDate) inventoryInfo.purchaseDate = inventory.purchaseDate
-  if (inventory.warrantyExpiration) inventoryInfo.warrantyExpiration = inventory.warrantyExpiration
+  if (purchaseDate) inventoryInfo.purchaseDate = purchaseDate
+  if (warrantyExpiration) inventoryInfo.warrantyExpiration = warrantyExpiration
   if (inventory.vendor) inventoryInfo.vendor = inventory.vendor
   if (inventory.model) inventoryInfo.model = inventory.model
-  if (inventory.serialNumber) inventoryInfo.serialNumber = inventory.serialNumber
+  if (serialNumber) inventoryInfo.serialNumber = serialNumber
   if (inventory.description) inventoryInfo.description = inventory.description
 
   console.log('[INVENTORY MODULE] Inventory info extracted:', {
