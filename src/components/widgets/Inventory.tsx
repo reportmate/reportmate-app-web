@@ -1,6 +1,8 @@
 /**
  * Inventory Widget
  * Displays inventory information including device name, usage, catalog, department, location, asset tag, and serial number
+ * 
+ * SNAKE_CASE: All properties match API response format directly
  */
 
 import React from 'react'
@@ -10,35 +12,27 @@ import { formatRelativeTime } from '../../lib/time'
 interface Device {
   id: string
   name: string
-  assetTag?: string
   serialNumber?: string
   deviceId?: string
   model?: string
   lastSeen?: string
   createdAt?: string
   status?: 'active' | 'stale' | 'warning' | 'error'
-  // Inventory specific fields from the inventory module
-  inventory?: {
-    deviceName?: string
-    usage?: string
-    catalog?: string
-    department?: string
-    location?: string
-    assetTag?: string
-    serialNumber?: string
-    uuid?: string
-  }
-  // Modular data from modules
+  // Modular data from modules - snake_case to match API
   modules?: {
     inventory?: {
-      deviceName?: string
+      device_name?: string
       usage?: string
       catalog?: string
       department?: string
       location?: string
-      assetTag?: string
-      serialNumber?: string
+      asset_tag?: string
+      serial_number?: string
       uuid?: string
+      owner?: string
+      collected_at?: string
+      device_id?: string
+      module_id?: string
     }
   }
 }
@@ -48,7 +42,7 @@ interface InventoryWidgetProps {
 }
 
 export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
-  // Use inventory module data if available, fallback to device properties
+  // Use inventory module data directly - snake_case from API
   const inventory = device.modules?.inventory || {}
   
   // Check if we have any assignment details for the right column
@@ -69,14 +63,14 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             {/* Device Name */}
             <Stat 
               label="Device Name" 
-              value={inventory.deviceName || 'Unknown Device'} 
+              value={inventory.device_name || 'Unknown Device'} 
             />
             
             {/* Asset Tag */}
-            {inventory.assetTag && (
+            {inventory.asset_tag && (
               <Stat 
                 label="Asset Tag" 
-                value={inventory.assetTag} 
+                value={inventory.asset_tag} 
                 isMono 
                 showCopyButton
               />
@@ -85,7 +79,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             {/* Serial Number */}
             <Stat 
               label="Serial Number" 
-              value={inventory.serialNumber || device.serialNumber} 
+              value={inventory.serial_number || device.serialNumber} 
               isMono 
               showCopyButton
             />

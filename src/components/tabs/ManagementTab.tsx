@@ -2,11 +2,12 @@
  * Management Tab Component
  * Comprehensive device management status and enrollment details
  * Based on the rich Management widget with enhanced tab layout
+ * 
+ * SNAKE_CASE: All fields match API response format directly
  */
 
 import React from 'react'
 import { Icons } from '../widgets/shared'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
 
 interface ManagementTabProps {
@@ -14,11 +15,8 @@ interface ManagementTabProps {
 }
 
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
-  // Access management data from modular structure or fallback to device level
-  const rawManagement = (device as any).modules?.management || (device as any).management
-
-  // Parse PowerShell objects to proper JavaScript objects
-  const management = convertPowerShellObjects(rawManagement)
+  // Access management data from modular structure or fallback to device level (snake_case)
+  const management = (device as any).modules?.management || (device as any).management
 
   if (!management) {
     return (
@@ -48,13 +46,13 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     )
   }
 
-  // Extract key data from the management structure
-  const isEnrolled = management.mdmEnrollment?.isEnrolled || false
-  const provider = management.mdmEnrollment?.provider
-  const enrollmentType = management.mdmEnrollment?.enrollmentType
-  const tenantName = management.tenantDetails?.tenantName
-  const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
-  const profileCount = management.profiles?.length || 0
+  // Extract key data from the management structure (snake_case from API)
+  const isEnrolled = management?.mdm_enrollment?.is_enrolled || false
+  const provider = management?.mdm_enrollment?.provider
+  const enrollmentType = management?.mdm_enrollment?.enrollment_type
+  const tenantName = management?.tenant_details?.tenant_name
+  const deviceAuthStatus = management?.device_details?.device_auth_status
+  const profileCount = management?.profiles?.length || 0
 
   // Helper functions
   const formatExpiryDate = (dateString?: string) => {
@@ -163,28 +161,28 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <span className="text-sm font-medium text-gray-900 dark:text-white ml-4">{tenantName}</span>
                 </div>
 
-                {/* Intune Device ID with copy button */}
-                {management.deviceDetails?.intuneDeviceId && (
+                {/* Intune Device ID with copy button (snake_case from API) */}
+                {management?.device_details?.intune_device_id && (
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Intune ID:</span>
                     <div className="flex items-center gap-2 ml-4">
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {management.deviceDetails.intuneDeviceId}
+                        {management.device_details.intune_device_id}
                       </span>
-                      <CopyButton value={management.deviceDetails.intuneDeviceId} />
+                      <CopyButton value={management.device_details.intune_device_id} />
                     </div>
                   </div>
                 )}
 
-                {/* Entra Object ID with copy button */}
-                {management.deviceDetails?.entraObjectId && (
+                {/* Entra Object ID with copy button (snake_case from API) */}
+                {management?.device_details?.entra_object_id && (
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Object ID:</span>
                     <div className="flex items-center gap-2 ml-4">
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {management.deviceDetails.entraObjectId}
+                        {management.device_details.entra_object_id}
                       </span>
-                      <CopyButton value={management.deviceDetails.entraObjectId} />
+                      <CopyButton value={management.device_details.entra_object_id} />
                     </div>
                   </div>
                 )}
@@ -199,8 +197,8 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             </div>
           )}
 
-          {/* Domain Trust Status - Only for Domain Joined (Hybrid Entra Join) devices */}
-          {(enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined') && management.domainTrust && (
+          {/* Domain Trust Status - Only for Domain Joined (Hybrid Entra Join) devices (snake_case from API) */}
+          {(enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined') && management?.domain_trust && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Domain Trust Status</h3>
               <div className="space-y-3">
@@ -208,83 +206,83 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Secure Channel</span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    management.domainTrust.secureChannelValid === true
+                    management.domain_trust.secure_channel_valid === true
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : management.domainTrust.secureChannelValid === false
+                      : management.domain_trust.secure_channel_valid === false
                       ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                       : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
                   }`}>
-                    {management.domainTrust.secureChannelValid === true ? 'Valid' : 
-                     management.domainTrust.secureChannelValid === false ? 'Invalid' : 'Unknown'}
+                    {management.domain_trust.secure_channel_valid === true ? 'Valid' : 
+                     management.domain_trust.secure_channel_valid === false ? 'Invalid' : 'Unknown'}
                   </span>
                 </div>
 
                 {/* Domain Name */}
-                {management.domainTrust.domainName && (
+                {management.domain_trust.domain_name && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain</span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {management.domainTrust.domainName}
+                      {management.domain_trust.domain_name}
                     </span>
                   </div>
                 )}
 
                 {/* Domain Controller */}
-                {management.domainTrust.domainController && (
+                {management.domain_trust.domain_controller && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain Controller</span>
                     <span className="text-sm font-mono text-gray-900 dark:text-white text-xs">
-                      {management.domainTrust.domainController}
+                      {management.domain_trust.domain_controller}
                     </span>
                   </div>
                 )}
 
                 {/* Trust Status */}
-                {management.domainTrust.trustStatus && (
+                {management.domain_trust.trust_status && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Trust Status</span>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      management.domainTrust.trustStatus === 'Healthy' || management.domainTrust.trustStatus === 'Success' || management.domainTrust.trustStatus === 'Trusted'
+                      management.domain_trust.trust_status === 'Healthy' || management.domain_trust.trust_status === 'Success' || management.domain_trust.trust_status === 'Trusted'
                         ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                         : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                     }`}>
-                      {management.domainTrust.trustStatus}
+                      {management.domain_trust.trust_status}
                     </span>
                   </div>
                 )}
 
                 {/* Machine Password Age */}
-                {management.domainTrust.machinePasswordAgeDays !== undefined && (
+                {management.domain_trust.machine_password_age_days !== undefined && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Password Age</span>
                     <span className={`text-sm font-medium ${
-                      management.domainTrust.machinePasswordAgeDays > 30
+                      management.domain_trust.machine_password_age_days > 30
                         ? 'text-yellow-600 dark:text-yellow-400'
                         : 'text-gray-900 dark:text-white'
                     }`}>
-                      {management.domainTrust.machinePasswordAgeDays} days
+                      {management.domain_trust.machine_password_age_days} days
                     </span>
                   </div>
                 )}
 
                 {/* Last Checked */}
-                {management.domainTrust.lastChecked && (
+                {management.domain_trust.last_checked && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Checked</span>
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {formatExpiryDate(management.domainTrust.lastChecked)}
+                      {formatExpiryDate(management.domain_trust.last_checked)}
                     </span>
                   </div>
                 )}
 
                 {/* Error Message if present */}
-                {management.domainTrust.errorMessage && (
+                {management.domain_trust.error_message && (
                   <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     <div className="flex items-start gap-2">
                       <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm text-red-700 dark:text-red-300">{management.domainTrust.errorMessage}</span>
+                      <span className="text-sm text-red-700 dark:text-red-300">{management.domain_trust.error_message}</span>
                     </div>
                   </div>
                 )}
@@ -292,12 +290,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             </div>
           )}
 
-          {/* Management URL - Move to bottom */}
-          {management.mdmEnrollment?.managementUrl && (
+          {/* Management URL - Move to bottom (snake_case from API) */}
+          {management?.mdm_enrollment?.management_url && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Management URL</div>
               <div className="text-sm font-mono text-gray-900 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 rounded-md px-3 py-2 break-all">
-                {management.mdmEnrollment.managementUrl}
+                {management.mdm_enrollment.management_url}
               </div>
             </div>
           )}
@@ -320,7 +318,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {management.compliancePolicies?.length || 0}
+                  {management?.compliance_policies?.length || 0}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Compliance Policies
@@ -329,7 +327,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {management.metadata?.Applications?.length || 0}
+                  {management?.metadata?.applications?.length || 0}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Managed Apps
@@ -337,13 +335,13 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               </div>
             </div>
 
-            {/* Compliance Status with pill on right */}
+            {/* Compliance Status with pill on right (snake_case from API) */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
+              {management?.compliance_policies && management.compliance_policies.length > 0 ? (
                 <div className="flex items-center justify-between">
                   <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies Applied</span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    {management.compliancePolicies.length} policies
+                    {management.compliance_policies.length} policies
                   </span>
                 </div>
               ) : (
@@ -390,24 +388,24 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   {management.profiles.map((profile: any, index: number) => (
                     <tr key={profile.id || index}>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {profile.displayName || profile.name || 'Unknown Profile'}
+                        {profile.display_name || profile.name || 'Unknown Profile'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
                         {profile.type || 'Configuration'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          (profile.status || profile.installState || '').toLowerCase().includes('install') 
+                          (profile.status || profile.install_state || '').toLowerCase().includes('install') 
                             ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                            : (profile.status || profile.installState || '').toLowerCase().includes('pending') 
+                            : (profile.status || profile.install_state || '').toLowerCase().includes('pending') 
                             ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
                             : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                         }`}>
-                          {profile.status || profile.installState || 'Unknown'}
+                          {profile.status || profile.install_state || 'Unknown'}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {profile.installDate ? formatExpiryDate(profile.installDate) : 'Unknown'}
+                        {profile.install_date ? formatExpiryDate(profile.install_date) : 'Unknown'}
                       </td>
                     </tr>
                   ))}

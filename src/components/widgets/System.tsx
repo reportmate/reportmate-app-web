@@ -1,6 +1,8 @@
 /**
  * System Widget
  * Displays operating system information and system details
+ * 
+ * SNAKE_CASE: All properties match API response format directly
  */
 
 import React from 'react'
@@ -10,22 +12,52 @@ interface Device {
   id: string
   name: string
   serialNumber?: string
-  // Modules structure
+  // Modules structure - snake_case from API
   modules?: {
     system?: {
-      operatingSystem?: {
+      uptime?: string
+      operating_system?: {
         name: string
         edition?: string
         version?: string
-        displayVersion?: string
+        display_version?: string
         build?: string
         architecture?: string
         locale?: string
-        timeZone?: string
-        activeKeyboardLayout?: string
-        featureUpdate?: string
+        time_zone?: string
+        active_keyboard_layout?: string
+        keyboard_layouts?: string[]
+        feature_update?: string
+        install_date?: string
+        activation?: {
+          status?: string
+          status_code?: number
+          is_activated?: boolean
+          license_type?: string
+          license_source?: string
+          partial_product_key?: string
+          has_firmware_license?: boolean
+        }
       }
-      uptimeString?: string
+      services?: Array<{
+        name?: string
+        path?: string
+        status?: string
+        start_type?: string
+        description?: string
+        display_name?: string
+      }>
+      updates?: Array<{
+        id?: string
+        title?: string
+        status?: string
+        category?: string
+        install_date?: string
+        requires_restart?: boolean
+      }>
+      collected_at?: string
+      device_id?: string
+      module_id?: string
     }
   }
 }
@@ -35,14 +67,21 @@ interface SystemWidgetProps {
 }
 
 export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
-  // Use modules.system data only
-  const operatingSystem = device.modules?.system?.operatingSystem
-  const uptimeString = device.modules?.system?.uptimeString
+  // Use modules.system data - snake_case from API
+  const system = device.modules?.system
+  const operatingSystem = system?.operating_system
+  const uptime = system?.uptime
+
+  console.log('SystemWidget DEBUG:', {
+    deviceName: device?.name,
+    hasSystem: !!system,
+    hasOperatingSystem: !!operatingSystem,
+    systemKeys: system ? Object.keys(system) : [],
+    osKeys: operatingSystem ? Object.keys(operatingSystem) : []
+  })
 
   // Check if we have any system information
-  const hasSystemInfo = operatingSystem
-
-  if (!hasSystemInfo) {
+  if (!operatingSystem) {
     return (
       <StatBlock 
         title="System" 
@@ -77,7 +116,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
             
             <Stat 
               label="Display Version" 
-              value={operatingSystem?.displayVersion || 'Unknown'} 
+              value={operatingSystem?.display_version || 'Unknown'} 
             />
 
           </div>
@@ -91,7 +130,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
             
             <Stat 
               label="Feature Update" 
-              value={operatingSystem?.featureUpdate || 'Unknown'} 
+              value={operatingSystem?.feature_update || 'Unknown'} 
             />
           </div>
         </div>
@@ -104,19 +143,19 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
           <div className="col-span-3 space-y-4">
             <Stat 
               label="Keyboard Layout" 
-              value={operatingSystem?.activeKeyboardLayout || 'Unknown'} 
+              value={operatingSystem?.active_keyboard_layout || 'Unknown'} 
             />
             
             <Stat 
               label="Time Zone" 
-              value={operatingSystem?.timeZone || 'Unknown'} 
+              value={operatingSystem?.time_zone || 'Unknown'} 
             />
           </div>
           
           <div className="col-span-2 space-y-4">
             <Stat 
               label="Uptime" 
-              value={uptimeString || 'Unknown'} 
+              value={uptime || 'Unknown'} 
             />
 
             <Stat 

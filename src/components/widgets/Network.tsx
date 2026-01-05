@@ -1,89 +1,91 @@
 /**
  * Enhanced Network Widget
  * Displays comprehensive network configuration and connectivity information
+ * 
+ * SNAKE_CASE: All interfaces match API response format directly
  */
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
 import { extractNetwork } from '../../lib/data-processing/modules/network'
 
-// Based on actual API response structure from your sample data
+// Based on actual API response structure (snake_case from osquery/FastAPI)
 interface NetworkInfo {
-  moduleId?: string
-  deviceId?: string
-  collectedAt?: string
+  module_id?: string
+  device_id?: string
+  collected_at?: string
   hostname?: string
-  connectionType?: string
-  connectionName?: string
+  connection_type?: string
+  connection_name?: string
   ssid?: string | null
-  signalStrength?: string | null
+  signal_strength?: string | null
   service?: string
   status?: number
   ethernet?: string
-  clientid?: string
-  ipv4conf?: string
-  ipv4ip?: string
-  ipv4mask?: string
-  ipv4router?: string
-  ipv6conf?: string
-  ipv6ip?: string
-  ipv6prefixlen?: number
-  ipv6router?: string
-  ipv4dns?: string
+  client_id?: string
+  ipv4_conf?: string
+  ipv4_ip?: string
+  ipv4_mask?: string
+  ipv4_router?: string
+  ipv6_conf?: string
+  ipv6_ip?: string
+  ipv6_prefix_len?: number
+  ipv6_router?: string
+  ipv4_dns?: string
   vlans?: string
-  activemtu?: number
-  validmturange?: string
-  currentmedia?: string
-  activemedia?: string
-  searchdomain?: string
-  externalip?: string
+  active_mtu?: number
+  valid_mtu_range?: string
+  current_media?: string
+  active_media?: string
+  search_domain?: string
+  external_ip?: string
   location?: string
   // WiFi specific
   airdrop_channel?: string
   airdrop_supported?: boolean
   wow_supported?: boolean
   supported_channels?: string
-  supported_phymodes?: string
+  supported_phy_modes?: string
   wireless_card_type?: string
   country_code?: string
   firmware_version?: string
   wireless_locale?: string
-  // Enhanced modular structure
+  // Enhanced modular structure (snake_case)
   interfaces?: Array<{
     name: string
     type: string
     status: string
-    ipAddress?: string
-    macAddress?: string
+    ip_address?: string
+    mac_address?: string
     speed?: string
     ssid?: string
-    signalStrength?: string
-    isActive?: boolean
+    signal_strength?: string
+    is_active?: boolean
   }>
-  activeConnection?: {
-    connectionType?: string
-    interfaceName?: string
-    friendlyName?: string
-    ipAddress?: string
+  active_connection?: {
+    connection_type?: string
+    interface_name?: string
+    friendly_name?: string
+    ip_address?: string
     gateway?: string
-    activeWifiSsid?: string
-    wifiSignalStrength?: number
-    isVpnActive?: boolean
-    vpnName?: string
+    active_wifi_ssid?: string
+    wifi_signal_strength?: number
+    is_vpn_active?: boolean
+    vpn_name?: string
   }
-  primaryInterface?: string
+  primary_interface?: string
   dns?: string[]
   gateway?: string
-  externalIp?: string
+  external_ip_address?: string
 }
 
 interface Device {
   id: string
   name: string
-  ipAddress?: string
-  ipAddressV4?: string
-  ipAddressV6?: string
-  macAddress?: string
+  ip_address?: string
+  ip_address_v4?: string
+  ip_address_v6?: string
+  mac_address?: string
   network?: NetworkInfo
   // Modular network data
   modules?: {
@@ -99,20 +101,20 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   // Use the enhanced extractNetwork function to get processed network data
   const network = extractNetwork(device)
   
-  // Get activeConnection data using the processed network data
+  // Get active_connection data using the processed network data (snake_case)
   const activeConnectionData = {
-    connectionType: network.connectionType || 'Unknown',
-    interfaceName: network.interfaceName,
-    ipAddress: network.ipAddress || device.ipAddress,
+    connectionType: network.connection_type || 'Unknown',
+    interfaceName: network.interface_name,
+    ipAddress: network.ip_address || device.ip_address,
     gateway: network.gateway,
-    macAddress: network.macAddress || device.macAddress,
-    isVpnActive: network.vpnActive || false,
-    vpnName: network.vpnName || '',
+    macAddress: network.mac_address || device.mac_address,
+    isVpnActive: network.vpn_active || false,
+    vpnName: network.vpn_name || '',
     activeWifiSsid: network.ssid,
-    wifiSignalStrength: network.signalStrength,
-    // Enhanced data for active connection
-    activeDnsServers: network.activeDnsServers || [],
-    dnsAddress: network.dnsAddress
+    wifiSignalStrength: network.signal_strength,
+    // Enhanced data for active connection (snake_case)
+    activeDnsServers: network.active_dns_servers || [],
+    dnsAddress: network.dns_address
   }
   
   // Debug logging

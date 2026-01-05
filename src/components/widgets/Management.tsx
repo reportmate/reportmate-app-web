@@ -1,114 +1,90 @@
 /**
  * Management Widget
  * Displays device management enrollment status and details
+ * 
+ * SNAKE_CASE: All properties match API response format directly
  */
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
-
-interface Management {
-  deviceState?: {
-    status?: string
-    deviceName?: string
-    entraJoined?: boolean
-    domainJoined?: boolean
-    virtualDesktop?: boolean
-    enterpriseJoined?: boolean
-  }
-  deviceDetails?: {
-    deviceId?: string
-    thumbprint?: string
-    keyProvider?: string
-    tmpProtected?: boolean
-    keyContainerId?: string
-    deviceAuthStatus?: string
-    deviceCertificateValidity?: string
-    // Enhanced device identification
-    intuneDeviceId?: string
-    entraObjectId?: string
-  }
-  mdmEnrollment?: {
-    provider?: string
-    isEnrolled?: boolean
-    managementUrl?: string
-    enrollmentType?: string
-    serverUrl?: string
-  }
-  tenantDetails?: {
-    tenantName?: string
-    tenantId?: string
-    mdmUrl?: string
-  }
-  userState?: {
-    ngcSet?: boolean
-    canReset?: boolean
-    ngcKeyId?: string
-    wamDefaultId?: string
-    wamDefaultSet?: boolean
-    wamDefaultGUID?: string
-    workplaceJoined?: boolean
-    wamDefaultAuthority?: string
-  }
-  ssoState?: {
-    cloudTgt?: boolean
-    entraPrt?: boolean
-    onPremTgt?: boolean
-    enterprisePrt?: boolean
-    entraPrtAuthority?: string
-    kerbTopLevelNames?: string
-    entraPrtExpiryTime?: string
-    entraPrtUpdateTime?: string
-    enterprisePrtAuthority?: string
-  }
-  diagnosticData?: {
-    accessType?: string
-    clientTime?: string
-    keySignTest?: string
-    clientErrorCode?: string
-    hostNameUpdated?: boolean
-    proxyBypassList?: string
-    proxyServerList?: string
-    osVersionUpdated?: string
-    autoDetectSettings?: boolean
-    displayNameUpdated?: string
-    lastHostNameUpdate?: string
-    autoConfigurationUrl?: string
-    entraRecoveryEnabled?: boolean
-    executingAccountName?: string
-  }
-  profiles?: Array<{
-    id: string
-    name: string
-    description: string
-    type: string
-    status: string
-    lastModified: string
-  }>
-  compliancePolicies?: Array<{
-    name?: string
-    status?: string
-    lastEvaluated?: string
-  }>
-  metadata?: {
-    Certificates?: Array<{
-      Issuer: string
-      Subject: string
-      NotValidAfter: string
-      NotValidBefore: string
-      SigningAlgorithm: string
-    }>
-  }
-}
 
 interface Device {
   id: string
   name: string
   platform?: string
-  management?: Management
-  // Modular management data
+  // Modular management data - snake_case from API
   modules?: {
-    management?: Management
+    management?: {
+      device_state?: {
+        status?: string
+        device_name?: string
+        entra_joined?: boolean
+        domain_joined?: boolean
+        virtual_desktop?: boolean
+        enterprise_joined?: boolean
+      }
+      device_details?: {
+        device_id?: string
+        thumbprint?: string
+        key_provider?: string
+        tmp_protected?: boolean
+        key_container_id?: string
+        device_auth_status?: string
+        device_certificate_validity?: string
+        intune_device_id?: string
+        entra_object_id?: string
+      }
+      mdm_enrollment?: {
+        provider?: string
+        is_enrolled?: boolean
+        enrollment_id?: string
+        enrollment_type?: string
+        user_principal_name?: string
+      }
+      tenant_details?: {
+        tenant_name?: string
+        tenant_id?: string
+        mdm_url?: string
+      }
+      user_state?: {
+        ngc_set?: boolean
+        can_reset?: boolean
+        ngc_key_id?: string
+        wam_default_id?: string
+        wam_default_set?: boolean
+        wam_default_guid?: string
+        workplace_joined?: boolean
+        wam_default_authority?: string
+      }
+      sso_state?: {
+        cloud_tgt?: boolean
+        entra_prt?: boolean
+        on_prem_tgt?: boolean
+        enterprise_prt?: boolean
+        entra_prt_authority?: string
+        kerb_top_level_names?: string
+        enterprise_prt_authority?: string
+      }
+      domain_trust?: {
+        domain_name?: string
+        trust_status?: string
+        error_message?: string
+        domain_controller?: string
+        secure_channel_valid?: boolean
+        computer_account_exists?: boolean
+      }
+      diagnostic_data?: {
+        access_type?: string
+        client_time?: string
+        key_sign_test?: string
+        client_error_code?: string
+      }
+      profiles?: any[]
+      last_sync?: string
+      collected_at?: string
+      device_id?: string
+      module_id?: string
+    }
   }
 }
 
@@ -117,25 +93,16 @@ interface ManagementWidgetProps {
 }
 
 export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) => {
-  // Access management data from modular structure or fallback to device level
-  const rawManagement = device.modules?.management
+  // Access management data from modules - snake_case from API
+  const management = device.modules?.management
 
-  // Parse PowerShell objects to proper JavaScript objects
-  const management = convertPowerShellObjects(rawManagement)
-
-  // Debug logging to see what data we're getting
   console.log('ManagementWidget DEBUG:', {
     deviceName: device?.name,
     hasModules: !!device.modules,
     hasManagement: !!management,
     managementKeys: management ? Object.keys(management) : [],
-    hasDeviceState: !!management?.deviceState,
-    deviceState: management?.deviceState,
-    entraJoined: management?.deviceState?.entraJoined,
-    ssoState: management?.ssoState,
-    entraPrt: management?.ssoState?.entraPrt,
-    userState: management?.userState,
-    ngcSet: management?.userState?.ngcSet
+    device_state: management?.device_state,
+    mdm_enrollment: management?.mdm_enrollment
   })
 
   if (!management) {
@@ -151,21 +118,21 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
     )
   }
 
-  // Extract key data from the management structure
-  const isEnrolled = management.mdmEnrollment?.isEnrolled || false
-  const provider = management.mdmEnrollment?.provider
-  const rawEnrollmentType = management.mdmEnrollment?.enrollmentType
-  const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
+  // Extract key data from the management structure - snake_case from API
+  const isEnrolled = management.mdm_enrollment?.is_enrolled || false
+  const provider = management.mdm_enrollment?.provider
+  const rawEnrollmentType = management.mdm_enrollment?.enrollment_type
+  const deviceAuthStatus = management.device_details?.device_auth_status
   const profileCount = management.profiles?.length || 0
 
-  // Device identification information
-  const intuneDeviceId = management.deviceDetails?.intuneDeviceId
-  const entraObjectId = management.deviceDetails?.entraObjectId
+  // Device identification information - snake_case from API
+  const intuneDeviceId = management.device_details?.intune_device_id
+  const entraObjectId = management.device_details?.entra_object_id
 
   // Transform enrollment type display name
   let enrollmentType = rawEnrollmentType
   if (enrollmentType === 'Hybrid Entra Join') enrollmentType = 'Domain Joined'
-  if (enrollmentType === 'Entra Join') enrollmentType = 'Entra Joined'
+  if (enrollmentType === 'Entra Joined') enrollmentType = 'Entra Joined'
 
   // Helper function to get enrollment type color
   const getEnrollmentTypeColor = (type?: string) => {
@@ -194,7 +161,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
       icon={Icons.management}
       iconColor={WidgetColors.yellow}
     >
-      {/* Provider prominently displayed first - made smaller */}
+      {/* Provider prominently displayed first */}
       {provider && (
         <div className="flex justify-between items-center mb-4">
           <span className="text-sm text-gray-600 dark:text-gray-400">Provider</span>
@@ -209,7 +176,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
         type={isEnrolled ? 'success' : 'error'}
       />
 
-      {/* Enrollment Type (replaces Device Status) - with colors */}
+      {/* Enrollment Type with colors */}
       {enrollmentType && (
         <StatusBadge
           label="Enrollment Type"
@@ -220,7 +187,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
 
       {isEnrolled && (
         <>
-          {/* Device Authentication Status - moved up */}
+          {/* Device Authentication Status */}
           {deviceAuthStatus && (
             <StatusBadge
               label="Device Auth"

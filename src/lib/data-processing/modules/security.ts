@@ -1,34 +1,72 @@
 /**
  * Security Module - Reader Only
  * Frontend reads pre-processed security data from device collection
+ * 
+ * SNAKE_CASE: All properties match API response format directly
  * NO heavy processing - device should provide clean, standardized security analysis
  */
 
 export interface SecurityInfo {
-  overallScore: number  // 0-100, calculated on device
-  riskLevel: 'low' | 'medium' | 'high' | 'critical'
-  lastScan?: string
+  overall_score: number  // 0-100, calculated on device
+  risk_level: 'low' | 'medium' | 'high' | 'critical'
+  last_scan?: string
   threats: ThreatInfo[]
   vulnerabilities: VulnerabilityInfo[]
   compliance: ComplianceInfo
   firewall: FirewallInfo
   antivirus: AntivirusInfo
   encryption: EncryptionInfo
-  secureShell?: SecureShellInfo
+  secure_shell?: SecureShellInfo
+  windows_hello?: WindowsHelloInfo
+  tpm?: TpmInfo
   policies: PolicyInfo[]
   summary: SecuritySummary
+  collected_at?: string
+  device_id?: string
+  module_id?: string
+}
+
+export interface TpmInfo {
+  version?: string
+  is_enabled: boolean
+  is_present: boolean
+  is_activated: boolean
+  manufacturer?: string
+  status_display?: string
 }
 
 export interface SecureShellInfo {
-  isInstalled: boolean
-  isServiceRunning: boolean
-  isFirewallRulePresent: boolean
-  isConfigured: boolean
-  isKeyDeployed: boolean
-  arePermissionsCorrect: boolean
-  serviceStatus: string
-  configStatus: string
-  statusDisplay: string
+  is_installed: boolean
+  is_service_running: boolean
+  is_firewall_rule_present: boolean
+  is_configured: boolean
+  is_key_deployed: boolean
+  are_permissions_correct: boolean
+  service_status: string
+  config_status: string
+  status_display: string
+}
+
+export interface WindowsHelloInfo {
+  policies?: {
+    group_policies?: any[]
+    passport_policies?: any[]
+    allow_domain_pin_logon?: boolean
+    biometric_logon_enabled?: boolean
+  }
+  web_auth_n?: {
+    settings?: any[]
+    is_enabled?: boolean
+    is_configured?: boolean
+  }
+  hello_events?: Array<{
+    level?: string
+    source?: string
+    event_id?: number
+    timestamp?: string
+    event_type?: string
+    description?: string
+  }>
 }
 
 export interface ThreatInfo {
@@ -37,82 +75,110 @@ export interface ThreatInfo {
   severity: 'low' | 'medium' | 'high' | 'critical'
   status: 'active' | 'resolved' | 'investigating'
   description: string
-  detectedAt: string
-  resolvedAt?: string
+  detected_at: string
+  resolved_at?: string
 }
 
 export interface VulnerabilityInfo {
   cve?: string
   title: string
   severity: 'low' | 'medium' | 'high' | 'critical'
-  cvssScore?: number
+  cvss_score?: number
   component: string
   version: string
-  patchAvailable: boolean
+  patch_available: boolean
   description: string
 }
 
 export interface ComplianceInfo {
   framework: string  // 'SOC2', 'GDPR', 'HIPAA', etc.
-  overallCompliance: number  // percentage
-  passedControls: number
-  failedControls: number
-  totalControls: number
-  lastAssessment?: string
+  overall_compliance: number  // percentage
+  passed_controls: number
+  failed_controls: number
+  total_controls: number
+  last_assessment?: string
 }
 
 export interface FirewallInfo {
-  enabled: boolean
+  is_enabled: boolean
   status: 'active' | 'disabled' | 'misconfigured'
   product: string
   version?: string
-  lastUpdate?: string
-  blockedConnections?: number
+  last_update?: string
+  blocked_connections?: number
+  profile?: string
+  rules?: any[]
+  status_display?: string
 }
 
 export interface AntivirusInfo {
   installed: boolean
-  enabled: boolean
-  product: string
+  is_enabled: boolean
+  name: string
   version?: string
-  lastUpdate?: string
-  lastScan?: string
-  threatsDetected?: number
+  last_update?: string
+  last_scan?: string
+  scan_type?: string
+  is_up_to_date?: boolean
+  threats_detected?: number
   status: 'protected' | 'outdated' | 'disabled' | 'not_installed'
+  status_display?: string
 }
 
 export interface EncryptionInfo {
-  diskEncryption: boolean
-  encryptionMethod?: string
-  bitlockerStatus?: string
-  fileVaultStatus?: string
-  networkEncryption: boolean
+  disk_encryption: boolean
+  encryption_method?: string
+  bit_locker?: BitLockerInfo
+  file_vault?: FileVaultInfo
+  luks?: LuksInfo
+  device_encryption?: boolean
+  encrypted_volumes?: Array<{
+    status?: string
+    drive_letter?: string
+    encryption_method?: string
+    encryption_percentage?: number
+  }>
+  status_display?: string
+}
+
+export interface BitLockerInfo {
+  status?: string
+  is_enabled: boolean
+  status_display?: string
+  recovery_key_id?: string
+  encrypted_drives?: string[]
+}
+
+export interface FileVaultInfo {
+  is_enabled: boolean
+  status_display?: string
+}
+
+export interface LuksInfo {
+  is_enabled: boolean
+  status_display?: string
 }
 
 export interface PolicyInfo {
   name: string
   type: 'password' | 'access' | 'data' | 'network' | 'device'
   status: 'compliant' | 'non_compliant' | 'unknown'
-  lastChecked?: string
+  last_checked?: string
   description?: string
 }
 
 export interface SecuritySummary {
-  totalThreats: number
-  activeThreats: number
-  resolvedThreats: number
-  criticalVulnerabilities: number
-  patchesNeeded: number
-  complianceScore: number
+  total_threats: number
+  active_threats: number
+  resolved_threats: number
+  critical_vulnerabilities: number
+  patches_needed: number
+  compliance_score: number
 }
 
 /**
  * Extract security information from device modules
- * READER ONLY: Expects device to provide pre-processed security analysis
- */
-/**
- * Extract security information from device modules
- * READER ONLY: Expects device to provide pre-processed, clean security analysis
+ * READER ONLY: Expects device to provide pre-processed, clean snake_case security analysis
  */
 export function extractSecurity(deviceModules: any): SecurityInfo {
   if (!deviceModules?.security) {
@@ -123,19 +189,22 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
   const security = deviceModules.security
   
   console.log('[SECURITY MODULE] Reading pre-processed security data:', {
-    hasOverallScore: typeof security.overallScore === 'number',
-    hasThreats: !!security.threats,
-    hasVulnerabilities: !!security.vulnerabilities,
-    hasCompliance: !!security.compliance,
+    hasTpm: !!security.tpm,
     hasFirewall: !!security.firewall,
-    hasAntivirus: !!security.antivirus
+    hasAntivirus: !!security.antivirus,
+    hasEncryption: !!security.encryption,
+    hasSecureShell: !!security.secure_shell,
+    hasWindowsHello: !!security.windows_hello
   })
 
   const securityInfo: SecurityInfo = {
     // Use device-calculated security score, not frontend calculation
-    overallScore: security.overallScore || 0,
-    riskLevel: security.riskLevel || calculateRiskFromScore(security.overallScore || 0),
-    lastScan: security.lastScan,
+    overall_score: security.overall_score || 0,
+    risk_level: security.risk_level || calculateRiskFromScore(security.overall_score || 0),
+    last_scan: security.last_scan,
+    
+    // TPM data - snake_case from API
+    tpm: security.tpm,
     
     // Read pre-processed threat data
     threats: security.threats ? security.threats.map(mapThreat) : [],
@@ -146,25 +215,30 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     // Read compliance data (device should calculate compliance scores)
     compliance: security.compliance || createEmptyCompliance(),
     
-    // Read system security components
+    // Read system security components - snake_case from API
     firewall: security.firewall || createEmptyFirewall(),
     antivirus: security.antivirus || createEmptyAntivirus(),
     encryption: security.encryption || createEmptyEncryption(),
-    secureShell: security.secureShell || createEmptySecureShell(),
+    secure_shell: security.secure_shell,
+    windows_hello: security.windows_hello,
     
     // Read policy compliance
     policies: security.policies ? security.policies.map(mapPolicy) : [],
     
     // Read device-calculated summary
-    summary: security.summary || createEmptySummary()
+    summary: security.summary || createEmptySummary(),
+    
+    // Metadata
+    collected_at: security.collected_at,
+    device_id: security.device_id,
+    module_id: security.module_id
   }
 
   console.log('[SECURITY MODULE] Security info read:', {
-    overallScore: securityInfo.overallScore,
-    riskLevel: securityInfo.riskLevel,
-    threatsCount: securityInfo.threats.length,
-    vulnerabilitiesCount: securityInfo.vulnerabilities.length,
-    complianceScore: securityInfo.compliance.overallCompliance
+    overall_score: securityInfo.overall_score,
+    risk_level: securityInfo.risk_level,
+    threats_count: securityInfo.threats.length,
+    vulnerabilities_count: securityInfo.vulnerabilities.length
   })
 
   return securityInfo
@@ -178,8 +252,8 @@ function mapThreat(threat: any): ThreatInfo {
     severity: threat.severity || 'medium',
     status: threat.status || 'active',
     description: threat.description || '',
-    detectedAt: threat.detectedAt || threat.detected_at || '',
-    resolvedAt: threat.resolvedAt || threat.resolved_at
+    detected_at: threat.detected_at || '',
+    resolved_at: threat.resolved_at
   }
 }
 
@@ -188,10 +262,10 @@ function mapVulnerability(vuln: any): VulnerabilityInfo {
     cve: vuln.cve,
     title: vuln.title || '',
     severity: vuln.severity || 'medium',
-    cvssScore: vuln.cvssScore || vuln.cvss_score,
+    cvss_score: vuln.cvss_score,
     component: vuln.component || '',
     version: vuln.version || '',
-    patchAvailable: vuln.patchAvailable || vuln.patch_available || false,
+    patch_available: vuln.patch_available || false,
     description: vuln.description || ''
   }
 }
@@ -201,7 +275,7 @@ function mapPolicy(policy: any): PolicyInfo {
     name: policy.name || '',
     type: policy.type || 'access',
     status: policy.status || 'unknown',
-    lastChecked: policy.lastChecked || policy.last_checked,
+    last_checked: policy.last_checked,
     description: policy.description
   }
 }
@@ -217,8 +291,8 @@ function calculateRiskFromScore(score: number): 'low' | 'medium' | 'high' | 'cri
 // Empty data creators
 function createEmptySecurityInfo(): SecurityInfo {
   return {
-    overallScore: 0,
-    riskLevel: 'critical',
+    overall_score: 0,
+    risk_level: 'critical',
     threats: [],
     vulnerabilities: [],
     compliance: createEmptyCompliance(),
@@ -233,16 +307,16 @@ function createEmptySecurityInfo(): SecurityInfo {
 function createEmptyCompliance(): ComplianceInfo {
   return {
     framework: 'Unknown',
-    overallCompliance: 0,
-    passedControls: 0,
-    failedControls: 0,
-    totalControls: 0
+    overall_compliance: 0,
+    passed_controls: 0,
+    failed_controls: 0,
+    total_controls: 0
   }
 }
 
 function createEmptyFirewall(): FirewallInfo {
   return {
-    enabled: false,
+    is_enabled: false,
     status: 'disabled',
     product: 'Unknown'
   }
@@ -251,40 +325,25 @@ function createEmptyFirewall(): FirewallInfo {
 function createEmptyAntivirus(): AntivirusInfo {
   return {
     installed: false,
-    enabled: false,
-    product: 'Unknown',
+    is_enabled: false,
+    name: 'Unknown',
     status: 'not_installed'
   }
 }
 
 function createEmptyEncryption(): EncryptionInfo {
   return {
-    diskEncryption: false,
-    networkEncryption: false
-  }
-}
-
-function createEmptySecureShell(): SecureShellInfo {
-  return {
-    isInstalled: false,
-    isServiceRunning: false,
-    isFirewallRulePresent: false,
-    isConfigured: false,
-    isKeyDeployed: false,
-    arePermissionsCorrect: false,
-    serviceStatus: 'Unknown',
-    configStatus: 'Unknown',
-    statusDisplay: 'Unknown'
+    disk_encryption: false
   }
 }
 
 function createEmptySummary(): SecuritySummary {
   return {
-    totalThreats: 0,
-    activeThreats: 0,
-    resolvedThreats: 0,
-    criticalVulnerabilities: 0,
-    patchesNeeded: 0,
-    complianceScore: 0
+    total_threats: 0,
+    active_threats: 0,
+    resolved_threats: 0,
+    critical_vulnerabilities: 0,
+    patches_needed: 0,
+    compliance_score: 0
   }
 }
