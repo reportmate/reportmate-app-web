@@ -441,11 +441,14 @@ export function mapStatusToEventType(status: StandardInstallStatus): 'success' |
  * - If installCount > 0 or updateCount > 0: Package was actually processed by Cimian, show timestamp
  * - If status is "Installed" but installCount == 0 and updateCount == 0: Package was pre-existing, hide timestamp
  * - For Pending/Error/Warning status: Show timestamp as it indicates last attempt
+ * 
+ * Supports both snake_case (new) and camelCase (legacy) field names
  */
 function getLatestAttemptTimestamp(item: any): string {
-  // First check recentAttempts if available
-  if (item.recentAttempts && Array.isArray(item.recentAttempts) && item.recentAttempts.length > 0) {
-    const latestAttempt = item.recentAttempts.reduce((latest: any, current: any) => {
+  // First check recentAttempts if available (support both snake_case and camelCase)
+  const recentAttempts = item.recent_attempts || item.recentAttempts
+  if (recentAttempts && Array.isArray(recentAttempts) && recentAttempts.length > 0) {
+    const latestAttempt = recentAttempts.reduce((latest: any, current: any) => {
       if (!latest) return current;
       if (!current.timestamp) return latest;
       if (!latest.timestamp) return current;
@@ -461,9 +464,10 @@ function getLatestAttemptTimestamp(item: any): string {
     }
   }
   
-  const status = standardizeInstallStatus(item.status || item.currentStatus || '');
-  const installCount = item.installCount ?? 0;
-  const updateCount = item.updateCount ?? 0;
+  // Support both snake_case and camelCase field names
+  const status = standardizeInstallStatus(item.status || item.current_status || item.currentStatus || '');
+  const installCount = item.install_count ?? item.installCount ?? 0;
+  const updateCount = item.update_count ?? item.updateCount ?? 0;
   const hasActivity = installCount > 0 || updateCount > 0;
   
   // For "Installed" packages that Cimian never actually installed/updated,
@@ -474,9 +478,10 @@ function getLatestAttemptTimestamp(item: any): string {
   
   // For packages with actual activity OR non-Installed status, show the timestamp
   // This includes: Failed, Pending, Warning, or actually installed/updated packages
-  if (item.lastUpdate) return item.lastUpdate;
-  if (item.lastAttemptTime) return item.lastAttemptTime;
-  return item.lastSeenInSession || '';
+  // Support both snake_case and camelCase
+  if (item.last_update || item.lastUpdate) return item.last_update || item.lastUpdate;
+  if (item.last_attempt_time || item.lastAttemptTime) return item.last_attempt_time || item.lastAttemptTime;
+  return item.last_seen_in_session || item.lastSeenInSession || '';
 }
 
 /**
@@ -538,11 +543,13 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   let packagesToProcess = []
   
   // CRITICAL FIX: Check cimian.items FIRST as it contains the real data
+  // Support both snake_case (new API) and camelCase (legacy) field names
   if (installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0) {
     packagesToProcess = installs.cimian.items
       .filter((item: any) => {
-        const name = item.itemName || item.displayName || item.name;
-        const type = item.type || item.itemType || item.group;
+        // Support both snake_case and camelCase field names
+        const name = item.item_name || item.itemName || item.display_name || item.displayName || item.name;
+        const type = item.type || item.item_type || item.itemType || item.group;
         
         // Filter out internal managed_apps and managed_profiles items by name
         if (name === 'managed_apps' || name === 'managed_profiles') return false;
@@ -554,13 +561,23 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       })
       .map((item: any) => ({
       ...item,
-      name: item.itemName || item.displayName || item.name || 'Unknown',
-      displayName: item.displayName || item.itemName || item.name || 'Unknown',
-      status: item.currentStatus, // Keep original status for standardization
-      version: item.latestVersion || item.installedVersion || item.version || 'Unknown',
-      id: item.id || item.itemName?.toLowerCase() || 'unknown',
+      // Support both snake_case (new) and camelCase (legacy) field names
+      name: item.item_name || item.itemName || item.display_name || item.displayName || item.name || 'Unknown',
+      displayName: item.display_name || item.displayName || item.item_name || item.itemName || item.name || 'Unknown',
+      status: item.current_status || item.currentStatus || item.mapped_status || item.mappedStatus, // Keep original status for standardization
+      version: item.latest_version || item.latestVersion || item.installed_version || item.installedVersion || item.version || 'Unknown',
+      installedVersion: item.installed_version || item.installedVersion || '',
+      id: item.id || (item.item_name || item.itemName || '')?.toLowerCase() || 'unknown',
       type: 'cimian',
-      lastSeenInSession: item.lastSeenInSession || installs.lastCheckIn || installs.collectedAt || ''
+      lastSeenInSession: item.last_seen_in_session || item.lastSeenInSession || installs.lastCheckIn || installs.last_check_in || installs.collectedAt || installs.collected_at || '',
+      lastUpdate: item.last_update || item.lastUpdate || '',
+      lastAttemptTime: item.last_attempt_time || item.lastAttemptTime || '',
+      lastAttemptStatus: item.last_attempt_status || item.lastAttemptStatus || '',
+      failureCount: item.failure_count ?? item.failureCount ?? 0,
+      installCount: item.install_count ?? item.installCount ?? 0,
+      updateCount: item.update_count ?? item.updateCount ?? 0,
+      itemSize: item.item_size || item.itemSize || '',
+      recentAttempts: item.recent_attempts || item.recentAttempts || []
     }))
     console.log('[INSTALLS MODULE] PROCESSING CIMIAN.ITEMS - COUNT:', installs.cimian.items.length)
   } else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {

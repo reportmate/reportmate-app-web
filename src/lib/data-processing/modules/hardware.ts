@@ -7,6 +7,7 @@ export interface HardwareInfo {
   processor?: string
   processorSpeed?: string
   cores?: number
+  logicalProcessors?: number
   memory?: string
   availableRAM?: string
   memorySlots?: string
@@ -59,21 +60,26 @@ export function extractHardware(deviceModules: any): HardwareInfo {
 
   const hardwareInfo: HardwareInfo = {
     processor: hardware.processor?.name,
-    processorSpeed: hardware.processor?.speed,
+    // Support both snake_case and camelCase for processor speed
+    processorSpeed: hardware.processor?.speed || hardware.processor?.base_speed || hardware.processor?.baseSpeed,
     cores: hardware.processor?.cores,
-    architecture: system?.operatingSystem?.architecture,
-    bootTime: system?.operatingSystem?.bootTime
+    // Support snake_case logical_processors
+    logicalProcessors: hardware.processor?.logical_processors || hardware.processor?.logicalProcessors,
+    architecture: system?.operating_system?.architecture || system?.operatingSystem?.architecture,
+    bootTime: system?.operating_system?.bootTime || system?.operatingSystem?.bootTime || system?.boot_time
   }
 
-  // Memory processing - supports both snake_case (Mac osquery) and camelCase (Windows)
+  // Memory processing - supports both snake_case (osquery/new) and camelCase (legacy)
   if (hardware.memory) {
-    // Mac sends physical_memory, Windows sends totalPhysical
-    const totalMem = hardware.memory.physical_memory ?? hardware.memory.totalPhysical
+    // Support: total_physical (snake_case), totalPhysical (camelCase), physical_memory (Mac)
+    const totalMem = hardware.memory.total_physical ?? hardware.memory.totalPhysical ?? hardware.memory.physical_memory
     if (totalMem) {
       hardwareInfo.memory = `${Math.round(totalMem / (1024*1024*1024))} GB`
     }
-    if (hardware.memory.availablePhysical) {
-      hardwareInfo.availableRAM = `${Math.round(hardware.memory.availablePhysical / (1024*1024*1024))} GB`
+    // Support: available_physical (snake_case), availablePhysical (camelCase)
+    const availMem = hardware.memory.available_physical ?? hardware.memory.availablePhysical
+    if (availMem) {
+      hardwareInfo.availableRAM = `${Math.round(availMem / (1024*1024*1024))} GB`
     }
   }
 
@@ -97,30 +103,31 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     hardwareInfo.vram = hardware.graphics.vram
   }
 
-  // NPU processing
+  // NPU processing - supports both snake_case and camelCase
   if (hardware.npu) {
     hardwareInfo.npu = hardware.npu.name
     hardwareInfo.npuManufacturer = hardware.npu.manufacturer
     hardwareInfo.npuArchitecture = hardware.npu.architecture
-    hardwareInfo.npuComputeUnits = hardware.npu.computeUnits
+    // Support: compute_units (snake_case), computeUnits (camelCase)
+    hardwareInfo.npuComputeUnits = hardware.npu.compute_units ?? hardware.npu.computeUnits
   }
 
-  // Battery processing - supports both osquery snake_case (Mac) and legacy camelCase (Windows)
+  // Battery processing - supports both snake_case (osquery) and camelCase (legacy)
   if (hardware.battery) {
-    // osquery uses percent_remaining, Windows uses chargePercent
+    // Support: percent_remaining (snake_case), chargePercent (camelCase)
     hardwareInfo.batteryLevel = hardware.battery.percent_remaining ?? hardware.battery.chargePercent
     hardwareInfo.batteryHealth = hardware.battery.health
-    // osquery uses cycle_count, Windows uses cycleCount
+    // Support: cycle_count (snake_case), cycleCount (camelCase)
     hardwareInfo.batteryCycleCount = hardware.battery.cycle_count ?? hardware.battery.cycleCount
-    // osquery uses charging (0/1), Windows uses isCharging (boolean)
+    // Support: charging (0/1 from osquery), isCharging (boolean from legacy)
     hardwareInfo.isCharging = hardware.battery.charging === 1 || hardware.battery.isCharging === true
   }
 
-  // Performance metrics
+  // Performance metrics - supports both snake_case and camelCase
   if (hardware.performance) {
-    hardwareInfo.diskUtilization = hardware.performance.diskUtilization
-    hardwareInfo.memoryUtilization = hardware.performance.memoryUtilization
-    hardwareInfo.cpuUtilization = hardware.performance.cpuUtilization
+    hardwareInfo.diskUtilization = hardware.performance.disk_utilization ?? hardware.performance.diskUtilization
+    hardwareInfo.memoryUtilization = hardware.performance.memory_utilization ?? hardware.performance.memoryUtilization
+    hardwareInfo.cpuUtilization = hardware.performance.cpu_utilization ?? hardware.performance.cpuUtilization
     hardwareInfo.temperature = hardware.performance.temperature
   }
 

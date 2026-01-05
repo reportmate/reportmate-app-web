@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { StatBlock, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
+import { convertPowerShellObjects, normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface Device {
   id: string
@@ -39,12 +39,15 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   // Access security data from device object, prioritizing the modules structure
   const rawSecurity = device?.modules?.security || device?.security || device?.securityFeatures
   
-  // Parse PowerShell objects to proper JavaScript objects
-  const security = convertPowerShellObjects(rawSecurity)
+  // Parse PowerShell objects and normalize keys to camelCase
+  const parsedSecurity = convertPowerShellObjects(rawSecurity)
+  const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
   
   console.log('SecurityWidget PARSED:', {
     parsedWindowsHello: security?.windowsHello,
-    parsedCredentialProviders: security?.windowsHello?.credentialProviders
+    parsedCredentialProviders: security?.windowsHello?.credentialProviders,
+    antivirus: security?.antivirus,
+    firewall: security?.firewall
   })
   
   // Detect platform for platform-aware display

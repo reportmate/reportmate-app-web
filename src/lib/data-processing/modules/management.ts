@@ -174,24 +174,36 @@ export function extractManagement(deviceModules: any): ManagementInfo {
   const management = deviceModules.management
   
   console.log('[MANAGEMENT MODULE] Reading pre-processed management data:', {
-    hasMdmEnrollment: !!management.mdmEnrollment,
-    hasDomainStatus: !!management.domainStatus,
+    hasMdmEnrollment: !!(management.mdmEnrollment || management.mdm_enrollment),
+    hasDomainStatus: !!(management.domainStatus || management.domain_status || management.device_state),
     hasPolicies: !!management.policies,
     hasCompliance: !!management.compliance,
     hasCertificates: !!management.certificates,
-    hasBitlocker: !!management.bitlockerStatus,
-    hasWindowsUpdate: !!management.windowsUpdate,
-    hasGroupPolicies: !!management.groupPolicies,
-    hasLocalUsers: !!management.localUsers,
-    hasRemoteAccess: !!management.remoteAccess
+    hasBitlocker: !!(management.bitlockerStatus || management.bitlocker_status),
+    hasWindowsUpdate: !!(management.windowsUpdate || management.windows_update),
+    hasGroupPolicies: !!(management.groupPolicies || management.group_policies),
+    hasLocalUsers: !!(management.localUsers || management.local_users),
+    hasRemoteAccess: !!(management.remoteAccess || management.remote_access),
+    hasDeviceState: !!management.device_state
   })
+
+  // Support both snake_case (new) and camelCase (legacy) field names throughout
+  const mdmData = management.mdm_enrollment || management.mdmEnrollment
+  const domainData = management.domain_status || management.domainStatus
+  const deviceStateData = management.device_state || management.deviceState
+  const bitlockerData = management.bitlocker_status || management.bitlockerStatus
+  const windowsUpdateData = management.windows_update || management.windowsUpdate
+  const groupPoliciesData = management.group_policies || management.groupPolicies
+  const localUsersData = management.local_users || management.localUsers
+  const remoteAccessData = management.remote_access || management.remoteAccess
 
   const managementInfo: ManagementInfo = {
     // Read MDM enrollment status (device should detect and analyze)
-    mdmEnrollment: management.mdmEnrollment ? mapMdmEnrollment(management.mdmEnrollment) : createEmptyMdmEnrollment(),
+    mdmEnrollment: mdmData ? mapMdmEnrollment(mdmData) : createEmptyMdmEnrollment(),
     
-    // Read domain join status
-    domainStatus: management.domainStatus ? mapDomainInfo(management.domainStatus) : createEmptyDomainInfo(),
+    // Read domain join status - prefer device_state for enrollment info
+    domainStatus: deviceStateData ? mapDeviceStateToDomainInfo(deviceStateData) : 
+                   (domainData ? mapDomainInfo(domainData) : createEmptyDomainInfo()),
     
     // Read applied policies
     policies: management.policies ? management.policies.map(mapPolicy) : [],
@@ -202,20 +214,20 @@ export function extractManagement(deviceModules: any): ManagementInfo {
     // Read certificate inventory
     certificates: management.certificates ? management.certificates.map(mapCertificate) : [],
     
-    // Read BitLocker status
-    bitlockerStatus: management.bitlockerStatus ? mapBitlockerInfo(management.bitlockerStatus) : createEmptyBitlockerInfo(),
+    // Read BitLocker status - support both snake_case and camelCase
+    bitlockerStatus: bitlockerData ? mapBitlockerInfo(bitlockerData) : createEmptyBitlockerInfo(),
     
-    // Read Windows Update status
-    windowsUpdate: management.windowsUpdate ? mapWindowsUpdateInfo(management.windowsUpdate) : createEmptyWindowsUpdateInfo(),
+    // Read Windows Update status - support both snake_case and camelCase
+    windowsUpdate: windowsUpdateData ? mapWindowsUpdateInfo(windowsUpdateData) : createEmptyWindowsUpdateInfo(),
     
-    // Read Group Policy status
-    groupPolicies: management.groupPolicies ? management.groupPolicies.map(mapGroupPolicy) : [],
+    // Read Group Policy status - support both snake_case and camelCase
+    groupPolicies: groupPoliciesData ? groupPoliciesData.map(mapGroupPolicy) : [],
     
-    // Read local user accounts
-    localUsers: management.localUsers ? management.localUsers.map(mapLocalUser) : [],
+    // Read local user accounts - support both snake_case and camelCase
+    localUsers: localUsersData ? localUsersData.map(mapLocalUser) : [],
     
-    // Read remote access configuration
-    remoteAccess: management.remoteAccess ? mapRemoteAccess(management.remoteAccess) : createEmptyRemoteAccess(),
+    // Read remote access configuration - support both snake_case and camelCase
+    remoteAccess: remoteAccessData ? mapRemoteAccess(remoteAccessData) : createEmptyRemoteAccess(),
     
     // Use device-calculated summary
     summary: management.summary || createEmptySummary()
@@ -256,11 +268,43 @@ function mapDomainInfo(domain: any): DomainInfo {
     joined: domain.joined || false,
     domainName: domain.domainName || domain.domain_name,
     domainController: domain.domainController || domain.domain_controller,
-    computerName: domain.computerName || domain.computer_name,
+    computerName: domain.computerName || domain.computer_name || domain.device_name,
     lastLogon: domain.lastLogon || domain.last_logon,
     status: domain.status || 'not_joined',
     organizationalUnit: domain.organizationalUnit || domain.organizational_unit,
     siteName: domain.siteName || domain.site_name
+  }
+}
+
+/**
+ * Map device_state object to DomainInfo format
+ * device_state contains: entra_joined, domain_joined, enterprise_joined, device_name, status
+ */
+function mapDeviceStateToDomainInfo(deviceState: any): DomainInfo {
+  // Determine joined status from entra/domain/enterprise flags
+  const isEntraJoined = deviceState.entra_joined || deviceState.entraJoined || false
+  const isDomainJoined = deviceState.domain_joined || deviceState.domainJoined || false
+  const isEnterpriseJoined = deviceState.enterprise_joined || deviceState.enterpriseJoined || false
+  
+  // Determine status based on join state
+  let status: 'joined' | 'not_joined' | 'workgroup' | 'error' = 'not_joined'
+  if (isDomainJoined) {
+    status = 'joined'
+  } else if (isEntraJoined || isEnterpriseJoined) {
+    status = 'joined' // Entra/Enterprise joined counts as "joined"
+  } else {
+    status = 'workgroup'
+  }
+  
+  return {
+    joined: isEntraJoined || isDomainJoined || isEnterpriseJoined,
+    computerName: deviceState.device_name || deviceState.deviceName,
+    status: status,
+    domainName: deviceState.domain_name || deviceState.domainName,
+    domainController: deviceState.domain_controller || deviceState.domainController,
+    lastLogon: deviceState.last_logon || deviceState.lastLogon,
+    organizationalUnit: deviceState.organizational_unit || deviceState.organizationalUnit,
+    siteName: deviceState.site_name || deviceState.siteName
   }
 }
 

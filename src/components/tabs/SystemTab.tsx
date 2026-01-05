@@ -87,9 +87,31 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   }, []);
   
   // Get operating system information (same logic as SystemWidget)
-  // Use modules.system data only
-  const osInfo = device.modules?.system?.operatingSystem
-  const uptimeString = device.modules?.system?.uptimeString
+  // Use modules.system data only - support both snake_case (new) and camelCase (legacy)
+  const rawOsInfo = device.modules?.system?.operating_system || device.modules?.system?.operatingSystem
+  const uptimeString = device.modules?.system?.uptime_string || device.modules?.system?.uptimeString
+
+  // Normalize OS info to support both snake_case and camelCase field access
+  const osInfo = rawOsInfo ? {
+    name: rawOsInfo.name || rawOsInfo.product_name,
+    version: rawOsInfo.version,
+    displayVersion: rawOsInfo.display_version || rawOsInfo.displayVersion,
+    edition: rawOsInfo.edition,
+    build: rawOsInfo.build || rawOsInfo.build_number,
+    architecture: rawOsInfo.architecture || rawOsInfo.arch,
+    locale: rawOsInfo.locale,
+    timeZone: rawOsInfo.time_zone || rawOsInfo.timeZone,
+    activeKeyboardLayout: rawOsInfo.active_keyboard_layout || rawOsInfo.activeKeyboardLayout || 
+      (rawOsInfo.keyboard_layouts?.length > 0 ? rawOsInfo.keyboard_layouts.join(', ') : ''),
+    featureUpdate: rawOsInfo.feature_update || rawOsInfo.featureUpdate,
+    activation: rawOsInfo.activation ? {
+      isActivated: rawOsInfo.activation.is_activated ?? rawOsInfo.activation.isActivated,
+      status: rawOsInfo.activation.status,
+      statusCode: rawOsInfo.activation.status_code ?? rawOsInfo.activation.statusCode,
+      partialProductKey: rawOsInfo.activation.partial_product_key ?? rawOsInfo.activation.partialProductKey,
+      licenseType: rawOsInfo.activation.license_type ?? rawOsInfo.activation.licenseType
+    } : undefined
+  } : undefined
 
   // Filter services based on search
   const filteredServices = useMemo(() => {
