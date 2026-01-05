@@ -218,6 +218,6 @@ export const config = {
      * except for static assets, authentication endpoints, health endpoints,
      * and internal API routes (which handle their own authentication)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/healthz|api/health|api/device|api/devices|api/stats|api/events).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/auth|api/healthz|api/health|api/device|api/devices|api/modules|api/stats|api/events).*)',
   ],
 }
