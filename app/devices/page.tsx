@@ -9,6 +9,7 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
+import { normalizeKeys } from "../../src/lib/utils/powershell-parser"
 
 interface InventoryItem {
   id: string
@@ -86,7 +87,9 @@ function DevicesPageContent() {
           // FIXED: Process devices with correct nested structure from modules.inventory
           const inventoryItems = devices.map((device: any) => {
             // Extract inventory data from modules (where it actually lives)
-            const inventory = device.modules?.inventory || {}
+            // Normalize snake_case to camelCase (API returns asset_tag, device_name, etc.)
+            const rawInventory = device.modules?.inventory || {}
+            const inventory = normalizeKeys(rawInventory) as any
             const isArchived = device.archived === true
             
             // Calculate status from lastSeen timestamp
