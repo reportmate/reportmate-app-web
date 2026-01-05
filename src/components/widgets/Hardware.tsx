@@ -1,11 +1,11 @@
 /**
  * Hardware Widget
- * Displays comprehensive hardware information for   // Legacy hardware properties (fallback)
-  hardware?: Record<string, unknown>vices
+ * Displays comprehensive hardware information for devices
  */
 
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface ProcessorInfo {
   name?: string;
@@ -115,17 +115,17 @@ const safeProcessorString = (processor: string | ProcessorInfo | unknown): strin
 }
 
 export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
-  // Get hardware data from modules first, then fallback to device properties
-  const hardwareModule = device.modules?.hardware
-  const legacyHardware = device.modules?.hardware || {}
+  // Normalize hardware data to camelCase (API returns snake_case)
+  const rawHardware = device.modules?.hardware
+  const hardwareModule = rawHardware ? normalizeKeys(rawHardware) as any : null
+  const legacyHardware = hardwareModule || {}
   
   console.log('[HardwareWidget] Debug data access:', {
     deviceId: device.id,
     hasModules: !!device.modules,
     hasHardwareModule: !!device.modules?.hardware,
-    hasLegacyHardware: !!device.modules?.hardware,
+    normalizedHardware: hardwareModule,
     hardwareModuleKeys: hardwareModule ? Object.keys(hardwareModule) : [],
-    legacyHardwareKeys: Object.keys(legacyHardware)
   })
 
   // Helper function to format bytes to human readable format

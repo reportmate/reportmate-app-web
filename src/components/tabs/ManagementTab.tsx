@@ -48,12 +48,17 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     )
   }
 
-  // Extract key data from the management structure
-  const isEnrolled = management.mdmEnrollment?.isEnrolled || false
-  const provider = management.mdmEnrollment?.provider
-  const enrollmentType = management.mdmEnrollment?.enrollmentType
-  const tenantName = management.tenantDetails?.tenantName
-  const deviceAuthStatus = management.deviceDetails?.deviceAuthStatus
+  // Extract key data from the management structure - support both snake_case and camelCase
+  const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment
+  const deviceState = management.device_state || management.deviceState
+  const tenantDetails = management.tenant_details || management.tenantDetails
+  const deviceDetails = management.device_details || management.deviceDetails
+  
+  const isEnrolled = mdmEnrollment?.is_enrolled || mdmEnrollment?.isEnrolled || false
+  const provider = mdmEnrollment?.provider
+  const enrollmentType = mdmEnrollment?.enrollment_type || mdmEnrollment?.enrollmentType || deviceState?.status
+  const tenantName = tenantDetails?.tenant_name || tenantDetails?.tenantName
+  const deviceAuthStatus = deviceDetails?.device_auth_status || deviceDetails?.deviceAuthStatus
   const profileCount = management.profiles?.length || 0
 
   // Helper functions
@@ -163,28 +168,28 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <span className="text-sm font-medium text-gray-900 dark:text-white ml-4">{tenantName}</span>
                 </div>
 
-                {/* Intune Device ID with copy button */}
-                {management.deviceDetails?.intuneDeviceId && (
+                {/* Intune Device ID with copy button - support both snake_case and camelCase */}
+                {(deviceDetails?.intune_device_id || deviceDetails?.intuneDeviceId) && (
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Intune ID:</span>
                     <div className="flex items-center gap-2 ml-4">
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {management.deviceDetails.intuneDeviceId}
+                        {deviceDetails.intune_device_id || deviceDetails.intuneDeviceId}
                       </span>
-                      <CopyButton value={management.deviceDetails.intuneDeviceId} />
+                      <CopyButton value={deviceDetails.intune_device_id || deviceDetails.intuneDeviceId} />
                     </div>
                   </div>
                 )}
 
-                {/* Entra Object ID with copy button */}
-                {management.deviceDetails?.entraObjectId && (
+                {/* Entra Object ID with copy button - support both snake_case and camelCase */}
+                {(deviceDetails?.entra_object_id || deviceDetails?.entraObjectId) && (
                   <div className="flex items-center">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Object ID:</span>
                     <div className="flex items-center gap-2 ml-4">
                       <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {management.deviceDetails.entraObjectId}
+                        {deviceDetails.entra_object_id || deviceDetails.entraObjectId}
                       </span>
-                      <CopyButton value={management.deviceDetails.entraObjectId} />
+                      <CopyButton value={deviceDetails.entra_object_id || deviceDetails.entraObjectId} />
                     </div>
                   </div>
                 )}
@@ -200,7 +205,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           )}
 
           {/* Domain Trust Status - Only for Domain Joined (Hybrid Entra Join) devices */}
-          {(enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined') && management.domainTrust && (
+          {/* Support both snake_case and camelCase */}
+          {(enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined') && (management.domain_trust || management.domainTrust) && (() => {
+            const domainTrust = management.domain_trust || management.domainTrust
+            return (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Domain Trust Status</h3>
               <div className="space-y-3">
@@ -208,89 +216,90 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Secure Channel</span>
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                    management.domainTrust.secureChannelValid === true
+                    (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === true
                       ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : management.domainTrust.secureChannelValid === false
+                      : (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === false
                       ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                       : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
                   }`}>
-                    {management.domainTrust.secureChannelValid === true ? 'Valid' : 
-                     management.domainTrust.secureChannelValid === false ? 'Invalid' : 'Unknown'}
+                    {(domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === true ? 'Valid' : 
+                     (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === false ? 'Invalid' : 'Unknown'}
                   </span>
                 </div>
 
                 {/* Domain Name */}
-                {management.domainTrust.domainName && (
+                {(domainTrust.domain_name || domainTrust.domainName) && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain</span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {management.domainTrust.domainName}
+                      {domainTrust.domain_name || domainTrust.domainName}
                     </span>
                   </div>
                 )}
 
                 {/* Domain Controller */}
-                {management.domainTrust.domainController && (
+                {(domainTrust.domain_controller || domainTrust.domainController) && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain Controller</span>
                     <span className="text-sm font-mono text-gray-900 dark:text-white text-xs">
-                      {management.domainTrust.domainController}
+                      {domainTrust.domain_controller || domainTrust.domainController}
                     </span>
                   </div>
                 )}
 
                 {/* Trust Status */}
-                {management.domainTrust.trustStatus && (
+                {(domainTrust.trust_status || domainTrust.trustStatus) && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Trust Status</span>
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                      management.domainTrust.trustStatus === 'Healthy' || management.domainTrust.trustStatus === 'Success' || management.domainTrust.trustStatus === 'Trusted'
+                      (domainTrust.trust_status || domainTrust.trustStatus) === 'Healthy' || (domainTrust.trust_status || domainTrust.trustStatus) === 'Success' || (domainTrust.trust_status || domainTrust.trustStatus) === 'Trusted'
                         ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                         : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
                     }`}>
-                      {management.domainTrust.trustStatus}
+                      {domainTrust.trust_status || domainTrust.trustStatus}
                     </span>
                   </div>
                 )}
 
                 {/* Machine Password Age */}
-                {management.domainTrust.machinePasswordAgeDays !== undefined && (
+                {(domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays) !== undefined && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Password Age</span>
                     <span className={`text-sm font-medium ${
-                      management.domainTrust.machinePasswordAgeDays > 30
+                      (domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays) > 30
                         ? 'text-yellow-600 dark:text-yellow-400'
                         : 'text-gray-900 dark:text-white'
                     }`}>
-                      {management.domainTrust.machinePasswordAgeDays} days
+                      {domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays} days
                     </span>
                   </div>
                 )}
 
                 {/* Last Checked */}
-                {management.domainTrust.lastChecked && (
+                {(domainTrust.last_checked || domainTrust.lastChecked) && (
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Checked</span>
                     <span className="text-sm text-gray-600 dark:text-gray-400">
-                      {formatExpiryDate(management.domainTrust.lastChecked)}
+                      {formatExpiryDate(domainTrust.last_checked || domainTrust.lastChecked)}
                     </span>
                   </div>
                 )}
 
                 {/* Error Message if present */}
-                {management.domainTrust.errorMessage && (
+                {(domainTrust.error_message || domainTrust.errorMessage) && (
                   <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     <div className="flex items-start gap-2">
                       <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-sm text-red-700 dark:text-red-300">{management.domainTrust.errorMessage}</span>
+                      <span className="text-sm text-red-700 dark:text-red-300">{domainTrust.error_message || domainTrust.errorMessage}</span>
                     </div>
                   </div>
                 )}
               </div>
             </div>
-          )}
+            )
+          })()}
 
           {/* Management URL - Move to bottom */}
           {management.mdmEnrollment?.managementUrl && (
