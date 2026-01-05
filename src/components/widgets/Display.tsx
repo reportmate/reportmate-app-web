@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface DisplayInfo {
   name?: string
@@ -21,8 +22,8 @@ interface DisplayInfo {
 }
 
 interface DisplaysData {
-  totalDisplays: number
-  displays: DisplayInfo[]
+  totalDisplays?: number
+  displays?: DisplayInfo[]
   primaryDisplay?: DisplayInfo
   externalDisplays?: DisplayInfo[]
 }
@@ -34,7 +35,7 @@ interface Device {
   resolution?: string
   // Modular displays data
   modules?: {
-    displays?: DisplaysData
+    displays?: any
   }
 }
 
@@ -43,8 +44,9 @@ interface DisplayWidgetProps {
 }
 
 export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
-  // Access display data from modular structure
-  const displays = device.modules?.displays
+  // Access display data from modular structure with snake_case normalization
+  const rawDisplays = device.modules?.displays
+  const displays = rawDisplays ? normalizeKeys(rawDisplays) as DisplaysData : null
   const hasDisplayInfo = displays && displays.displays && displays.displays.length > 0
   
   // Fallback to legacy resolution field

@@ -5,7 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
+import { convertPowerShellObjects, normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface Management {
   deviceState?: {
@@ -120,8 +120,9 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   // Access management data from modular structure or fallback to device level
   const rawManagement = device.modules?.management
 
-  // Parse PowerShell objects to proper JavaScript objects
-  const management = convertPowerShellObjects(rawManagement)
+  // Parse PowerShell objects and normalize keys to camelCase (API returns snake_case)
+  const parsedManagement = convertPowerShellObjects(rawManagement)
+  const management = parsedManagement ? normalizeKeys(parsedManagement) as any : null
 
   // Debug logging to see what data we're getting
   console.log('ManagementWidget DEBUG:', {

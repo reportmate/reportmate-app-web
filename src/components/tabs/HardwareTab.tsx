@@ -6,6 +6,7 @@
 import React from 'react'
 import { StorageVisualization } from '../storage'
 import { CopyButton } from '../ui/CopyButton'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { 
   Cpu, 
   MemoryStick, 
@@ -268,7 +269,9 @@ const DetailRow = ({ label, value, subValue }: { label?: string, value: React.Re
 )
 
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
-  const hardwareData = device?.modules?.hardware || device?.hardware || data || {}
+  // Normalize snake_case to camelCase for all hardware data
+  const rawHardware = device?.modules?.hardware || device?.hardware || data || {}
+  const hardwareData = normalizeKeys(rawHardware) as any
   
   if (!hardwareData || Object.keys(hardwareData).length === 0) {
     return (

@@ -7,6 +7,7 @@ import { formatExactTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { extractSystem } from '../../lib/data-processing/modules/system'
 import { ScheduledTasksTable } from '../tables/ScheduledTasksTable'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface DeviceData {
   id: string;
@@ -43,8 +44,19 @@ interface SystemTabProps {
 }
 
 export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => {
+  // Normalize snake_case to camelCase for system module
+  const rawSystemModule = device?.modules?.system
+  const normalizedSystemModule = rawSystemModule ? normalizeKeys(rawSystemModule) as any : null
+  const normalizedDevice = {
+    ...device,
+    modules: {
+      ...device?.modules,
+      system: normalizedSystemModule
+    }
+  }
+  
   // Process system data using the centralized data processing function
-  const systemTabData = extractSystem(device)
+  const systemTabData = extractSystem(normalizedDevice)
   const { services, environment, updates, scheduledTasks, runningServices } = systemTabData
   
   // State for services search

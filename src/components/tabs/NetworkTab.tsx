@@ -6,6 +6,7 @@
 import React, { useState } from 'react'
 import { NetworkTable } from '../tables/NetworkTable'
 import { extractNetwork } from '../../lib/data-processing/modules/network'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface NetworkTabProps {
   device: any
@@ -101,15 +102,19 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
     return ips.find(ip => ipv4Pattern.test(ip));
   };
   
+  // Normalize snake_case to camelCase for network module
+  const rawNetworkModule = data || device?.modules?.network
+  const normalizedNetworkModule = rawNetworkModule ? normalizeKeys(rawNetworkModule) as any : null
+  
   // Process network data directly like ApplicationsTab does
   // If data is provided (from on-demand loading), we need to process it using extractNetwork
   // We combine it with the device info to ensure hostname and other device-level fields are available
-  const processedNetworkData = data 
-    ? extractNetwork({ ...device, modules: { ...device?.modules, network: data } }) 
+  const processedNetworkData = normalizedNetworkModule 
+    ? extractNetwork({ ...device, modules: { ...device?.modules, network: normalizedNetworkModule } }) 
     : extractNetwork(device)
   
   // Use processed data as primary source, fallback to data prop
-  const networkData = processedNetworkData || data || {}
+  const networkData = processedNetworkData || normalizedNetworkModule || {}
 
   return (
     <div className="space-y-6">

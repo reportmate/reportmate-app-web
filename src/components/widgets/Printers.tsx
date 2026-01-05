@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface PrinterInfo {
   name: string
@@ -23,8 +24,8 @@ interface PrinterInfo {
 }
 
 interface PrintersData {
-  totalPrinters: number
-  printers: PrinterInfo[]
+  totalPrinters?: number
+  printers?: PrinterInfo[]
   defaultPrinter?: PrinterInfo
   activePrintJobs?: number
   recentPrintJobs?: any[]
@@ -35,7 +36,7 @@ interface Device {
   name: string
   // Modular structure
   modules?: {
-    printers?: PrintersData
+    printers?: any
   }
 }
 
@@ -44,8 +45,9 @@ interface PrintersWidgetProps {
 }
 
 export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
-  // Access printers data from modular structure
-  const printers = device.modules?.printers
+  // Access printers data from modular structure with snake_case normalization
+  const rawPrinters = device.modules?.printers
+  const printers = rawPrinters ? normalizeKeys(rawPrinters) as PrintersData : null
   const hasPrintersInfo = printers && printers.printers && printers.printers.length > 0
 
   if (!hasPrintersInfo) {

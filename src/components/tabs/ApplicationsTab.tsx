@@ -7,6 +7,7 @@ import React, { useMemo, useState } from 'react'
 import { ApplicationsTable } from '../tables'
 import { extractApplications } from '../../lib/data-processing/modules/applications'
 import { formatRelativeTime } from '../../lib/time'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 // Extended ApplicationInfo with usage data
 interface ApplicationUsage {
@@ -94,40 +95,37 @@ function formatDuration(seconds: number): string {
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
   const [activeFilter, setActiveFilter] = useState<'all' | 'unused' | 'singleUser' | 'withUsage'>('all')
   
+  // Normalize snake_case to camelCase for applications module
+  const rawApplicationsModule = device?.modules?.applications
+  const normalizedApplicationsModule = rawApplicationsModule ? normalizeKeys(rawApplicationsModule) as any : null
+  
   // Process applications data from the modular device structure
   const applicationsModuleData = extractApplications(device?.modules || {})
   
-  // Extract usage data from module
-  const usageData = device?.modules?.applications?.Usage || device?.modules?.applications?.usage
-  const isUsageAvailable = usageData?.IsCaptureEnabled || usageData?.isCaptureEnabled || false
-  const usageStatus = usageData?.Status || usageData?.status || 'unavailable'
+  // Extract usage data from normalized module
+  const usageData = normalizedApplicationsModule?.usage
+  const isUsageAvailable = usageData?.isCaptureEnabled || false
+  const usageStatus = usageData?.status || 'unavailable'
   
-  // Check if we have applications data
+  // Check if we have applications data - check normalized module
   const hasApplicationsData = (data?.installedApps?.length ?? 0) > 0 ||
                               (device?.applications?.installedApps?.length ?? 0) > 0 ||
-                              (device?.modules?.applications?.installed_applications?.length ?? 0) > 0 || 
-                              (device?.modules?.applications?.installedApplications?.length ?? 0) > 0 || 
+                              (normalizedApplicationsModule?.installedApplications?.length ?? 0) > 0 || 
                               (applicationsModuleData?.applications?.length ?? 0) > 0
   
-  // Memoize the selection of installed apps
+  // Memoize the selection of installed apps - use normalized module
   const installedApps = useMemo(() => {
     if (data?.installedApps?.length) {
       return data.installedApps
-    } else if (device?.modules?.applications?.installedApplications) {
-      return device.modules.applications.installedApplications
-    } else if (device?.modules?.applications?.InstalledApplications) {
-      return device.modules.applications.InstalledApplications
-    } else if (device?.modules?.applications?.installed_applications) {
-      return device.modules.applications.installed_applications
+    } else if (normalizedApplicationsModule?.installedApplications) {
+      return normalizedApplicationsModule.installedApplications
     } else if (applicationsModuleData?.applications) {
       return applicationsModuleData.applications
     }
     return []
   }, [
     data?.installedApps, 
-    device?.modules?.applications?.installedApplications,
-    device?.modules?.applications?.InstalledApplications,
-    device?.modules?.applications?.installed_applications,
+    normalizedApplicationsModule?.installedApplications,
     applicationsModuleData?.applications
   ])
 
