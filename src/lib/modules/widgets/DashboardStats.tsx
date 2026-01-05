@@ -114,12 +114,19 @@ export const WarningStatsWidget: React.FC<{
   if (installStats) {
     warningCount = installStats.devicesWithWarnings ?? 0
   } else if (devices) {
-    warningCount = devices.filter((d: any) => 
-      d.modules?.installs?.cimian?.items?.some((item: any) => 
+    warningCount = devices.filter((d: any) => {
+      // Check Cimian items (Windows)
+      const cimianWarning = d.modules?.installs?.cimian?.items?.some((item: any) => 
         item.currentStatus?.toLowerCase().includes('warning') || 
         item.currentStatus?.toLowerCase().includes('pending')
       )
-    ).length
+      // Check Munki items (macOS)
+      const munkiWarning = d.modules?.installs?.munki?.items?.some((item: any) => 
+        item.status?.toLowerCase().includes('warning') || 
+        item.status?.toLowerCase().includes('pending')
+      )
+      return cimianWarning || munkiWarning
+    }).length
   }
 
   if (isLoading || warningCount === null) {
@@ -168,12 +175,19 @@ export const ErrorStatsWidget: React.FC<{
   if (installStats) {
     errorCount = installStats.devicesWithErrors ?? 0
   } else if (devices) {
-    errorCount = devices.filter((d: any) => 
-      d.modules?.installs?.cimian?.items?.some((item: any) => 
+    errorCount = devices.filter((d: any) => {
+      // Check Cimian items (Windows)
+      const cimianError = d.modules?.installs?.cimian?.items?.some((item: any) => 
         item.currentStatus?.toLowerCase().includes('error') || 
         item.currentStatus?.toLowerCase().includes('failed')
       )
-    ).length
+      // Check Munki items (macOS)
+      const munkiError = d.modules?.installs?.munki?.items?.some((item: any) => 
+        item.status?.toLowerCase().includes('error') || 
+        item.status?.toLowerCase().includes('failed')
+      )
+      return cimianError || munkiError
+    }).length
   }
 
   if (isLoading || errorCount === null) {
