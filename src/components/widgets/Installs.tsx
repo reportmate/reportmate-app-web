@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface InstallEvent {
   id: string
@@ -17,11 +18,11 @@ interface InstallEvent {
 }
 
 interface InstallsData {
-  totalInstalls: number
-  recentInstalls: InstallEvent[]
-  successfulInstalls: number
-  failedInstalls: number
-  pendingInstalls: number
+  totalInstalls?: number
+  recentInstalls?: InstallEvent[]
+  successfulInstalls?: number
+  failedInstalls?: number
+  pendingInstalls?: number
 }
 
 interface Device {
@@ -29,7 +30,7 @@ interface Device {
   name: string
   // Modular structure
   modules?: {
-    installs?: InstallsData
+    installs?: any
   }
 }
 
@@ -38,9 +39,10 @@ interface InstallsWidgetProps {
 }
 
 export const InstallsWidget: React.FC<InstallsWidgetProps> = ({ device }) => {
-  // Access installs data from modular structure
-  const installs = device.modules?.installs
-  const hasInstallsInfo = installs && (installs.totalInstalls > 0 || installs.recentInstalls?.length > 0)
+  // Access installs data from modular structure with snake_case normalization
+  const rawInstalls = device.modules?.installs
+  const installs = rawInstalls ? normalizeKeys(rawInstalls) as InstallsData : null
+  const hasInstallsInfo = installs && ((installs.totalInstalls && installs.totalInstalls > 0) || (installs.recentInstalls && installs.recentInstalls.length > 0))
 
   if (!hasInstallsInfo) {
     return (
