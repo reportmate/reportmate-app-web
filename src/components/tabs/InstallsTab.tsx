@@ -7,6 +7,7 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { ManagedInstallsTable } from '../tables/ManagedInstallsTable'
 import { extractInstalls, type InstallsInfo } from '../../lib/data-processing/modules/installs'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface InstallsTabProps {
   device: any
@@ -194,9 +195,17 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
   // If device prop is null/empty, we'll show a fallback message
   const effectiveDevice = device || selfFetchedDevice
   
+  // Normalize snake_case to camelCase for installs module
+  const rawInstallsModule = effectiveDevice?.modules?.installs
+  const normalizedInstallsModule = rawInstallsModule ? normalizeKeys(rawInstallsModule) as any : null
+  const normalizedModules = effectiveDevice?.modules ? {
+    ...effectiveDevice.modules,
+    installs: normalizedInstallsModule
+  } : null
+  
   // CRITICAL FIX: Always process raw device data directly to ensure we get the rich Cimian data
   // The data prop might be empty or not processed correctly, so we handle it ourselves
-  const installsData = effectiveDevice ? extractInstalls(effectiveDevice.modules) : null
+  const installsData = normalizedModules ? extractInstalls(normalizedModules) : null
   
   // Self-contained device data fetching as workaround for broken device page useEffect
   // BUT ONLY if we don't have device data already
