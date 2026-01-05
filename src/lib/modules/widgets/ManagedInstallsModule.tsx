@@ -116,8 +116,8 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
     configType: config?.type
   })
 
-  // Check if we have a managed installs system (Cimian) configured
-  const hasManagedSystem = totalPackages > 0 || (config && config.type === 'cimian')
+  // Check if we have a managed installs system (Cimian or Munki) configured
+  const hasManagedSystem = totalPackages > 0 || (config && (config.type === 'cimian' || config.type === 'Cimian' || config.type === 'munki' || config.type === 'Munki'))
 
   console.log('ManagedInstalls: Managed system detection:', {
     totalPackages,
