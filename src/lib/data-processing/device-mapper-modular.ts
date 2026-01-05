@@ -92,23 +92,29 @@ export function validateDeviceStructure(rawDevice: any): void {
 }
 
 /**
- * MODULAR Device Mapper - NEW ARCHITECTURE
+ * Modular Device Mapper
  * Each aspect is processed by dedicated modules
+ * 
+ * Pass the full modules object to each extractor
+ * Each extractor expects: { hardware: {...}, system: {...}, etc. }
+ * NOT the individual module data directly
  */
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   // Extract modules data with correct nesting
   const modules = rawDevice.modules || {}
   
-  // FIXED: Extract inventory from the correct nested path
-  const inventory = extractInventory(modules.inventory || {})
-  const system = extractSystem(modules.system || {})
-  const hardware = extractHardware(modules.hardware || {})
-  const network = extractNetwork(modules.network || {})
-  const security = extractSecurity(modules.security || {})
-  const applications = extractApplications(modules.applications || {})
-  const management = extractManagement(modules.management || {})
-  const installs = extractInstalls(modules.installs || {})
-  const profiles = extractProfiles(modules.profiles || {})
+  // Pass modules object to each extractor in the format it expects
+  // extractHardware, extractSecurity expect: { hardware: {...} } directly (modules)
+  // extractSystem, extractNetwork expect: { modules: { system: {...} } } (wrapped)
+  const inventory = extractInventory(modules)
+  const system = extractSystem({ modules })
+  const hardware = extractHardware(modules)
+  const network = extractNetwork({ modules })  // extractNetwork expects deviceModules.modules.network
+  const security = extractSecurity(modules)
+  const applications = extractApplications(modules)
+  const management = extractManagement(modules)
+  const installs = extractInstalls(modules)
+  const profiles = extractProfiles(modules)
   
   const finalName = inventory.deviceName || rawDevice.name || rawDevice.serialNumber || 'Unknown Device'
   

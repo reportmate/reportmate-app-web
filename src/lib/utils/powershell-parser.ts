@@ -253,3 +253,33 @@ export function isPowerShellFalse(value: any): boolean {
   if (typeof value === 'object') return Object.keys(value).length === 0
   return false
 }
+
+/**
+ * Convert snake_case string to camelCase
+ */
+export function snakeToCamel(str: string): string {
+  return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
+}
+
+/**
+ * Recursively convert all snake_case keys in an object to camelCase
+ * Supports both snake_case (API) and camelCase (legacy) formats
+ */
+export function normalizeKeys(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj
+  
+  if (Array.isArray(obj)) {
+    return obj.map(item => normalizeKeys(item))
+  }
+  
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      const camelKey = snakeToCamel(key)
+      result[camelKey] = normalizeKeys(value)
+    }
+    return result
+  }
+  
+  return obj
+}

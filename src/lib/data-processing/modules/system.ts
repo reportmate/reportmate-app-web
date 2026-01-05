@@ -152,9 +152,11 @@ export function extractSystem(deviceModules: any): SystemInfo {
     }))
   }
 
-  // Extract scheduled tasks - check both system.scheduledTasks and separate scheduledTasks module
+  // Extract scheduled tasks - check both system.scheduledTasks and system.scheduled_tasks
   let rawScheduledTasks = null
-  if (modules?.system?.scheduledTasks) {
+  if (modules?.system?.scheduled_tasks) {
+    rawScheduledTasks = modules.system.scheduled_tasks
+  } else if (modules?.system?.scheduledTasks) {
     rawScheduledTasks = modules.system.scheduledTasks
   } else if (modules?.scheduledTasks?.scheduledTasks) {
     rawScheduledTasks = modules.scheduledTasks.scheduledTasks
@@ -168,54 +170,65 @@ export function extractSystem(deviceModules: any): SystemInfo {
       action: task.action || '',
       hidden: task.hidden || false,
       state: task.state || '',
-      lastRunTime: task.lastRunTime || task.last_run_time || '',
-      nextRunTime: task.nextRunTime || task.next_run_time || '',
-      lastRunCode: task.lastRunCode || task.last_run_code || '',
-      lastRunMessage: task.lastRunMessage || task.last_run_message || '',
+      lastRunTime: task.last_run_time || task.lastRunTime || '',
+      nextRunTime: task.next_run_time || task.nextRunTime || '',
+      lastRunCode: task.last_run_code || task.lastRunCode || '',
+      lastRunMessage: task.last_run_message || task.lastRunMessage || '',
       status: task.status || task.state || 'Unknown'
     }))
   }
 
   // Extract operating system info - handle both Windows and Mac structures
-  if (modules?.system?.operatingSystem) {
-    const os = modules.system.operatingSystem
+  // Support both snake_case (new) and camelCase (legacy) field names
+  const rawOs = modules?.system?.operating_system || modules?.system?.operatingSystem
+  if (rawOs) {
+    const os = rawOs
     // Check for Mac's systemDetails which contains locale, timeZone, keyboardLayouts
-    const systemDetails = modules.system.systemDetails || {}
+    const systemDetails = modules.system.systemDetails || modules.system.system_details || {}
     
     systemInfo.operatingSystem = {
-      name: os.name || os.productName || '',
+      name: os.name || os.productName || os.product_name || '',
       version: os.version || '',
-      // Mac uses majorVersion.minorVersion.patchVersion format
-      displayVersion: os.displayVersion || os.display_version || 
-        (os.majorVersion !== undefined ? `${os.majorVersion}.${os.minorVersion || 0}` : ''),
+      // Support both snake_case and camelCase for displayVersion
+      displayVersion: os.display_version || os.displayVersion || 
+        (os.majorVersion !== undefined ? `${os.majorVersion}.${os.minorVersion || 0}` : '') ||
+        (os.major !== undefined ? `${os.major}.${os.minor || 0}.${os.patch || 0}` : ''),
       edition: os.edition || os.platform || '', // Mac uses platform (Darwin)
-      build: os.build || os.buildNumber || '',
+      build: os.build || os.buildNumber || os.build_number || '',
       architecture: os.architecture || os.arch || '',
-      // Mac stores locale/timezone in systemDetails
+      // Support both snake_case and camelCase for locale/timezone
       locale: os.locale || systemDetails.locale || '',
-      timeZone: os.timeZone || os.timezone || systemDetails.timeZone || '',
-      // Mac stores keyboard layouts as array in systemDetails
-      activeKeyboardLayout: os.activeKeyboardLayout || 
+      timeZone: os.time_zone || os.timeZone || os.timezone || systemDetails.timeZone || systemDetails.time_zone || '',
+      // Support both snake_case and camelCase for keyboard layout
+      activeKeyboardLayout: os.active_keyboard_layout || os.activeKeyboardLayout || 
+        (os.keyboard_layouts?.length > 0 ? os.keyboard_layouts.join(', ') : '') ||
         (systemDetails.keyboardLayouts?.length > 0 ? systemDetails.keyboardLayouts.join(', ') : ''),
-      featureUpdate: os.featureUpdate || '',
-      // Windows activation status
+      featureUpdate: os.feature_update || os.featureUpdate || '',
+      // Windows activation status - support snake_case
       activation: os.activation ? {
-        isActivated: os.activation.isActivated,
+        isActivated: os.activation.is_activated ?? os.activation.isActivated,
         status: os.activation.status,
-        statusCode: os.activation.statusCode,
-        partialProductKey: os.activation.partialProductKey,
-        licenseType: os.activation.licenseType
+        statusCode: os.activation.status_code ?? os.activation.statusCode,
+        partialProductKey: os.activation.partial_product_key ?? os.activation.partialProductKey,
+        licenseType: os.activation.license_type ?? os.activation.licenseType
       } : undefined
     }
   }
 
   // Boot time - check various possible locations including Mac's systemDetails
-  if (modules?.system?.lastBootTime) {
+  // Support both snake_case and camelCase
+  if (modules?.system?.last_boot_time) {
+    systemInfo.bootTime = modules.system.last_boot_time
+  } else if (modules?.system?.lastBootTime) {
     systemInfo.bootTime = modules.system.lastBootTime
   } else if (modules?.system?.bootTime) {
     systemInfo.bootTime = modules.system.bootTime
+  } else if (modules?.system?.boot_time) {
+    systemInfo.bootTime = modules.system.boot_time
   } else if (modules?.system?.systemDetails?.bootTime) {
     systemInfo.bootTime = modules.system.systemDetails.bootTime
+  } else if (modules?.system?.system_details?.boot_time) {
+    systemInfo.bootTime = modules.system.system_details.boot_time
   }
 
   console.log('[SYSTEM MODULE] System info extracted:', {

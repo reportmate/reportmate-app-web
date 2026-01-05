@@ -299,13 +299,17 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     }
   }
 
-  // Extract WiFi networks
-  if (network.wifiNetworks && Array.isArray(network.wifiNetworks)) {
+  // Extract WiFi networks - support both snake_case (new API) and camelCase (legacy)
+  if (network.wifi_networks && Array.isArray(network.wifi_networks)) {
+    networkInfo.wifiNetworks = network.wifi_networks
+  } else if (network.wifiNetworks && Array.isArray(network.wifiNetworks)) {
     networkInfo.wifiNetworks = network.wifiNetworks
   }
 
-  // Extract VPN connections
-  if (network.vpnConnections && Array.isArray(network.vpnConnections)) {
+  // Extract VPN connections - support both snake_case (new API) and camelCase (legacy)
+  if (network.vpn_connections && Array.isArray(network.vpn_connections)) {
+    networkInfo.vpnConnections = network.vpn_connections
+  } else if (network.vpnConnections && Array.isArray(network.vpnConnections)) {
     networkInfo.vpnConnections = network.vpnConnections
   }
 
