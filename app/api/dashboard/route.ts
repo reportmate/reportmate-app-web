@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
@@ -14,39 +13,16 @@ export const revalidate = 0
  * - Recent events for the widget
  * 
  * This eliminates multiple separate API calls from the dashboard,
- * dramatically improving load time (3 calls 1).
+ * dramatically improving load time (3 calls → 1).
  */
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
-  // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost') || request.headers.get('host')?.includes('127.0.0.1')
-  
-  // Check authentication (skip for localhost)
-  if (!isLocalhost) {
-    const session = await getServerSession()
-    if (!session) {
-      console.log('[DASHBOARD API] Unauthorized access attempt')
-      return NextResponse.json({
-        error: 'Unauthorized',
-        details: 'Authentication required',
-        timestamp
-      }, { status: 401 })
-    }
-  }
+  console.log('[DASHBOARD API] Request received')
 
   try {
-    const apiBaseUrl = process.env.API_BASE_URL
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://reportmate-functions-api'
     
-    if (!apiBaseUrl) {
-      console.error('[DASHBOARD API] API_BASE_URL not configured')
-      return NextResponse.json({
-        error: 'API configuration error',
-        details: 'API_BASE_URL environment variable not configured',
-        timestamp
-      }, { status: 500 })
-    }
-
     // Forward query parameters
     const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
     const queryString = incomingParams.toString()

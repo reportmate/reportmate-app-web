@@ -1,57 +1,29 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 /**
  * Bulk Applications API Route - Proxy to FastAPI
- * Architecture: Next.js (proxy) FastAPI (data layer) PostgreSQL
+ * Architecture: Next.js (proxy) → FastAPI (data layer) → PostgreSQL
+ * Uses internal container-to-container auth
  */
 export async function GET(request: Request) {
-  // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
-  
-  // Check authentication (skip for localhost)
-  if (!isLocalhost) {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        details: 'Authentication required'
-      }, { status: 401 })
-    }
-  }
-
   try {
     const timestamp = new Date().toISOString()
     const { searchParams } = new URL(request.url)
     
     console.log(`[APPLICATIONS PROXY] ${timestamp} - Forwarding to FastAPI`)
     
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.API_BASE_URL
-    if (!API_BASE_URL) {
-      throw new Error('API_BASE_URL not configured')
-    }
+    // Use internal API URL for container-to-container communication
+    const API_BASE_URL = process.env.API_BASE_URL || 'http://reportmate-functions-api'
     
     const fastApiUrl = `${API_BASE_URL}/api/devices/applications?${searchParams.toString()}`
     console.log(`[APPLICATIONS PROXY] Calling: ${fastApiUrl}`)
     
-    const isLocalhost = request.headers.get('host')?.includes('localhost')
-    
-    // Build headers with authentication
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json'
-    }
-    
-    if (process.env.REPORTMATE_PASSPHRASE) {
-      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    } else {
-      const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
-      if (managedIdentityId) {
-        headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-      }
-    }
+    // Use shared auth headers for internal API calls
+    const headers = getInternalApiHeaders()
     
     const response = await fetch(fastApiUrl, {
       method: 'GET',
