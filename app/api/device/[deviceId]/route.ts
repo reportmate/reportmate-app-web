@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
 import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
@@ -92,24 +91,6 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ deviceId: string }> }
 ) {
-  // Check authentication (bypass for localhost development)
-  const isLocalhost = _request.nextUrl.hostname === 'localhost' || 
-                     _request.nextUrl.hostname === '127.0.0.1' || 
-                     _request.nextUrl.hostname === '0.0.0.0' ||
-                     process.env.NODE_ENV === 'development'
-  
-  if (!isLocalhost) {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        details: 'Authentication required'
-      }, { status: 401 })
-    }
-  } else {
-    console.log('[DEVICE API] Localhost detected - bypassing authentication')
-  }
-
   try {
     const { deviceId } = await params
     console.log('[DEVICE API] Starting API call for device:', deviceId)
@@ -273,17 +254,8 @@ export async function GET(
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
         console.log('[DEVICE API] Events URL:', deviceEventsUrl)
         
-        // Build events headers with authentication for localhost
-        const eventsHeaders: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-        
-        if (process.env.REPORTMATE_PASSPHRASE) {
-          eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-        } else if (managedIdentityId) {
-          eventsHeaders['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-        }
+        // Use shared auth headers for internal API calls
+        const eventsHeaders = getInternalApiHeaders()
         
         const eventsResponse = await fetch(deviceEventsUrl, {
           headers: eventsHeaders
@@ -382,17 +354,8 @@ export async function GET(
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
         console.log('[DEVICE API] Events URL:', deviceEventsUrl)
         
-        // Build events headers with authentication for localhost
-        const eventsHeaders: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-        
-        if (process.env.REPORTMATE_PASSPHRASE) {
-          eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-        } else if (managedIdentityId) {
-          eventsHeaders['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-        }
+        // Use shared auth headers for internal API calls
+        const eventsHeaders = getInternalApiHeaders()
         
         const eventsResponse = await fetch(deviceEventsUrl, {
           headers: eventsHeaders
@@ -494,17 +457,8 @@ export async function GET(
           const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
           console.log('[DEVICE API] Events URL:', deviceEventsUrl)
           
-          // Build events headers with authentication for localhost
-          const eventsHeaders: Record<string, string> = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          }
-          
-          if (process.env.REPORTMATE_PASSPHRASE) {
-            eventsHeaders['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-          } else if (managedIdentityId) {
-            eventsHeaders['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId
-          }
+          // Use shared auth headers for internal API calls
+          const eventsHeaders = getInternalApiHeaders()
           
           const eventsResponse = await fetch(deviceEventsUrl, {
             headers: eventsHeaders

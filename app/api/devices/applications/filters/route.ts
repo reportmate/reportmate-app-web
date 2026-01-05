@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -142,27 +142,13 @@ function shouldIncludeApplication(appName: string): boolean {
 }
 
 // Container Apps API configuration
-const CONTAINER_APPS_API_BASE = process.env.CONTAINER_APPS_API_BASE || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+const CONTAINER_APPS_API_BASE = process.env.API_BASE_URL || 'http://reportmate-functions-api'
 
 export async function GET(request: Request) {
-  // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
-  
-  // Check authentication (skip for localhost)
-  if (!isLocalhost) {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        details: 'Authentication required'
-      }, { status: 401 })
-    }
-  }
-
   try {
     const timestamp = new Date().toISOString()
-    const { headers } = request
-    const host = headers.get('host') || ''
+    const { headers: requestHeaders } = request
+    const host = requestHeaders.get('host') || ''
     const isLocalDev = host.includes('localhost')
     
     console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching applications from FastAPI bulk endpoint (localhost: ${isLocalDev})`)
@@ -170,15 +156,14 @@ export async function GET(request: Request) {
     // PERFORMANCE FIX: Use FastAPI bulk applications endpoint instead of fetching each device individually
     // This reduces 234 sequential API calls to just 2 calls (devices + applications)
     
-    // Determine base URL: Full URL for localhost (fetch requires absolute URLs), absolute FastAPI URL for production
-    const baseUrl = isLocalDev ? `http://${host}` : CONTAINER_APPS_API_BASE
+    // Use internal API URL for container-to-container communication
+    const baseUrl = CONTAINER_APPS_API_BASE
+    const headers = getInternalApiHeaders()
     
     // 1. Fetch devices for inventory metadata
     const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers,
     })
 
     if (!devicesResponse.ok) {
@@ -198,9 +183,7 @@ export async function GET(request: Request) {
     // 2. Fetch ALL applications using bulk endpoint (much faster than 234 individual calls)
     const applicationsResponse = await fetch(`${baseUrl}/api/devices/applications?loadAll=true`, {
       method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-      }
+      headers,
     })
 
     if (!applicationsResponse.ok) {
