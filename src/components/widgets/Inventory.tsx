@@ -6,6 +6,7 @@
 import React from 'react'
 import { StatBlock, Stat, Icons, WidgetColors } from './shared'
 import { formatRelativeTime } from '../../lib/time'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface Device {
   id: string
@@ -32,12 +33,15 @@ interface Device {
   modules?: {
     inventory?: {
       deviceName?: string
+      device_name?: string
       usage?: string
       catalog?: string
       department?: string
       location?: string
       assetTag?: string
+      asset_tag?: string
       serialNumber?: string
+      serial_number?: string
       uuid?: string
     }
   }
@@ -48,8 +52,9 @@ interface InventoryWidgetProps {
 }
 
 export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
-  // Use inventory module data if available, fallback to device properties
-  const inventory = device.modules?.inventory || {}
+  // Normalize inventory module data to camelCase (API returns snake_case)
+  const rawInventory = device.modules?.inventory
+  const inventory = rawInventory ? normalizeKeys(rawInventory) as any : {}
   
   // Check if we have any assignment details for the right column
   const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location

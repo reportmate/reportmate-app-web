@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface ProfileInfo {
   id: string
@@ -25,8 +26,8 @@ interface ProfileInfo {
 }
 
 interface ProfilesData {
-  totalProfiles: number
-  profiles: ProfileInfo[]
+  totalProfiles?: number
+  profiles?: ProfileInfo[]
   installedProfiles?: ProfileInfo[]
   managedProfiles?: ProfileInfo[]
   userProfiles?: ProfileInfo[]
@@ -36,7 +37,10 @@ interface Device {
   id: string
   name: string
   // Modular profiles data
-  profiles?: ProfilesData
+  profiles?: any
+  modules?: {
+    profiles?: any
+  }
 }
 
 interface ProfilesWidgetProps {
@@ -44,8 +48,10 @@ interface ProfilesWidgetProps {
 }
 
 export const ProfilesWidget: React.FC<ProfilesWidgetProps> = ({ device }) => {
-  // Access profiles data from modular structure
-  const profiles = device.profiles
+  // Access profiles data from modular structure with snake_case normalization
+  // Check both device.profiles (legacy) and device.modules.profiles (modular)
+  const rawProfiles = device.modules?.profiles || device.profiles
+  const profiles = rawProfiles ? normalizeKeys(rawProfiles) as ProfilesData : null
   const hasProfilesInfo = profiles && profiles.profiles && profiles.profiles.length > 0
 
   if (!hasProfilesInfo) {

@@ -5,6 +5,7 @@
 
 import React from 'react'
 import { StatBlock, Stat, EmptyState, Icons, WidgetColors } from './shared'
+import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 interface ApplicationInfo {
   id: string
@@ -14,12 +15,12 @@ interface ApplicationInfo {
   publisher?: string
   category?: string
   installDate?: string
-  signed_by?: string
+  signedBy?: string
 }
 
 interface ApplicationsData {
-  totalApps: number
-  installedApps: ApplicationInfo[]
+  totalApps?: number
+  installedApps?: ApplicationInfo[]
 }
 
 interface Device {
@@ -27,7 +28,7 @@ interface Device {
   name: string
   // Modular applications data
   modules?: {
-    applications?: ApplicationsData
+    applications?: any
   }
 }
 
@@ -36,8 +37,9 @@ interface ApplicationsWidgetProps {
 }
 
 export const ApplicationsWidget: React.FC<ApplicationsWidgetProps> = ({ device }) => {
-  // Access applications data from modular structure
-  const applications = device.modules?.applications
+  // Access applications data from modular structure with snake_case normalization
+  const rawApplications = device.modules?.applications
+  const applications = rawApplications ? normalizeKeys(rawApplications) as ApplicationsData : null
   const hasApplicationsInfo = applications && applications.installedApps && applications.installedApps.length > 0
 
   if (!hasApplicationsInfo) {
@@ -54,10 +56,10 @@ export const ApplicationsWidget: React.FC<ApplicationsWidgetProps> = ({ device }
   }
 
   const stats = {
-    total: applications.totalApps || applications.installedApps.length,
-    signed: applications.installedApps.filter(app => app.signed_by || app.publisher).length,
-    categories: new Set(applications.installedApps.map(app => app.category).filter(Boolean)).size,
-    publishers: new Set(applications.installedApps.map(app => app.publisher).filter(Boolean)).size
+    total: applications.totalApps || applications.installedApps!.length,
+    signed: applications.installedApps!.filter(app => app.signedBy || app.publisher).length,
+    categories: new Set(applications.installedApps!.map(app => app.category).filter(Boolean)).size,
+    publishers: new Set(applications.installedApps!.map(app => app.publisher).filter(Boolean)).size
   }
 
   return (
@@ -73,7 +75,7 @@ export const ApplicationsWidget: React.FC<ApplicationsWidgetProps> = ({ device }
       <Stat label="Publishers" value={stats.publishers.toString()} />
       
       {/* Show a few recent applications */}
-      {applications.installedApps.slice(0, 3).map((app, index) => (
+      {applications.installedApps!.slice(0, 3).map((app, index) => (
         <div key={app.id || index} className="pt-2 border-t border-gray-200 dark:border-gray-700 first:border-t-0 first:pt-0">
           <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
             {app.displayName || app.name}
@@ -84,9 +86,9 @@ export const ApplicationsWidget: React.FC<ApplicationsWidgetProps> = ({ device }
         </div>
       ))}
       
-      {applications.installedApps.length > 3 && (
+      {applications.installedApps!.length > 3 && (
         <div className="text-xs text-gray-500 dark:text-gray-400 pt-2 border-t border-gray-200 dark:border-gray-700">
-          +{applications.installedApps.length - 3} more applications
+          +{applications.installedApps!.length - 3} more applications
         </div>
       )}
     </StatBlock>
