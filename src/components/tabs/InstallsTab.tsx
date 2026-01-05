@@ -401,11 +401,11 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
           </div>
         </div>
         {/* Last Run - Top Right */}
-        {(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time) && (
+        {(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.munki?.endTime || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time) && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Last Run</div>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCompactRelativeTime(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time || '')}
+              {formatCompactRelativeTime(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.munki?.endTime || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time || '')}
             </div>
           </div>
         )}
@@ -420,18 +420,21 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
                 {processedInstallsData?.config?.manifest || 
+                 effectiveDevice?.modules?.installs?.munki?.manifestName ||
+                 effectiveDevice?.modules?.installs?.munki?.clientIdentifier ||
                  effectiveDevice?.modules?.installs?.cimian?.config?.ClientIdentifier || 
                  effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
-                 'Assigned/Staff/IT/B1115/RodChristiansen'}
+                 'No manifest configured'}
               </div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
                 {processedInstallsData?.config?.softwareRepoURL || 
+                 effectiveDevice?.modules?.installs?.munki?.softwareRepoURL ||
                  effectiveDevice?.modules?.installs?.cimian?.config?.SoftwareRepoURL || 
                  effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
-                 'https://cimian.ecuad.ca/deployment'}
+                 'No repo configured'}
               </div>
             </div>
           </div>
@@ -444,18 +447,20 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
                 <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
                   {processedInstallsData?.config?.runType || 
                    effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
-                   'Manual'}
+                   'Auto'}
                 </span>
               </div>
             </div>
             <div>
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                {installsData?.systemName ? `${installsData.systemName.charAt(0).toUpperCase()}${installsData.systemName.slice(1)} Version` : 'Cimian Version'}
+                {processedInstallsData?.systemName ? `${processedInstallsData.systemName} Version` : 
+                 effectiveDevice?.modules?.installs?.munki ? 'Munki Version' : 'Cimian Version'}
               </div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border mx-auto inline-block">
                 {processedInstallsData?.config?.version || 
+                 effectiveDevice?.modules?.installs?.munki?.version ||
                  effectiveDevice?.modules?.installs?.cimian?.version || 
-                 '25.8.26.2231'}
+                 'Unknown'}
               </div>
             </div>
           </div>
@@ -473,6 +478,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
                 {(() => {
                   const timestamp = processedInstallsData?.config?.lastRun || 
+                                   effectiveDevice?.modules?.installs?.munki?.endTime ||
                                    effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
                                    effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.endTime
                   if (!timestamp) return 'Never'

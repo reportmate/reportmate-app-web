@@ -485,16 +485,13 @@ function getLatestAttemptTimestamp(item: any): string {
 }
 
 /**
- * Extract and process installs information from device modules
- * MODULAR: Self-contained installs data processing with status standardization
- */
-/**
  * Extract install status information from device modules
+ * Supports both Cimian (Windows/cross-platform) and Munki (macOS) data sources
  * FIXES: Status capitalization issues by enforcing standard format
- * VERSION: 2025-08-30 22:25 - Force refresh to verify duration extraction
+ * VERSION: 2025-01-04 - Added Munki support via macadmins osquery extension
  */
 export function extractInstalls(deviceModules: any): InstallsInfo {
-  console.log('[INSTALLS MODULE] === STARTING EXTRACT INSTALLS v2025-08-30 ===')
+  console.log('[INSTALLS MODULE] === STARTING EXTRACT INSTALLS v2025-01-04 ===')
   console.log('[INSTALLS MODULE] Input deviceModules:', {
     hasDeviceModules: !!deviceModules,
     deviceModulesType: typeof deviceModules,
@@ -527,7 +524,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     hasRecentInstalls: !!installs.recentInstalls,
     recentInstallsCount: installs.recentInstalls?.length || 0,
     hasCimian: !!installs.cimian,
-    hasConfig: !!installs.cimian?.config
+    hasMunki: !!installs.munki,
+    hasConfig: !!installs.cimian?.config || !!installs.munki
   })
 
   const packages: InstallPackage[] = []
@@ -539,11 +537,22 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     removed: 0
   }
 
+  // Determine which managed software system to use
+  const hasCimianData = installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0
+  const hasMunkiData = installs.munki?.items && Array.isArray(installs.munki.items) && installs.munki.items.length > 0
+  
+  // Determine system name for UI
+  let systemName = 'Managed Installs'
+  if (hasCimianData) {
+    systemName = 'Cimian'
+  } else if (hasMunkiData) {
+    systemName = 'Munki'
+  }
+
   // Process recent installs (contains Cimian data) - CRITICAL FIX: Use cimian.items as primary source
   let packagesToProcess = []
   
   // CRITICAL FIX: Check cimian.items FIRST as it contains the real data
-  // Support both snake_case (new API) and camelCase (legacy) field names
   if (installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0) {
     packagesToProcess = installs.cimian.items
       .filter((item: any) => {
@@ -580,7 +589,23 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       recentAttempts: item.recent_attempts || item.recentAttempts || []
     }))
     console.log('[INSTALLS MODULE] PROCESSING CIMIAN.ITEMS - COUNT:', installs.cimian.items.length)
-  } else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
+  } 
+  // Process Munki items if available (macOS)
+  else if (hasMunkiData) {
+    packagesToProcess = installs.munki.items.map((item: any) => ({
+      ...item,
+      name: item.name || item.displayName || 'Unknown',
+      displayName: item.displayName || item.name || 'Unknown',
+      status: item.status, // Already standardized from macOS client
+      version: item.version || item.installedVersion || 'Unknown',
+      installedVersion: item.installedVersion || '',
+      id: item.id || item.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown',
+      type: 'munki',
+      lastSeenInSession: item.endTime || installs.munki.endTime || ''
+    }))
+    console.log('[INSTALLS MODULE] PROCESSING MUNKI.ITEMS - COUNT:', installs.munki.items.length)
+  }
+  else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
     packagesToProcess = installs.recentInstalls
     console.log('[INSTALLS MODULE] PROCESSING RECENT INSTALLS - COUNT:', installs.recentInstalls.length)
   } else if (installs.cimian?.pendingPackages && Array.isArray(installs.cimian.pendingPackages) && installs.cimian.pendingPackages.length > 0) {
@@ -598,14 +623,35 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       pendingPackages: installs.cimian.pendingPackages,
       processedCount: packagesToProcess.length
     })
-  } else {
+  } 
+  // FALLBACK: Check for Munki pending packages
+  else if (installs.munki?.pendingPackages && Array.isArray(installs.munki.pendingPackages) && installs.munki.pendingPackages.length > 0) {
+    packagesToProcess = installs.munki.pendingPackages.map((pkgName: string) => ({
+      name: pkgName,
+      displayName: pkgName,
+      status: 'Pending',
+      type: 'munki',
+      version: 'Unknown',
+      id: pkgName.toLowerCase().replace(/\s+/g, '-'),
+      lastSeenInSession: installs.munki?.endTime || ''
+    }))
+    console.log('[INSTALLS MODULE] FALLBACK TO MUNKI PENDING PACKAGES:', {
+      pendingPackages: installs.munki.pendingPackages,
+      processedCount: packagesToProcess.length
+    })
+  }
+  else {
     console.log('[INSTALLS MODULE] NO PACKAGE DATA FOUND:', {
       hasRecentInstalls: !!installs.recentInstalls,
       recentInstallsLength: installs.recentInstalls?.length || 0,
       hasCimianItems: !!installs.cimian?.items,
       cimianItemsLength: installs.cimian?.items?.length || 0,
+      hasMunkiItems: !!installs.munki?.items,
+      munkiItemsLength: installs.munki?.items?.length || 0,
       hasCimianPending: !!installs.cimian?.pendingPackages,
-      cimianPendingLength: installs.cimian?.pendingPackages?.length || 0
+      cimianPendingLength: installs.cimian?.pendingPackages?.length || 0,
+      hasMunkiPending: !!installs.munki?.pendingPackages,
+      munkiPendingLength: installs.munki?.pendingPackages?.length || 0
     })
   }
   
@@ -1022,9 +1068,20 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     failed: statusCounts.errors + statusCounts.warnings,
     lastUpdate: installs.lastCheckIn || installs.collected_at || '',
     packages,
-    systemName: installs.cimian?.config?.systemName || 'Cimian',
+    systemName: hasMunkiData ? 'Munki' : (installs.cimian?.config?.systemName || 'Cimian'),
     cacheSizeMb,
-    config: {
+    config: hasMunkiData ? {
+      // Munki configuration
+      type: 'Munki',
+      version: installs.munki?.version || '',
+      softwareRepoURL: installs.munki?.softwareRepoURL || '',
+      manifest: installs.munki?.manifestName || installs.munki?.clientIdentifier || '',
+      lastRun: installs.munki?.endTime || installs.munki?.lastRun || '',
+      runType: 'Auto', // Munki is typically scheduled
+      duration: 'Unknown', // Munki doesn't report duration
+      durationSeconds: undefined
+    } : {
+      // Cimian configuration
       type: 'Cimian',
       version: installs.cimian?.version || installs.version,
       lastRun: installs.lastCheckIn,
@@ -1035,6 +1092,37 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     messages: {
       errors: [...sessionErrors, ...packageErrors],
       warnings: [...sessionWarnings, ...packageWarnings]
+    }
+  }
+
+  // Add Munki-specific errors/warnings if present
+  if (hasMunkiData) {
+    if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
+      installsInfo.messages?.errors.push({
+        id: 'munki-run-errors',
+        message: installs.munki.errors,
+        timestamp: installs.munki.endTime || new Date().toISOString(),
+        code: 'MUNKI_ERROR',
+        package: 'Munki'
+      })
+    }
+    if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
+      installsInfo.messages?.warnings.push({
+        id: 'munki-run-warnings',
+        message: installs.munki.warnings,
+        timestamp: installs.munki.endTime || new Date().toISOString(),
+        code: 'MUNKI_WARNING',
+        package: 'Munki'
+      })
+    }
+    if (installs.munki?.problemInstalls && installs.munki.problemInstalls.trim() !== '') {
+      installsInfo.messages?.warnings.push({
+        id: 'munki-problem-installs',
+        message: `Problem installs: ${installs.munki.problemInstalls}`,
+        timestamp: installs.munki.endTime || new Date().toISOString(),
+        code: 'MUNKI_PROBLEM_INSTALLS',
+        package: 'Munki'
+      })
     }
   }
 
