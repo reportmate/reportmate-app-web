@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getInternalApiHeaders } from '@/lib/api-auth';
 import { getDevicesWithInstalls, parseInventory } from './shared';
 
 export const dynamic = 'force-dynamic';
@@ -8,20 +8,6 @@ export const revalidate = 0;
 export const maxDuration = 60;
 
 export async function GET(request: Request) {
-  // LOCALHOST BYPASS: Skip auth check for local development
-  const isLocalhost = request.headers.get('host')?.includes('localhost') || process.env.NODE_ENV === 'development'
-  
-  // Check authentication (skip for localhost)
-  if (!isLocalhost) {
-    const session = await getServerSession()
-    if (!session) {
-      return NextResponse.json({ 
-        error: 'Unauthorized',
-        details: 'Authentication required'
-      }, { status: 401 })
-    }
-  }
-
   const API_BASE_URL = process.env.API_BASE_URL;
 
   if (!API_BASE_URL) {
@@ -54,20 +40,8 @@ export async function GET(request: Request) {
       const timestamp = new Date().toISOString();
       console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
 
-      // Build headers with authentication (matching shared.ts pattern)
-      const headers: Record<string, string> = {
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-Frontend/1.0'
-      };
-      
-      if (process.env.REPORTMATE_PASSPHRASE) {
-        headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE;
-      } else {
-        const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID;
-        if (managedIdentityId) {
-          headers['X-MS-CLIENT-PRINCIPAL-ID'] = managedIdentityId;
-        }
-      }
+      // Use shared authentication headers
+      const headers = getInternalApiHeaders();
 
       // Fetch device data from Azure Functions device endpoint
       const apiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}`, {
