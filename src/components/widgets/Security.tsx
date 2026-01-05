@@ -1,11 +1,12 @@
 /**
  * Security Widget - Platform-Aware with Simplified Status
  * Displays security information with simple status messages
+ * 
+ * SNAKE_CASE: All properties match API response format directly
  */
 
 import React from 'react'
 import { StatBlock, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 
 interface Device {
   id: string
@@ -13,10 +14,87 @@ interface Device {
   platform?: string
   os?: string
   osName?: string
-  security?: any
-  securityFeatures?: any
+  // Modular security data - snake_case from API
   modules?: {
-    security?: any
+    security?: {
+      tpm?: {
+        version?: string
+        is_enabled?: boolean
+        is_present?: boolean
+        is_activated?: boolean
+        manufacturer?: string
+        status_display?: string
+      }
+      firewall?: {
+        rules?: any[]
+        profile?: string
+        is_enabled?: boolean
+        status_display?: string
+      }
+      antivirus?: {
+        name?: string
+        version?: string
+        last_scan?: string
+        scan_type?: string
+        is_enabled?: boolean
+        last_update?: string
+        is_up_to_date?: boolean
+        status_display?: string
+      }
+      encryption?: {
+        bit_locker?: {
+          status?: string
+          is_enabled?: boolean
+          status_display?: string
+          recovery_key_id?: string
+          encrypted_drives?: string[]
+        }
+        file_vault?: {
+          is_enabled?: boolean
+          status_display?: string
+        }
+        luks?: {
+          is_enabled?: boolean
+          status_display?: string
+        }
+        status_display?: string
+        device_encryption?: boolean
+        encrypted_volumes?: Array<{
+          status?: string
+          drive_letter?: string
+          encryption_method?: string
+          encryption_percentage?: number
+        }>
+      }
+      secure_shell?: {
+        is_installed?: boolean
+        config_status?: string
+        is_configured?: boolean
+        service_status?: string
+        status_display?: string
+        is_key_deployed?: boolean
+        is_service_running?: boolean
+        are_permissions_correct?: boolean
+        is_firewall_rule_present?: boolean
+      }
+      windows_hello?: {
+        policies?: {
+          group_policies?: any[]
+          passport_policies?: any[]
+          allow_domain_pin_logon?: boolean
+          biometric_logon_enabled?: boolean
+        }
+        web_auth_n?: {
+          settings?: any[]
+          is_enabled?: boolean
+          is_configured?: boolean
+        }
+        hello_events?: any[]
+      }
+      collected_at?: string
+      device_id?: string
+      module_id?: string
+    }
   }
 }
 
@@ -25,32 +103,19 @@ interface SecurityWidgetProps {
 }
 
 export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
-  // Debug logging to see exactly what data we're getting
+  // Access security data from modules - snake_case from API
+  const security = device?.modules?.security
+  
   console.log('SecurityWidget DEBUG:', {
     deviceName: device?.name,
     hasModules: !!device?.modules,
-    hasModulesSecurity: !!device?.modules?.security,
-    hasDirectSecurity: !!device?.security,
-    securityData: device?.modules?.security || device?.security,
-    windowsHelloData: (device?.modules?.security || device?.security)?.windowsHello,
-    credentialProviders: (device?.modules?.security || device?.security)?.windowsHello?.credentialProviders
-  })
-
-  // Access security data from device object, prioritizing the modules structure
-  const rawSecurity = device?.modules?.security || device?.security || device?.securityFeatures
-  
-  // Parse PowerShell objects to proper JavaScript objects
-  const security = convertPowerShellObjects(rawSecurity)
-  
-  console.log('SecurityWidget PARSED:', {
-    parsedWindowsHello: security?.windowsHello,
-    parsedCredentialProviders: security?.windowsHello?.credentialProviders
+    hasModulesSecurity: !!security,
+    securityKeys: security ? Object.keys(security) : []
   })
   
   // Detect platform for platform-aware display
   const platform = device?.platform?.toLowerCase() || 
                   device?.os?.toLowerCase() || 
-                  device?.osName?.toLowerCase() || 
                   'windows'
   
   const isWindows = platform.includes('windows')
@@ -88,8 +153,8 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const getAntivirusDetails = () => {
     if (!security?.antivirus) return { status: 'Unknown', details: 'Unknown' }
     
-    const isActive = security.antivirus.isEnabled
-    const isUpToDate = security.antivirus.isUpToDate
+    const isActive = security.antivirus.is_enabled
+    const isUpToDate = security.antivirus.is_up_to_date
     
     if (isActive && isUpToDate) {
       return { status: 'Current', details: 'Current' }
@@ -103,24 +168,24 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const getEncryptionDetails = () => {
     if (!security?.encryption) return { status: 'Unknown', details: 'Unknown' }
     
-    if (isWindows && security.encryption.bitLocker) {
-      const isEnabled = security.encryption.bitLocker.isEnabled
-      const status = security.encryption.bitLocker.status || (isEnabled ? 'Enabled' : 'Disabled')
+    if (isWindows && security.encryption.bit_locker) {
+      const isEnabled = security.encryption.bit_locker.is_enabled
+      const status = security.encryption.bit_locker.status || (isEnabled ? 'Enabled' : 'Disabled')
       return {
         status: status,
         details: status
       }
-    } else if (isMacOS && security.encryption.fileVault) {
-      const fileVault = security.encryption.fileVault
+    } else if (isMacOS && security.encryption.file_vault) {
+      const fileVault = security.encryption.file_vault
       return {
-        status: fileVault.isEnabled ? 'Enabled' : 'Disabled',
-        details: fileVault.isEnabled ? 'Enabled' : 'Disabled'
+        status: fileVault.is_enabled ? 'Enabled' : 'Disabled',
+        details: fileVault.is_enabled ? 'Enabled' : 'Disabled'
       }
     } else if (isLinux && security.encryption.luks) {
       const luks = security.encryption.luks
       return {
-        status: luks.isEnabled ? 'Enabled' : 'Disabled',
-        details: luks.isEnabled ? 'Enabled' : 'Disabled'
+        status: luks.is_enabled ? 'Enabled' : 'Disabled',
+        details: luks.is_enabled ? 'Enabled' : 'Disabled'
       }
     }
     
@@ -130,7 +195,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const getFirewallDetails = () => {
     if (!security?.firewall) return { status: 'Unknown', details: 'Unknown' }
     
-    const isEnabled = security.firewall.isEnabled
+    const isEnabled = security.firewall.is_enabled
     const profile = security.firewall.profile || 'Not specified'
     
     return {
@@ -169,8 +234,8 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
         <div>
           <StatusBadge
             label="Antivirus"
-            status={security.antivirus?.statusDisplay || antivirusInfo.status}
-            type={getStatusType(security.antivirus?.isEnabled, antivirusInfo.status)}
+            status={security.antivirus?.status_display || antivirusInfo.status}
+            type={getStatusType(security.antivirus?.is_enabled, antivirusInfo.status)}
           />
           {security.antivirus && (
             <div className="ml-4 mt-2 space-y-1 text-xs text-gray-600 dark:text-gray-400">
@@ -180,13 +245,13 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               {security.antivirus.version && (
                 <div>Version: {security.antivirus.version}</div>
               )}
-              {security.antivirus.lastUpdate && (
-                <div>Updated: {formatDate(security.antivirus.lastUpdate)}</div>
+              {security.antivirus.last_update && (
+                <div>Updated: {formatDate(security.antivirus.last_update)}</div>
               )}
-              {security.antivirus.lastScan && (
+              {security.antivirus.last_scan && (
                 <div>
-                  Last Scan: {formatDate(security.antivirus.lastScan)}
-                  {security.antivirus.scanType && ` (${security.antivirus.scanType})`}
+                  Last Scan: {formatDate(security.antivirus.last_scan)}
+                  {security.antivirus.scan_type && ` (${security.antivirus.scan_type})`}
                 </div>
               )}
             </div>
@@ -196,50 +261,56 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
         {/* Firewall Protection */}
         <StatusBadge
           label="Firewall"
-          status={security.firewall?.statusDisplay || firewallInfo.status}
-          type={getStatusType(security.firewall?.isEnabled, firewallInfo.status)}
+          status={security.firewall?.status_display || firewallInfo.status}
+          type={getStatusType(security.firewall?.is_enabled, firewallInfo.status)}
         />
 
         {/* Disk Encryption */}
         <StatusBadge
           label={isWindows ? "BitLocker" : isMacOS ? "FileVault" : "Encryption"}
-          status={security.encryption?.statusDisplay || encryptionInfo.status}
+          status={security.encryption?.status_display || encryptionInfo.status}
           type={getStatusType(
-            isWindows ? security.encryption?.bitLocker?.isEnabled :
-            isMacOS ? security.encryption?.fileVault?.isEnabled :
-            isLinux ? security.encryption?.luks?.isEnabled :
+            isWindows ? security.encryption?.bit_locker?.is_enabled :
+            isMacOS ? security.encryption?.file_vault?.is_enabled :
+            isLinux ? security.encryption?.luks?.is_enabled :
             false,
             encryptionInfo.status
           )}
         />
 
+        {/* TPM Status (Windows only) */}
+        {isWindows && security?.tpm && (
+          <StatusBadge
+            label="TPM"
+            status={security.tpm.is_enabled ? 'Enabled' : 'Disabled'}
+            type={getStatusType(security.tpm.is_enabled)}
+          />
+        )}
+
         {/* Windows Hello Authentication (Windows only) */}
-        {isWindows && security?.windowsHello && (
+        {isWindows && security?.windows_hello && (
           <div className="space-y-2">
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400">Windows Hello</div>
             <div className="ml-4 space-y-3">
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 dark:text-gray-400">PIN Status:</span>
+                <span className="text-gray-600 dark:text-gray-400">Biometric:</span>
                 <StatusBadge
                   label=""
-                  status={security.windowsHello.credentialProviders?.pinEnabled ? 'Enabled' : 'Disabled'}
-                  type={getStatusType(security.windowsHello.credentialProviders?.pinEnabled)}
-                />
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 dark:text-gray-400">Biometric Status:</span>
-                <StatusBadge
-                  label=""
-                  status={(security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                           security.windowsHello.credentialProviders?.fingerprintEnabled) ? 'Enabled' : 'Disabled'}
-                  type={getStatusType(
-                    security.windowsHello.credentialProviders?.faceRecognitionEnabled || 
-                    security.windowsHello.credentialProviders?.fingerprintEnabled
-                  )}
+                  status={security.windows_hello.policies?.biometric_logon_enabled ? 'Enabled' : 'Disabled'}
+                  type={getStatusType(security.windows_hello.policies?.biometric_logon_enabled)}
                 />
               </div>
             </div>
           </div>
+        )}
+
+        {/* Secure Shell Status */}
+        {security?.secure_shell && (
+          <StatusBadge
+            label="SSH"
+            status={security.secure_shell.status_display || (security.secure_shell.is_service_running ? 'Running' : 'Stopped')}
+            type={getStatusType(security.secure_shell.is_service_running)}
+          />
         )}
       </div>
     </StatBlock>

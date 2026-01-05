@@ -1,58 +1,57 @@
 /**
  * Network Info Module  
  * Handles all network data extraction in isolation
+ * 
+ * SNAKE_CASE: All interfaces match API response format directly
  */
 
 export interface NetworkInfo {
-  ipAddress?: string
-  macAddress?: string
+  ip_address?: string
+  mac_address?: string
   hostname?: string
   domain?: string
   gateway?: string
   dns?: any
   interfaces?: NetworkInterface[]
-  wifiNetworks?: any[]
-  vpnConnections?: any[]
+  wifi_networks?: any[]
+  vpn_connections?: any[]
   routes?: any[]
-  connectionType?: string
+  connection_type?: string
   ssid?: string
-  signalStrength?: number | string
-  interfaceName?: string
-  vpnName?: string
-  vpnActive?: boolean
+  signal_strength?: number | string
+  interface_name?: string
+  vpn_name?: string
+  vpn_active?: boolean
   // Enhanced DNS and NETBIOS for active connection
-  activeDnsServers?: string[]
-  activeNetbiosName?: string
-  activeNetbiosType?: string
+  active_dns_servers?: string[]
+  active_netbios_name?: string
+  active_netbios_type?: string
   // Computer's DNS address/FQDN
-  dnsAddress?: string
+  dns_address?: string
 }
 
 export interface NetworkInterface {
   name: string
-  ipAddress?: string
-  ipAddresses?: string[]
-  macAddress?: string
+  ip_address?: string
+  ip_addresses?: string[]
+  mac_address?: string
   type?: string
   status?: string
   speed?: string
-  friendlyName?: string
-  isActive?: boolean
+  friendly_name?: string
+  is_active?: boolean
   mtu?: number
-  bytesSent?: number
-  bytesReceived?: number
-  linkSpeed?: string
-  wirelessProtocol?: string
-  wirelessBand?: string
+  bytes_sent?: number
+  bytes_received?: number
+  link_speed?: string
+  wireless_protocol?: string
+  wireless_band?: string
 }
 
 /**
  * Extract network information from device modules
  * MODULAR: Self-contained network data processing
- */
-/**
- * Extract network information from device modules
- * MODULAR: Self-contained network data processing
+ * SNAKE_CASE: All fields match API response format directly
  */
 export function extractNetwork(deviceModules: any): NetworkInfo {
   console.log('[NETWORK MODULE] Processing network data')
@@ -76,21 +75,21 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
   console.log('[NETWORK MODULE] Found network module with keys:', Object.keys(network))
 
-  // Extract active connection information
-  if (network.activeConnection) {
-    const active = network.activeConnection
-    networkInfo.ipAddress = active.ipAddress
-    networkInfo.macAddress = active.macAddress
+  // Extract active connection information (snake_case from API)
+  if (network.active_connection) {
+    const active = network.active_connection
+    networkInfo.ip_address = active.ip_address
+    networkInfo.mac_address = active.mac_address
     networkInfo.gateway = active.gateway
-    networkInfo.connectionType = active.connectionType
-    networkInfo.interfaceName = active.interfaceName || active.friendlyName
-    networkInfo.ssid = active.activeWifiSsid
-    networkInfo.signalStrength = active.wifiSignalStrength
-    networkInfo.vpnName = active.vpnName
-    networkInfo.vpnActive = active.isVpnActive
+    networkInfo.connection_type = active.connection_type
+    networkInfo.interface_name = active.interface_name || active.friendly_name
+    networkInfo.ssid = active.active_wifi_ssid
+    networkInfo.signal_strength = active.wifi_signal_strength
+    networkInfo.vpn_name = active.vpn_name
+    networkInfo.vpn_active = active.is_vpn_active
   }
 
-  // Extract DNS information
+  // Extract DNS information (snake_case from API)
   if (network.dns) {
     networkInfo.dns = network.dns
     
@@ -110,25 +109,25 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         ...ipv4Servers.slice(0, 2),
         ...ipv6Servers.slice(0, 1)
       ]
-      networkInfo.activeDnsServers = displayServers.slice(0, 3)
+      networkInfo.active_dns_servers = displayServers.slice(0, 3)
     }
   }
 
-  // Extract NETBIOS information for active connection
-  if (network.netbios && network.netbios.localNames && Array.isArray(network.netbios.localNames)) {
+  // Extract NETBIOS information for active connection (snake_case from API)
+  if (network.netbios && network.netbios.local_names && Array.isArray(network.netbios.local_names)) {
     console.log('[NETWORK MODULE] Processing NetBIOS data:', {
-      localNamesCount: network.netbios.localNames.length,
-      activeInterface: networkInfo.interfaceName,
-      localNames: network.netbios.localNames.map((n: any) => ({ name: n.name, type: n.type, interface: n.interface }))
+      localNamesCount: network.netbios.local_names.length,
+      activeInterface: networkInfo.interface_name,
+      localNames: network.netbios.local_names.map((n: any) => ({ name: n.name, type: n.type, interface: n.interface }))
     })
 
-    const activeInterface = networkInfo.interfaceName
+    const activeInterface = networkInfo.interface_name
     
     // Find NETBIOS name for the active interface, prefer "File Server Service" type
-    const activeNetbiosEntry = network.netbios.localNames.find((entry: any) => {
+    const activeNetbiosEntry = network.netbios.local_names.find((entry: any) => {
       // Match by interface name or use first entry if no interface match
       if (activeInterface && entry.interface) {
-        // Handle case where interfaceName might be just a number but interface is full name
+        // Handle case where interface_name might be just a number but interface is full name
         const interfaceMatch = entry.interface.includes(activeInterface) || 
                                activeInterface.includes(entry.interface) ||
                                entry.interface === activeInterface
@@ -147,16 +146,16 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     })
     
     // Fallback to first File Server Service entry if no interface match
-    const fallbackEntry = activeNetbiosEntry || network.netbios.localNames.find((entry: any) => 
+    const fallbackEntry = activeNetbiosEntry || network.netbios.local_names.find((entry: any) => 
       entry.type === 'File Server Service'
     )
     
     // Additional fallback: any NetBIOS entry (Workstation Service is also useful)
-    const anyNetbiosEntry = fallbackEntry || network.netbios.localNames[0]
+    const anyNetbiosEntry = fallbackEntry || network.netbios.local_names[0]
     
     if (anyNetbiosEntry) {
-      networkInfo.activeNetbiosName = anyNetbiosEntry.name
-      networkInfo.activeNetbiosType = anyNetbiosEntry.type
+      networkInfo.active_netbios_name = anyNetbiosEntry.name
+      networkInfo.active_netbios_type = anyNetbiosEntry.type
       console.log('[NETWORK MODULE] Selected NetBIOS entry:', {
         name: anyNetbiosEntry.name,
         type: anyNetbiosEntry.type,
@@ -169,21 +168,21 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
   } else {
     console.log('[NETWORK MODULE] No NetBIOS data available:', {
       hasNetbios: !!network.netbios,
-      hasLocalNames: !!(network.netbios && network.netbios.localNames),
-      isArray: network.netbios && network.netbios.localNames ? Array.isArray(network.netbios.localNames) : false
+      hasLocalNames: !!(network.netbios && network.netbios.local_names),
+      isArray: network.netbios && network.netbios.local_names ? Array.isArray(network.netbios.local_names) : false
     })
   }
 
-  // Extract all network interfaces
+  // Extract all network interfaces (snake_case from API)
   if (network.interfaces && Array.isArray(network.interfaces)) {
     const allInterfaces = network.interfaces.map((iface: any) => {
       // Find best IP address to display
       let displayAddress = ''
       
-      // Handle both Windows (ipAddresses array) and Mac (addresses array with family/address objects)
+      // Handle both Windows (ip_addresses array) and Mac (addresses array with family/address objects)
       const ipAddresses: string[] = []
-      if (iface.ipAddresses && Array.isArray(iface.ipAddresses)) {
-        ipAddresses.push(...iface.ipAddresses)
+      if (iface.ip_addresses && Array.isArray(iface.ip_addresses)) {
+        ipAddresses.push(...iface.ip_addresses)
       }
       // Mac format: addresses: [{ address: "192.168.1.100", family: "IPv4", netmask: "..." }]
       if (iface.addresses && Array.isArray(iface.addresses)) {
@@ -194,14 +193,14 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         })
       }
       
-      // Determine if interface is up/active
-      // Mac uses isUp: 1/0, Windows uses status: "Up"
+      // Determine if interface is up/active (snake_case from API)
+      // Mac uses is_up: 1/0, Windows uses status: "Up"
       const isUp = iface.status === 'Up' || iface.status === 'Active' || iface.status === 'Connected' || 
-                   iface.isUp === 1 || iface.isUp === true
+                   iface.is_up === 1 || iface.is_up === true
       
       if (ipAddresses.length > 0) {
         // For active interfaces, prioritize IPv4
-        if (isUp || iface.isActive) {
+        if (isUp || iface.is_active) {
           // Look for IPv4 address first (format: x.x.x.x)
           const ipv4 = ipAddresses.find((ip: string) => 
             /^(\d{1,3}\.){3}\d{1,3}$/.test(ip)
@@ -220,39 +219,39 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       }
 
       // Normalize status - map "Up" to active status
-      const isActive = iface.isActive === true || isUp
-      const normalizedStatus = isUp ? (iface.isActive ? 'Active' : 'Connected') : 'Disconnected'
+      const isActive = iface.is_active === true || isUp
+      const normalizedStatus = isUp ? (iface.is_active ? 'Active' : 'Connected') : 'Disconnected'
 
       return {
-        name: iface.name || iface.friendlyName || 'Unknown',
-        friendlyName: iface.friendlyName,
-        ipAddress: displayAddress,
-        ipAddresses: ipAddresses,
-        macAddress: iface.macAddress,
+        name: iface.name || iface.friendly_name || 'Unknown',
+        friendly_name: iface.friendly_name,
+        ip_address: displayAddress,
+        ip_addresses: ipAddresses,
+        mac_address: iface.mac_address,
         type: iface.type,
         status: normalizedStatus,
-        isActive: isActive,
+        is_active: isActive,
         mtu: iface.mtu,
-        bytesSent: iface.bytesSent,
-        bytesReceived: iface.bytesReceived,
-        linkSpeed: iface.linkSpeed,
-        wirelessProtocol: iface.wirelessProtocol,
-        wirelessBand: iface.wirelessBand
+        bytes_sent: iface.bytes_sent,
+        bytes_received: iface.bytes_received,
+        link_speed: iface.link_speed,
+        wireless_protocol: iface.wireless_protocol,
+        wireless_band: iface.wireless_band
       }
     })
 
     // Filter out virtual/internal network adapters
     const physicalInterfaces = allInterfaces.filter((iface: NetworkInterface) => {
       // Filter out virtual adapters by MAC address patterns
-      const isVirtualMac = iface.macAddress && (
-        iface.macAddress.startsWith('00:15:5d') || // Hyper-V
-        iface.macAddress.startsWith('00:50:56') || // VMware
-        iface.macAddress.startsWith('08:00:27') || // VirtualBox
-        iface.macAddress.startsWith('0a:00:27')    // VirtualBox
+      const isVirtualMac = iface.mac_address && (
+        iface.mac_address.startsWith('00:15:5d') || // Hyper-V
+        iface.mac_address.startsWith('00:50:56') || // VMware
+        iface.mac_address.startsWith('08:00:27') || // VirtualBox
+        iface.mac_address.startsWith('0a:00:27')    // VirtualBox
       );
       
       // Filter out by IP address patterns (common virtual network ranges)
-      const hasVirtualIP = iface.ipAddresses?.some((ip: string) => 
+      const hasVirtualIP = iface.ip_addresses?.some((ip: string) => 
         ip.startsWith('172.') || // Docker, WSL2, Hyper-V ranges
         ip.startsWith('10.0.75.') || // WSL2
         ip.startsWith('169.254.') // APIPA/link-local
@@ -265,11 +264,11 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     // Sort interfaces: active first, then by type (wireless preferred), then by name
     physicalInterfaces.sort((a: NetworkInterface, b: NetworkInterface) => {
       // Active interfaces first
-      if (a.isActive && !b.isActive) return -1;
-      if (!a.isActive && b.isActive) return 1;
+      if (a.is_active && !b.is_active) return -1;
+      if (!a.is_active && b.is_active) return 1;
       
       // Among active interfaces, prefer wireless
-      if (a.isActive && b.isActive) {
+      if (a.is_active && b.is_active) {
         if (a.type === 'Wireless' && b.type !== 'Wireless') return -1;
         if (a.type !== 'Wireless' && b.type === 'Wireless') return 1;
       }
@@ -280,31 +279,31 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
     networkInfo.interfaces = physicalInterfaces
     
-    // FALLBACK: If no activeConnection data, use first active interface
-    if (!network.activeConnection && physicalInterfaces.length > 0) {
-      const activeInterface = physicalInterfaces.find((iface: NetworkInterface) => iface.isActive)
+    // FALLBACK: If no active_connection data, use first active interface
+    if (!network.active_connection && physicalInterfaces.length > 0) {
+      const activeInterface = physicalInterfaces.find((iface: NetworkInterface) => iface.is_active)
       if (activeInterface) {
         console.log('[NETWORK MODULE] Using first active interface as fallback for active connection:', activeInterface.name)
-        networkInfo.ipAddress = networkInfo.ipAddress || activeInterface.ipAddress
-        networkInfo.macAddress = networkInfo.macAddress || activeInterface.macAddress
-        networkInfo.interfaceName = networkInfo.interfaceName || activeInterface.friendlyName || activeInterface.name
-        networkInfo.connectionType = networkInfo.connectionType || activeInterface.type
+        networkInfo.ip_address = networkInfo.ip_address || activeInterface.ip_address
+        networkInfo.mac_address = networkInfo.mac_address || activeInterface.mac_address
+        networkInfo.interface_name = networkInfo.interface_name || activeInterface.friendly_name || activeInterface.name
+        networkInfo.connection_type = networkInfo.connection_type || activeInterface.type
         // Extract wireless protocol for display (e.g., "WiFi 6")
-        if (activeInterface.wirelessProtocol) {
-          networkInfo.connectionType = activeInterface.wirelessProtocol
+        if (activeInterface.wireless_protocol) {
+          networkInfo.connection_type = activeInterface.wireless_protocol
         }
       }
     }
   }
 
-  // Extract WiFi networks
-  if (network.wifiNetworks && Array.isArray(network.wifiNetworks)) {
-    networkInfo.wifiNetworks = network.wifiNetworks
+  // Extract WiFi networks (snake_case from API)
+  if (network.wifi_networks && Array.isArray(network.wifi_networks)) {
+    networkInfo.wifi_networks = network.wifi_networks
   }
 
-  // Extract VPN connections
-  if (network.vpnConnections && Array.isArray(network.vpnConnections)) {
-    networkInfo.vpnConnections = network.vpnConnections
+  // Extract VPN connections (snake_case from API)
+  if (network.vpn_connections && Array.isArray(network.vpn_connections)) {
+    networkInfo.vpn_connections = network.vpn_connections
   }
 
   // Extract routes
@@ -317,10 +316,10 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     networkInfo.hostname = network.hostname
   } else if (deviceModules.hostname) {
     networkInfo.hostname = deviceModules.hostname
-  } else if (deviceModules.computerName) {
-    networkInfo.hostname = deviceModules.computerName
-  } else if (deviceModules.deviceName) {
-    networkInfo.hostname = deviceModules.deviceName
+  } else if (deviceModules.computer_name) {
+    networkInfo.hostname = deviceModules.computer_name
+  } else if (deviceModules.device_name) {
+    networkInfo.hostname = deviceModules.device_name
   } else {
     // Try to extract from system module environment variables
     const systemModule = modules?.system
@@ -336,28 +335,28 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     // If still no hostname, leave it undefined (will show as N/A in UI)
   }
 
-  // Build computer's DNS address/FQDN
+  // Build computer's DNS address/FQDN (snake_case from API)
   if (networkInfo.hostname) {
-    const domain = network.domain || network.dns?.domain || network.dns?.dhcpDomain
+    const domain = network.domain || network.dns?.domain || network.dns?.dhcp_domain
     if (domain && domain.trim() !== '') {
-      networkInfo.dnsAddress = `${networkInfo.hostname}.${domain}`
+      networkInfo.dns_address = `${networkInfo.hostname}.${domain}`
     } else {
-      networkInfo.dnsAddress = networkInfo.hostname
+      networkInfo.dns_address = networkInfo.hostname
     }
   }
   
-  // FALLBACK: If no dnsAddress and we have DNS servers, use the first DNS server
-  if (!networkInfo.dnsAddress && networkInfo.activeDnsServers && networkInfo.activeDnsServers.length > 0) {
-    networkInfo.dnsAddress = networkInfo.activeDnsServers[0]
+  // FALLBACK: If no dns_address and we have DNS servers, use the first DNS server
+  if (!networkInfo.dns_address && networkInfo.active_dns_servers && networkInfo.active_dns_servers.length > 0) {
+    networkInfo.dns_address = networkInfo.active_dns_servers[0]
   }
 
   console.log('[NETWORK MODULE] Network info extracted:', {
-    hasActiveConnection: !!network.activeConnection,
+    hasActiveConnection: !!network.active_connection,
     interfacesCount: networkInfo.interfaces?.length || 0,
-    wifiNetworksCount: networkInfo.wifiNetworks?.length || 0,
-    vpnConnectionsCount: networkInfo.vpnConnections?.length || 0,
+    wifiNetworksCount: networkInfo.wifi_networks?.length || 0,
+    vpnConnectionsCount: networkInfo.vpn_connections?.length || 0,
     routesCount: networkInfo.routes?.length || 0,
-    connectionType: networkInfo.connectionType,
+    connectionType: networkInfo.connection_type,
     ssid: networkInfo.ssid
   })
 

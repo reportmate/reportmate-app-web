@@ -2,10 +2,11 @@
  * Security Tab Component  
  * Security features and compliance information with 3x2 grid design
  * Supports both Windows and macOS platforms
+ * 
+ * SNAKE_CASE: All fields match API response format directly
  */
 
 import React from 'react'
-import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Eye } from 'lucide-react'
 
 interface SecurityTabProps {
@@ -52,21 +53,20 @@ const DetailRow = ({ label, value, isStatus, enabled }: {
   </div>
 )
 
-// Platform detection helper
+// Platform detection helper (snake_case)
 const isMacOS = (device: any): boolean => {
   const platform = device?.platform?.toLowerCase() || 
                    device?.modules?.metadata?.platform?.toLowerCase() ||
                    device?.metadata?.platform?.toLowerCase() ||
-                   device?.modules?.system?.operatingSystem?.platform?.toLowerCase() || ''
-  const osName = device?.modules?.system?.operatingSystem?.name?.toLowerCase() || 
-                 device?.system?.operatingSystem?.name?.toLowerCase() || ''
+                   device?.modules?.system?.operating_system?.platform?.toLowerCase() || ''
+  const osName = device?.modules?.system?.operating_system?.name?.toLowerCase() || 
+                 device?.system?.operating_system?.name?.toLowerCase() || ''
   return platform === 'macos' || platform === 'darwin' || osName.includes('macos') || osName.includes('mac os')
 }
 
 export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
-  const rawSecurity = device?.modules?.security || device?.security
-  const security = convertPowerShellObjects(rawSecurity)
-  const secureShell = security?.secureShell
+  const security = device?.modules?.security || device?.security
+  const secureShell = security?.secure_shell
   const isMac = isMacOS(device)
 
   const formatDate = (dateStr?: string) => {
@@ -99,36 +99,36 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
 
   // === macOS Security Status ===
   // FileVault (disk encryption)
-  const fileVaultEnabled = security.fileVault?.enabled === 1 || security.fileVault?.enabled === true || security.fileVault?.status === 'On'
+  const fileVaultEnabled = security?.file_vault?.enabled === 1 || security?.file_vault?.enabled === true || security?.file_vault?.status === 'On'
   // System Integrity Protection
-  const sipEnabled = security.systemIntegrityProtection?.enabled === 1 || security.systemIntegrityProtection?.enabled === true
+  const sipEnabled = security?.system_integrity_protection?.enabled === 1 || security?.system_integrity_protection?.enabled === true
   // Gatekeeper
-  const gatekeeperEnabled = security.gatekeeper?.enabled === 1 || security.gatekeeper?.enabled === true
+  const gatekeeperEnabled = security?.gatekeeper?.enabled === 1 || security?.gatekeeper?.enabled === true
   // Secure Boot (Mac)
-  const macSecureBootEnabled = security.secureBoot?.secureBootEnabled === 1 || security.secureBoot?.secureBootEnabled === true
+  const macSecureBootEnabled = security?.secure_boot?.secure_boot_enabled === 1 || security?.secure_boot?.secure_boot_enabled === true
   // Firmware Password
-  const firmwarePasswordEnabled = security.firmwarePassword?.enabled === 1 || security.firmwarePassword?.enabled === true
+  const firmwarePasswordEnabled = security?.firmware_password?.enabled === 1 || security?.firmware_password?.enabled === true
   // SSH (Mac) - note: enabled means it's ON, which could be a security concern
-  const macSshEnabled = security.ssh?.enabled === 1 || security.ssh?.enabled === true
+  const macSshEnabled = security?.ssh?.enabled === 1 || security?.ssh?.enabled === true
 
   // === Windows Security Status ===
-  // Windows Hello
-  const windowsHelloEnabled = security.windowsHello?.statusDisplay !== 'Disabled' && (
-    security.windowsHello?.credentialProviders?.pinEnabled || 
-    security.windowsHello?.credentialProviders?.faceRecognitionEnabled ||
-    security.windowsHello?.credentialProviders?.fingerprintEnabled
+  // Windows Hello (snake_case from API)
+  const windowsHelloEnabled = security?.windows_hello?.status_display !== 'Disabled' && (
+    security?.windows_hello?.credential_providers?.pin_enabled || 
+    security?.windows_hello?.credential_providers?.face_recognition_enabled ||
+    security?.windows_hello?.credential_providers?.fingerprint_enabled
   )
-  // TPM
-  const tpmActive = security.tpm?.isPresent && security.tpm?.isEnabled && security.tpm?.isActivated
-  // SSH (Windows)
-  const sshConfigured = secureShell?.isConfigured || secureShell?.isServiceRunning
+  // TPM (snake_case from API)
+  const tpmActive = security?.tpm?.is_present && security?.tpm?.is_enabled && security?.tpm?.is_activated
+  // SSH (Windows) (snake_case from API)
+  const sshConfigured = secureShell?.is_configured || secureShell?.is_service_running
 
   // === Common Security Status ===
-  // Firewall - handle both Mac and Windows formats
-  const firewallEnabled = security.firewall?.isEnabled || 
-                          security.firewall?.enabled === 1 || 
-                          security.firewall?.enabled === true ||
-                          security.firewall?.globalState === 'on'
+  // Firewall - handle both Mac and Windows formats (snake_case from API)
+  const firewallEnabled = security?.firewall?.is_enabled || 
+                          security?.firewall?.enabled === 1 || 
+                          security?.firewall?.enabled === true ||
+                          security?.firewall?.global_state === 'on'
 
   return (
     <div className="space-y-6">
@@ -145,11 +145,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             </p>
           </div>
         </div>
-        {(security.antivirus?.lastScan || security.lastSecurityScan) && (
+        {(security?.antivirus?.last_scan || security?.last_security_scan) && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Last Scan</div>
             <div className="text-lg font-semibold text-gray-900 dark:text-white">
-              {formatDate(security.antivirus?.lastScan || security.lastSecurityScan)}
+              {formatDate(security?.antivirus?.last_scan || security?.last_security_scan)}
             </div>
           </div>
         )}
@@ -168,7 +168,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
             </div>
             <StatusBadge 
-              enabled={isMac ? fileVaultEnabled : security.encryption?.bitLocker?.isEnabled} 
+              enabled={isMac ? fileVaultEnabled : security?.encryption?.bit_locker?.is_enabled} 
               activeLabel="Encrypted" 
               inactiveLabel="Not Encrypted" 
             />
@@ -181,26 +181,26 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   FileVault Disk Encryption
                 </div>
-                <DetailRow label="Status" value={security.fileVault?.status || (fileVaultEnabled ? 'Enabled' : 'Disabled')} />
+                <DetailRow label="Status" value={security?.file_vault?.status || (fileVaultEnabled ? 'Enabled' : 'Disabled')} />
                 <DetailRow label="Encrypted Volumes" value={
-                  security.fileVault?.encryptedVolumes?.length > 0 
-                    ? security.fileVault.encryptedVolumes.map((v: any) => v.volumeName || v).join(', ')
+                  security?.file_vault?.encrypted_volumes?.length > 0 
+                    ? security.file_vault.encrypted_volumes.map((v: any) => v.volume_name || v).join(', ')
                     : fileVaultEnabled ? 'System Volume' : 'None'
                 } />
               </>
             ) : (
-              // Windows BitLocker
+              // Windows BitLocker (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   BitLocker Drive Encryption
                 </div>
-                {security.encryption?.bitLocker?.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 ? (
-                  <DetailRow label="Drives" value={security.encryption.bitLocker.encryptedDrives.join(', ')} />
+                {security?.encryption?.bit_locker?.encrypted_drives && security.encryption.bit_locker.encrypted_drives.length > 0 ? (
+                  <DetailRow label="Drives" value={security.encryption.bit_locker.encrypted_drives.join(', ')} />
                 ) : (
                   <DetailRow label="Drives" value="None encrypted" />
                 )}
-                <DetailRow label="Method" value={security.encryption?.bitLocker?.encryptionMethod || 'XTS-AES'} />
-                <DetailRow label="Status" value={security.encryption?.bitLocker?.status || (security.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
+                <DetailRow label="Method" value={security?.encryption?.bit_locker?.encryption_method || 'XTS-AES'} />
+                <DetailRow label="Status" value={security?.encryption?.bit_locker?.status || (security?.encryption?.bit_locker?.is_enabled ? 'Enabled' : 'Disabled')} />
               </>
             )}
           </div>
@@ -234,11 +234,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="SIP Enabled" isStatus enabled={sipEnabled} />
                 <DetailRow 
                   label="Details" 
-                  value={security.systemIntegrityProtection?.details?.split('\n')[0] || (sipEnabled ? 'Protected' : 'Disabled')} 
+                  value={security?.system_integrity_protection?.details?.split('\n')[0] || (sipEnabled ? 'Protected' : 'Disabled')} 
                 />
               </>
             ) : (
-              // Windows Hello
+              // Windows Hello (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   Windows Hello
@@ -246,22 +246,22 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow 
                   label="PIN" 
                   isStatus 
-                  enabled={security.windowsHello?.credentialProviders?.pinEnabled} 
+                  enabled={security?.windows_hello?.credential_providers?.pin_enabled} 
                 />
                 <DetailRow 
                   label="Face Recognition" 
                   isStatus 
-                  enabled={security.windowsHello?.credentialProviders?.faceRecognitionEnabled} 
+                  enabled={security?.windows_hello?.credential_providers?.face_recognition_enabled} 
                 />
                 <DetailRow 
                   label="Fingerprint" 
                   isStatus 
-                  enabled={security.windowsHello?.credentialProviders?.fingerprintEnabled} 
+                  enabled={security?.windows_hello?.credential_providers?.fingerprint_enabled} 
                 />
                 <DetailRow 
                   label="Domain PIN Logon" 
                   isStatus 
-                  enabled={security.windowsHello?.policies?.allowDomainPinLogon} 
+                  enabled={security?.windows_hello?.policies?.allow_domain_pin_logon} 
                 />
               </>
             )}
@@ -279,7 +279,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 {isMac ? 'Gatekeeper' : 'Protection'}
               </h3>
             </div>
-            <StatusBadge enabled={isMac ? gatekeeperEnabled : security.antivirus?.isEnabled} />
+            <StatusBadge enabled={isMac ? gatekeeperEnabled : security?.antivirus?.is_enabled} />
           </div>
           
           <div className="space-y-2">
@@ -293,24 +293,24 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow 
                   label="Assessments" 
                   isStatus 
-                  enabled={security.gatekeeper?.assessmentsEnabled === 1 || security.gatekeeper?.assessmentsEnabled === true} 
+                  enabled={security?.gatekeeper?.assessments_enabled === 1 || security?.gatekeeper?.assessments_enabled === true} 
                 />
                 <DetailRow 
                   label="Developer ID" 
                   isStatus 
-                  enabled={security.gatekeeper?.developerIdEnabled === 1 || security.gatekeeper?.developerIdEnabled === true} 
+                  enabled={security?.gatekeeper?.developer_id_enabled === 1 || security?.gatekeeper?.developer_id_enabled === true} 
                 />
               </>
             ) : (
-              // Windows Antivirus
+              // Windows Antivirus (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  {security.antivirus?.name || 'Windows Defender'}
+                  {security?.antivirus?.name || 'Windows Defender'}
                 </div>
-                <DetailRow label="Version" value={security.antivirus?.version} />
-                <DetailRow label="Definitions" value={security.antivirus?.isUpToDate ? 'Up to date' : 'Needs update'} />
-                <DetailRow label="Last Update" value={formatDate(security.antivirus?.lastUpdate)} />
-                <DetailRow label="Last Scan" value={`${formatDate(security.antivirus?.lastScan)}${security.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`} />
+                <DetailRow label="Version" value={security?.antivirus?.version} />
+                <DetailRow label="Definitions" value={security?.antivirus?.is_up_to_date ? 'Up to date' : 'Needs update'} />
+                <DetailRow label="Last Update" value={formatDate(security?.antivirus?.last_update)} />
+                <DetailRow label="Last Scan" value={`${formatDate(security?.antivirus?.last_scan)}${security?.antivirus?.scan_type ? ` (${security.antivirus.scan_type})` : ''}`} />
               </>
             )}
           </div>
@@ -348,25 +348,25 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Secure Boot" isStatus enabled={macSecureBootEnabled} />
                 <DetailRow 
                   label="Security Level" 
-                  value={security.secureBoot?.securityLevel || 'Unknown'} 
+                  value={security?.secure_boot?.security_level || 'Unknown'} 
                 />
                 <DetailRow label="Firmware Password" isStatus enabled={firmwarePasswordEnabled} />
                 <DetailRow 
                   label="Firmware Details" 
-                  value={security.firmwarePassword?.details?.split('\n')[0] || 'Not configured'} 
+                  value={security?.firmware_password?.details?.split('\n')[0] || 'Not configured'} 
                 />
               </>
             ) : (
-              // Windows TPM
+              // Windows TPM (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   Trusted Platform Module
                 </div>
-                <DetailRow label="Present" isStatus enabled={security.tpm?.isPresent} />
-                <DetailRow label="Enabled" isStatus enabled={security.tpm?.isEnabled} />
-                <DetailRow label="Activated" isStatus enabled={security.tpm?.isActivated} />
-                <DetailRow label="Version" value={security.tpm?.version} />
-                <DetailRow label="Manufacturer" value={security.tpm?.manufacturer} />
+                <DetailRow label="Present" isStatus enabled={security?.tpm?.is_present} />
+                <DetailRow label="Enabled" isStatus enabled={security?.tpm?.is_enabled} />
+                <DetailRow label="Activated" isStatus enabled={security?.tpm?.is_activated} />
+                <DetailRow label="Version" value={security?.tpm?.version} />
+                <DetailRow label="Manufacturer" value={security?.tpm?.manufacturer} />
               </>
             )}
           </div>
@@ -393,33 +393,33 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </div>
                 <DetailRow 
                   label="Global State" 
-                  value={security.firewall?.globalState || (firewallEnabled ? 'On' : 'Off')} 
+                  value={security?.firewall?.global_state || (firewallEnabled ? 'On' : 'Off')} 
                 />
                 <DetailRow 
                   label="Stealth Mode" 
                   isStatus 
-                  enabled={security.firewall?.stealthMode === 1 || security.firewall?.stealthMode === true} 
+                  enabled={security?.firewall?.stealth_mode === 1 || security?.firewall?.stealth_mode === true} 
                 />
                 <DetailRow 
                   label="Logging" 
                   isStatus 
-                  enabled={security.firewall?.loggingEnabled === 1 || security.firewall?.loggingEnabled === true} 
+                  enabled={security?.firewall?.logging_enabled === 1 || security?.firewall?.logging_enabled === true} 
                 />
                 <DetailRow 
                   label="Signed Software" 
                   isStatus 
-                  enabled={security.firewall?.allowSignedSoftware === 1 || security.firewall?.allowSignedSoftware === true} 
+                  enabled={security?.firewall?.allow_signed_software === 1 || security?.firewall?.allow_signed_software === true} 
                 />
               </>
             ) : (
-              // Windows Firewall
+              // Windows Firewall (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   Windows Firewall
                 </div>
-                <DetailRow label="Profile" value={security.firewall?.profile || 'Domain/Private/Public'} />
-                <DetailRow label="Inbound Rules" value={security.firewall?.inboundRules?.toString() || 'Active'} />
-                <DetailRow label="Outbound Rules" value={security.firewall?.outboundRules?.toString() || 'Active'} />
+                <DetailRow label="Profile" value={security?.firewall?.profile || 'Domain/Private/Public'} />
+                <DetailRow label="Inbound Rules" value={security?.firewall?.inbound_rules?.toString() || 'Active'} />
+                <DetailRow label="Outbound Rules" value={security?.firewall?.outbound_rules?.toString() || 'Active'} />
               </>
             )}
           </div>
@@ -443,8 +443,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             ) : (
               <StatusBadge 
                 enabled={sshConfigured} 
-                activeLabel={secureShell?.statusDisplay || 'Configured'} 
-                inactiveLabel={secureShell?.statusDisplay || 'Not Configured'} 
+                activeLabel={secureShell?.status_display || 'Configured'} 
+                inactiveLabel={secureShell?.status_display || 'Not Configured'} 
               />
             )}
           </div>
@@ -467,16 +467,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 />
               </>
             ) : (
-              // Windows OpenSSH
+              // Windows OpenSSH (snake_case from API)
               <>
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   OpenSSH Server
                 </div>
-                <DetailRow label="Installed" isStatus enabled={secureShell?.isInstalled} />
-                <DetailRow label="Service Running" isStatus enabled={secureShell?.isServiceRunning} />
-                <DetailRow label="Firewall Rule" isStatus enabled={secureShell?.isFirewallRulePresent} />
-                <DetailRow label="Keys Deployed" isStatus enabled={secureShell?.isKeyDeployed} />
-                <DetailRow label="Service Status" value={secureShell?.serviceStatus || 'Unknown'} />
+                <DetailRow label="Installed" isStatus enabled={secureShell?.is_installed} />
+                <DetailRow label="Service Running" isStatus enabled={secureShell?.is_service_running} />
+                <DetailRow label="Firewall Rule" isStatus enabled={secureShell?.is_firewall_rule_present} />
+                <DetailRow label="Keys Deployed" isStatus enabled={secureShell?.is_key_deployed} />
+                <DetailRow label="Service Status" value={secureShell?.service_status || 'Unknown'} />
               </>
             )}
           </div>
