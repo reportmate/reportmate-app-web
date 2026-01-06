@@ -103,15 +103,16 @@ const getDeviceName = (event: FleetEvent, deviceNameMap: Record<string, string>)
   
   // If deviceId looks like an asset tag (short, alphanumeric), show it nicely
   if (deviceId && deviceId.length <= 10 && /^[A-Z0-9]+$/i.test(deviceId)) {
-    return `Asset ${deviceId}` // e.g., "Asset A004733"
+    return deviceId // Return the serial number directly (e.g., "N2YLJFHWRT")
   }
   
-  // Final fallback - return the deviceId but truncate if it's too long (UUID case)
-  if (deviceId && deviceId.length > 20) {
-    return `Device ${deviceId.substring(0, 8)}...` // e.g., "Device 79349310..."
+  // Final fallback - return the deviceId (serial number) directly
+  // If it's a UUID, just show it - better than "Unknown"
+  if (deviceId && deviceId.length > 0) {
+    return deviceId
   }
   
-  return deviceId || 'Unknown Device'
+  return 'Unknown Device'
 }
 
 // Helper function to get event status icon
