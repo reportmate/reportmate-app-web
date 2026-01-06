@@ -172,8 +172,8 @@ export default function Dashboard() {
               ? 'macOS'
               : 'Unknown')
           
-          // OS version from FastAPI includes complete system module data
-          const osVersion = apiDevice.osVersion || systemOS.displayVersion || systemOS.version || apiDevice.os || 'Unknown'
+          // OS version string for display - used for compatibility with legacy components
+          const osVersionString = systemOS.displayVersion || systemOS.version || apiDevice.osVersion || apiDevice.os || 'Unknown'
           const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen)
 
           // Build modules object with complete OS data from FastAPI
@@ -199,7 +199,7 @@ export default function Dashboard() {
             catalog: inventory.catalog || apiDevice.catalog,
             owner: inventory.owner || apiDevice.owner,
             platform,
-            os: osVersion,
+            os: osVersionString,
             modules: modules && Object.keys(modules).length > 0 ? modules : undefined,
             inventory: Object.keys(inventory).length > 0 ? inventory : undefined,
             totalEvents: apiDevice.totalEvents ?? 0,
