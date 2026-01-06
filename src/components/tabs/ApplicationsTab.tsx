@@ -20,6 +20,30 @@ interface ApplicationUsage {
   averageSessionSeconds?: number
 }
 
+// macOS active session from SQLite watcher
+interface ActiveSession {
+  name: string
+  path: string
+  user: string
+  isActive: number | boolean
+  processId: number
+  sessionId: string
+  startTime: string
+  durationSeconds: number
+}
+
+// macOS applicationUsage structure
+interface MacApplicationUsage {
+  status?: string
+  captureMethod?: string
+  totalLaunches?: number
+  totalUsageSeconds?: number
+  activeSessions?: ActiveSession[]
+  windowStart?: string
+  windowEnd?: string
+  generatedAt?: string
+}
+
 interface ApplicationInfo {
   id: string;
   name: string;
@@ -57,8 +81,10 @@ interface UsageSnapshot {
   totalUsageSeconds?: number
   Applications?: ApplicationUsage[]
   applications?: ApplicationUsage[]
-  ActiveSessions?: unknown[]
-  activeSessions?: unknown[]
+  ActiveSessions?: ActiveSession[]
+  activeSessions?: ActiveSession[]
+  CaptureMethod?: string
+  captureMethod?: string
 }
 
 interface DeviceData {
@@ -102,10 +128,60 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   // Process applications data from the modular device structure
   const applicationsModuleData = extractApplications(device?.modules || {})
   
-  // Extract usage data from normalized module
-  const usageData = normalizedApplicationsModule?.usage
-  const isUsageAvailable = usageData?.isCaptureEnabled || false
-  const usageStatus = usageData?.status || 'unavailable'
+  // Extract usage data - check both raw and normalized module
+  // macOS sends applicationUsage at the module level with activeSessions array
+  const rawUsageData = (rawApplicationsModule as any)?.applicationUsage || (rawApplicationsModule as any)?.usage
+  const normalizedUsageData = normalizedApplicationsModule?.applicationUsage || normalizedApplicationsModule?.usage
+  const usageData = rawUsageData || normalizedUsageData
+  
+  // For macOS SQLiteWatcher, check captureMethod instead of isCaptureEnabled
+  const captureMethod = usageData?.captureMethod || usageData?.CaptureMethod
+  const isUsageAvailable = captureMethod === 'SQLiteWatcher' || usageData?.isCaptureEnabled || usageData?.IsCaptureEnabled || false
+  const usageStatus = isUsageAvailable ? 'available' : (usageData?.status || usageData?.Status || 'unavailable')
+  
+  // Get active sessions from macOS data
+  const activeSessions: ActiveSession[] = usageData?.activeSessions || usageData?.ActiveSessions || []
+  
+  // Build usage map by app path for efficient lookup
+  const usageByPath = useMemo(() => {
+    const map = new Map<string, {
+      launchCount: number
+      totalSeconds: number
+      lastUsed: string
+      firstSeen: string
+      users: Set<string>
+    }>()
+    
+    for (const session of activeSessions) {
+      const path = session.path
+      if (!path) continue
+      
+      const existing = map.get(path)
+      if (existing) {
+        existing.launchCount++
+        existing.totalSeconds += session.durationSeconds || 0
+        if (session.startTime > existing.lastUsed) {
+          existing.lastUsed = session.startTime
+        }
+        if (session.startTime < existing.firstSeen) {
+          existing.firstSeen = session.startTime
+        }
+        if (session.user) {
+          existing.users.add(session.user)
+        }
+      } else {
+        map.set(path, {
+          launchCount: 1,
+          totalSeconds: session.durationSeconds || 0,
+          lastUsed: session.startTime || '',
+          firstSeen: session.startTime || '',
+          users: new Set(session.user ? [session.user] : [])
+        })
+      }
+    }
+    
+    return map
+  }, [activeSessions])
   
   // Check if we have applications data - check normalized module
   const hasApplicationsData = (data?.installedApps?.length ?? 0) > 0 ||
@@ -131,25 +207,48 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
 
   // Transform and enrich with usage data
   const processedApps = useMemo(() => {
-    return installedApps.map((app: ApplicationInfo, index: number) => ({
-      id: app.id || app.name || `app-${index}`,
-      name: app.name || app.displayName || 'Unknown Application',
-      displayName: app.displayName || app.name,
-      version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
-      publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
-      category: app.category || 'Uncategorized',
-      installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
-      size: app.size,
-      path: app.path || (app as unknown as Record<string, unknown>).install_location as string,
-      bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string,
-      info: (app as unknown as Record<string, unknown>).info as string,
-      obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
-      runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
-      has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
-      signed_by: (app as unknown as Record<string, unknown>).signed_by as string,
-      usage: app.usage || (app as unknown as Record<string, unknown>).Usage as ApplicationUsage
-    }))
-  }, [installedApps])
+    return installedApps.map((app: ApplicationInfo, index: number) => {
+      // Look up usage from the usageByPath map (macOS) or existing app.usage (Windows)
+      const appPath = app.path || (app as unknown as Record<string, unknown>).install_location as string
+      const sessionUsage = appPath ? usageByPath.get(appPath) : undefined
+      
+      // Build usage object from session data if available
+      let usage: ApplicationUsage | undefined = app.usage || (app as unknown as Record<string, unknown>).Usage as ApplicationUsage
+      
+      if (sessionUsage) {
+        usage = {
+          launchCount: sessionUsage.launchCount,
+          totalSeconds: sessionUsage.totalSeconds,
+          lastUsed: sessionUsage.lastUsed,
+          firstSeen: sessionUsage.firstSeen,
+          users: Array.from(sessionUsage.users),
+          uniqueUserCount: sessionUsage.users.size,
+          averageSessionSeconds: sessionUsage.launchCount > 0 
+            ? sessionUsage.totalSeconds / sessionUsage.launchCount 
+            : 0
+        }
+      }
+      
+      return {
+        id: app.id || app.name || `app-${index}`,
+        name: app.name || app.displayName || 'Unknown Application',
+        displayName: app.displayName || app.name,
+        version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
+        publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
+        category: app.category || 'Uncategorized',
+        installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
+        size: app.size,
+        path: appPath,
+        bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string || (app as unknown as Record<string, unknown>).bundleIdentifier as string,
+        info: (app as unknown as Record<string, unknown>).info as string,
+        obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
+        runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
+        has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
+        signed_by: (app as unknown as Record<string, unknown>).signed_by as string,
+        usage
+      }
+    })
+  }, [installedApps, usageByPath])
 
   // Filter apps based on active filter
   const filteredApps = useMemo(() => {
@@ -280,6 +379,23 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
                   <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Usage Tracking {usageStatus}</p>
                   <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
                     Kernel process telemetry is not available. Enable Microsoft-Windows-Kernel-Process/Operational log for usage tracking.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+      
+      {/* Usage Available Banner for macOS */}
+      {isUsageAvailable && captureMethod === 'SQLiteWatcher' && (
+            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+              <div className="flex items-center gap-3">
+                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-green-800 dark:text-green-200">Usage Tracking Active</p>
+                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
+                    {usageData?.totalLaunches || 0} app launches tracked via {captureMethod} • {activeSessions.length} active sessions
                   </p>
                 </div>
               </div>
