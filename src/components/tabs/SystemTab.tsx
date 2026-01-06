@@ -99,22 +99,32 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   }, []);
   
   // Get operating system information (same logic as SystemWidget)
-  // Use modules.system data only - support both snake_case (new) and camelCase (legacy)
-  const rawOsInfo = device.modules?.system?.operating_system || device.modules?.system?.operatingSystem
-  const uptimeString = device.modules?.system?.uptime_string || device.modules?.system?.uptimeString
+  // Use modules.system data only - support both snake_case (Windows) and camelCase (Mac)
+  // Mac uses camelCase: operatingSystem, systemDetails, uptimeString
+  // Windows uses snake_case: operating_system, uptime_string
+  const rawOsInfo = device.modules?.system?.operatingSystem || device.modules?.system?.operating_system
+  const uptimeString = device.modules?.system?.uptimeString || device.modules?.system?.uptime_string
 
   // Normalize OS info to support both snake_case and camelCase field access
+  // Mac stores timezone, locale, keyboardLayouts in systemDetails (separate field)
+  // Windows stores them directly in operating_system
+  const systemDetails = device.modules?.system?.systemDetails || device.modules?.system?.system_details || {}
+  
   const osInfo = rawOsInfo ? {
     name: rawOsInfo.name || rawOsInfo.product_name,
     version: rawOsInfo.version,
-    displayVersion: rawOsInfo.display_version || rawOsInfo.displayVersion,
-    edition: rawOsInfo.edition,
-    build: rawOsInfo.build || rawOsInfo.build_number,
+    // Mac uses majorVersion.minorVersion.patchVersion
+    displayVersion: rawOsInfo.display_version || rawOsInfo.displayVersion ||
+      (rawOsInfo.majorVersion !== undefined ? `${rawOsInfo.majorVersion}.${rawOsInfo.minorVersion || 0}.${rawOsInfo.patchVersion || 0}` : ''),
+    edition: rawOsInfo.edition || rawOsInfo.platform,  // Mac uses platform (Darwin)
+    build: rawOsInfo.build || rawOsInfo.build_number || rawOsInfo.buildNumber,
     architecture: rawOsInfo.architecture || rawOsInfo.arch,
-    locale: rawOsInfo.locale,
-    timeZone: rawOsInfo.time_zone || rawOsInfo.timeZone,
+    // Check both rawOsInfo and systemDetails for Mac
+    locale: rawOsInfo.locale || systemDetails.locale,
+    timeZone: rawOsInfo.time_zone || rawOsInfo.timeZone || systemDetails.timeZone || systemDetails.time_zone,
     activeKeyboardLayout: rawOsInfo.active_keyboard_layout || rawOsInfo.activeKeyboardLayout || 
-      (rawOsInfo.keyboard_layouts?.length > 0 ? rawOsInfo.keyboard_layouts.join(', ') : ''),
+      (rawOsInfo.keyboard_layouts?.length > 0 ? rawOsInfo.keyboard_layouts.join(', ') : '') ||
+      (systemDetails.keyboardLayouts?.length > 0 ? systemDetails.keyboardLayouts.filter((k: string) => k).join(', ') : ''),
     featureUpdate: rawOsInfo.feature_update || rawOsInfo.featureUpdate,
     activation: rawOsInfo.activation ? {
       isActivated: rawOsInfo.activation.is_activated ?? rawOsInfo.activation.isActivated,

@@ -180,26 +180,31 @@ export function extractSystem(deviceModules: any): SystemInfo {
 
   // Extract operating system info - handle both Windows and Mac structures
   // Support both snake_case (new) and camelCase (legacy) field names
-  const rawOs = modules?.system?.operating_system || modules?.system?.operatingSystem
+  // Mac client uses camelCase (operatingSystem), Windows may use snake_case (operating_system)
+  const rawOs = modules?.system?.operatingSystem || modules?.system?.operating_system
   if (rawOs) {
     const os = rawOs
     // Check for Mac's systemDetails which contains locale, timeZone, keyboardLayouts
+    // Mac client uses camelCase (systemDetails), might have snake_case variant (system_details)
     const systemDetails = modules.system.systemDetails || modules.system.system_details || {}
     
     systemInfo.operatingSystem = {
       name: os.name || os.productName || os.product_name || '',
       version: os.version || '',
       // Support both snake_case and camelCase for displayVersion
+      // Mac: uses majorVersion.minorVersion.patchVersion
       displayVersion: os.display_version || os.displayVersion || 
-        (os.majorVersion !== undefined ? `${os.majorVersion}.${os.minorVersion || 0}` : '') ||
+        (os.majorVersion !== undefined ? `${os.majorVersion}.${os.minorVersion || 0}.${os.patchVersion || 0}` : '') ||
         (os.major !== undefined ? `${os.major}.${os.minor || 0}.${os.patch || 0}` : ''),
       edition: os.edition || os.platform || '', // Mac uses platform (Darwin)
       build: os.build || os.buildNumber || os.build_number || '',
       architecture: os.architecture || os.arch || '',
       // Support both snake_case and camelCase for locale/timezone
+      // Mac stores these in systemDetails, Windows in operating_system
       locale: os.locale || systemDetails.locale || '',
       timeZone: os.time_zone || os.timeZone || os.timezone || systemDetails.timeZone || systemDetails.time_zone || '',
       // Support both snake_case and camelCase for keyboard layout
+      // Mac stores keyboardLayouts array in systemDetails
       activeKeyboardLayout: os.active_keyboard_layout || os.activeKeyboardLayout || 
         (os.keyboard_layouts?.length > 0 ? os.keyboard_layouts.join(', ') : '') ||
         (systemDetails.keyboardLayouts?.length > 0 ? systemDetails.keyboardLayouts.join(', ') : ''),
@@ -213,6 +218,23 @@ export function extractSystem(deviceModules: any): SystemInfo {
         licenseType: os.activation.license_type ?? os.activation.licenseType
       } : undefined
     }
+  }
+
+  // Boot time - check various possible locations including Mac's systemDetails
+  // Support both snake_case and camelCase
+  // Mac stores bootTime in systemDetails (camelCase)
+  if (modules?.system?.last_boot_time) {
+    systemInfo.bootTime = modules.system.last_boot_time
+  } else if (modules?.system?.lastBootTime) {
+    systemInfo.bootTime = modules.system.lastBootTime
+  } else if (modules?.system?.bootTime) {
+    systemInfo.bootTime = modules.system.bootTime
+  } else if (modules?.system?.boot_time) {
+    systemInfo.bootTime = modules.system.boot_time
+  } else if (modules?.system?.systemDetails?.bootTime) {
+    systemInfo.bootTime = modules.system.systemDetails.bootTime
+  } else if (modules?.system?.system_details?.boot_time) {
+    systemInfo.bootTime = modules.system.system_details.boot_time
   }
 
   // Boot time - check various possible locations including Mac's systemDetails

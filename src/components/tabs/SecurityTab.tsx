@@ -100,18 +100,26 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   }
 
   // === macOS Security Status ===
+  // Mac uses top-level fields like fileVault, systemIntegrityProtection, gatekeeper (NOT nested in encryption)
   // FileVault (disk encryption)
-  const fileVaultEnabled = security.fileVault?.enabled === 1 || security.fileVault?.enabled === true || security.fileVault?.status === 'On'
+  const fileVaultEnabled = security?.fileVault?.enabled === 1 || 
+                           security?.fileVault?.enabled === true || 
+                           security?.fileVault?.status?.toLowerCase() === 'on'
   // System Integrity Protection
-  const sipEnabled = security.systemIntegrityProtection?.enabled === 1 || security.systemIntegrityProtection?.enabled === true
+  const sipEnabled = security?.systemIntegrityProtection?.enabled === 1 || 
+                     security?.systemIntegrityProtection?.enabled === true
   // Gatekeeper
-  const gatekeeperEnabled = security.gatekeeper?.enabled === 1 || security.gatekeeper?.enabled === true
+  const gatekeeperEnabled = security?.gatekeeper?.enabled === 1 || 
+                            security?.gatekeeper?.enabled === true
   // Secure Boot (Mac)
-  const macSecureBootEnabled = security.secureBoot?.secureBootEnabled === 1 || security.secureBoot?.secureBootEnabled === true
+  const macSecureBootEnabled = security?.secureBoot?.secureBootEnabled === 1 || 
+                               security?.secureBoot?.secureBootEnabled === true
   // Firmware Password
-  const firmwarePasswordEnabled = security.firmwarePassword?.enabled === 1 || security.firmwarePassword?.enabled === true
+  const firmwarePasswordEnabled = security?.firmwarePassword?.enabled === 1 || 
+                                  security?.firmwarePassword?.enabled === true
   // SSH (Mac) - note: enabled means it's ON, which could be a security concern
-  const macSshEnabled = security.ssh?.enabled === 1 || security.ssh?.enabled === true
+  const macSshEnabled = security?.ssh?.enabled === 1 || 
+                        security?.ssh?.enabled === true
 
   // === Windows Security Status ===
   // Support both snake_case (new API) and camelCase (legacy) - all normalized to camelCase now
@@ -134,7 +142,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const firewallEnabled = security?.firewall?.isEnabled || 
                           security?.firewall?.enabled === 1 || 
                           security?.firewall?.enabled === true ||
-                          security?.firewall?.globalState === 'on'
+                          security?.firewall?.globalState?.toLowerCase() === 'on'
 
   return (
     <div className="space-y-6">
@@ -188,12 +196,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
                   FileVault Disk Encryption
                 </div>
-                <DetailRow label="Status" value={security?.fileVault?.status || (fileVaultEnabled ? 'Enabled' : 'Disabled')} />
+                <DetailRow label="Status" value={security?.fileVault?.status || (fileVaultEnabled ? 'On' : 'Off')} />
                 <DetailRow label="Encrypted Volumes" value={
                   security?.fileVault?.encryptedVolumes?.length > 0 
-                    ? security.fileVault.encryptedVolumes.map((v: any) => v.volumeName || v).join(', ')
+                    ? security.fileVault.encryptedVolumes.map((v: any) => v.name || v.volumeName || v).join(', ')
                     : fileVaultEnabled ? 'System Volume' : 'None'
                 } />
+                <DetailRow 
+                  label="Encryption Type" 
+                  value={security?.fileVault?.encryptedVolumes?.[0]?.encryptionType || 'XTS-AES 128'} 
+                />
               </>
             ) : (
               // Windows BitLocker (now all camelCase after normalization)
@@ -240,8 +252,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </div>
                 <DetailRow label="SIP Enabled" isStatus enabled={sipEnabled} />
                 <DetailRow 
-                  label="Details" 
-                  value={security?.systemIntegrityProtection?.details?.split('\n')[0] || (sipEnabled ? 'Protected' : 'Disabled')} 
+                  label="Status" 
+                  value={security?.systemIntegrityProtection?.status || 
+                         security?.systemIntegrityProtection?.details?.split('\n')[0] || 
+                         (sipEnabled ? 'Enabled' : 'Disabled')} 
                 />
               </>
             ) : (
@@ -298,6 +312,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   App Security
                 </div>
                 <DetailRow label="Gatekeeper" isStatus enabled={gatekeeperEnabled} />
+                <DetailRow 
+                  label="Status" 
+                  value={security?.gatekeeper?.status || (gatekeeperEnabled ? 'Enabled' : 'Disabled')} 
+                />
                 <DetailRow 
                   label="Assessments" 
                   isStatus 
@@ -356,12 +374,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Secure Boot" isStatus enabled={macSecureBootEnabled} />
                 <DetailRow 
                   label="Security Level" 
-                  value={security.secureBoot?.securityLevel || 'Unknown'} 
+                  value={security?.secureBoot?.securityLevel || 'Unknown'} 
                 />
                 <DetailRow label="Firmware Password" isStatus enabled={firmwarePasswordEnabled} />
                 <DetailRow 
-                  label="Firmware Details" 
-                  value={security.firmwarePassword?.details?.split('\n')[0] || 'Not configured'} 
+                  label="EFI Protection" 
+                  value={security?.firmwarePassword?.details?.split('\n')[0] || 
+                         (firmwarePasswordEnabled ? 'Protected' : 'Not configured')} 
                 />
               </>
             ) : (
@@ -401,22 +420,22 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </div>
                 <DetailRow 
                   label="Global State" 
-                  value={security.firewall?.globalState || (firewallEnabled ? 'On' : 'Off')} 
+                  value={security?.firewall?.globalState || (firewallEnabled ? 'on' : 'off')} 
                 />
                 <DetailRow 
                   label="Stealth Mode" 
                   isStatus 
-                  enabled={security.firewall?.stealthMode === 1 || security.firewall?.stealthMode === true} 
+                  enabled={security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true} 
                 />
                 <DetailRow 
                   label="Logging" 
                   isStatus 
-                  enabled={security.firewall?.loggingEnabled === 1 || security.firewall?.loggingEnabled === true} 
+                  enabled={security?.firewall?.loggingEnabled === 1 || security?.firewall?.loggingEnabled === true} 
                 />
                 <DetailRow 
-                  label="Signed Software" 
+                  label="Allow Signed Apps" 
                   isStatus 
-                  enabled={security.firewall?.allowSignedSoftware === 1 || security.firewall?.allowSignedSoftware === true} 
+                  enabled={security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true} 
                 />
               </>
             ) : (
@@ -467,11 +486,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Status" isStatus enabled={macSshEnabled} />
                 <DetailRow 
                   label="Details" 
-                  value={security.ssh?.details || (macSshEnabled ? 'Remote Login: On' : 'Remote Login: Off')} 
+                  value={security?.ssh?.details || (macSshEnabled ? 'Remote Login: On' : 'Remote Login: Off')} 
                 />
                 <DetailRow 
-                  label="Authentication" 
-                  value={security.ssh?.authMethod || security.ssh?.authentication || 'Password & Key'} 
+                  label="Service" 
+                  value={macSshEnabled ? 'Running' : 'Stopped'} 
                 />
               </>
             ) : (
