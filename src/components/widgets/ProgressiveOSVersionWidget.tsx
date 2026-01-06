@@ -68,7 +68,8 @@ export const ProgressiveOSVersionWidget: React.FC<ProgressiveOSVersionWidgetProp
 
   // Filter OS versions for the requested OS type
   const filteredVersions = chartData.charts.osVersions.filter(item => {
-    const version = item.version.toLowerCase()
+    // Ensure version is a string before calling toLowerCase
+    const version = (typeof item.version === 'string' ? item.version : String(item.version || '')).toLowerCase()
     if (osType === 'Windows') {
       return version.includes('windows') || version.includes('microsoft windows')
     } else {
