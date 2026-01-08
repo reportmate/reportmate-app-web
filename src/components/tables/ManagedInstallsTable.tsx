@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { formatRelativeTime } from '../../lib/time';
+import { formatRelativeTime, formatExactTime } from '../../lib/time';
 import { InstallsInfo, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
 
 // Helper function to format item size from bytes to human readable format
@@ -408,7 +408,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               )}
                                               {error.timestamp && (
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                  {new Date(error.timestamp).toLocaleString()}
+                                                  {formatExactTime(error.timestamp)}
                                                 </span>
                                               )}
                                             </div>
@@ -438,7 +438,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               )}
                                               {warning.timestamp && (
                                                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                  {new Date(warning.timestamp).toLocaleString()}
+                                                  {formatExactTime(warning.timestamp)}
                                                 </span>
                                               )}
                                             </div>

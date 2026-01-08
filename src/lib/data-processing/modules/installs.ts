@@ -304,7 +304,7 @@ export interface WarningMessage {
 }
 
 /**
- * CRITICAL FIX: Standardize install status to proper capitalization
+ * Standardize install status to proper capitalization
  * Maps any incoming status to the standard format
  */
 export function standardizeInstallStatus(rawStatus: string): StandardInstallStatus {
@@ -345,7 +345,7 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
     case 'ok':
       return 'Installed'
 
-    // Pending variants - CRITICAL FIX: Added "pending update" status from Cimian
+    // Pending variants - includes "pending update" status from Cimian
     case 'pending':
     case 'pending install':
     case 'pending_install':
@@ -434,17 +434,38 @@ export function mapStatusToEventType(status: StandardInstallStatus): 'success' |
 /**
  * Get the latest attempt timestamp from recentAttempts array.
  * 
- * IMPORTANT: Cimian sets last_update/last_attempt_time to the session run time for ALL packages,
- * not when they were actually installed. This is misleading for pre-existing packages.
+ * Cimian's last_update field reflects when package metadata was last updated,
+ * NOT when it was actually installed. For pre-existing packages, this can be old/misleading.
  * 
  * Logic:
+ * - Check recentAttempts array first for actual attempt timestamps
  * - If installCount > 0 or updateCount > 0: Package was actually processed by Cimian, show timestamp
  * - If status is "Installed" but installCount == 0 and updateCount == 0: Package was pre-existing, hide timestamp
- * - For Pending/Error/Warning status: Show timestamp as it indicates last attempt
+ * - For Pending/Error/Warning status: Show last_attempt_time (when it was last tried)
+ * - NEVER show last_seen_in_session for pre-existing packages (that's just when Cimian saw it, not when it was processed)
  * 
  * Supports both snake_case (new) and camelCase (legacy) field names
  */
 function getLatestAttemptTimestamp(item: any): string {
+  // Support both snake_case and camelCase field names
+  const status = standardizeInstallStatus(item.status || item.current_status || item.currentStatus || '');
+  const installCount = item.install_count ?? item.installCount ?? 0;
+  const updateCount = item.update_count ?? item.updateCount ?? 0;
+  const failureCount = item.failure_count ?? item.failureCount ?? 0;
+  const hasActivity = installCount > 0 || updateCount > 0 || failureCount > 0;
+  
+  console.log('[INSTALLS TIMESTAMP] Item:', {
+    name: item.item_name || item.itemName || item.name,
+    status,
+    installCount,
+    updateCount,
+    failureCount,
+    hasActivity,
+    last_update: item.last_update,
+    last_attempt_time: item.last_attempt_time,
+    last_seen_in_session: item.last_seen_in_session
+  });
+  
   // First check recentAttempts if available (support both snake_case and camelCase)
   const recentAttempts = item.recent_attempts || item.recentAttempts
   if (recentAttempts && Array.isArray(recentAttempts) && recentAttempts.length > 0) {
@@ -460,28 +481,36 @@ function getLatestAttemptTimestamp(item: any): string {
     }, null);
     
     if (latestAttempt?.timestamp) {
+      console.log('[INSTALLS TIMESTAMP] Using recentAttempts timestamp:', latestAttempt.timestamp);
       return latestAttempt.timestamp;
     }
   }
   
-  // Support both snake_case and camelCase field names
-  const status = standardizeInstallStatus(item.status || item.current_status || item.currentStatus || '');
-  const installCount = item.install_count ?? item.installCount ?? 0;
-  const updateCount = item.update_count ?? item.updateCount ?? 0;
-  const hasActivity = installCount > 0 || updateCount > 0;
-  
-  // For "Installed" packages that Cimian never actually installed/updated,
-  // don't show any timestamp - it's misleading to show session run time
+  // For "Installed" packages that Cimian never actually touched (pre-existing),
+  // don't show any timestamp - it's misleading
   if (status === 'Installed' && !hasActivity) {
+    console.log('[INSTALLS TIMESTAMP] Pre-existing installed package with no activity - hiding timestamp');
     return '';
   }
   
-  // For packages with actual activity OR non-Installed status, show the timestamp
-  // This includes: Failed, Pending, Warning, or actually installed/updated packages
-  // Support both snake_case and camelCase
-  if (item.last_update || item.lastUpdate) return item.last_update || item.lastUpdate;
-  if (item.last_attempt_time || item.lastAttemptTime) return item.last_attempt_time || item.lastAttemptTime;
-  return item.last_seen_in_session || item.lastSeenInSession || '';
+  // For packages with actual activity (install/update/failure attempts), show when they were last attempted
+  // Priority: last_attempt_time (when it was tried) > last_update (metadata update)
+  if (hasActivity) {
+    const timestamp = item.last_attempt_time || item.lastAttemptTime || item.last_update || item.lastUpdate || '';
+    console.log('[INSTALLS TIMESTAMP] Package with activity - using timestamp:', timestamp);
+    return timestamp;
+  }
+  
+  // For Error/Warning/Pending status, show last_attempt_time (when it was last tried)
+  if (status === 'Error' || status === 'Warning' || status === 'Pending') {
+    const timestamp = item.last_attempt_time || item.lastAttemptTime || item.last_update || item.lastUpdate || '';
+    console.log('[INSTALLS TIMESTAMP] Non-installed status - using attempt timestamp:', timestamp);
+    return timestamp;
+  }
+  
+  // Default: no timestamp (shouldn't reach here in normal cases)
+  console.log('[INSTALLS TIMESTAMP] No timestamp applicable');
+  return '';
 }
 
 /**
@@ -549,10 +578,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     systemName = 'Munki'
   }
 
-  // Process recent installs (contains Cimian data) - CRITICAL FIX: Use cimian.items as primary source
+  // Process recent installs (contains Cimian data) - Use cimian.items as primary source
   let packagesToProcess = []
   
-  // CRITICAL FIX: Check cimian.items FIRST as it contains the real data
+  // Check cimian.items FIRST as it contains the real data
   if (installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0) {
     packagesToProcess = installs.cimian.items
       .filter((item: any) => {
@@ -667,7 +696,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         allKeys: Object.keys(item)
       })
       
-      // CRITICAL FIX: For Cimian packages, respect the raw status first, then fall back to version comparison
+// For Cimian packages, respect the raw status first, then fall back to version comparison
       let finalStatus: StandardInstallStatus
       
       if (item.type === 'cimian') {
@@ -751,7 +780,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         warnings: []
       }
 
-      // CRITICAL FIX: Use lastError and lastWarning fields from Cimian (added in Windows client version 2025.10.03.1427)
+      // Use lastError and lastWarning fields from Cimian
       // These fields contain the actual error/warning messages from the MDM system
       if (item.lastError && item.lastError.trim() !== '') {
         packageInfo.errors?.push({
@@ -845,11 +874,38 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   }
 
   for (const pkg of packages) {
-    // Update status based on warnings/errors
+    // Update status and timestamp based on warnings/errors
     if (pkg.errors && pkg.errors.length > 0) {
       pkg.status = 'Error'
+      // Update lastUpdate to match the most recent error timestamp
+      // This ensures "Date processed" column shows when the error actually occurred
+      const mostRecentError = pkg.errors.reduce((latest, current) => {
+        if (!latest?.timestamp) return current
+        if (!current?.timestamp) return latest
+        return new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
+      }, pkg.errors[0])
+      if (mostRecentError?.timestamp) {
+        pkg.lastUpdate = mostRecentError.timestamp
+        console.log('[INSTALLS MODULE] Updated package lastUpdate to match error timestamp:', {
+          packageName: pkg.name,
+          errorTimestamp: mostRecentError.timestamp
+        })
+      }
     } else if (pkg.warnings && pkg.warnings.length > 0) {
       pkg.status = 'Warning'
+      // Update lastUpdate to match the most recent warning timestamp
+      const mostRecentWarning = pkg.warnings.reduce((latest, current) => {
+        if (!latest?.timestamp) return current
+        if (!current?.timestamp) return latest
+        return new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
+      }, pkg.warnings[0])
+      if (mostRecentWarning?.timestamp) {
+        pkg.lastUpdate = mostRecentWarning.timestamp
+        console.log('[INSTALLS MODULE] Updated package lastUpdate to match warning timestamp:', {
+          packageName: pkg.name,
+          warningTimestamp: mostRecentWarning.timestamp
+        })
+      }
     }
     // Otherwise keep the original status
 
