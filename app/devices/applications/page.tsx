@@ -81,12 +81,36 @@ interface UtilizationSummary {
   unusedAppCount: number
 }
 
+// Version distribution data structure from API
+interface VersionDevice {
+  serialNumber: string
+  deviceName: string
+  location: string | null
+  catalog: string | null
+  lastSeen: string | null
+}
+
+interface VersionInfo {
+  count: number
+  devices: VersionDevice[]
+}
+
+interface AppVersionDistribution {
+  versions: { [version: string]: VersionInfo }
+  totalDevices: number
+}
+
+interface VersionDistribution {
+  [appName: string]: AppVersionDistribution
+}
+
 interface UtilizationData {
   status: string
   applications: UtilizationApp[]
   topUsers: TopUser[]
   singleUserApps: SingleUserApp[]
   unusedApps: UnusedApp[]
+  versionDistribution?: VersionDistribution
   summary: UtilizationSummary
   filters: {
     days: number
@@ -847,44 +871,12 @@ function ApplicationsPageContent() {
         setUtilizationData(null)
       } else {
         setUtilizationData(data)
-        
-        // Load inventory data for version analysis AFTER getting utilization data
-        // Get unique app names from the report to fetch their version info
-        if (data.applications && data.applications.length > 0) {
-          setLoadingMessage('Loading version data...')
-          setLoadingProgress({ current: 90, total: 100 })
-          
-          // Get all app names from the utilization report
-          const appNamesForInventory = data.applications.map(app => app.name).slice(0, 100) // Limit to 100 apps
-          
-          try {
-            const inventoryParams = new URLSearchParams()
-            inventoryParams.set('applicationNames', appNamesForInventory.join(','))
-            
-            const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
-            console.log('[APPLICATIONS PAGE] Fetching inventory for version analysis:', appNamesForInventory.length, 'apps')
-            
-            const inventoryResponse = await fetch(inventoryUrl, {
-              cache: 'no-store',
-              headers: { 'Cache-Control': 'no-cache' }
-            })
-            
-            if (inventoryResponse.ok) {
-              const inventoryData = await inventoryResponse.json()
-              if (Array.isArray(inventoryData)) {
-                setApplications(inventoryData)
-                console.log(`Loaded ${inventoryData.length} inventory items for version analysis`)
-              }
-            }
-          } catch (invError) {
-            console.warn('Failed to load inventory data for versions:', invError)
-            // Non-critical - continue without version data
-          }
-        }
+        // Version distribution is now included in the utilization API response
+        // No need for separate inventory fetch
+        console.log(`Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked, ${Object.keys(data.versionDistribution || {}).length} with version info`)
         
         setLoadingProgress({ current: 100, total: 100 })
         setLoadingMessage('Complete!')
-        console.log(`Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked`)
       }
       
       // Save current filter state
@@ -1624,8 +1616,124 @@ function ApplicationsPageContent() {
           )}
           
 
-          {/* Report Content - Shows utilization data with inventory info */}
-          {utilizationData && (
+          {/* Version Distribution Widget - Shows apps filtered by selectedApplications */}
+          {utilizationData && utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && (
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                  Version Distribution
+                  {selectedVersions.length > 0 && (
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                      ({selectedVersions.length} selected)
+                    </span>
+                  )}
+                  {selectedApplications.length > 0 && (
+                    <span className="text-sm font-normal text-blue-500 dark:text-blue-400">
+                      - Showing {selectedApplications.length} selected app{selectedApplications.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </h3>
+                {/* Horizontal scrollable container for apps - filtered by selectedApplications */}
+                <div className="flex overflow-x-auto gap-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
+                  {Object.keys(utilizationData.versionDistribution)
+                    // Filter to only show selected apps (if any are selected)
+                    .filter(appName => {
+                      if (selectedApplications.length === 0) {
+                        // No app filter - show top apps by device count (limit to prevent overwhelming)
+                        return true
+                      }
+                      // Check if this app matches any selected application (case-insensitive partial match)
+                      return selectedApplications.some(selected => 
+                        appName.toLowerCase().includes(selected.toLowerCase()) ||
+                        selected.toLowerCase().includes(appName.toLowerCase())
+                      )
+                    })
+                    .sort((a, b) => {
+                      // Sort by total devices descending
+                      const aTotal = utilizationData.versionDistribution![a].totalDevices
+                      const bTotal = utilizationData.versionDistribution![b].totalDevices
+                      return bTotal - aTotal
+                    })
+                    .map(appName => {
+                      const appData = utilizationData.versionDistribution![appName]
+                      const versions = appData.versions
+                      const sortedVersions = Object.entries(versions)
+                        .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                      const total = appData.totalDevices
+                      
+                      return (
+                        <div 
+                          key={appName} 
+                          className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>
+                              {appName}
+                            </h4>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
+                              {total} device{total !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {/* Scrollable version list with max height */}
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {sortedVersions.map(([version, versionInfo]) => {
+                              const count = versionInfo.count
+                              const percentage = Math.round((count / total) * 100)
+                              const versionFilter = `${appName}:${version}`
+                              const isSelected = selectedVersions.includes(versionFilter)
+                              return (
+                                <div 
+                                  key={version} 
+                                  className={`p-2 rounded cursor-pointer transition-colors ${
+                                    isSelected 
+                                      ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500' 
+                                      : 'hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-transparent'
+                                  }`}
+                                  onClick={() => toggleVersion(version, appName)}
+                                  title="Click to show devices with this version"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className={`text-xs font-medium ${
+                                      isSelected 
+                                        ? 'text-blue-700 dark:text-blue-300 font-bold' 
+                                        : 'text-gray-700 dark:text-gray-300'
+                                    }`}>
+                                      v{version}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {count} ({percentage}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
+                                    <div 
+                                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                                        isSelected ? 'bg-blue-700' : 'bg-blue-600'
+                                      }`}
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+                {Object.keys(utilizationData.versionDistribution).length === 0 && (
+                  <div className="text-center py-4 text-gray-500 dark:text-gray-400">
+                    No version data available
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Report Content - Shows utilization data OR device inventory when versions selected */}
+          {utilizationData && selectedVersions.length === 0 && (
             <>
               {/* Widgets Accordion - Collapsible section */}
               {(utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
@@ -1692,73 +1800,6 @@ function ApplicationsPageContent() {
                   </div>
                 </div>
               </div>
-              
-              {/* Version Distribution - Inside Widgets Accordion - Horizontal Scrollable */}
-              {Object.keys(versionAnalysis).length > 0 && (
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-gray-700">
-                  <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-                    </svg>
-                    Version Distribution
-                  </h3>
-                  {/* Horizontal scrollable container for many apps */}
-                  <div className="flex overflow-x-auto gap-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
-                    {Object.keys(versionAnalysis)
-                      .map(appName => {
-                        const versions = versionAnalysis[appName]
-                        const sortedVersions = Object.entries(versions)
-                          .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
-                        const total = Object.values(versions).reduce((sum, count) => sum + count, 0)
-                        
-                        return (
-                          <div 
-                            key={appName} 
-                            className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>
-                                {appName}
-                              </h4>
-                              <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
-                                {total} device{total !== 1 ? 's' : ''}
-                              </span>
-                            </div>
-                            {/* Scrollable version list with max height */}
-                            <div className="space-y-2 max-h-48 overflow-y-auto">
-                              {sortedVersions.map(([version, count]) => {
-                                const percentage = Math.round((count / total) * 100)
-                                return (
-                                  <div key={version} className="p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-600">
-                                    <div className="flex items-center justify-between mb-1">
-                                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                                        v{version}
-                                      </span>
-                                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                                        {count} ({percentage}%)
-                                      </span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
-                                      <div 
-                                        className="bg-blue-600 h-1.5 rounded-full transition-all duration-300" 
-                                        style={{ width: `${percentage}%` }}
-                                      ></div>
-                                    </div>
-                                  </div>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      })}
-                  </div>
-                  {Object.keys(versionAnalysis).length === 0 && (
-                    <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-                      No version data available
-                    </div>
-                  )}
-                </div>
-              )}
               
               {/* Widgets Grid */}
               <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2093,6 +2134,151 @@ function ApplicationsPageContent() {
                         </tr>
                       ))
                     )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Device Inventory Table - Shown when versions are selected, uses versionDistribution from API */}
+          {utilizationData && selectedVersions.length > 0 && utilizationData.versionDistribution && (
+            <>
+              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    Devices with Selected Versions
+                  </h3>
+                  <button
+                    onClick={() => setSelectedVersions([])}
+                    className="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded transition-colors"
+                  >
+                    Clear Version Selection
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {selectedVersions.map(versionFilter => {
+                    const [appName, version] = versionFilter.split(':')
+                    return (
+                      <span key={versionFilter} className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full text-sm">
+                        {appName} v{version}
+                        <button
+                          onClick={() => toggleVersion(version, appName)}
+                          className="hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full p-0.5 transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+              <div className="overflow-x-auto bg-white dark:bg-gray-800">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Device Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Serial Number
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Application
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Version
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Location
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Catalog
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Last Seen
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {(() => {
+                      // Build device list from versionDistribution based on selected versions
+                      const devices: Array<{
+                        id: string
+                        appName: string
+                        version: string
+                        serialNumber: string
+                        deviceName: string
+                        location: string | null
+                        catalog: string | null
+                        lastSeen: string | null
+                      }> = []
+                      
+                      selectedVersions.forEach(versionFilter => {
+                        const [appName, version] = versionFilter.split(':')
+                        const appData = utilizationData.versionDistribution![appName]
+                        if (appData && appData.versions[version]) {
+                          const versionInfo = appData.versions[version]
+                          versionInfo.devices.forEach((device, idx) => {
+                            devices.push({
+                              id: `${appName}-${version}-${device.serialNumber}-${idx}`,
+                              appName,
+                              version,
+                              serialNumber: device.serialNumber,
+                              deviceName: device.deviceName || device.serialNumber,
+                              location: device.location,
+                              catalog: device.catalog,
+                              lastSeen: device.lastSeen
+                            })
+                          })
+                        }
+                      })
+                      
+                      if (devices.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                              No devices found with the selected versions
+                            </td>
+                          </tr>
+                        )
+                      }
+                      
+                      return devices.map((device) => (
+                        <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Link
+                              href={`/device/${device.serialNumber}`}
+                              className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                            >
+                              {device.deviceName}
+                            </Link>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.serialNumber}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {device.appName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            v{device.version}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.location || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.catalog || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {formatRelativeTime(device.lastSeen)}
+                          </td>
+                        </tr>
+                      ))
+                    })()}
                   </tbody>
                 </table>
               </div>
