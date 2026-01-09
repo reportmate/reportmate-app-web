@@ -410,6 +410,11 @@ function ManagementPageContent() {
         // Unconfirmed filter - Domain Joined devices without domainTrust data
         const hasDomainTrust = m.raw?.domainTrust != null
         if (!isDomainJoined || hasDomainTrust) return false
+      } else if (typeFilter === 'Trust Valid') {
+        // Trust Valid filter - Domain Joined devices with healthy/valid trust status
+        const hasDomainTrust = m.raw?.domainTrust != null
+        const trustStatus = m.raw?.domainTrust?.trustStatus
+        if (!isDomainJoined || !hasDomainTrust || trustStatus === 'Broken') return false
       } else if (typeFilter === 'Domain Joined') {
         // Domain Joined filter shows ALL domain-joined devices (use deviceState as source of truth)
         if (!isDomainJoined) return false
