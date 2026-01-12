@@ -4,8 +4,11 @@ import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } fr
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '../../../src/lib/time'
-import { categorizeDevicesByInstallStatus } from '../../../src/hooks/useInstallsData'
+import { categorizeDevicesByInstallStatus, aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem } from '../../../src/hooks/useInstallsData'
 import { calculateDeviceStatus } from '../../../src/lib/data-processing'
+import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '../../../src/components/widgets/InstallMessages'
+import { CopyButton } from '../../../src/components/ui/CopyButton'
+import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -443,7 +446,7 @@ function InstallsPageContent() {
       return 'error'
     }
     // Check for warnings
-    if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+    if (status.includes('warning') || status === 'needs-attention') {
       return 'warning'
     }
     // Check for pending removals (separate from other pending)
@@ -452,7 +455,8 @@ function InstallsPageContent() {
     }
     // Check for other pending statuses
     if (status.includes('will-be-installed') || status.includes('update-available') || 
-        status.includes('update_available') || status.includes('pending') || status.includes('scheduled')) {
+        status.includes('update_available') || status.includes('pending') || status.includes('scheduled') || 
+        status === 'managed-update-available') {
       return 'pending'
     }
     // Everything else is installed
@@ -513,10 +517,10 @@ function InstallsPageContent() {
           fleet: device.modules?.inventory?.fleet || 'Unknown',
           platform: device.modules?.inventory?.platform || device.modules?.system?.operatingSystem?.platform || device.platform || 'Unknown',
           lastSeen: device.lastSeen,
-          // Config data
+          // Config data - Cimian has config sub-object, Munki has fields at root
           configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
-          clientIdentifier: config?.config?.ClientIdentifier || config?.config?.clientIdentifier || 'N/A',
-          softwareRepoUrl: config?.config?.SoftwareRepoURL || config?.config?.softwareRepoUrl || 'N/A',
+          clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
+          softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
           version: config?.version || 'N/A',
           lastSessionStatus: latestSession?.status || 'N/A',
           totalPackagesManaged: items.length,
@@ -722,10 +726,10 @@ function InstallsPageContent() {
           return status.includes('installed') || status === 'present'
         }
         if (installStatusFilter === 'pending') {
-          return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')
+          return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled') || status === 'managed-update-available'
         }
         if (installStatusFilter === 'warnings') {
-          return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+          return status.includes('warning') || status === 'needs-attention'
         }
         if (installStatusFilter === 'errors') {
           return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
@@ -927,10 +931,10 @@ function InstallsPageContent() {
             return status.includes('installed') || status === 'present'
           }
           if (installStatusFilter === 'pending') {
-            return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')
+            return status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled') || status === 'managed-update-available'
           }
           if (installStatusFilter === 'warnings') {
-            return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+            return status.includes('warning') || status === 'needs-attention'
           }
           if (installStatusFilter === 'errors') {
             return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
@@ -1027,7 +1031,7 @@ function InstallsPageContent() {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const status = item.currentStatus?.toLowerCase() || ''
             return itemName === searchQuery.toLowerCase() && 
-                   (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available')
+                   (status.includes('warning') || status === 'needs-attention')
           })
         })
       } else if (itemsStatusFilter === 'pending') {
@@ -1039,7 +1043,8 @@ function InstallsPageContent() {
             return itemName === searchQuery.toLowerCase() && 
                    (status.includes('will-be-installed') || status.includes('update-available') || 
                     status.includes('update_available') || status.includes('will-be-removed') || 
-                    status.includes('pending') || status.includes('scheduled'))
+                    status.includes('pending') || status.includes('scheduled') || 
+                    status === 'managed-update-available')
           })
         })
       }
@@ -1212,9 +1217,9 @@ function InstallsPageContent() {
         const status = (item.status || '').toLowerCase()
         if (status.includes('installed') || status === 'present') {
           counts.installed++
-        } else if (status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled')) {
+        } else if (status.includes('pending') || status.includes('will-be-installed') || status.includes('update-available') || status.includes('scheduled') || status === 'managed-update-available') {
           counts.pending++
-        } else if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+        } else if (status.includes('warning') || status === 'needs-attention') {
           counts.warnings++
         } else if (status.includes('error') || status.includes('failed') || status === 'needs_reinstall') {
           counts.errors++
@@ -1328,11 +1333,12 @@ function InstallsPageContent() {
             if (itemsStatusFilter === 'errors') {
               return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
             } else if (itemsStatusFilter === 'warnings') {
-              return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+              return status.includes('warning') || status === 'needs-attention'
             } else if (itemsStatusFilter === 'pending') {
               return status.includes('will-be-installed') || status.includes('update-available') || 
                      status.includes('update_available') || status.includes('will-be-removed') || 
-                     status.includes('pending') || status.includes('scheduled')
+                     status.includes('pending') || status.includes('scheduled') || 
+                     status === 'managed-update-available'
             }
           }
           return true
@@ -1361,11 +1367,12 @@ function InstallsPageContent() {
             if (itemsStatusFilter === 'errors') {
               return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
             } else if (itemsStatusFilter === 'warnings') {
-              return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+              return status.includes('warning') || status === 'needs-attention'
             } else if (itemsStatusFilter === 'pending') {
               return status.includes('will-be-installed') || status.includes('update-available') || 
                      status.includes('update_available') || status.includes('will-be-removed') || 
-                     status.includes('pending') || status.includes('scheduled')
+                     status.includes('pending') || status.includes('scheduled') || 
+                     status === 'managed-update-available'
             }
           }
           return true
@@ -1428,7 +1435,7 @@ function InstallsPageContent() {
       cimianItems.forEach((item: any) => {
         // Check for warning statuses ONLY (not pending statuses)
         const status = item.currentStatus?.toLowerCase() || ''
-        if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+        if (status.includes('warning') || status === 'needs-attention') {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!warningItems[itemName]) {
             warningItems[itemName] = { name: itemName, count: 0, devices: [] }
@@ -2361,6 +2368,15 @@ function InstallsPageContent() {
                 )}
               </div>
             )}
+
+            {/* Messages Widgets Row: Error Messages + Warning Messages */}
+            {/* Similar to MunkiReport's Munki Errors and Munki Warnings panels */}
+            {itemsStatusFilter === 'all' && devices.length > 0 && (
+              <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <InstallErrorsWidget devices={devices} maxItems={8} />
+                <InstallWarningsWidget devices={devices} maxItems={8} />
+              </div>
+            )}
             
             {/* Config Widgets Row: Software Repos + Munki (conditional) + Cimian (conditional) + Manifests */}
             {/* Only show when items status filter is 'all' (not filtering by errors/warnings/pending) */}
@@ -2403,7 +2419,7 @@ function InstallsPageContent() {
                     
                     const repoCounts: Record<string, number> = {}
                     devices.forEach((d: any) => {
-                      const repoUrl = d.modules?.installs?.cimian?.config?.SoftwareRepoURL || d.modules?.installs?.munki?.config?.softwareRepoUrl
+                      const repoUrl = d.modules?.installs?.cimian?.config?.SoftwareRepoURL || d.modules?.installs?.munki?.softwareRepoURL
                       if (repoUrl) {
                         repoCounts[repoUrl] = (repoCounts[repoUrl] || 0) + 1
                       }
@@ -2554,8 +2570,8 @@ function InstallsPageContent() {
                               }}
                               className={`text-sm font-medium truncate transition-colors ${
                                 isSelected 
-                                  ? 'text-blue-600 dark:text-blue-400 font-bold' 
-                                  : 'text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400'
+                                  ? 'text-emerald-600 dark:text-emerald-400 font-bold' 
+                                  : 'text-gray-900 dark:text-white hover:text-emerald-600 dark:hover:text-emerald-400'
                               }`}
                             >
                               {isSelected && ''}{version}
@@ -2574,12 +2590,12 @@ function InstallsPageContent() {
                             }}
                             className={`w-full rounded-full h-2 cursor-pointer transition-colors ${
                               isSelected
-                                ? 'bg-blue-300 dark:bg-blue-800'
-                                : 'bg-gray-200 dark:bg-gray-600 hover:bg-blue-200 dark:hover:bg-blue-700'
+                                ? 'bg-emerald-300 dark:bg-emerald-800'
+                                : 'bg-gray-200 dark:bg-gray-600 hover:bg-emerald-200 dark:hover:bg-emerald-700'
                             }`}
                           >
                             <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                              className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
                               style={{ width: `${percentage}%` }}
                             />
                           </div>
@@ -2833,6 +2849,21 @@ function InstallsPageContent() {
                 </div>
               </div>
             </div>
+            )}
+
+            {/* Selected Item Messages Panel - Show inside Widgets accordion when filtering by specific item */}
+            {searchQuery && (itemsStatusFilter === 'errors' || itemsStatusFilter === 'warnings') && !filtersLoading && (
+              <div className="px-6 py-4">
+                <SelectedItemMessages
+                  devices={devices}
+                  itemName={searchQuery}
+                  messageType={itemsStatusFilter === 'errors' ? 'errors' : 'warnings'}
+                  onClose={() => {
+                    setSearchQuery('')
+                    setItemsStatusFilter('all')
+                  }}
+                />
+              </div>
             )}
               </div>
               )}
@@ -3433,12 +3464,14 @@ function InstallsPageContent() {
                               {install.deviceName}
                             </span>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 truncate">
-                            <span>{install.serialNumber}</span>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                            <span className="truncate">{install.serialNumber}</span>
+                            <CopyButton value={install.serialNumber} size="sm" />
                             {install.assetTag && (
                               <>
-                                <span className="text-gray-300 dark:text-gray-600"></span>
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
                                 <span>{install.assetTag}</span>
+                                <CopyButton value={install.assetTag} size="sm" />
                               </>
                             )}
                           </div>
@@ -3569,13 +3602,23 @@ function InstallsPageContent() {
                             className="group block min-w-0"
                             title={device.deviceName || 'Unknown Device'}
                           >
-                            <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
-                              {device.deviceName}
-                            </span>
+                            <div className="flex items-center gap-1.5">
+                              <PlatformBadge platform={device.platform || device.configType || ''} size="sm" />
+                              <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
+                                {device.deviceName}
+                              </span>
+                            </div>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                            {device.serialNumber}
-                            {device.assetTag && <span className="ml-2 text-gray-400">{device.assetTag}</span>}
+                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 pl-5">
+                            <span className="truncate">{device.serialNumber}</span>
+                            <CopyButton value={device.serialNumber} size="sm" />
+                            {device.assetTag && (
+                              <>
+                                <span className="text-gray-300 dark:text-gray-600">|</span>
+                                <span className="text-gray-400">{device.assetTag}</span>
+                                <CopyButton value={device.assetTag} size="sm" />
+                              </>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -3653,27 +3696,34 @@ function InstallsPageContent() {
                       <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
-                      Devices with Install Errors ({statusFilteredDevices.length})
+                      {searchQuery ? (
+                        <>({statusFilteredDevices.length}) Devices with ({itemsWithErrors.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Install Errors for {searchQuery}</>
+                      ) : (
+                        <>({statusFilteredDevices.length}) Devices with Install Errors</>
+                      )}
                     </>
                   ) : itemsStatusFilter === 'warnings' ? (
                     <>
                       <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                       </svg>
-                      Devices with Warnings ({statusFilteredDevices.length})
+                      {searchQuery ? (
+                        <>({statusFilteredDevices.length}) Devices with ({itemsWithWarnings.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Warnings for {searchQuery}</>
+                      ) : (
+                        <>({statusFilteredDevices.length}) Devices with Warnings</>
+                      )}
                     </>
                   ) : (
                     <>
-                      <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
                       </svg>
-                      Devices with Pending Updates ({statusFilteredDevices.length})
+                      {searchQuery ? (
+                        <>({statusFilteredDevices.length}) Devices with ({itemsWithPending.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Pending for {searchQuery}</>
+                      ) : (
+                        <>({statusFilteredDevices.length}) Devices with Pending Updates</>
+                      )}
                     </>
-                  )}
-                  {searchQuery && (
-                    <span className="ml-2 text-sm font-normal text-gray-500 dark:text-gray-400">
-                      - filtered by &quot;{searchQuery}&quot;
-                    </span>
                   )}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -3720,13 +3770,14 @@ function InstallsPageContent() {
                         : itemsStatusFilter === 'warnings'
                           ? cimianItems.filter((item: any) => {
                               const status = item.currentStatus?.toLowerCase() || ''
-                              return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+                              return status.includes('warning') || status === 'needs-attention'
                             })
                           : cimianItems.filter((item: any) => {
                               const status = item.currentStatus?.toLowerCase() || ''
                               return status.includes('will-be-installed') || status.includes('update-available') || 
                                      status.includes('update_available') || status.includes('will-be-removed') || 
-                                     status.includes('pending') || status.includes('scheduled')
+                                     status.includes('pending') || status.includes('scheduled') || 
+                                     status === 'managed-update-available'
                             })
                       
                       // Then filter by search query if present
@@ -3749,14 +3800,22 @@ function InstallsPageContent() {
                                 className="group block min-w-0"
                                 title={device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown Device'}
                               >
-                                <span className="text-emerald-600 group-hover:text-emerald-800 dark:text-emerald-400 dark:group-hover:text-emerald-300 font-medium block truncate">
-                                  {device.modules?.inventory?.deviceName || device.serialNumber}
-                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <PlatformBadge platform={device.platform || device.modules?.system?.operatingSystem?.name || ''} size="sm" />
+                                  <span className="text-emerald-600 group-hover:text-emerald-800 dark:text-emerald-400 dark:group-hover:text-emerald-300 font-medium block truncate">
+                                    {device.modules?.inventory?.deviceName || device.serialNumber}
+                                  </span>
+                                </div>
                               </Link>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
-                                {device.serialNumber}
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1 pl-5">
+                                <span className="truncate">{device.serialNumber}</span>
+                                <CopyButton value={device.serialNumber} size="sm" />
                                 {device.modules?.inventory?.assetTag && (
-                                  <span className="ml-2 text-gray-400 dark:text-gray-500">{device.modules.inventory.assetTag}</span>
+                                  <>
+                                    <span className="text-gray-300 dark:text-gray-600">|</span>
+                                    <span className="text-gray-400 dark:text-gray-500">{device.modules.inventory.assetTag}</span>
+                                    <CopyButton value={device.modules.inventory.assetTag} size="sm" />
+                                  </>
                                 )}
                               </div>
                             </div>
@@ -3787,11 +3846,11 @@ function InstallsPageContent() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex flex-col">
-                              <div className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.config?.ClientIdentifier || '-'}>
-                                {device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.config?.ClientIdentifier || '-'}
+                              <div className="text-sm text-gray-900 dark:text-white font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.clientIdentifier || '-'}>
+                                {device.modules?.installs?.cimian?.config?.ClientIdentifier || device.modules?.installs?.munki?.clientIdentifier || '-'}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.config?.SoftwareRepoURL || ''}>
-                                {device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.config?.SoftwareRepoURL || ''}
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[200px]" title={device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.softwareRepoURL || ''}>
+                                {device.modules?.installs?.cimian?.config?.SoftwareRepoURL || device.modules?.installs?.munki?.softwareRepoURL || ''}
                               </div>
                             </div>
                           </td>
