@@ -359,6 +359,13 @@ function ManagementPageContent() {
     return isDomainJoined && hasDomainTrust && trustStatus !== 'Broken'
   }).length
 
+  // Count Unmanaged - Domain Joined devices without MDM enrollment
+  const unmanagedCount = management.filter(m => {
+    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
+    const isEnrolled = m.isEnrolled === true
+    return isDomainJoined && !isEnrolled
+  }).length
+
   // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
     management.map(m => m.provider).filter(p => p && p !== 'Unknown')
@@ -406,6 +413,9 @@ function ManagementPageContent() {
         const trustStatus = m.raw?.domainTrust?.trustStatus
         // Only show as Broken Trust if device is domain-joined AND trust is broken
         if (!isDomainJoined || trustStatus !== 'Broken') return false
+      } else if (typeFilter === 'Unmanaged') {
+        // Unmanaged filter - devices with enrollmentType='Unmanaged' from the client
+        if (m.enrollmentType !== 'Unmanaged') return false
       } else if (typeFilter === 'Unconfirmed') {
         // Unconfirmed filter - Domain Joined devices without domainTrust data
         const hasDomainTrust = m.raw?.domainTrust != null
@@ -589,27 +599,35 @@ function ManagementPageContent() {
                     <div key={item.label}>
                       <div className="flex items-center justify-between text-sm">
                         {/* Parent item with expand/collapse if it has nested items */}
-                        <div 
-                          className={`flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
-                          onClick={() => {
-                            if (hasNested) {
-                              toggleCategory(item.label)
-                            } else if (onFilter) {
-                              onFilter(isSelected ? 'all' : item.label)
-                            }
-                          }}
-                        >
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
-                          <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={item.label}>{item.label}</span>
+                        <div className="flex items-center gap-2 flex-1">
+                          <div 
+                            className={`flex items-center gap-2 flex-1 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
+                            onClick={() => {
+                              if (onFilter) {
+                                onFilter(isSelected ? 'all' : item.label)
+                              }
+                            }}
+                          >
+                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
+                            <span className="text-gray-600 dark:text-gray-300 truncate max-w-[120px]" title={item.label}>{item.label}</span>
+                          </div>
                           {hasNested && (
-                            <svg 
-                              className={`w-3 h-3 text-gray-400 transition-transform ml-auto ${isExpanded ? 'rotate-90' : ''}`} 
-                              fill="none" 
-                              stroke="currentColor" 
-                              viewBox="0 0 24 24"
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                toggleCategory(item.label)
+                              }}
+                              className="p-1 hover:bg-gray-100 dark:hover:bg-gray-600 rounded transition-colors"
                             >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                            </svg>
+                              <svg 
+                                className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </button>
                           )}
                         </div>
                         <span className="font-medium text-gray-900 dark:text-white ml-2">{item.value}</span>
@@ -883,6 +901,40 @@ function ManagementPageContent() {
             </div>
           </div>
           
+          {/* Active Filters Indicator with Clear Button */}
+          {(providerFilter !== 'all' || 
+            enrollmentStatusFilter !== 'all' || 
+            typeFilter !== 'all' || 
+            searchQuery !== '' ||
+            selectedStatuses.length > 0 ||
+            selectedCatalogs.length > 0 ||
+            selectedAreas.length > 0 ||
+            selectedLocations.length > 0 ||
+            selectedFleets.length > 0 ||
+            selectedPlatforms.length > 0 ||
+            selectedUsages.length > 0) && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span className="font-medium">Filters Active</span>
+                <span className="text-yellow-700 dark:text-yellow-300">
+                  Showing {filteredManagement.length} of {management.length} devices
+                </span>
+              </div>
+              <button
+                onClick={clearAllFilters}
+                className="px-3 py-1.5 text-sm rounded-lg bg-yellow-600 hover:bg-yellow-700 text-white transition-colors flex items-center gap-2 font-medium"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                Clear Filters
+              </button>
+            </div>
+          )}
+          
           {/* Widgets Accordion */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
             <button
@@ -940,7 +992,8 @@ function ManagementPageContent() {
                 <DonutChart 
                   title="Enrollment Type"
                   data={[
-                    // Show enrollment types in order: Entra Joined, Domain Joined, then trust status indicators
+                    // Show enrollment types in order: Entra Joined, Domain Joined, then others
+                    // Note: 'Unmanaged' is an enrollmentType from the client (not domain-joined devices without MDM)
                     ...Object.entries(enrollmentTypeCounts)
                       .sort(([a], [b]) => {
                         // Entra Joined first, Domain Joined second
@@ -957,10 +1010,12 @@ function ManagementPageContent() {
                   colors={{
                     'Entra Joined': '#10b981', // emerald-500
                     'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
+                    'Unmanaged': '#ef4444', // red-500 - unmanaged (critical issue)
                     'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
                     'Broken Trust': '#ef4444', // red-500 - broken trust
                     'Trust Valid': '#eab308', // yellow-500 - valid trust
                     'AxM Assigned': '#10b981', // emerald-500
+                    'Manual': '#8b5cf6', // violet-500
                     'default': '#8b5cf6' // violet-500
                   }}
                   onFilter={setTypeFilter}
@@ -969,7 +1024,7 @@ function ManagementPageContent() {
                     {
                       parentLabel: 'Domain Joined',
                       items: [
-                        // Trust Valid first, then Broken Trust, then Unconfirmed
+                        // Trust Valid first, then trust issues (Broken Trust, Unconfirmed)
                         ...(trustValidCount > 0 ? [{ label: 'Trust Valid', value: trustValidCount }] : []),
                         ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : []),
                         ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : [])
@@ -1174,6 +1229,8 @@ function ManagementPageContent() {
                                   ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                   : displayType === 'Domain Joined'
                                   ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                  : displayType === 'Unmanaged'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                   : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                               }`}>
                                 {displayType}
@@ -1182,6 +1239,22 @@ function ManagementPageContent() {
                           })()}
                           {/* Show trust status indicator for Domain Joined (Hybrid Entra Join) devices */}
                           {(mgmt.enrollmentType === 'Hybrid Entra Join' || mgmt.enrollmentType === 'Domain Joined') && (() => {
+                            // Check if device is unmanaged (domain-joined without MDM enrollment) - CRITICAL
+                            const isEnrolled = mgmt.isEnrolled === true
+                            if (!isEnrolled) {
+                              return (
+                                <span 
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
+                                  title="Domain-joined device without MDM enrollment - Critical security risk"
+                                >
+                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                  </svg>
+                                  Unmanaged
+                                </span>
+                              )
+                            }
+                            
                             // Check domainTrust.trustStatus - API returns 'Healthy' or 'Broken'
                             const domainTrust = mgmt.raw?.domainTrust
                             
