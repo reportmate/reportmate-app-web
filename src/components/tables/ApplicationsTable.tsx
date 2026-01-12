@@ -6,10 +6,13 @@ const PAGE_SIZE = 100;
 const INITIAL_VISIBLE = 50;
 
 // Usage data for an application
+// Supports both frontend-standard field names and Windows client variants
 interface ApplicationUsage {
   launchCount: number;
-  totalSeconds: number;
+  totalSeconds?: number;
+  totalUsageSeconds?: number;  // Windows client variant
   lastUsed?: string;
+  lastLaunchTime?: string;  // Windows client variant
   firstSeen?: string;
   users?: string[];
   uniqueUserCount?: number;
@@ -310,15 +313,15 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {hasUsage && app.usage?.lastUsed 
-                          ? formatRelativeTime(app.usage.lastUsed) 
+                        {hasUsage && (app.usage?.lastUsed || app.usage?.lastLaunchTime)
+                          ? formatRelativeTime(app.usage.lastUsed || app.usage.lastLaunchTime!)
                           : <span className="text-gray-400">-</span>}
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {hasUsage 
-                          ? formatDuration(app.usage!.totalSeconds)
+                        {hasUsage
+                          ? formatDuration(app.usage!.totalSeconds || app.usage!.totalUsageSeconds || 0)
                           : <span className="text-gray-400">-</span>}
                       </div>
                       {hasUsage && app.usage?.averageSessionSeconds && app.usage.averageSessionSeconds > 0 && (
