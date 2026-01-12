@@ -103,7 +103,7 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
     const hasWarning = cimianItems.some((item: any) => {
       const status = item.currentStatus?.toLowerCase() || ''
       // Warnings are issues that need attention - NOT pending changes
-      return status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available'
+      return status.includes('warning') || status === 'needs-attention'
     })
 
     const hasPending = cimianItems.some((item: any) => {
@@ -111,7 +111,8 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
       // Pending are scheduled changes - installations, removals, updates
       return status.includes('will-be-installed') || status.includes('update-available') || 
              status.includes('update_available') || status.includes('will-be-removed') || 
-             status.includes('pending') || status.includes('scheduled')
+             status.includes('pending') || status.includes('scheduled') || 
+             status === 'managed-update-available'
     })
     
     // Devices can be in multiple categories - they're not mutually exclusive
@@ -153,14 +154,15 @@ export function getInstallItemsByStatus(devices: any[], statusFilter: 'errors' |
         }
       } else if (statusFilter === 'warnings') {
         // Warnings are issues - NOT pending changes
-        if (status.includes('warning') || status === 'needs-attention' || status === 'managed-update-available') {
+        if (status.includes('warning') || status === 'needs-attention') {
           items.push({ ...item, device })
         }
       } else if (statusFilter === 'pending') {
         // Pending are scheduled changes
         if (status.includes('will-be-installed') || status.includes('update-available') || 
             status.includes('update_available') || status.includes('will-be-removed') || 
-            status.includes('pending') || status.includes('scheduled')) {
+            status.includes('pending') || status.includes('scheduled') || 
+            status === 'managed-update-available') {
           items.push({ ...item, device })
         }
       }
@@ -168,4 +170,272 @@ export function getInstallItemsByStatus(devices: any[], statusFilter: 'errors' |
   }
   
   return items
+}
+
+/**
+ * Interface for aggregated install messages
+ */
+export interface AggregatedInstallMessage {
+  message: string
+  count: number
+  devices: Array<{
+    serialNumber: string
+    deviceName: string
+    itemName?: string
+    timestamp?: string
+  }>
+  type: 'error' | 'warning'
+  source?: string // e.g., 'cimian', 'munki'
+}
+
+/**
+ * Aggregate all error messages from devices
+ * Groups identical messages and counts occurrences
+ * Similar to MunkiReport's "Munki Errors" widget
+ */
+export function aggregateInstallErrors(devices: any[]): AggregatedInstallMessage[] {
+  const errorMap = new Map<string, AggregatedInstallMessage>()
+  
+  for (const device of devices) {
+    if (device.archived === true) continue
+    
+    const deviceName = device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown'
+    const serialNumber = device.serialNumber || device.deviceId || 'Unknown'
+    
+    // Check Cimian items for lastError
+    const cimianItems = device.modules?.installs?.cimian?.items || []
+    for (const item of cimianItems) {
+      if (item.lastError && item.lastError.trim() !== '') {
+        const errorMsg = item.lastError.trim()
+        const existing = errorMap.get(errorMsg)
+        
+        if (existing) {
+          existing.count++
+          existing.devices.push({
+            serialNumber,
+            deviceName,
+            itemName: item.itemName || item.name,
+            timestamp: item.lastUpdate || item.lastAttemptTime
+          })
+        } else {
+          errorMap.set(errorMsg, {
+            message: errorMsg,
+            count: 1,
+            devices: [{
+              serialNumber,
+              deviceName,
+              itemName: item.itemName || item.name,
+              timestamp: item.lastUpdate || item.lastAttemptTime
+            }],
+            type: 'error',
+            source: 'cimian'
+          })
+        }
+      }
+    }
+    
+    // Check Munki errors (if available)
+    const munkiData = device.modules?.installs?.munki
+    if (munkiData?.errors && munkiData.errors.trim() !== '') {
+      // Munki can have multiple errors concatenated, split by common delimiters
+      const munkiErrors = munkiData.errors.split(/ERROR:|[\n\r]+/).filter((e: string) => e.trim())
+      for (const errorMsg of munkiErrors) {
+        const trimmedError = errorMsg.trim()
+        if (!trimmedError) continue
+        
+        const existing = errorMap.get(trimmedError)
+        if (existing) {
+          existing.count++
+          existing.devices.push({
+            serialNumber,
+            deviceName,
+            timestamp: munkiData.endTime
+          })
+        } else {
+          errorMap.set(trimmedError, {
+            message: trimmedError,
+            count: 1,
+            devices: [{
+              serialNumber,
+              deviceName,
+              timestamp: munkiData.endTime
+            }],
+            type: 'error',
+            source: 'munki'
+          })
+        }
+      }
+    }
+  }
+  
+  // Sort by count (most common first)
+  return Array.from(errorMap.values()).sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Aggregate all warning messages from devices
+ * Groups identical messages and counts occurrences
+ * Similar to MunkiReport's "Munki Warnings" widget
+ */
+export function aggregateInstallWarnings(devices: any[]): AggregatedInstallMessage[] {
+  const warningMap = new Map<string, AggregatedInstallMessage>()
+  
+  for (const device of devices) {
+    if (device.archived === true) continue
+    
+    const deviceName = device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown'
+    const serialNumber = device.serialNumber || device.deviceId || 'Unknown'
+    
+    // Check Cimian items for lastWarning
+    const cimianItems = device.modules?.installs?.cimian?.items || []
+    for (const item of cimianItems) {
+      if (item.lastWarning && item.lastWarning.trim() !== '') {
+        const warningMsg = item.lastWarning.trim()
+        const existing = warningMap.get(warningMsg)
+        
+        if (existing) {
+          existing.count++
+          existing.devices.push({
+            serialNumber,
+            deviceName,
+            itemName: item.itemName || item.name,
+            timestamp: item.lastUpdate || item.lastAttemptTime
+          })
+        } else {
+          warningMap.set(warningMsg, {
+            message: warningMsg,
+            count: 1,
+            devices: [{
+              serialNumber,
+              deviceName,
+              itemName: item.itemName || item.name,
+              timestamp: item.lastUpdate || item.lastAttemptTime
+            }],
+            type: 'warning',
+            source: 'cimian'
+          })
+        }
+      }
+    }
+    
+    // Check Munki warnings (if available)
+    const munkiData = device.modules?.installs?.munki
+    if (munkiData?.warnings && munkiData.warnings.trim() !== '') {
+      // Munki can have multiple warnings, split by common delimiters
+      const munkiWarnings = munkiData.warnings.split(/WARNING:|[\n\r]+/).filter((w: string) => w.trim())
+      for (const warningMsg of munkiWarnings) {
+        const trimmedWarning = warningMsg.trim()
+        if (!trimmedWarning) continue
+        
+        const existing = warningMap.get(trimmedWarning)
+        if (existing) {
+          existing.count++
+          existing.devices.push({
+            serialNumber,
+            deviceName,
+            timestamp: munkiData.endTime
+          })
+        } else {
+          warningMap.set(trimmedWarning, {
+            message: trimmedWarning,
+            count: 1,
+            devices: [{
+              serialNumber,
+              deviceName,
+              timestamp: munkiData.endTime
+            }],
+            type: 'warning',
+            source: 'munki'
+          })
+        }
+      }
+    }
+    
+    // Also check problemInstalls
+    if (munkiData?.problemInstalls && munkiData.problemInstalls.trim() !== '') {
+      const problemMsg = `Problem installs: ${munkiData.problemInstalls.trim()}`
+      const existing = warningMap.get(problemMsg)
+      if (existing) {
+        existing.count++
+        existing.devices.push({
+          serialNumber,
+          deviceName,
+          timestamp: munkiData.endTime
+        })
+      } else {
+        warningMap.set(problemMsg, {
+          message: problemMsg,
+          count: 1,
+          devices: [{
+            serialNumber,
+            deviceName,
+            timestamp: munkiData.endTime
+          }],
+          type: 'warning',
+          source: 'munki'
+        })
+      }
+    }
+  }
+  
+  // Sort by count (most common first)
+  return Array.from(warningMap.values()).sort((a, b) => b.count - a.count)
+}
+
+/**
+ * Get error/warning messages for a specific package item across all devices
+ * Used when clicking on an item in the Items with Errors/Warnings widgets
+ */
+export function getMessagesForItem(
+  devices: any[], 
+  itemName: string, 
+  messageType: 'errors' | 'warnings'
+): AggregatedInstallMessage[] {
+  const messageMap = new Map<string, AggregatedInstallMessage>()
+  
+  for (const device of devices) {
+    if (device.archived === true) continue
+    
+    const deviceName = device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown'
+    const serialNumber = device.serialNumber || device.deviceId || 'Unknown'
+    
+    // Check Cimian items
+    const cimianItems = device.modules?.installs?.cimian?.items || []
+    for (const item of cimianItems) {
+      const currentItemName = item.itemName || item.name || ''
+      if (currentItemName.toLowerCase() !== itemName.toLowerCase()) continue
+      
+      const messageField = messageType === 'errors' ? item.lastError : item.lastWarning
+      if (messageField && messageField.trim() !== '') {
+        const message = messageField.trim()
+        const existing = messageMap.get(message)
+        
+        if (existing) {
+          existing.count++
+          existing.devices.push({
+            serialNumber,
+            deviceName,
+            itemName: currentItemName,
+            timestamp: item.lastUpdate || item.lastAttemptTime
+          })
+        } else {
+          messageMap.set(message, {
+            message,
+            count: 1,
+            devices: [{
+              serialNumber,
+              deviceName,
+              itemName: currentItemName,
+              timestamp: item.lastUpdate || item.lastAttemptTime
+            }],
+            type: messageType === 'errors' ? 'error' : 'warning',
+            source: 'cimian'
+          })
+        }
+      }
+    }
+  }
+  
+  // Sort by count (most common first)
+  return Array.from(messageMap.values()).sort((a, b) => b.count - a.count)
 }
