@@ -10,10 +10,13 @@ import { formatRelativeTime } from '../../lib/time'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 
 // Extended ApplicationInfo with usage data
+// Supports both frontend-standard field names and Windows client variants
 interface ApplicationUsage {
   launchCount: number
-  totalSeconds: number
+  totalSeconds?: number
+  totalUsageSeconds?: number  // Windows client variant
   lastUsed?: string
+  lastLaunchTime?: string  // Windows client variant
   firstSeen?: string
   users?: string[]
   uniqueUserCount?: number
@@ -209,11 +212,22 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   const processedApps = useMemo(() => {
     return installedApps.map((app: ApplicationInfo, index: number) => {
       // Look up usage from the usageByPath map (macOS) or existing app.usage (Windows)
-      const appPath = app.path || (app as unknown as Record<string, unknown>).install_location as string
+      // Windows uses installLocation (camelCase), check both variants
+      const appPath = app.path || (app as unknown as Record<string, unknown>).installLocation as string || (app as unknown as Record<string, unknown>).install_location as string
       const sessionUsage = appPath ? usageByPath.get(appPath) : undefined
-      
+
       // Build usage object from session data if available
-      let usage: ApplicationUsage | undefined = app.usage || (app as unknown as Record<string, unknown>).Usage as ApplicationUsage
+      // Windows client sends totalUsageSeconds/lastLaunchTime, normalize to totalSeconds/lastUsed
+      const existingUsage = app.usage || (app as unknown as Record<string, unknown>).Usage as ApplicationUsage & { totalUsageSeconds?: number; lastLaunchTime?: string }
+      let usage: ApplicationUsage | undefined = existingUsage ? {
+        launchCount: existingUsage.launchCount,
+        totalSeconds: existingUsage.totalSeconds || existingUsage.totalUsageSeconds || 0,
+        lastUsed: existingUsage.lastUsed || existingUsage.lastLaunchTime,
+        firstSeen: existingUsage.firstSeen,
+        users: existingUsage.users,
+        uniqueUserCount: existingUsage.uniqueUserCount,
+        averageSessionSeconds: existingUsage.averageSessionSeconds
+      } : undefined
       
       if (sessionUsage) {
         usage = {

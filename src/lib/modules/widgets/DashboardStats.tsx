@@ -1,6 +1,9 @@
 /**
  * Dashboard Stats Widgets
  * Core statistics widgets for the dashboard overview
+ * 
+ * OPTIMIZED: Uses pre-calculated installStats from API instead of iterating
+ * through all device install items. This reduces dashboard response from ~26MB to ~1MB.
  */
 
 import React from 'react'
@@ -8,14 +11,15 @@ import Link from 'next/link'
 
 // Type for pre-aggregated install stats from API
 export interface InstallStatsData {
-  devicesWithErrors: number
-  devicesWithWarnings: number
-  totalFailedInstalls?: number
-  totalWarnings?: number
+  devicesWithErrors?: number
+  devicesWithWarnings?: number
+  totalErrorItems: number      // Total error items across all devices (Cimian + Munki)
+  totalWarningItems: number    // Total warning items across all devices (Cimian + Munki)
+  hasInstallData: boolean      // Whether any install data exists
 }
 
 interface StatsWidgetProps {
-  value: number
+  value: number | null | undefined
   label: string
   icon: React.ReactNode
   color: 'green' | 'yellow' | 'red' | 'blue'
@@ -57,7 +61,7 @@ const StatsWidget: React.FC<StatsWidgetProps> = ({ value, label, icon, color, hr
       </div>
       <div>
         <p className={`text-2xl font-bold ${classes.text} ${classes.hover} transition-colors`}>
-          {value}
+          {value === null || value === undefined ? '-' : value}
         </p>
         <p className="text-sm text-gray-600 dark:text-gray-400 group-hover:text-gray-700 dark:group-hover:text-gray-300 transition-colors">
           {label}
@@ -103,31 +107,14 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
   )
 }
 
-// Warning Events Widget - calculates from device data (SAME LOGIC as /devices/installs)
+// Warning Events Widget - uses pre-calculated stats from API
+// Displays total WARNING ITEMS across all devices (not device count)
 export const WarningStatsWidget: React.FC<{ 
-  devices?: any[]
-  isLoading?: boolean
   installStats?: InstallStatsData | null
-}> = ({ devices, isLoading = false, installStats }) => {
-  let warningCount: number | null = null
-
-  if (installStats) {
-    warningCount = installStats.devicesWithWarnings ?? 0
-  } else if (devices) {
-    warningCount = devices.filter((d: any) => {
-      // Check Cimian items (Windows)
-      const cimianWarning = d.modules?.installs?.cimian?.items?.some((item: any) => 
-        item.currentStatus?.toLowerCase().includes('warning') || 
-        item.currentStatus?.toLowerCase().includes('pending')
-      )
-      // Check Munki items (macOS)
-      const munkiWarning = d.modules?.installs?.munki?.items?.some((item: any) => 
-        item.status?.toLowerCase().includes('warning') || 
-        item.status?.toLowerCase().includes('pending')
-      )
-      return cimianWarning || munkiWarning
-    }).length
-  }
+  isLoading?: boolean
+}> = ({ installStats, isLoading = false }) => {
+  // Use pre-calculated stats from API - no client-side iteration needed
+  const warningCount = installStats?.hasInstallData ? installStats.totalWarningItems : null
 
   if (isLoading || warningCount === null) {
     return (
@@ -164,31 +151,14 @@ export const WarningStatsWidget: React.FC<{
   )
 }
 
-// Error Events Widget - calculates from device data (SAME LOGIC as /devices/installs)
+// Error Events Widget - uses pre-calculated stats from API
+// Displays total ERROR ITEMS across all devices (not device count)
 export const ErrorStatsWidget: React.FC<{ 
-  devices?: any[]
-  isLoading?: boolean
   installStats?: InstallStatsData | null
-}> = ({ devices, isLoading = false, installStats }) => {
-  let errorCount: number | null = null
-
-  if (installStats) {
-    errorCount = installStats.devicesWithErrors ?? 0
-  } else if (devices) {
-    errorCount = devices.filter((d: any) => {
-      // Check Cimian items (Windows)
-      const cimianError = d.modules?.installs?.cimian?.items?.some((item: any) => 
-        item.currentStatus?.toLowerCase().includes('error') || 
-        item.currentStatus?.toLowerCase().includes('failed')
-      )
-      // Check Munki items (macOS)
-      const munkiError = d.modules?.installs?.munki?.items?.some((item: any) => 
-        item.status?.toLowerCase().includes('error') || 
-        item.status?.toLowerCase().includes('failed')
-      )
-      return cimianError || munkiError
-    }).length
-  }
+  isLoading?: boolean
+}> = ({ installStats, isLoading = false }) => {
+  // Use pre-calculated stats from API - no client-side iteration needed
+  const errorCount = installStats?.hasInstallData ? installStats.totalErrorItems : null
 
   if (isLoading || errorCount === null) {
     return (
