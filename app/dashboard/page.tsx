@@ -162,6 +162,8 @@ export default function Dashboard() {
         const transformedDevices: Device[] = rawDevices.map((apiDevice: any) => {
           const inventory = apiDevice.inventory || apiDevice.modules?.inventory || {}
           const systemOS = apiDevice.modules?.system?.operatingSystem || {}
+          // NOTE: installs data is NOT included in dashboard response (too large ~26MB)
+          // Error/warning counts come from pre-calculated installStats instead
           const deviceName = inventory.deviceName || apiDevice.name || apiDevice.deviceName || apiDevice.serialNumber
           const assetTag = inventory.assetTag || apiDevice.assetTag
           
