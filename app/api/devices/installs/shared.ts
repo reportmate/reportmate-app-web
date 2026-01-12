@@ -107,31 +107,59 @@ export async function getDevicesWithInstalls(): Promise<{
   
   // Transform bulk records into the expected device structure for compatibility
   // The bulk endpoint already has flattened records, but route.ts expects nested modules
+  // Group by device and separate by source (cimian/munki)
   const devicesWithInstalls = Array.from(deviceMap.entries()).map(([serial, deviceRecords]) => {
     const firstRecord = deviceRecords[0];
+    
+    // Separate records by source
+    const cimianRecords = deviceRecords.filter(r => r.source === 'cimian' || !r.source);
+    const munkiRecords = deviceRecords.filter(r => r.source === 'munki');
+    
+    const installs: any = {};
+    
+    // Include Cimian data if present (Windows)
+    if (cimianRecords.length > 0) {
+      installs.cimian = {
+        items: cimianRecords.map(r => ({
+          itemName: r.itemName,
+          displayName: r.itemName,
+          currentStatus: r.currentStatus,
+          latestVersion: r.latestVersion,
+          installedVersion: r.installedVersion,
+          ...r.raw
+        }))
+      };
+    }
+    
+    // Include Munki data if present (macOS)
+    if (munkiRecords.length > 0) {
+      installs.munki = {
+        items: munkiRecords.map(r => ({
+          name: r.itemName,
+          displayName: r.itemName,
+          status: r.currentStatus,
+          version: r.latestVersion,
+          installedVersion: r.installedVersion,
+          ...r.raw
+        })),
+        version: firstRecord.munkiVersion || munkiRecords[0]?.raw?.version,
+      };
+    }
+    
     return {
       serialNumber: serial,
       deviceId: firstRecord.deviceId,
       deviceName: firstRecord.deviceName,
       lastSeen: firstRecord.lastSeen,
+      platform: firstRecord.platform,
       modules: {
-        installs: {
-          cimian: {
-            items: deviceRecords.map(r => ({
-              itemName: r.itemName,
-              displayName: r.itemName,
-              currentStatus: r.currentStatus,
-              latestVersion: r.latestVersion,
-              installedVersion: r.installedVersion,
-              ...r.raw
-            }))
-          }
-        },
+        installs,
         inventory: {
           usage: firstRecord.usage,
           catalog: firstRecord.catalog,
           location: firstRecord.location,
-          deviceName: firstRecord.deviceName
+          deviceName: firstRecord.deviceName,
+          platform: firstRecord.platform
         }
       }
     };
