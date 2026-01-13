@@ -8,12 +8,10 @@ export const revalidate = 0
 export async function POST(request: Request) {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[DEVICE API] ${timestamp} - Received POST request for device data ingestion`)
-
+    
     // Get the request body
     const requestData = await request.json()
-    console.log(`[DEVICE API] ${timestamp} - Request data:`, JSON.stringify(requestData, null, 2))
-
+    
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -25,8 +23,7 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
     
-    console.log(`[DEVICE API] ${timestamp} - Forwarding to Azure Functions API:`, apiBaseUrl)
-    
+        
     // Get managed identity principal ID from Azure Container Apps
     const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
 
@@ -57,8 +54,7 @@ export async function POST(request: Request) {
     
     // Fallback to local database processing if Azure Functions failed
     if (useLocalFallback) {
-      console.log(`[DEVICE API] ${timestamp} - Azure Functions API failed - NO FALLBACK ALLOWED`)
-      return NextResponse.json(
+            return NextResponse.json(
         { error: 'Service temporarily unavailable - cloud infrastructure error' },
         { status: 503 }
       )
@@ -78,8 +74,7 @@ export async function POST(request: Request) {
       }
       
       // Azure Functions failed - return error
-      console.log(`[DEVICE API] ${timestamp} - Azure Functions failed - NO FALLBACK ALLOWED`)
-      
+            
       return NextResponse.json({
         success: false,
         error: 'Failed to process device data',
@@ -97,8 +92,7 @@ export async function POST(request: Request) {
     // If we reach here, Azure Functions succeeded
     if (response) {
       const data = await response.json()
-      console.log(`[DEVICE API] ${timestamp} - Successfully processed device data`)
-      
+            
       return NextResponse.json(data, {
         status: 200,
         headers: {
@@ -138,8 +132,7 @@ export async function POST(request: Request) {
 // Also support HEAD requests for endpoint availability checks
 export async function HEAD() {
   const timestamp = new Date().toISOString()
-  console.log(`[DEVICE API] ${timestamp} - Received HEAD request for endpoint availability check`)
-  
+    
   return new Response(null, {
     status: 200,
     headers: {

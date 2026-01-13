@@ -426,7 +426,6 @@ function ApplicationsPageContent() {
   
   const searchParams = useSearchParams()
 
-
   // Initialize search query and filters from URL parameters
   useEffect(() => {
     try {
@@ -476,8 +475,7 @@ function ApplicationsPageContent() {
         if (cachedData && cachedTimestamp) {
           const age = Date.now() - parseInt(cachedTimestamp)
           if (age < cacheExpiry) {
-            console.log('[APPLICATIONS PAGE] Using cached filter data (age:', Math.round(age / 1000), 'seconds)')
-            const data = JSON.parse(cachedData)
+                        const data = JSON.parse(cachedData)
             
             setFilterOptions({
               applicationNames: data.applicationNames || [],
@@ -490,16 +488,14 @@ function ApplicationsPageContent() {
             })
             
             // Don't auto-load applications from cache - let user filter first
-            console.log('[APPLICATIONS PAGE] Cached filters loaded - applications will load on demand')
-            
+                        
             setLoadingMessage('Loaded from cache')
             setLoadingProgress({ current: data.devices?.length || 0, total: data.devices?.length || 0 })
             setFiltersLoading(false)
             setLoading(false)
             return
           } else {
-            console.log('[APPLICATIONS PAGE] Cache expired (age:', Math.round(age / 1000), 'seconds), fetching fresh data')
-          }
+                      }
         }
         
         // Show loading state without specific numbers initially
@@ -615,19 +611,7 @@ function ApplicationsPageContent() {
         const rooms = data.rooms || []
         const fleets = data.fleets || []
         
-        console.log('APPLICATIONS PAGE FILTER OPTIONS LOADED:', {
-          devices: actualDeviceCount,
-          applicationNames: data.applicationNames?.length || 0,
-          usages: usages.length,
-          catalogs: catalogs.length,
-          rooms: rooms.length,
-          fleets: fleets.length,
-          locations: locations.length,
-          publishers: data.publishers?.length || 0,
-          categories: data.categories?.length || 0,
-          first5Apps: data.applicationNames?.slice(0, 5) || []
-        })
-
+        
         setFilterOptions({
           applicationNames: data.applicationNames || [],
           usages,
@@ -644,9 +628,7 @@ function ApplicationsPageContent() {
         setFiltersLoading(false)
         setLoading(false)
         
-        console.log('[APPLICATIONS PAGE] Filter options loaded successfully - UI ready!')
-        console.log('[APPLICATIONS PAGE] Applications will load when user applies filters or clicks "Generate Report"')
-        
+                        
       } catch (error) {
         console.error('[APPLICATIONS PAGE] Error fetching filter options:', error)
         setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
@@ -670,15 +652,7 @@ function ApplicationsPageContent() {
       setFiltersExpanded(false) // Collapse filters when generating report
       setSearchQuery('') // Clear search field when generating report
       
-      console.log('[APPLICATIONS PAGE] Loading applications with current selections...')
-      console.log('Selections:', {
-        applications: selectedApplications.length,
-        usages: selectedUsages.length,
-        catalogs: selectedCatalogs.length,
-        locations: selectedLocations.length,
-        rooms: selectedRooms.length
-      })
-      
+                  
       // Prevent loading all 78K applications without specific selections
       // Require at least one application name to be selected
       if (selectedApplications.length === 0) {
@@ -714,8 +688,7 @@ function ApplicationsPageContent() {
       const queryString = params.toString()
       const url = `/api/devices/applications${queryString ? `?${queryString}` : ''}`
       
-      console.log('[APPLICATIONS PAGE] Fetching:', url)
-      
+            
       const response = await fetch(url, {
         cache: 'no-store',
         headers: {
@@ -737,8 +710,7 @@ function ApplicationsPageContent() {
         setApplications(data)
         setLoadingProgress({ current: estimatedDevices, total: estimatedDevices })
         setLoadingMessage('Complete!')
-        console.log(`Successfully loaded ${data.length} applications matching selections`)
-        
+                
         // Save current filter state as last applied
         const currentFilters = JSON.stringify({
           applications: selectedApplications,
@@ -779,8 +751,7 @@ function ApplicationsPageContent() {
       // Start simple progress indicator (0 to 100)
       setLoadingProgress({ current: 0, total: 100 })
       
-      console.log('[APPLICATIONS PAGE] Loading utilization and inventory data...')
-      
+            
       // Build params for both endpoints
       const selectedAppsParam = selectedApplications.length > 0 
         ? selectedApplications.join(',') 
@@ -794,8 +765,7 @@ function ApplicationsPageContent() {
         inventoryParams.set('applicationNames', selectedAppsParam)
         
         const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
-        console.log('[APPLICATIONS PAGE] Fetching inventory:', inventoryUrl)
-        
+                
         try {
           const inventoryResponse = await fetch(inventoryUrl, {
             cache: 'no-store',
@@ -808,8 +778,7 @@ function ApplicationsPageContent() {
             const inventoryData = await inventoryResponse.json()
             if (Array.isArray(inventoryData)) {
               setApplications(inventoryData)
-              console.log(`Loaded ${inventoryData.length} inventory items for version analysis`)
-            }
+                          }
           }
         } catch (invError) {
           console.warn('Failed to load inventory data:', invError)
@@ -819,13 +788,7 @@ function ApplicationsPageContent() {
       
       setLoadingProgress({ current: 30, total: 100 })
       setLoadingMessage('Loading application usage data...')
-      console.log('Selections:', {
-        days: effectiveDays,
-        applications: selectedApplications.length,
-        usages: selectedUsages.length,
-        catalogs: selectedCatalogs.length
-      })
-      
+            
       // Build query params for utilization endpoint - 30-90%
       const params = new URLSearchParams()
       params.set('days', effectiveDays.toString())
@@ -844,8 +807,7 @@ function ApplicationsPageContent() {
       }
       
       const url = `/api/devices/applications/usage?${params.toString()}`
-      console.log('[APPLICATIONS PAGE] Fetching utilization:', url)
-      
+            
       setLoadingProgress({ current: 40, total: 100 })
       
       const response = await fetch(url, {
@@ -873,8 +835,7 @@ function ApplicationsPageContent() {
         setUtilizationData(data)
         // Version distribution is now included in the utilization API response
         // No need for separate inventory fetch
-        console.log(`Successfully loaded utilization data: ${data.applications?.length || 0} apps tracked, ${Object.keys(data.versionDistribution || {}).length} with version info`)
-        
+                
         setLoadingProgress({ current: 100, total: 100 })
         setLoadingMessage('Complete!')
       }
@@ -1027,16 +988,12 @@ function ApplicationsPageContent() {
 
   // Helper functions for tag management
   const toggleApplication = (app: string) => {
-    console.log(`[TOGGLE] Toggling application: "${app}"`)
-    setSelectedApplications(prev => {
+        setSelectedApplications(prev => {
       const isCurrentlySelected = prev.includes(app)
       const newSelection = isCurrentlySelected 
         ? prev.filter(a => a !== app) 
         : [...prev, app]
-      console.log(`[TOGGLE] Previous selection:`, prev)
-      console.log(`[TOGGLE] New selection:`, newSelection)
-      console.log(`[TOGGLE] Action:`, isCurrentlySelected ? 'REMOVED' : 'ADDED')
-      return newSelection
+                        return newSelection
     })
   }
 

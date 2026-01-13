@@ -30,12 +30,7 @@ export function extractEvents(deviceModules: any, eventsArray?: any[]): EventsIn
   // Events are typically provided separately, not in modules
   const events = eventsArray || []
   
-  console.log('[EVENTS MODULE] Processing events data:', {
-    eventsCount: events.length,
-    hasEventsArray: !!eventsArray,
-    sampleEvent: events[0] ? JSON.stringify(events[0]).substring(0, 200) : 'No events'
-  })
-
+  
   // Process and categorize events
   const processedEvents: EventItem[] = events.map((event: any, index: number) => ({
     id: event.id || `event-${index}`,

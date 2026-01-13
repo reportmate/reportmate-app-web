@@ -8,8 +8,7 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[DEVICES LIST API] ${timestamp} - Fast devices list (inventory only)`)
-
+    
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
     
     // Use shared authentication headers
@@ -24,8 +23,7 @@ export async function GET() {
     const devicesData = await devicesResponse.json()
     const devices = devicesData.devices || []
     
-    console.log(`[DEVICES LIST API] ${timestamp} - Found ${devices.length} devices (fast response)`)
-    
+        
     // Process devices with inventory data only - NO system calls
     const processedDevices = devices.map((device: any) => ({
       deviceId: device.deviceId,
@@ -52,8 +50,7 @@ export async function GET() {
       }
     }))
     
-    console.log(`[DEVICES LIST API] ${timestamp} - Processed ${processedDevices.length} devices in <2 seconds`)
-    
+        
     return NextResponse.json(processedDevices, {
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',

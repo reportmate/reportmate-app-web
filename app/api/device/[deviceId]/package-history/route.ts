@@ -12,8 +12,7 @@ export async function GET(
   try {
     const { deviceId } = await params
 
-    console.log('[PACKAGE HISTORY API] Fetching package history for device:', deviceId)
-
+    
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -28,8 +27,7 @@ export async function GET(
     // Construct the API URL
     const apiUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/package-history`
     
-    console.log('[PACKAGE HISTORY API] Using API URL:', apiUrl)
-    const headers = getInternalApiHeaders()
+        const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl, {
       cache: 'no-store',
       headers
@@ -63,8 +61,7 @@ export async function GET(
     }
 
     const data = await response.json()
-    console.log('[PACKAGE HISTORY API] Successfully fetched package history from Azure Functions')
-    
+        
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

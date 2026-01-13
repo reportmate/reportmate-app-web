@@ -14,8 +14,7 @@ export async function GET(
     const { searchParams } = new URL(request.url)
     const range = searchParams.get('range') || '30d'
 
-    console.log('[INSTALL ANALYTICS API] Fetching install analytics for device:', deviceId)
-
+    
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -31,8 +30,7 @@ export async function GET(
     const apiUrl = new URL(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/install-analytics`)
     apiUrl.searchParams.set('range', range)
     
-    console.log('[INSTALL ANALYTICS API] Using API URL:', apiUrl.toString())
-    const headers = getInternalApiHeaders()
+        const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl.toString(), {
       cache: 'no-store',
       headers
@@ -66,8 +64,7 @@ export async function GET(
     }
 
     const data = await response.json()
-    console.log('[INSTALL ANALYTICS API] Successfully fetched install analytics from Azure Functions')
-    
+        
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

@@ -76,8 +76,7 @@ export interface SystemInfo {
  * MODULAR: Self-contained system data processing
  */
 export function extractSystem(deviceModules: any): SystemInfo {
-  console.log('[SYSTEM MODULE] Processing system data')
-  
+    
   // Initialize with defaults
   const systemInfo: SystemInfo = {
     services: [],
@@ -89,8 +88,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   if (!deviceModules?.modules) {
-    console.log('[SYSTEM MODULE] No modules data found')
-    return systemInfo
+        return systemInfo
   }
 
   const modules = deviceModules.modules
@@ -253,14 +251,6 @@ export function extractSystem(deviceModules: any): SystemInfo {
     systemInfo.bootTime = modules.system.system_details.boot_time
   }
 
-  console.log('[SYSTEM MODULE] System info extracted:', {
-    servicesCount: systemInfo.services.length,
-    runningServices: systemInfo.runningServices,
-    environmentCount: systemInfo.environment.length,
-    updatesCount: systemInfo.updates.length,
-    scheduledTasksCount: systemInfo.scheduledTasks.length,
-    hasOperatingSystem: !!Object.keys(systemInfo.operatingSystem).length
-  })
-
+  
   return systemInfo
 }

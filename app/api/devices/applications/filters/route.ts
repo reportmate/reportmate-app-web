@@ -151,8 +151,7 @@ export async function GET(request: Request) {
     const host = requestHeaders.get('host') || ''
     const isLocalDev = host.includes('localhost')
     
-    console.log(`[APPLICATIONS FILTERS API] ${timestamp} - Fetching applications from FastAPI bulk endpoint (localhost: ${isLocalDev})`)
-
+    
     // PERFORMANCE FIX: Use FastAPI bulk applications endpoint instead of fetching each device individually
     // This reduces 234 sequential API calls to just 2 calls (devices + applications)
     
@@ -178,8 +177,7 @@ export async function GET(request: Request) {
       throw new Error('Invalid devices response format')
     }
 
-    console.log(`[APPLICATIONS FILTERS API] Fetched ${devicesData.devices.length} devices`)
-
+    
     // 2. Fetch ALL applications using bulk endpoint (much faster than 234 individual calls)
     const applicationsResponse = await fetch(`${baseUrl}/api/devices/applications?loadAll=true`, {
       method: 'GET',
@@ -198,8 +196,7 @@ export async function GET(request: Request) {
       throw new Error('Invalid applications response format')
     }
 
-    console.log(`[APPLICATIONS FILTERS API] Fetched ${applicationsData.length} applications from bulk endpoint`)
-
+    
     // Build devices array with inventory metadata AND group applications by device
     const devicesMap = new Map()
     const deviceAppsCount = new Map() // Track app count per device
@@ -312,21 +309,7 @@ export async function GET(request: Request) {
       fleets
     }
 
-    console.log(`[APPLICATIONS FILTERS API] Generated filter options:`, {
-      devicesProcessed: devices.length,
-      totalApplications: applicationsData.length,
-      normalizedAppNames: filterOptions.applicationNames.length,
-      publishers: filterOptions.publishers.length,
-      categories: filterOptions.categories.length,
-      inventoryFilters: {
-        usages: usages.length,
-        catalogs: catalogs.length,
-        locations: locations.length,
-        rooms: rooms.length,
-        fleets: fleets.length
-      }
-    })
-    
+        
     return NextResponse.json(filterOptions, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',

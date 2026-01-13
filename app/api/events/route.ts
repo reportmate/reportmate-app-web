@@ -69,8 +69,7 @@ export async function GET(request: Request) {
     }
     
     const timestamp = new Date().toISOString()
-    console.log(`[EVENTS API CACHED] ${timestamp} - Cached events endpoint (limit: ${validLimit}, offset: ${validOffset}, dateRange: ${validStartDate || 'none'} - ${validEndDate || 'none'})`)
-
+    
     // Get API base URL (consistent with other routes)
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -99,8 +98,7 @@ export async function GET(request: Request) {
       if (eventsCache.length > 0 && 
           (now - eventsCacheTimestamp) < EVENTS_CACHE_DURATION && 
           validLimit <= eventsCache.length) {
-        console.log(`[EVENTS API CACHED] ${timestamp} - Serving from cache: ${validLimit}/${eventsCache.length} events`)
-        const limitedEvents = eventsCache.slice(0, validLimit)
+                const limitedEvents = eventsCache.slice(0, validLimit)
         return NextResponse.json({
           success: true,
           events: limitedEvents,
@@ -118,10 +116,7 @@ export async function GET(request: Request) {
       }
     }
 
-    console.log(`[EVENTS API CACHED] ${timestamp} - Fetching fresh data from Azure Functions (limit: ${validLimit}, offset: ${validOffset}, dateRange: ${validStartDate || 'none'} - ${validEndDate || 'none'})`)
-    console.log('[EVENTS API] Fetching events from Azure Functions API');
-    console.log('[EVENTS API] Using API base URL:', apiBaseUrl);
-
+            
     // Valid event categories - filter out everything else
     const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection'];
 
@@ -137,8 +132,7 @@ export async function GET(request: Request) {
       const queryString = queryParams.toString()
       const apiUrl = `${apiBaseUrl}/api/events?${queryString}`
       
-      console.log('[EVENTS API] Attempting to fetch from:', apiUrl);
-      
+            
       // Use longer timeout (15 seconds) for Azure Functions
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
@@ -154,28 +148,7 @@ export async function GET(request: Request) {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('[EVENTS API] Successfully fetched events from Azure Functions');
-        console.log('[EVENTS API] Raw response structure:', {
-          success: data.success,
-          eventCount: data.events?.length || 0,
-          firstEvent: data.events?.[0] ? {
-            id: data.events[0].id,
-            // Container Apps API fields
-            deviceId: data.events[0].deviceId,
-            serialNumber: data.events[0].serialNumber,
-            eventType: data.events[0].eventType,
-            timestamp: data.events[0].timestamp,
-            // Legacy fields for compatibility
-            device: data.events[0].device || data.events[0].device_id,
-            kind: data.events[0].kind,
-            ts: data.events[0].ts,
-            payloadType: typeof (data.events[0].details || data.events[0].payload),
-            payloadKeys: (data.events[0].details || data.events[0].payload) && typeof (data.events[0].details || data.events[0].payload) === 'object' 
-              ? Object.keys(data.events[0].details || data.events[0].payload) 
-              : 'not object'
-          } : 'no events'
-        });
-        
+                        
         // Filter events to only include valid categories and normalize field names
         // Handle both response formats: {success: true, events: []} or {events: [], total: N}
         const eventsArray = data.events || (Array.isArray(data) ? data : [])
@@ -202,9 +175,7 @@ export async function GET(request: Request) {
             VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
           );
           
-          console.log('[EVENTS API] Events before filter:', normalizedEvents.length, 'After filter:', filteredEvents.length);
-          console.log('[EVENTS API] Sample event kinds:', normalizedEvents.slice(0, 5).map((e: any) => ({ id: e.id, kind: e.kind, kindLower: e.kind?.toLowerCase(), isValid: VALID_EVENT_KINDS.includes(e.kind?.toLowerCase()) })));
-          
+                              
           const filteredData = {
             success: true, // Always include success field for frontend compatibility
             events: filteredEvents,
@@ -218,9 +189,7 @@ export async function GET(request: Request) {
             eventsCacheTimestamp = Date.now()
           }
           
-          console.log('[EVENTS API] Normalized and filtered events count:', filteredEvents.length);
-          console.log(`[EVENTS API CACHED] ${timestamp} - Cached ${filteredEvents.length} events`)
-          
+                              
           return NextResponse.json(filteredData, {
             headers: {
               'Cache-Control': 'no-store, no-cache, must-revalidate',
@@ -246,23 +215,18 @@ export async function GET(request: Request) {
     } catch (fetchError) {
       if (fetchError instanceof Error) {
         if (fetchError.name === 'AbortError') {
-          console.log('[EVENTS API] Azure Functions API timed out after 15 seconds - using fallback data');
-        } else {
-          console.log('[EVENTS API] Azure Functions API fetch error:', fetchError.message);
-        }
+                  } else {
+                  }
       } else {
-        console.log('[EVENTS API] Azure Functions API fetch error:', String(fetchError));
-      }
+              }
       // Fall through to direct database query
     }
 
     // Try direct database query as backup
-    console.log('[EVENTS API] Azure Functions timeout - attempting direct database query');
-    
+        
     try {
       // TODO: Implement direct database query here
-      console.log('[EVENTS API] Direct database query not yet implemented');
-      return NextResponse.json(
+            return NextResponse.json(
         { error: 'Azure Functions API unavailable and direct database fallback not implemented' },
         { status: 503 }
       );
