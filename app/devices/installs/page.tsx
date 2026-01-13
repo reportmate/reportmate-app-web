@@ -201,12 +201,10 @@ function InstallsPageContent() {
           const countData = await countResponse.json()
           if (countData.devices?.length) {
             estimatedTotal = countData.devices.length
-            console.log('[INSTALLS PAGE] Got device count from API:', estimatedTotal)
-          }
+                      }
         }
       } catch (e) {
-        console.log('[INSTALLS PAGE] Could not fetch device count, using fallback')
-      }
+              }
       
       // Fallback if all else fails
       if (estimatedTotal === 0) {
@@ -288,28 +286,17 @@ function InstallsPageContent() {
         startTransition(() => {
           setDevices(data.devices)
         })
-        console.log('[INSTALLS PAGE] Loaded', data.devices.length, 'devices with installs data from single API call')
-      }
+              }
       
       // DISABLED: sessionStorage caching - the full devices data is too large (10MB+)
       // and JSON.stringify blocks the main thread for 30+ seconds
       // The API response is fast enough that caching isn't worth the UI freeze
       // If caching is needed in the future, use IndexedDB with async operations
       
-      console.log('[INSTALLS PAGE] Filter options loaded successfully:', {
-        managedInstalls: data.managedInstalls?.length || 0,
-        usages: data.usages?.length || 0,
-        catalogs: data.catalogs?.length || 0,
-        rooms: data.rooms?.length || 0,
-        devicesWithData: actualDeviceCount,
-        devicesLoaded: data.devices?.length || 0,
-        loadTime: 'fresh from API'
-      })
-    } catch (error) {
+          } catch (error) {
       // Ignore abort errors - these happen when component unmounts or dev server reloads
       if (error instanceof Error && (error.name === 'AbortError' || error.message.includes('abort'))) {
-        console.log('[INSTALLS PAGE] Request aborted (likely dev server reload or navigation)')
-        return
+                return
       }
       console.error('[INSTALLS PAGE] Error fetching filter options:', error)
       setError(error instanceof Error ? error.message : 'Failed to load filter options. Please check API connectivity.')
@@ -1513,7 +1500,6 @@ function InstallsPageContent() {
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           
 
-
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 sticky top-16 z-30 bg-white dark:bg-gray-800 rounded-t-xl">
             <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -2499,8 +2485,7 @@ function InstallsPageContent() {
                 </h3>
                 <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
-                    console.log('[MUNKI WIDGET] Total devices:', devices?.length || 0)
-                    
+                                        
                     if (filtersLoading || !devices || devices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
@@ -2527,8 +2512,7 @@ function InstallsPageContent() {
                       return hasMunki
                     })
                     
-                    console.log('[MUNKI WIDGET] Devices with Munki:', munkiDevices.length)
-                    
+                                        
                     if (munkiDevices.length === 0) {
                       return (
                         <div className="text-center py-4 text-gray-500 dark:text-gray-400">
@@ -2615,8 +2599,7 @@ function InstallsPageContent() {
                 </h3>
                 <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
-                    console.log('[CIMIAN WIDGET] Total devices:', devices?.length || 0)
-                    
+                                        
                     if (filtersLoading || !devices || devices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
@@ -2641,13 +2624,11 @@ function InstallsPageContent() {
                     const cimianDevices = (devices || []).filter((d: any) => {
                       const hasCimian = d?.modules?.installs?.cimian?.version
                       if (hasCimian) {
-                        console.log('[CIMIAN WIDGET] Found device with Cimian:', d.serialNumber, d.modules.installs.cimian.version)
-                      }
+                                              }
                       return hasCimian
                     })
                     
-                    console.log('[CIMIAN WIDGET] Devices with Cimian:', cimianDevices.length)
-                    
+                                        
                     if (cimianDevices.length === 0) {
                       return (
                         <div className="text-center py-4 text-gray-500 dark:text-gray-400">
@@ -2672,8 +2653,7 @@ function InstallsPageContent() {
                       return versionB.localeCompare(versionA, undefined, { numeric: true, sensitivity: 'base' })
                     })
                     
-                    console.log('[CIMIAN WIDGET] Version groups:', versionGroups.length, 'versions')
-                    
+                                        
                     return versionGroups.map(([version, data]) => {
                       const total = cimianDevices.length
                       const percentage = total > 0 ? Math.round((data.count / total) * 100) : 0
@@ -2735,8 +2715,7 @@ function InstallsPageContent() {
                 </h3>
                 <div className="h-40 overflow-y-auto space-y-3">
                   {(() => {
-                    console.log('[MANIFEST WIDGET] Total devices:', devices?.length || 0)
-                    
+                                        
                     if (filtersLoading || !devices || devices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
@@ -2785,8 +2764,7 @@ function InstallsPageContent() {
                     
                     const manifestEntries = Object.entries(manifestCounts).sort(([,a], [,b]) => b.count - a.count)
                     
-                    console.log('[MANIFEST WIDGET] Total manifests:', manifestEntries.length)
-                    
+                                        
                     if (manifestEntries.length === 0) {
                       return (
                         <div className="text-center py-4 text-gray-500 dark:text-gray-400">

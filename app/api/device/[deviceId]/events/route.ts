@@ -17,14 +17,12 @@ export async function GET(
 ) {
   try {
     const { deviceId } = await params
-    console.log('[DEVICE EVENTS API] Fetching events for device:', deviceId)
-
+    
     // Extract query parameters for pagination
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500, default 100
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
-    console.log('[DEVICE EVENTS API] Query params - limit:', limit, 'offset:', offset)
-
+    
     // Valid event categories - filter out everything else
     const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
 
@@ -39,8 +37,7 @@ export async function GET(
       }, { status: 500 })
     }
     
-    console.log('[DEVICE EVENTS API] Using API base URL:', apiBaseUrl)
-    
+        
     try {
       // Try to fetch from Azure Functions if available
       const headers = getInternalApiHeaders()
@@ -52,8 +49,7 @@ export async function GET(
       
       if (response.ok) {
         const data = await response.json()
-        console.log('[DEVICE EVENTS API] Successfully fetched device events from Azure Functions')
-        
+                
         // Filter events to only include valid categories
         if (data.success && Array.isArray(data.events)) {
           const filteredEvents = data.events.filter((event: DeviceEvent) => 
@@ -83,8 +79,7 @@ export async function GET(
         })
       } else {
         // API returned error - return empty events (no fake data)
-        console.log('[DEVICE EVENTS API] Azure Functions API error:', response.status, response.statusText)
-        return NextResponse.json({
+                return NextResponse.json({
           success: true,
           events: [],
           count: 0,
@@ -107,8 +102,7 @@ export async function GET(
       }
     } catch (error) {
       // API unavailable - return empty events (no fake data)
-      console.log('[DEVICE EVENTS API] Azure Functions API error:', error instanceof Error ? error.message : String(error))
-      return NextResponse.json({
+            return NextResponse.json({
         success: true,
         events: [],
         count: 0,

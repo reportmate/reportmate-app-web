@@ -193,31 +193,12 @@ export interface ManagementSummary {
  */
 export function extractManagement(deviceModules: any): ManagementInfo {
   if (!deviceModules?.management) {
-    console.log('[MANAGEMENT MODULE] No management data found in modules')
-    return createEmptyManagementInfo()
+        return createEmptyManagementInfo()
   }
 
   const management = deviceModules.management
   
-  console.log('[MANAGEMENT MODULE] Reading pre-processed management data:', {
-    // Check for both snake_case (Mac/osquery) and camelCase (Windows/legacy) keys
-    hasMdmEnrollment: !!(management.mdm_enrollment || management.mdmEnrollment),
-    hasDomainStatus: !!(management.domain_status || management.domainStatus || management.device_state),
-    hasPolicies: !!management.policies,
-    hasCompliance: !!(management.compliance_status || management.compliance || management.complianceStatus),
-    hasCertificates: !!management.certificates,
-    hasBitlocker: !!(management.bitlocker_status || management.bitlockerStatus),
-    hasWindowsUpdate: !!(management.windows_update || management.windowsUpdate),
-    hasGroupPolicies: !!(management.group_policies || management.groupPolicies),
-    hasLocalUsers: !!(management.local_users || management.localUsers),
-    hasRemoteAccess: !!(management.remote_management || management.remote_access || management.remoteAccess),
-    hasDeviceState: !!management.device_state,
-    // Mac-specific
-    hasAdeConfiguration: !!(management.ade_configuration || management.adeConfiguration),
-    hasDeviceIdentifiers: !!(management.device_identifiers || management.deviceIdentifiers),
-    hasInstalledProfiles: !!(management.installed_profiles || management.installedProfiles)
-  })
-
+  
   // Support both snake_case (Mac/osquery) and camelCase (Windows/legacy) field names
   // Mac uses snake_case from osquery output
   const mdmData = management.mdm_enrollment || management.mdmEnrollment
@@ -267,18 +248,7 @@ export function extractManagement(deviceModules: any): ManagementInfo {
     summary: management.summary || createEmptySummary()
   }
 
-  console.log('[MANAGEMENT MODULE] Management info read:', {
-    mdmEnrolled: managementInfo.mdmEnrollment.enrolled,
-    domainJoined: managementInfo.domainStatus.joined,
-    policiesCount: managementInfo.policies.length,
-    complianceScore: managementInfo.compliance.complianceScore,
-    certificatesCount: managementInfo.certificates.length,
-    bitlockerEnabled: managementInfo.bitlockerStatus.enabled,
-    pendingUpdates: managementInfo.windowsUpdate.pendingUpdates,
-    groupPoliciesCount: managementInfo.groupPolicies.length,
-    localUsersCount: managementInfo.localUsers.length
-  })
-
+  
   return managementInfo
 }
 
