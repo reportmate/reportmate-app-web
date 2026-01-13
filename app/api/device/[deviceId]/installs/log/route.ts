@@ -15,6 +15,8 @@ export async function GET(
 ) {
   try {
     const { deviceId } = await params
+    console.log(`[INSTALLS LOG API] Fetching installs log for device:`, deviceId)
+
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -30,6 +32,8 @@ export async function GET(
     const headers = getInternalApiHeaders()
     
     const upstreamUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/installs/log`
+    console.log('[INSTALLS LOG API] Fetching from:', upstreamUrl)
+    
     const response = await fetch(upstreamUrl, {
       cache: 'no-store',
       headers
@@ -48,7 +52,7 @@ export async function GET(
     }
 
     const data = await response.json()
-    `)
+    console.log(`[INSTALLS LOG API] Successfully fetched log (${data.runLog ? data.runLog.length : 0} chars)`)
     
     return NextResponse.json(data, {
       headers: {

@@ -8,6 +8,8 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[CHART DATA API] ${timestamp} - Getting system data for charts only`)
+
     const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
     
     // Use shared authentication headers
@@ -24,6 +26,8 @@ export async function GET() {
     
     // Get system data from ALL devices - NO LIMITS!
     const sampleDevices = devices
+    
+    console.log(`[CHART DATA API] ${timestamp} - Getting system data from ALL ${devices.length} devices`)
     
     const chartData = []
     
@@ -52,6 +56,8 @@ export async function GET() {
         console.warn(`[CHART DATA API] Failed to get data for ${device.serialNumber}:`, error)
       }
     }
+    
+    console.log(`[CHART DATA API] ${timestamp} - Got chart data for ${chartData.length}/${sampleDevices.length} devices`)
     
     // Process chart data
     const osVersionCounts = new Map<string, number>()

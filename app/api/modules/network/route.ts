@@ -7,6 +7,8 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[NETWORK API] ${timestamp} - Fetching network data from FastAPI`)
+    
     // Fetch from FastAPI - use dedicated bulk network endpoint
     const apiBaseUrl = process.env.API_BASE_URL;
     
@@ -26,7 +28,7 @@ export async function GET() {
     }
     
     const networkData = await response.json()
-    ? networkData.length : 0} network records`)
+    console.log(`[NETWORK API] ${timestamp} - FastAPI returned ${Array.isArray(networkData) ? networkData.length : 0} network records`)
     
     // If we got an array, it's already in the correct format from FastAPI
     if (Array.isArray(networkData)) {
@@ -40,6 +42,7 @@ export async function GET() {
     }
     
     // If we got an empty result or unexpected format, return empty array
+    console.log(`[NETWORK API] ${timestamp} - No network data available`)
     return NextResponse.json([], {
       headers: { 
         'X-Fetched-At': timestamp, 

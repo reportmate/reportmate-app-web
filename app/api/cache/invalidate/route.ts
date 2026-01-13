@@ -7,11 +7,15 @@ export const revalidate = 0
 export async function POST(request: Request) {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[CACHE INVALIDATION] ${timestamp} - Cache invalidation request received`)
+    
     const body = await request.json()
     const { deviceId, serialNumber, invalidateAll = false } = body
     
     if (invalidateAll) {
       // Invalidate all caches - used for bulk operations or system maintenance
+      console.log(`[CACHE INVALIDATION] ${timestamp} - Invalidating ALL caches`)
+      
       // We'll implement cache clearing by importing the cache modules and resetting them
       // For now, we'll just log and return success - the actual cache clearing will be
       // implemented when we refactor the cache system to be centralized
@@ -25,6 +29,8 @@ export async function POST(request: Request) {
     }
     
     if (deviceId || serialNumber) {
+      console.log(`[CACHE INVALIDATION] ${timestamp} - Invalidating cache for device: ${deviceId || serialNumber}`)
+      
       // Device-specific cache invalidation
       // This would clear caches that contain data for this specific device
       
