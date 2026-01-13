@@ -7,12 +7,16 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[INVENTORY API] ${timestamp} - Fetching bulk inventory data from FastAPI`)
+    
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
       throw new Error('API_BASE_URL not configured')
     }
     
     const fastApiUrl = `${apiBaseUrl}/api/devices/inventory`
+    console.log(`[INVENTORY API] Calling: ${fastApiUrl}`)
+    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -29,7 +33,7 @@ export async function GET() {
     
     const inventoryData = await response.json()
     
-    ? inventoryData.length : 0} devices with inventory data`)
+    console.log(`[INVENTORY API] Received ${Array.isArray(inventoryData) ? inventoryData.length : 0} devices with inventory data`)
     
     return NextResponse.json(inventoryData, {
       headers: {

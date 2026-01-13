@@ -13,12 +13,16 @@ export async function GET(request: Request) {
     const timestamp = new Date().toISOString()
     const { searchParams } = new URL(request.url)
     
+    console.log(`[HARDWARE PROXY] ${timestamp} - Forwarding to FastAPI`)
+    
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
       throw new Error('API_BASE_URL not configured')
     }
     
     const fastApiUrl = `${apiBaseUrl}/api/devices/hardware?${searchParams.toString()}`
+    console.log(`[HARDWARE PROXY] Calling: ${fastApiUrl}`)
+    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
     }
     
     const data = await response.json()
-    ? data.length : 0} hardware records`)
+    console.log(`[HARDWARE PROXY] Received ${Array.isArray(data) ? data.length : 0} hardware records`)
     
     return NextResponse.json(data, {
       headers: {

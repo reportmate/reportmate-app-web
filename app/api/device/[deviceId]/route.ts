@@ -75,6 +75,7 @@ function convertPowerShellObjects(obj: unknown, parentKey?: string, originalObj?
     for (const [key, value] of Object.entries(obj)) {
       // For known array fields, preserve original data if available
       if (['events', 'items', 'sessions'].includes(key) && Array.isArray(value)) {
+        console.log(`[DEVICE API] Preserving original ${key} array with ${value.length} items`)
         result[key] = value // Preserve original array data
       } else {
         result[key] = convertPowerShellObjects(value, key, obj)
@@ -92,7 +93,12 @@ export async function GET(
 ) {
   try {
     const { deviceId } = await params
-    .filter(k => k.includes('API')),
+    console.log('[DEVICE API] Starting API call for device:', deviceId)
+    console.log('[DEVICE API] Environment check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      hasAPIBaseURL: !!process.env.API_BASE_URL,
+      apiBaseUrl: process.env.API_BASE_URL,
+      allEnvKeys: Object.keys(process.env).filter(k => k.includes('API')),
     })
 
     // Use server-side API base URL configuration
@@ -111,7 +117,10 @@ export async function GET(
       }, { status: 500 })
     }
     
+    console.log('[DEVICE API] Using API base URL:', apiBaseUrl)
     const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
+    console.log('[DEVICE API] About to fetch from Azure Functions:', azureFunctionsUrl)
+    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     
@@ -120,7 +129,8 @@ export async function GET(
       headers
     })
     
-    ))
+    console.log('[DEVICE API] Azure Functions response status:', response.status, response.statusText)
+    console.log('[DEVICE API] Azure Functions response headers:', Object.fromEntries(response.headers.entries()))
     
     if (!response.ok) {
       console.error('[DEVICE API] Azure Functions API error:', response.status, response.statusText)
@@ -150,7 +160,7 @@ export async function GET(
       
       // Pass through 404 errors cleanly (device not found)
       if (response.status === 404) {
-        - passing through')
+        console.log('[DEVICE API] Device not found (404) - passing through')
         return NextResponse.json({
           success: false,
           error: 'Device not found',
@@ -182,8 +192,11 @@ export async function GET(
     }
 
     const data = await response.json()
-    .substring(0, 2000))
-    : [],
+    console.log('[DEVICE API] Successfully fetched device data from Azure Functions')
+    console.log('[DEVICE API] DEBUG: Raw response data:', JSON.stringify(data, null, 2).substring(0, 2000))
+    console.log('[DEVICE API] Response structure:', {
+      hasMetadata: 'metadata' in data,
+      metadataKeys: data.metadata ? Object.keys(data.metadata) : [],
       responseKeys: Object.keys(data),
       responseSize: JSON.stringify(data).length,
       hasSuccess: 'success' in data,
@@ -194,19 +207,28 @@ export async function GET(
     })
     
     // DEBUG: Log the raw response to understand the structure
-    .substring(0, 1000))
+    console.log('[DEVICE API] RAW RESPONSE SAMPLE:', JSON.stringify(data, null, 2).substring(0, 1000))
     
-    .filter(k => k !== 'metadata')
+    console.log('[DEVICE API] Unified data structure sample:', JSON.stringify({
+      metadata: data.metadata,
+      moduleKeys: Object.keys(data).filter(k => k !== 'metadata')
     }, null, 2).substring(0, 500) + '...')
     
     // Handle new nested Azure Functions format: {success: true, device: {modules: {...}}}
     if (data.success && data.device && data.device.modules) {
+      console.log('[DEVICE API] Handling new nested Azure Functions format')
+      
       const device = data.device
       const modules = device.modules
       
+      console.log('[DEVICE API] Clean modular response - deviceId:', device.deviceId, 'serialNumber:', device.serialNumber)
+      
       // Convert any PowerShell objects in the modules
+      console.log('[DEVICE API] Converting PowerShell objects...')
       const cleanedModules = convertPowerShellObjects(modules, 'modules', data) as Record<string, unknown>
-      const responseData = {
+      console.log('[DEVICE API] PowerShell conversion complete')
+      
+        const responseData = {
           success: true,
           device: {
             deviceId: device.deviceId,
@@ -219,13 +241,19 @@ export async function GET(
           }
         }
       
-      .length,
+      console.log('[DEVICE API] Clean device response prepared:', {
+        deviceId: responseData.device.deviceId,
+        serialNumber: responseData.device.serialNumber,
+        moduleCount: Object.keys(responseData.device.modules).length,
         moduleNames: Object.keys(responseData.device.modules)
       })
       
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
+        console.log('[DEVICE API] Fetching device events for timestamp synchronization...')
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+        console.log('[DEVICE API] Events URL:', deviceEventsUrl)
+        
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
         
@@ -235,7 +263,9 @@ export async function GET(
         
         if (eventsResponse.ok) {
           const eventsData = await eventsResponse.json()
-          ,
+          console.log('[DEVICE API] Events response:', {
+            success: eventsData.success,
+            hasEvents: Array.isArray(eventsData.events),
             eventsCount: eventsData.events?.length || 0,
             firstEvent: eventsData.events?.[0] ? {
               id: eventsData.events[0].id,
@@ -249,15 +279,19 @@ export async function GET(
             const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
             
             if (eventTimestamp) {
+              console.log('[DEVICE API] UPDATING lastSeen from', responseData.device.lastSeen, 'to', eventTimestamp)
               responseData.device.lastSeen = eventTimestamp
             }
           }
         } else {
-          }
+          console.log('[DEVICE API] Failed to fetch events for timestamp sync:', eventsResponse.status)
+        }
       } catch (eventsError) {
         console.error('[DEVICE API] Error fetching events for timestamp sync:', eventsError)
         // Continue without timestamp sync if events fetch fails
       }
+      
+      console.log('[DEVICE API] Final device response prepared', responseData.device.deviceId)
       
       return NextResponse.json(responseData, {
         headers: {
@@ -270,6 +304,8 @@ export async function GET(
     // Handle legacy unified structure - data is the device info directly
     else if (data.metadata) {
       const metadata = data.metadata
+      
+      console.log('[DEVICE API] Clean modular response - deviceId:', metadata.deviceId, 'serialNumber:', metadata.serialNumber)
       
       // Build clean modules object with proper ordering: inventory, system, hardware, management, then alphabetical
       const modules: Record<string, unknown> = {}
@@ -308,11 +344,16 @@ export async function GET(
         }
       }
       
-      .length, 'modules')
+      console.log('[DEVICE API] Returning CLEAN modular structure with', Object.keys(modules).length, 'modules')
+      
+      console.log('ABOUT TO DO TIMESTAMP SYNC ')
       
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
+        console.log('[DEVICE API] Fetching device events for timestamp synchronization...')
         const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+        console.log('[DEVICE API] Events URL:', deviceEventsUrl)
+        
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
         
@@ -322,7 +363,9 @@ export async function GET(
         
         if (eventsResponse.ok) {
           const eventsData = await eventsResponse.json()
-          ,
+          console.log('[DEVICE API] Events response:', {
+            success: eventsData.success,
+            hasEvents: Array.isArray(eventsData.events),
             eventsCount: eventsData.events?.length || 0,
             firstEvent: eventsData.events?.[0] ? {
               id: eventsData.events[0].id,
@@ -336,11 +379,13 @@ export async function GET(
             const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
             
             if (eventTimestamp) {
+              console.log('[DEVICE API] UPDATING lastSeen from', responseData.device.lastSeen, 'to', eventTimestamp)
               responseData.device.lastSeen = eventTimestamp
             }
           }
         } else {
-          }
+          console.log('[DEVICE API] Failed to fetch events for timestamp sync:', eventsResponse.status)
+        }
       } catch (eventsError) {
         console.error('[DEVICE API] Error fetching events for timestamp sync:', eventsError)
         // Continue without timestamp sync if events fetch fails
@@ -355,8 +400,12 @@ export async function GET(
       })
     } else {
       // Handle direct Azure Functions response format (without metadata wrapper)
+      console.log('[DEVICE API] Handling direct Azure Functions response format')
+      
       // Check if this is the raw Azure Functions format with direct module properties
       if (data.success && (data.security || data.management || data.inventory)) {
+        console.log('[DEVICE API] Found direct Azure Functions format')
+        
         // Extract device metadata from the response
         const deviceMetadata = {
           deviceId: data.metadata?.deviceId || data.deviceId,
@@ -399,11 +448,15 @@ export async function GET(
           }
         }
         
-        .length, 'modules')
+        console.log('[DEVICE API] Returning Azure Functions format with', Object.keys(modules).length, 'modules')
+        console.log('[DEVICE API] Device identifier:', deviceIdentifier)
+        
         // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
         try {
-          ...')
+          console.log('[DEVICE API] Fetching device events for timestamp synchronization (Azure format)...')
           const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+          console.log('[DEVICE API] Events URL:', deviceEventsUrl)
+          
           // Use shared auth headers for internal API calls
           const eventsHeaders = getInternalApiHeaders()
           
@@ -413,7 +466,7 @@ export async function GET(
           
           if (eventsResponse.ok) {
             const eventsData = await eventsResponse.json()
-            :', {
+            console.log('[DEVICE API] Events response (Azure format):', {
               success: eventsData.success,
               hasEvents: Array.isArray(eventsData.events),
               eventsCount: eventsData.events?.length || 0,
@@ -429,12 +482,12 @@ export async function GET(
               const eventTimestamp = latestEvent.ts || latestEvent.timestamp || latestEvent.created_at
               
               if (eventTimestamp) {
-                from', responseData.device.lastSeen, 'to', eventTimestamp)
+                console.log('[DEVICE API] UPDATING lastSeen (Azure format) from', responseData.device.lastSeen, 'to', eventTimestamp)
                 responseData.device.lastSeen = eventTimestamp
               }
             }
           } else {
-            :', eventsResponse.status)
+            console.log('[DEVICE API] Failed to fetch events for timestamp sync (Azure format):', eventsResponse.status)
           }
         } catch (eventsError) {
           console.error('[DEVICE API] Error fetching events for timestamp sync (Azure format):', eventsError)
@@ -452,6 +505,7 @@ export async function GET(
     }
     
     // If no metadata found, return error
+    console.log('[DEVICE API] No metadata found in response')
     return NextResponse.json({
       error: 'Invalid device data structure',
       details: 'Expected unified data format with metadata'

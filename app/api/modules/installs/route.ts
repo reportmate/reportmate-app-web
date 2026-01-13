@@ -9,6 +9,8 @@ export const revalidate = 0
 export async function GET(request: NextRequest) {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[INSTALLS API] ${timestamp} - Fetching installs data`)
+
     // Get device parameter from URL
     const { searchParams } = new URL(request.url)
     const deviceId = searchParams.get('device')
@@ -32,6 +34,8 @@ export async function GET(request: NextRequest) {
     }
     
     // Fetch device data first to get the installs module data
+    console.log(`[INSTALLS API] ${timestamp} - Fetching device data for: ${deviceId}`)
+    
     try {
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
@@ -50,9 +54,21 @@ export async function GET(request: NextRequest) {
       }
       
       const deviceData = await deviceResponse.json()
+      console.log(`[INSTALLS API] ${timestamp} - Device data received successfully`)
+      
       // Extract installs data using the ReportMate processing module
       if (deviceData.success && deviceData.device && deviceData.device.modules) {
+        console.log(`[INSTALLS API] ${timestamp} - Processing installs data with ReportMate module`)
         const installsInfo = extractInstalls(deviceData.device.modules)
+        
+        console.log(`[INSTALLS API] ${timestamp} - Installs processing complete:`, {
+          totalPackages: installsInfo.totalPackages,
+          installed: installsInfo.installed,
+          pending: installsInfo.pending,
+          failed: installsInfo.failed,
+          errorsFound: installsInfo.messages?.errors.length || 0,
+          warningsFound: installsInfo.messages?.warnings.length || 0
+        })
         
         return NextResponse.json({
           success: true,

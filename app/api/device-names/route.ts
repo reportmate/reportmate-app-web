@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     // Return only the requested device names
     const requestedNames = getDeviceNamesFromCache(serials)
     
-    .length} requested device names`)
+    console.log(`[DEVICE-NAMES API] Returning ${Object.keys(requestedNames).length} requested device names`)
     
     return NextResponse.json({
       success: true,

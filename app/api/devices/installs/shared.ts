@@ -25,9 +25,12 @@ export async function fetchBulkInstallRecords(): Promise<any[]> {
 
   // Check cache first
   if (cachedInstallRecords && (Date.now() - cachedInstallRecords.timestamp) < CACHE_TTL) {
+    console.log('[INSTALLS SHARED] Using cached install records');
     return cachedInstallRecords.records;
   }
 
+  console.log('[INSTALLS SHARED] Fetching install records from bulk endpoint');
+  
   // Use shared authentication headers
   const headers = getInternalApiHeaders();
   
@@ -51,6 +54,7 @@ export async function fetchBulkInstallRecords(): Promise<any[]> {
     timestamp: Date.now()
   };
 
+  console.log(`[INSTALLS SHARED] Cached ${records.length} install records`);
   return records;
 }
 

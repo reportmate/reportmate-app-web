@@ -17,6 +17,8 @@ export async function GET(
     const session = searchParams.get('session')
     const level = searchParams.get('level')
 
+    console.log('[INSTALL EVENTS API] Fetching install events for device:', deviceId)
+
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -35,7 +37,7 @@ export async function GET(
     if (session) apiUrl.searchParams.set('session', session)
     if (level) apiUrl.searchParams.set('level', level)
     
-    )
+    console.log('[INSTALL EVENTS API] Using API URL:', apiUrl.toString())
     const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl.toString(), {
       cache: 'no-store',
@@ -70,6 +72,8 @@ export async function GET(
     }
 
     const data = await response.json()
+    console.log('[INSTALL EVENTS API] Successfully fetched install events from Azure Functions')
+    
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

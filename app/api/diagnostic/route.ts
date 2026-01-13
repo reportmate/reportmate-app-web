@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 
 export async function GET(request: Request) {
   try {
+    console.log('[DIAGNOSTIC] Testing both APIs from server side')
+    
     // Use internal localhost call for internal API calls
     // In production containers, the app runs on port 3000 internally
     const internalPort = process.env.PORT || '3000';

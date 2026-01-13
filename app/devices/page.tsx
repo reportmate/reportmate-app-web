@@ -122,8 +122,10 @@ function DevicesPageContent() {
             }
           })
           
+          console.log('[DEVICES PAGE] Processed inventory items:', inventoryItems.length, 'First item:', inventoryItems[0])
           setInventory(inventoryItems)
         } else {
+          console.log('[DEVICES PAGE] No devices found in response')
           setInventory([])
         }
       } catch (err) {
@@ -140,7 +142,8 @@ function DevicesPageContent() {
   // Filter inventory based on search query and filters
   const filteredInventory = (() => {
     try {
-      ,
+      console.log('Filter function called with inventory:', {
+        isArray: Array.isArray(inventory),
         length: inventory?.length,
         firstItem: inventory?.[0],
         inventoryState: inventory
@@ -275,6 +278,9 @@ function DevicesPageContent() {
         if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
         return 0
       })
+      
+      console.log(`Filtered inventory: ${filtered.length} items, unique: ${uniqueFiltered.length} items, sorted: ${sorted.length} items`)
+      console.log('Sample filtered item:', sorted[0])
       
       return sorted
     } catch (e) {
