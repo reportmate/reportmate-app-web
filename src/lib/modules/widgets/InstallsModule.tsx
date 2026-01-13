@@ -155,9 +155,7 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
           }))
           
           setSessions(processedSessions)
-          console.log(`[InstallsModule] Processed ${processedSessions.length} sessions from device data`)
-        } else {
-          console.log('[InstallsModule] No session data found in device object, falling back to API call')
+          } else {
           fetchSessionsFromAPI()
         }
       } catch (err) {
@@ -174,8 +172,7 @@ const InstallSessionsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
         if (response.ok) {
           const data = await response.json()
           setSessions(data.sessions || [])
-          console.log('[InstallsModule] Fetched sessions from API fallback')
-        } else {
+          } else {
           setError('Failed to fetch install sessions')
         }
       } catch (err) {

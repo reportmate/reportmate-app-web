@@ -2,8 +2,6 @@ import NextAuth from "next-auth"
 import AzureADProvider from "next-auth/providers/azure-ad"
 import type { NextAuthOptions } from "next-auth"
 
-console.log('[NEXTAUTH ROUTE] Loading NextAuth route handler')
-
 // Build authOptions at module level but defer provider creation
 const authOptions: NextAuthOptions = {
   providers: [
@@ -43,8 +41,6 @@ const authOptions: NextAuthOptions = {
     },
     async redirect({ url, baseUrl }) {
       const correctBaseUrl = 'https://reportmate.ecuad.ca'
-      console.log(`[NEXTAUTH] Redirect - URL: ${url}, baseUrl: ${baseUrl}, forcing: ${correctBaseUrl}`)
-      
       if (url.startsWith("/")) {
         return `${correctBaseUrl}${url}`
       }

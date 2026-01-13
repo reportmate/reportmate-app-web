@@ -18,14 +18,12 @@ applicationsCache.timestamp = 0
 
 export async function GET(_request: NextRequest) {
   const timestamp = new Date().toISOString()
-  console.log(`[APPLICATIONS API] ${timestamp} - Applications data requested`)
-
   try {
     const now = Date.now()
     
     // Check cache first
     if (applicationsCache.data && (now - applicationsCache.timestamp) < applicationsCache.ttl) {
-      console.log(`[APPLICATIONS API] ${timestamp} - Returning cached data (${applicationsCache.data.length} applications)`)
+      `)
       return NextResponse.json(applicationsCache.data, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -49,11 +47,8 @@ export async function GET(_request: NextRequest) {
       }, { status: 500 })
     }
     
-    console.log(`[APPLICATIONS API] ${timestamp} - Using API base URL: ${apiBaseUrl}`)
-    
     try {
       // First, get all devices
-      console.log(`[APPLICATIONS API] ${timestamp} - Fetching devices list from ${apiBaseUrl}/api/devices`)
       const headers = getInternalApiHeaders()
       const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
         cache: 'no-store',
@@ -65,8 +60,6 @@ export async function GET(_request: NextRequest) {
       }
       
       const devicesData = await devicesResponse.json()
-      console.log(`[APPLICATIONS API] ${timestamp} - Found ${devicesData.length} devices`)
-      
       if (devicesData.length === 0) {
         return NextResponse.json([], {
           headers: {
@@ -84,8 +77,6 @@ export async function GET(_request: NextRequest) {
       const allApplications: any[] = []
       let processedDevices = 0
       let devicesWithApps = 0
-      
-      console.log(`[APPLICATIONS API] ${timestamp} - Processing applications from ${devicesData.length} devices`)
       
       // Process devices in batches to avoid overwhelming the API
       const batchSize = 10
@@ -111,7 +102,6 @@ export async function GET(_request: NextRequest) {
             const applications = getApplicationsFromDevice(deviceData, deviceSerial)
             
             if (applications.length > 0) {
-              console.log(`[APPLICATIONS API] ${timestamp} - Found ${applications.length} applications on device ${deviceSerial}`)
               allApplications.push(...applications)
               devicesWithApps++
             }
@@ -128,10 +118,6 @@ export async function GET(_request: NextRequest) {
           await new Promise(resolve => setTimeout(resolve, 100))
         }
       }
-      
-      console.log(`[APPLICATIONS API] ${timestamp} - Successfully processed ${processedDevices}/${devicesData.length} devices`)
-      console.log(`[APPLICATIONS API] ${timestamp} - Found applications on ${devicesWithApps} devices`)
-      console.log(`[APPLICATIONS API] ${timestamp} - Total applications collected: ${allApplications.length}`)
       
       // Cache the successful result
       applicationsCache = {

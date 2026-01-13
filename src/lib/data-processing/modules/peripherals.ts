@@ -148,24 +148,11 @@ export interface PeripheralSummary {
  */
 export function extractPeripherals(deviceModules: any): PeripheralInfo {
   if (!deviceModules?.peripherals) {
-    console.log('[PERIPHERALS MODULE] No peripheral data found in modules')
     return createEmptyPeripheralInfo()
   }
 
   const peripherals = deviceModules.peripherals
   
-  console.log('[PERIPHERALS MODULE] Reading pre-processed peripheral data:', {
-    hasConnectedDevices: !!peripherals.connectedDevices,
-    hasUsbDevices: !!peripherals.usbDevices,
-    hasBluetoothDevices: !!peripherals.bluetoothDevices,
-    hasNetworkAdapters: !!peripherals.networkAdapters,
-    hasStorageDevices: !!peripherals.storageDevices,
-    hasDisplayDevices: !!peripherals.displayDevices,
-    hasAudioDevices: !!peripherals.audioDevices,
-    hasInputDevices: !!peripherals.inputDevices,
-    hasPrinters: !!peripherals.printers
-  })
-
   const peripheralInfo: PeripheralInfo = {
     // Read all device categories (device should categorize and process)
     connectedDevices: peripherals.connectedDevices ? peripherals.connectedDevices.map(mapConnectedDevice) : [],
@@ -184,19 +171,6 @@ export function extractPeripherals(deviceModules: any): PeripheralInfo {
     // Use device-generated summary
     summary: peripherals.summary || createEmptySummary()
   }
-
-  console.log('[PERIPHERALS MODULE] Peripheral info read:', {
-    totalCount: peripheralInfo.totalCount,
-    connectedDevices: peripheralInfo.connectedDevices.length,
-    usbDevices: peripheralInfo.usbDevices.length,
-    bluetoothDevices: peripheralInfo.bluetoothDevices.length,
-    networkAdapters: peripheralInfo.networkAdapters.length,
-    storageDevices: peripheralInfo.storageDevices.length,
-    displayDevices: peripheralInfo.displayDevices.length,
-    audioDevices: peripheralInfo.audioDevices.length,
-    inputDevices: peripheralInfo.inputDevices.length,
-    printers: peripheralInfo.printers.length
-  })
 
   return peripheralInfo
 }

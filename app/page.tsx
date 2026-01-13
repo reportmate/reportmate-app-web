@@ -19,7 +19,6 @@ export default function HomePage() {
   useEffect(() => {
     if (isDevelopment) {
       // In development, go straight to dashboard
-      console.log('[HOME] Development mode - redirecting to dashboard')
       router.push('/dashboard')
       return
     }

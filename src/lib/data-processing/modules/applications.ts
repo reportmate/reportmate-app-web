@@ -33,7 +33,6 @@ export interface ApplicationItem {
  */
 export function extractApplications(deviceModules: any): ApplicationInfo {
   if (!deviceModules?.applications) {
-    console.log('[APPLICATIONS MODULE] No applications data found in modules')
     return {
       totalApplications: 0,
       recentlyInstalled: 0,
@@ -51,13 +50,6 @@ export function extractApplications(deviceModules: any): ApplicationInfo {
                     apps.installedApplications || 
                     apps.InstalledApplications ||
                     apps.applications  // Mac sends as "applications" array
-
-  console.log('[APPLICATIONS MODULE] Reading pre-processed applications data:', {
-    hasInstalledApps: !!appSource,
-    appCount: appSource?.length || 0,
-    hasSummary: !!apps.summary,
-    isMacFormat: Array.isArray(appSource) && appSource.length > 0 && typeof appSource[0] === 'string'
-  })
 
   // READER PATTERN: Device should provide summary statistics
   const summary = apps.summary || {}
@@ -116,12 +108,6 @@ export function extractApplications(deviceModules: any): ApplicationInfo {
     applications,
     lastUpdated: apps.lastUpdated || apps.collectedAt
   }
-
-  console.log('[APPLICATIONS MODULE] Applications info read:', {
-    totalApplications: applicationsInfo.totalApplications,
-    categoriesCount: Object.keys(categories).length,
-    usesSummaryFromDevice: !!summary.recentlyInstalled
-  })
 
   return applicationsInfo
 }

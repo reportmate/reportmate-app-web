@@ -124,21 +124,6 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const parsedManagement = convertPowerShellObjects(rawManagement)
   const management = parsedManagement ? normalizeKeys(parsedManagement) as any : null
 
-  // Debug logging to see what data we're getting
-  console.log('ManagementWidget DEBUG:', {
-    deviceName: device?.name,
-    hasModules: !!device.modules,
-    hasManagement: !!management,
-    managementKeys: management ? Object.keys(management) : [],
-    hasDeviceState: !!management?.deviceState,
-    deviceState: management?.deviceState,
-    entraJoined: management?.deviceState?.entraJoined,
-    ssoState: management?.ssoState,
-    entraPrt: management?.ssoState?.entraPrt,
-    userState: management?.userState,
-    ngcSet: management?.userState?.ngcSet
-  })
-
   if (!management) {
     return (
       <StatBlock 

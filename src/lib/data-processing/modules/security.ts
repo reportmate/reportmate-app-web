@@ -116,21 +116,11 @@ export interface SecuritySummary {
  */
 export function extractSecurity(deviceModules: any): SecurityInfo {
   if (!deviceModules?.security) {
-    console.log('[SECURITY MODULE] No security data found in modules')
     return createEmptySecurityInfo()
   }
 
   const security = deviceModules.security
   
-  console.log('[SECURITY MODULE] Reading pre-processed security data:', {
-    hasOverallScore: typeof security.overallScore === 'number',
-    hasThreats: !!security.threats,
-    hasVulnerabilities: !!security.vulnerabilities,
-    hasCompliance: !!security.compliance,
-    hasFirewall: !!security.firewall,
-    hasAntivirus: !!security.antivirus
-  })
-
   const securityInfo: SecurityInfo = {
     // Use device-calculated security score, not frontend calculation
     overallScore: security.overallScore || 0,
@@ -158,14 +148,6 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     // Read device-calculated summary
     summary: security.summary || createEmptySummary()
   }
-
-  console.log('[SECURITY MODULE] Security info read:', {
-    overallScore: securityInfo.overallScore,
-    riskLevel: securityInfo.riskLevel,
-    threatsCount: securityInfo.threats.length,
-    vulnerabilitiesCount: securityInfo.vulnerabilities.length,
-    complianceScore: securityInfo.compliance.overallCompliance
-  })
 
   return securityInfo
 }
