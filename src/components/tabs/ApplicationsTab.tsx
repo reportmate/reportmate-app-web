@@ -382,40 +382,6 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
         </div>
       </div>
 
-      {/* Usage Status Banner */}
-      {!isUsageAvailable && (
-            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Usage Tracking {usageStatus}</p>
-                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
-                    Kernel process telemetry is not available. Enable Microsoft-Windows-Kernel-Process/Operational log for usage tracking.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-      
-      {/* Usage Available Banner for macOS */}
-      {isUsageAvailable && captureMethod === 'SQLiteWatcher' && (
-            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-              <div className="flex items-center gap-3">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-green-800 dark:text-green-200">Usage Tracking Active</p>
-                  <p className="text-xs text-green-600 dark:text-green-400 mt-0.5">
-                    {usageData?.totalLaunches || 0} app launches tracked via {captureMethod} • {activeSessions.length} active sessions
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Usage Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div 
