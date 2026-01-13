@@ -4,10 +4,10 @@ export const dynamic = 'force-dynamic'
 
 import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { extractSystem } from "../../../src/lib/data-processing/modules/system"
-import { OSVersionWidget } from "../../../src/lib/modules/widgets/OSVersionWidget"
+import { OSVersionPieChart } from "../../../src/lib/modules/graphs/OSVersionPieChart"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 
 interface SystemDevice {
@@ -185,9 +185,12 @@ function formatUptime(seconds: number): string {
 
 function SystemPageContent() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [systems, setSystems] = useState<SystemDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
+  const osVersionFilter = searchParams.get('osVersion') // Get OS version filter from URL
+
   const [platformFilter, setPlatformFilter] = useState('all')
   const [activationFilter, setActivationFilter] = useState('all')
   const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
@@ -197,6 +200,9 @@ function SystemPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedEditions, setSelectedEditions] = useState<string[]>([])
+  const [selectedActivationStatus, setSelectedActivationStatus] = useState<string[]>([])
+  const [selectedLicenseType, setSelectedLicenseType] = useState<string[]>([])
   
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
@@ -233,18 +239,42 @@ function SystemPageContent() {
     )
   }
   
+  const toggleEdition = (edition: string) => {
+    setSelectedEditions(prev => 
+      prev.includes(edition) ? prev.filter(e => e !== edition) : [...prev, edition]
+    )
+  }
+  
+  const toggleActivationStatus = (status: string) => {
+    setSelectedActivationStatus(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    )
+  }
+  
+  const toggleLicenseType = (type: string) => {
+    setSelectedLicenseType(prev => 
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    )
+  }
+  
   const clearAllFilters = () => {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedEditions([])
+    setSelectedActivationStatus([])
+    setSelectedLicenseType([])
     setPlatformFilter('all')
     setActivationFilter('all')
     setFirmwareLicenseFilter('all')
     setSearchQuery('')
+    if (osVersionFilter) router.push('/devices/system')
   }
   
   const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
-    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0)
+    selectedEditions.length + selectedActivationStatus.length + selectedLicenseType.length +
+    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0) +
+    (osVersionFilter ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
   const { devices, moduleData: systemModuleData, devicesLoading, moduleLoading, error } = useDeviceData({
@@ -280,6 +310,9 @@ function SystemPageContent() {
     )).sort() as string[],
     locations: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
+    )).sort() as string[],
+    editions: Array.from(new Set(
+      systems.map(s => s.raw?.operatingSystem?.edition).filter(Boolean)
     )).sort() as string[]
   }
 
@@ -296,20 +329,88 @@ function SystemPageContent() {
       if (s.operatingSystem !== platformFilter) return false
     }
     
-    // Filter by activation status
+    // Filter by activation status (dropdown)
     if (activationFilter !== 'all') {
       const isActivated = s.raw?.operatingSystem?.activation?.isActivated
       if (activationFilter === 'activated' && !isActivated) return false
       if (activationFilter === 'not-activated' && isActivated !== false) return false
     }
     
-    // Filter by firmware license (OEM embedded license)
+    // Filter by activation status (chips)
+    if (selectedActivationStatus.length > 0) {
+      const isActivated = s.raw?.operatingSystem?.activation?.isActivated
+      const status = isActivated === true ? 'Activated' : isActivated === false ? 'Not Activated' : 'Unknown'
+      if (!selectedActivationStatus.includes(status)) return false
+    }
+    
+    // Filter by firmware license (dropdown)
     if (firmwareLicenseFilter !== 'all') {
       const hasFirmwareLicense = s.raw?.operatingSystem?.activation?.hasFirmwareLicense
       if (firmwareLicenseFilter === 'has-firmware' && hasFirmwareLicense !== true) return false
       if (firmwareLicenseFilter === 'no-firmware' && hasFirmwareLicense !== false) return false
     }
     
+    // Filter by license type (chips)
+    if (selectedLicenseType.length > 0) {
+      const hasFirmwareLicense = s.raw?.operatingSystem?.activation?.hasFirmwareLicense
+      const type = hasFirmwareLicense === true ? 'Has OEM License' : hasFirmwareLicense === false ? 'No OEM License' : 'Unknown'
+      if (!selectedLicenseType.includes(type)) return false
+    }
+    
+    // Filter by edition (chips)
+    if (selectedEditions.length > 0) {
+      const edition = s.raw?.operatingSystem?.edition || ''
+      if (!selectedEditions.includes(edition)) return false
+    }
+    
+    // URL-based OS Version filter
+    if (osVersionFilter) {
+      const decodedFilter = decodeURIComponent(osVersionFilter)
+      
+      // Check for Windows Group (e.g., "Windows 11")
+      if (decodedFilter.startsWith('Windows ')) {
+        const osName = s.raw?.operatingSystem?.name || s.operatingSystem || ''
+        const versionMatch = osName.match(/Windows\s+(\d+)/)
+        const versionNum = versionMatch ? versionMatch[1] : ''
+        
+        // Handle "Windows 10" vs "Windows 11"
+        // Also handle if the name itself is just "Windows 10 Pro" -> matches "Windows 10"
+        if (!osName.includes(decodedFilter)) return false
+      } 
+      else {
+        // Try strict match on normalized version
+        const sysVersion = s.systemInfo?.operatingSystem?.version || s.osVersion || ''
+        
+        // Construct the Windows chart keys to match against
+        let windowsChildKey = ''
+        let windowsGroupKey = ''
+        if (s.raw?.operatingSystem) {
+           const osInfo = s.raw.operatingSystem
+           const nameMatch = osInfo.name?.match(/Windows\s+(\d+)/)
+           const windowsVersion = nameMatch ? nameMatch[1] : '11'
+           const versionParts = osInfo.version?.split('.') || []
+           const build = versionParts[2] || osInfo.build || '0'
+           const featureUpdate = osInfo.featureUpdate || '0'
+           const featureNum = parseInt(featureUpdate)
+           windowsGroupKey = `${windowsVersion}.${build}`
+           windowsChildKey = `${windowsVersion}.${build}.${featureNum > 0 ? featureNum : '0'}`
+        }
+
+        // Match Logic:
+        // 1. Exact match version (Mac full version e.g. 15.4.1)
+        // 2. Exact match windows chart key (e.g. 11.26200.1)
+        // 3. Exact match windows group key (e.g. 11.26200)
+        // 4. Starts with (Mac group e.g. 15.4 matches 15.4.1)
+        
+        const matchesWindowKey = windowsChildKey === decodedFilter
+        const matchesWindowGroup = windowsGroupKey === decodedFilter
+        const matchesVersion = sysVersion === decodedFilter
+        const matchesGroup = sysVersion.startsWith(`${decodedFilter}.`)
+        
+        if (!matchesWindowKey && !matchesWindowGroup && !matchesVersion && !matchesGroup) return false
+      }
+    }
+
     // Inventory-based filters
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
@@ -446,27 +547,6 @@ function SystemPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Activation Filter */}
-                <select
-                  value={activationFilter}
-                  onChange={(e) => setActivationFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                >
-                  <option value="all">All Activation Status</option>
-                  <option value="activated">Activated</option>
-                  <option value="not-activated">Not Activated</option>
-                </select>
-                {/* Firmware License Filter */}
-                <select
-                  value={firmwareLicenseFilter}
-                  onChange={(e) => setFirmwareLicenseFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                  title="Filter by firmware-embedded (OEM) license. Devices without OEM licenses may lose activation when migrating from AD to Entra ID."
-                >
-                  <option value="all">All License Types</option>
-                  <option value="has-firmware">Has OEM License</option>
-                  <option value="no-firmware">No OEM License</option>
-                </select>
                 {/* Platform Filter */}
                 <select
                   value={platformFilter}
@@ -547,10 +627,41 @@ function SystemPageContent() {
           {/* Widgets Content - Collapsible */}
           {widgetsExpanded && (
             <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              {/* OS Version Charts - Side by Side */}
+              {/* OS Version Charts - Side by Side with Pie Charts */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <OSVersionWidget devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
-                <OSVersionWidget devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
+                {/* Windows OS Version Pie Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/>
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Windows Versions</h2>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
+                  </div>
+                </div>
+                
+                {/* macOS OS Version Pie Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-red-500 dark:text-red-300" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">macOS Versions</h2>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -581,6 +692,91 @@ function SystemPageContent() {
             
             {filtersExpanded && (
               <div className="px-6 pb-4 space-y-4">
+                {/* OS Version Filter - NEW */}
+                {osVersionFilter && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OS Version</div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => router.push('/devices/system')}
+                        className="px-3 py-1 text-xs font-medium rounded-full border transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700 flex items-center gap-1 group"
+                      >
+                        {decodeURIComponent(osVersionFilter)}
+                        <svg className="w-3 h-3 group-hover:text-blue-600 dark:group-hover:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Edition Filter - NEW */}
+                {filterOptions.editions.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Edition</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.editions.map(edition => (
+                        <button
+                          key={edition}
+                          onClick={() => toggleEdition(edition)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedEditions.includes(edition)
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {edition}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Activation Status Filter - NEW */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Activation Status</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['Activated', 'Not Activated'].map(status => (
+                      <button
+                        key={status}
+                        onClick={() => toggleActivationStatus(status)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          selectedActivationStatus.includes(status)
+                            ? status === 'Activated' 
+                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
+                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {status}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* License Type Filter - NEW */}
+                <div>
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OEM License</div>
+                  <div className="flex flex-wrap gap-2">
+                    {['Has OEM License', 'No OEM License'].map(type => (
+                      <button
+                        key={type}
+                        onClick={() => toggleLicenseType(type)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          selectedLicenseType.includes(type)
+                            ? type === 'Has OEM License'
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700'
+                              : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                        title={type === 'Has OEM License' 
+                          ? 'Has usable firmware-embedded (UEFI/BIOS) Pro/Enterprise license' 
+                          : 'No usable OEM license - may lose activation when migrating from AD to Entra ID'}
+                      >
+                        {type}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
                 {/* Usage Filter */}
                 {filterOptions.usages.length > 0 && (
                   <div>
@@ -817,24 +1013,19 @@ function SystemPageContent() {
                               {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
                             </span>
                             {sys.raw?.operatingSystem?.activation?.isActivated === false && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              <span 
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                                title="Windows is not activated. Device requires a valid license."
+                              >
                                 Unlicensed
                               </span>
                             )}
                             {sys.raw?.operatingSystem?.activation?.hasFirmwareLicense === false && sys.raw?.operatingSystem?.activation?.isActivated !== false && (
                               <span 
                                 className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                title="No firmware-embedded license. May lose activation when migrating from AD to Entra ID."
+                                title={`No usable firmware license for domain/Entra join. ${sys.raw?.operatingSystem?.activation?.firmwareEdition ? `Firmware has: ${sys.raw.operatingSystem.activation.firmwareEdition} (Home/Core can't join domains)` : 'No firmware key detected'}. Currently activated via ${sys.raw?.operatingSystem?.activation?.licenseSource || 'KMS/MAK'}. May lose activation when migrating from AD to Entra ID.`}
                               >
                                 No OEM License
-                              </span>
-                            )}
-                            {sys.raw?.operatingSystem?.activation?.hasFirmwareLicense === true && (
-                              <span 
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                                title={`Firmware-embedded license detected. Source: ${sys.raw?.operatingSystem?.activation?.licenseSource || 'Firmware'}`}
-                              >
-                                OEM
                               </span>
                             )}
                           </div>
