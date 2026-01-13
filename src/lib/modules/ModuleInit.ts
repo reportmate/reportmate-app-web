@@ -45,8 +45,6 @@ import EventsWidgetModule from './widgets/EventsModule'
  * Initialize core modules
  */
 export async function initializeCoreModules(): Promise<void> {
-  console.log('Initializing ReportMate modules...')
-  
   try {
     // Register core modules
     const coreModules = [
@@ -79,7 +77,7 @@ export async function initializeCoreModules(): Promise<void> {
       moduleRegistry.register(moduleInstance.manifest as any)
     }
     
-    console.log(`Loaded ${allModules.length} modules (${coreModules.length} core, ${widgetModules.length} widgets)`)
+    `)
   } catch (error) {
     console.error('Failed to initialize core modules:', error)
     throw error
@@ -90,8 +88,6 @@ export async function initializeCoreModules(): Promise<void> {
  * Load custom modules from a directory or URL
  */
 export async function loadCustomModules(sources: string[]): Promise<void> {
-  console.log('Loading custom modules...')
-  
   let loadedCount = 0
   
   for (const source of sources) {
@@ -105,8 +101,7 @@ export async function loadCustomModules(sources: string[]): Promise<void> {
   }
   
   if (loadedCount > 0) {
-    console.log(`Loaded ${loadedCount} custom modules`)
-  }
+    }
 }
 
 /**
@@ -123,11 +118,9 @@ export async function initializeModules(customModuleSources: string[] = []): Pro
   const enabled = moduleRegistry.getEnabledModules()
   const total = moduleRegistry.getModules()
   
-  console.log(`Module system initialized: ${enabled.length}/${total.length} modules enabled`)
-  
   // Log enabled modules
   enabled.forEach(moduleManifest => {
-    console.log(`  ${moduleManifest.name} (${moduleManifest.id})`)
+    `)
   })
 }
 
@@ -165,8 +158,7 @@ export async function installModule(source: string | File): Promise<void> {
     // Enable by default
     moduleRegistry.setEnabled(moduleInstance.manifest.id, true)
     
-    console.log(`Installed module: ${moduleInstance.manifest.name}`)
-  } catch (error) {
+    } catch (error) {
     console.error('Failed to install module:', error)
     throw error
   }
@@ -183,8 +175,7 @@ export async function uninstallModule(moduleId: string): Promise<void> {
     // Unload from module loader
     await moduleLoader.unload(moduleId)
     
-    console.log(`Uninstalled module: ${moduleId}`)
-  } catch (error) {
+    } catch (error) {
     console.error('Failed to uninstall module:', error)
     throw error
   }
@@ -197,8 +188,7 @@ export function toggleModule(moduleId: string, enabled?: boolean): void {
   const currentState = moduleRegistry.isEnabled(moduleId)
   const newState = enabled !== undefined ? enabled : !currentState
   moduleRegistry.setEnabled(moduleId, newState)
-  console.log(`${newState ? 'Enabled' : 'Disabled'} module: ${moduleId}`)
-}
+  }
 
 /**
  * Get module marketplace info

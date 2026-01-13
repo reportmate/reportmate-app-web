@@ -119,7 +119,6 @@ const DonutChart: React.FC<{
         className="transition-all duration-300 hover:stroke-opacity-80 cursor-pointer"
         onClick={(e) => {
           e.stopPropagation()
-          console.log('Donut segment clicked:', dir.name)
           onDirectoryClick?.(dir)
         }}
         style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
@@ -360,7 +359,6 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
                   directories={sortedDirectories} 
                   capacity={selectedDevice.capacity}
                   onDirectoryClick={(directory) => {
-                    console.log('Directory click handler called for:', directory.name)
                     // Toggle expansion of the clicked directory
                     const newExpandedPaths = new Set(expandedPaths)
                     if (newExpandedPaths.has(directory.path)) {
@@ -369,12 +367,10 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
                       newExpandedPaths.add(directory.path)
                     }
                     setExpandedPaths(newExpandedPaths)
-                    console.log('Expanded paths updated:', newExpandedPaths)
                     
                     // Scroll to the directory in the right panel
                     setTimeout(() => {
                       const element = document.getElementById(`dir-${directory.path.replace(/[^a-zA-Z0-9]/g, '-')}`)
-                      console.log('Scrolling to element:', element)
                       if (element) {
                         element.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
                       }

@@ -41,25 +41,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     setExpandedPackageIds(newExpandedIds);
   };
 
-  // Debug the data being passed to the table
-  console.log('[MANAGED INSTALLS TABLE] Received data:', {
-    hasData: !!data,
-    totalPackages: data?.totalPackages,
-    packagesLength: data?.packages?.length,
-    hasConfig: !!data?.config,
-    configType: data?.config?.type,
-    systemName: data?.systemName,
-    cacheSizeMb: data?.cacheSizeMb,
-    hasCacheSizeMb: !!data?.cacheSizeMb,
-    cacheSizeMbType: typeof data?.cacheSizeMb,
-    firstPackage: data?.packages?.[0],
-    samplePackageFields: data?.packages?.[0] ? Object.keys(data.packages[0]) : [],
-    allDataKeys: data ? Object.keys(data) : []
-  });
-
   // Early return for completely missing data
   if (!data) {
-    console.warn('[MANAGED INSTALLS TABLE] No data provided - returning empty state');
     return (
       <div className="text-center py-16">
         <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
@@ -76,13 +59,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   // Check if this is truly no managed installs system vs. no packages
   const hasManagementSystem = data?.config || data?.systemName;
   const hasPackages = data?.packages && Array.isArray(data.packages) && data.packages.length > 0;
-
-  console.log('[MANAGED INSTALLS TABLE] System status:', {
-    hasManagementSystem,
-    hasPackages,
-    configExists: !!data?.config,
-    systemName: data?.systemName
-  });
 
   // Only show "No Managed Installs" if there's no management system configured at all
   if (!data || (!hasManagementSystem && !hasPackages)) {
@@ -132,12 +108,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   const getFilteredPackages = () => {
     if (!data || !data.packages || !Array.isArray(data.packages) || data.packages.length === 0) {
-      console.log('[MANAGED INSTALLS TABLE] No packages to filter:', {
-        hasData: !!data,
-        hasPackages: !!data?.packages,
-        isArray: Array.isArray(data?.packages),
-        length: data?.packages?.length
-      });
       return [];
     }
     

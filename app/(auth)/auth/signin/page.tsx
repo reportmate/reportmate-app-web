@@ -17,7 +17,6 @@ function SignInContent() {
   useEffect(() => {
     // Clear any error parameters from the URL
     if (error) {
-      console.log('[SIGNIN] Error parameter detected:', error)
       const url = new URL(window.location.href)
       url.searchParams.delete('error')
       window.history.replaceState({}, '', url.toString())
@@ -43,13 +42,11 @@ function SignInContent() {
         // Check if user is already signed in
         const session = await getSession()
         if (session) {
-          console.log('[SIGNIN] Already authenticated, redirecting...')
           router.push(callbackUrl)
           return
         }
 
         // Not authenticated - auto-redirect to Azure AD SSO
-        console.log('[SIGNIN] Not authenticated, auto-redirecting to Azure AD SSO...')
         setStatus('redirecting')
         hasTriggeredSignIn.current = true
         
@@ -59,7 +56,6 @@ function SignInContent() {
           redirect: true
         })
       } catch (err) {
-        console.error('[SIGNIN] Auto sign-in error:', err)
         setErrorMessage('Failed to initiate sign-in. Please try again.')
         setStatus('error')
         hasTriggeredSignIn.current = false
@@ -82,7 +78,6 @@ function SignInContent() {
         redirect: true 
       })
     } catch (err) {
-      console.error('[SIGNIN] Manual sign-in error:', err)
       setErrorMessage('Failed to initiate sign-in. Please try again.')
       setStatus('error')
     }

@@ -11,8 +11,6 @@ export async function GET(
 ) {
   try {
     const { identifier } = await params
-    console.log('[DEVICE RESOLVE API] Resolving identifier:', identifier)
-
     // Resolve the identifier
     const result = await resolveDeviceIdentifierServer(identifier)
     

@@ -129,7 +129,6 @@ export function PerformanceMonitor() {
                 memoryManager.logMemoryStatus('Manual Check')
                 if (typeof window !== 'undefined' && (window as any).gc) {
                   (window as any).gc()
-                  console.log('Manual garbage collection triggered')
                 }
               }}
               className="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white py-1 px-2 rounded text-xs"
