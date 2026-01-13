@@ -135,8 +135,6 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     setLoadingPayloads(prev => new Set(prev).add(eventIdStr))
     
     try {
-      console.log(`[DEVICE EVENTS SIMPLE] Fetching full payload for event: ${eventIdStr}`)
-      
       // Check if this is a bundled event
       const eventObj = events.find(e => e.id === eventIdStr)
       const isBundle = eventIdStr.startsWith('bundle-') || (eventObj && (eventObj as any).raw?.bundledEvents)
@@ -147,7 +145,6 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
         const bundledEvent = eventObj || events.find(e => e.id === eventIdStr)
         if (bundledEvent && (bundledEvent as any).raw?.bundledEvents) {
           const bundledEventIds = (bundledEvent as any).raw.bundledEvents
-          console.log(`[DEVICE EVENTS SIMPLE] Fetching payloads for ${bundledEventIds.length} bundled events`)
           
           // Fetch payloads for all bundled events in parallel with timeout
           const payloadPromises = bundledEventIds.map(async (realEventId: string) => {
@@ -199,7 +196,6 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
       
       if (response.ok) {
         const data = await response.json()
-        console.log(`[DEVICE EVENTS SIMPLE] Successfully fetched full payload for ${eventIdStr}`)
         
         setFullPayloads(prev => ({
           ...prev,

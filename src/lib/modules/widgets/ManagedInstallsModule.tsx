@@ -32,8 +32,7 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
         
         if (response.ok) {
           const data = await response.json()
-          console.log('ManagedInstalls: Fresh API response:', {
-            timestamp: new Date().toISOString(),
+          .toISOString(),
             hasDevice: !!data.device,
             cacheHeaders: response.headers.get('X-Fetched-At'),
             dataSource: response.headers.get('X-Data-Source')
@@ -43,19 +42,9 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
           const { extractInstalls } = await import('../../data-processing/modules/installs')
           const installsData = extractInstalls(data.device)
           
-          console.log('ManagedInstalls: Extracted modular data:', {
-            hasInstalls: !!installsData,
-            totalPackages: installsData?.totalPackages || 0,
-            hasConfig: !!installsData?.config,
-            systemName: installsData?.systemName
-          })
-          
           if (installsData) {
-            console.log('ManagedInstalls: Using modular installs data:', installsData)
             setInstallsData(installsData)
           } else {
-            console.log('ManagedInstalls: No modular installs data found:', {
-              rawHasInstalls: !!(data.device?.modules?.installs)
             })
           }
         }
@@ -106,25 +95,8 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
   const systemName = installsData.systemName || 'Unknown'
   const config = installsData.config
 
-  console.log('ManagedInstalls: Using processed data:', {
-    totalPackages,
-    installedCount,
-    pendingCount,
-    failedCount,
-    systemName,
-    hasConfig: !!config,
-    configType: config?.type
-  })
-
   // Check if we have a managed installs system (Cimian or Munki) configured
   const hasManagedSystem = totalPackages > 0 || (config && (config.type === 'cimian' || config.type === 'Cimian' || config.type === 'munki' || config.type === 'Munki'))
-
-  console.log('ManagedInstalls: Managed system detection:', {
-    totalPackages,
-    hasConfig: !!config,
-    configType: config?.type,
-    hasManagedSystem
-  })
 
   // If we have a managed installs system (regardless of package count), show status
   if (hasManagedSystem) {
@@ -294,22 +266,15 @@ const ManagedPackagesTableWidget: React.FC<DeviceWidgetProps> = ({ deviceId, isE
         const response = await fetch(`/api/device/${deviceId}`)
         if (response.ok) {
           const data = await response.json()
-          console.log('ManagedPackages: Full API response:', data)
-          
           // Import device mapper to process raw data into structured format
           const { extractInstalls } = await import('../../data-processing/modules/installs')
           const installsData = extractInstalls(data.device)
           
           if (installsData && installsData.packages) {
             const packagesData = installsData.packages
-            console.log('ManagedPackages: Using modular packages:', packagesData.length, packagesData)
             setPackages(packagesData)
           } else {
-            console.log('ManagedPackages: No modular packages found:', {
-              hasInstalls: !!installsData,
-              totalPackages: installsData?.totalPackages || 0
-            })
-          }
+            }
         }
       } catch (error) {
         console.error('Failed to fetch packages:', error)

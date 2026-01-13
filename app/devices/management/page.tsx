@@ -228,8 +228,6 @@ function ManagementPageContent() {
   useEffect(() => {
     const fetchManagement = async () => {
       try {
-        console.log('Fetching management data...')
-        
         // OPTIMIZED: Single consolidated API call for management data with inventory
         const response = await fetch('/api/devices/management', { 
           cache: 'no-store',
@@ -240,7 +238,7 @@ function ManagementPageContent() {
         if (!response.ok) throw new Error(`Management API failed: ${response.status}`)
         
         const managementList = await response.json()
-        console.log(`Loaded ${Array.isArray(managementList) ? managementList.length : 0} management records`)
+        ? managementList.length : 0} management records`)
         
         // Map API response to Management interface
         const combinedData = (Array.isArray(managementList) ? managementList : []).map((mgmt: any) => {

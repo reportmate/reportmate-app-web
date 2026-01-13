@@ -39,8 +39,7 @@ export default function LiveInstallsPage() {
       if (data.success && Array.isArray(data.data)) {
         setPackages(data.data)
         setLastRefresh(new Date().toLocaleString())
-        console.log('Live installs data loaded:', data.data)
-      } else {
+        } else {
         throw new Error(data.error || 'Invalid data format')
       }
     } catch (err) {

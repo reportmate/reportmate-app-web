@@ -200,6 +200,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
     entraJoined: management?.deviceState?.entraJoined
   })
 
+
   if (!management) {
     return (
       <StatBlock 

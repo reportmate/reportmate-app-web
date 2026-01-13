@@ -43,21 +43,6 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const isWindows = platform.includes('windows')
   const isMacOS = platform.includes('mac') || platform.includes('darwin')
   const isLinux = platform.includes('linux')
-  
-  // Debug logging
-  console.log('SecurityWidget:', {
-    platform,
-    isWindows,
-    isMacOS,
-    hasSystemIntegrityProtection: !!security?.systemIntegrityProtection,
-    hasGatekeeper: !!security?.gatekeeper,
-    hasFileVault: !!security?.fileVault,
-    hasWindowsHello: !!security?.windowsHello,
-    hasTpm: !!security?.tpm,
-    hasAntivirus: !!security?.antivirus,
-    hasFirewall: !!security?.firewall,
-    hasEncryption: !!security?.encryption
-  })
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'

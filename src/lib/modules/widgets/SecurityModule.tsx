@@ -985,24 +985,19 @@ const SecurityModule = {
 
   // Lifecycle hooks
   async onInstall() {
-    console.log('Security module installed');
-  },
+    },
 
   async onUninstall() {
-    console.log('Security module uninstalled');
-  },
+    },
 
   async onEnable() {
-    console.log('Security module enabled');
-  },
+    },
 
   async onDisable() {
-    console.log('Security module disabled');
-  },
+    },
 
   async onConfigChange(config: any) {
-    console.log('Security module configuration changed:', config);
-  },
+    },
 };
 
 export default SecurityModule;

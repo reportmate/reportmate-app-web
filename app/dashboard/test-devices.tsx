@@ -7,15 +7,13 @@ export default function TestDevices() {
   const [status, setStatus] = useState("Starting...")
 
   useEffect(() => {
-    console.log('[TEST] useEffect is running!')
     setStatus("useEffect ran!")
     
     // Simple test without fetch
     setTimeout(() => {
       setCount(42)
       setStatus("Timer completed!")
-      console.log('[TEST] Timer completed, count set to 42')
-    }, 1000)
+      }, 1000)
   }, [])
 
   return (

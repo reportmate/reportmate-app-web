@@ -169,6 +169,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Mac-specific data - Compliance moved to Security tab, Remote Management moved to Security/Remote Access
   const deviceIdentifiers = management.deviceIdentifiers || management.device_identifiers || {}
   const adeConfiguration = management.adeConfiguration || management.ade_configuration || {}
+  
+  // Get compliance policies and managed apps for summary
+  const compliancePolicies = management.compliance_policies || management.compliancePolicies || []
+  const managedApps = management.managed_apps || management.managedApps || []
+  const compliancePolicyCount = compliancePolicies.length
+  const managedAppCount = managedApps.length
 
   // Helper functions
   const formatExpiryDate = (dateString?: string) => {
@@ -580,36 +586,45 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   {profileCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Profiles
+                  Configuration Profiles
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  MDM policy areas applied
+                </p>
               </div>
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {management.compliancePolicies?.length || 0}
+                  {compliancePolicyCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Compliance Policies
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  Security & health requirements
+                </p>
               </div>
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {management.metadata?.Applications?.length || 0}
+                  {managedAppCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Managed Apps
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  Apps deployed via Intune
+                </p>
               </div>
             </div>
 
             {/* Compliance Status with pill on right */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
+              {compliancePolicyCount > 0 ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies Applied</span>
+                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies</span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    {management.compliancePolicies.length} policies
+                    {compliancePolicyCount} applied
                   </span>
                 </div>
               ) : (
@@ -624,65 +639,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           </div>
         )}
       </div>
-
-      {/* Configuration Profiles */}
-      {isEnrolled && management.profiles && management.profiles.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-              Configuration Profiles
-            </h2>
-          </div>
-          <div className="p-6">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Profile Name
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Type
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Installed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {management.profiles.map((profile: any, index: number) => (
-                    <tr key={profile.id || index}>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {profile.displayName || profile.name || 'Unknown Profile'}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {profile.type || 'Configuration'}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          (profile.status || profile.installState || '').toLowerCase().includes('install') 
-                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                            : (profile.status || profile.installState || '').toLowerCase().includes('pending') 
-                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
-                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                        }`}>
-                          {profile.status || profile.installState || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {profile.installDate ? formatExpiryDate(profile.installDate) : 'Unknown'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Debug Accordion for API Data */}
       <div className="mt-6">

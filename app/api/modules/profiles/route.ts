@@ -11,16 +11,12 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[PROFILES API] ${timestamp} - Fetching bulk profiles data from FastAPI`)
-    
     const API_BASE_URL = process.env.API_BASE_URL
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL not configured')
     }
     
     const fastApiUrl = `${API_BASE_URL}/api/devices/profiles`
-    console.log(`[PROFILES API] Calling: ${fastApiUrl}`)
-    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -37,7 +33,7 @@ export async function GET() {
     
     const profilesData = await response.json()
     
-    console.log(`[PROFILES API] Received ${Array.isArray(profilesData) ? profilesData.length : 0} devices with profiles data`)
+    ? profilesData.length : 0} devices with profiles data`)
     
     return NextResponse.json(profilesData, {
       headers: {

@@ -80,8 +80,6 @@ function convertPowerShellObjects(obj: unknown, parentKey?: string, originalObj?
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
-  console.log('[DEVICES API] Request received')
-
   try {
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -94,13 +92,9 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    console.log('[DEVICES API] Using FastAPI base URL:', apiBaseUrl)
-
     const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
     const queryString = incomingParams.toString()
     const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
-    console.log('[DEVICES API] Fetching from FastAPI:', devicesUrl)
-    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     
@@ -119,18 +113,14 @@ export async function GET(request: NextRequest) {
     }
 
     const fastApiData = await response.json()
-    console.log('[DEVICES API] FastAPI returned:', fastApiData.devices?.length || 0, 'devices')
-
     // Process the data to handle PowerShell objects
     let processedData = fastApiData
     if (fastApiData.devices && Array.isArray(fastApiData.devices)) {
-        console.log('[DEVICES API] Processing devices to convert PowerShell objects...')
         processedData = {
             ...fastApiData,
             devices: fastApiData.devices.map((device: any) => convertPowerShellObjects(device))
         }
-        console.log('[DEVICES API] Processing complete')
-    }
+        }
 
     return NextResponse.json(processedData, {
       headers: {
