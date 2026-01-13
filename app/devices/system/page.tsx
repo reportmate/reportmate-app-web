@@ -429,8 +429,7 @@ function SystemPageContent() {
     
     // Debug logging to verify device name mapping
     if (deviceFromMainAPI && deviceFromMainAPI.name !== systemDevice.deviceName) {
-      console.log(`[SYSTEM PAGE] Device name mapping: "${systemDevice.deviceName}" -> "${deviceFromMainAPI.name}"`)
-    }
+          }
     
     // Create a device object in the format expected by extractSystem
     const deviceData = {

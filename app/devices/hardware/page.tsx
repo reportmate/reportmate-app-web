@@ -229,30 +229,11 @@ function HardwarePageContent() {
     
     // Comprehensive debug logging for ARM64 detection
     if (hardwareRecord.serialNumber === '0F33V9G25083HJ') {
-      console.log(`[ARM64 COMPREHENSIVE DEBUG] Device ${hardwareRecord.serialNumber}:`, {
-        rawProcessor: hardwareRecord.processor,
-        rawGraphics: hardwareRecord.graphics,
-        processorText,
-        graphicsText,
-        snapdragonCheck: processorText.includes('snapdragon'),
-        qualcommCheck: graphicsText.includes('qualcomm adreno'),
-        isARM64Device,
-        originalArch: hardwareRecord.architecture,
-        finalArch: isARM64Device ? 'ARM64' : architecture,
-        completeHardwareRecord: hardwareRecord
-      })
-    }
+          }
 
     // Debug logging for ARM64 detection
     if (processorText.includes('snapdragon') || graphicsText.includes('qualcomm adreno')) {
-      console.log(`[ARM64 DEBUG] Device ${hardwareRecord.serialNumber}:`, {
-        processorText,
-        graphicsText,
-        isARM64Device,
-        originalArch: hardwareRecord.architecture,
-        finalArch: isARM64Device ? 'ARM64' : architecture
-      })
-    }
+          }
     
     // If we detected ARM64 indicators, override the architecture
     if (isARM64Device) {
@@ -344,12 +325,7 @@ function HardwarePageContent() {
   })
 
   // Debug logging for chart data  
-  console.log('Hardware Page Debug:', {
-    hardwareCount: hardware.length,
-    sampleHardware: hardware[0],
-    processedHardwareSample: processedHardware[0]
-  })
-
+  
   // Helper function to get memory range for a device
   const getMemoryRange = (memory: any): string => {
     let memoryGB = 0
@@ -470,8 +446,7 @@ function HardwarePageContent() {
     
     // Debug logging to see what models we have
     if (process.env.NODE_ENV === 'development') {
-      console.log('Platform detection for device:', h.serialNumber || h.deviceId, 'Model:', model)
-    }
+          }
     
     if (model.toLowerCase().includes('macbook') || 
         model.toLowerCase().includes('imac') || 
@@ -786,8 +761,7 @@ function HardwarePageContent() {
   const formatStorage = (storage: any) => {
     // Debug logging for storage data
     if (process.env.NODE_ENV === 'development') {
-      console.log('[STORAGE DEBUG] Raw storage data:', storage, 'Type:', typeof storage)
-    }
+          }
 
     // Handle non-array storage data
     if (!storage) return { total: 'No drives', free: null }
@@ -1236,16 +1210,7 @@ function HardwarePageContent() {
                           {(() => {
                             // Debug log architecture for specific devices
                             if (process.env.NODE_ENV === 'development' && hw.serialNumber === '0F33V9G25083HJ') {
-                              console.log(`[ARCHITECTURE RENDER DEBUG] Device ${hw.serialNumber}:`, {
-                                displayedArchitecture: hw.architecture || 'Unknown',
-                                originalArchitecture: hw.raw?.architecture,
-                                processor: hw.processor,
-                                graphics: hw.graphics,
-                                processorAsString: typeof hw.processor === 'string' ? hw.processor : JSON.stringify(hw.processor),
-                                graphicsAsString: typeof hw.graphics === 'string' ? hw.graphics : JSON.stringify(hw.graphics),
-                                allHardwareData: hw
-                              })
-                            }
+                                                          }
                             return hw.architecture || 'Unknown'
                           })()}
                         </td>

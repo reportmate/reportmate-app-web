@@ -22,8 +22,7 @@ export async function GET(request: Request) {
       
       const sendEvent = (data: any) => {
         if (isClosed || aborted) {
-          console.log('[INSTALLS PROGRESS API] Attempted to send event to closed/aborted controller, skipping');
-          return;
+                    return;
         }
         try {
           const message = `data: ${JSON.stringify(data)}\n\n`;
@@ -47,8 +46,7 @@ export async function GET(request: Request) {
 
       // Handle client disconnection
       request.signal?.addEventListener('abort', () => {
-        console.log('[INSTALLS PROGRESS API] Client disconnected, aborting stream');
-        aborted = true;
+                aborted = true;
         closeStream();
       });
 
@@ -66,8 +64,7 @@ export async function GET(request: Request) {
           });
 
           const timestamp = new Date().toISOString();
-          console.log(`[INSTALLS PROGRESS API] ${timestamp} - Starting installs fetch with progress updates`);
-          
+                    
           // Fetch all devices first
           const apiResponse = await fetch(`${API_BASE_URL}/api/devices`, {
             cache: 'no-store',
@@ -112,13 +109,11 @@ export async function GET(request: Request) {
             const batchNumber = Math.floor(i/batchSize) + 1;
             const totalBatches = Math.ceil(devices.length/batchSize);
             
-            console.log(`[INSTALLS PROGRESS API] Processing batch ${batchNumber}/${totalBatches} (devices ${i + 1}-${Math.min(i + batchSize, devices.length)})`);
-            
+                        
             const batchPromises = batch.map(async (device: any, index: number) => {
               // Check if client has disconnected
               if (aborted) {
-                console.log('[INSTALLS PROGRESS API] Processing aborted due to client disconnect');
-                return null;
+                                return null;
               }
               
               const serialNumber = device.serialNumber;
@@ -240,8 +235,7 @@ export async function GET(request: Request) {
             
             // Check if processing was aborted
             if (aborted) {
-              console.log('[INSTALLS PROGRESS API] Processing aborted, stopping batch processing');
-              break;
+                            break;
             }
             
             // Send batch complete update

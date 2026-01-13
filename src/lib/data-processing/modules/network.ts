@@ -55,14 +55,12 @@ export interface NetworkInterface {
  * MODULAR: Self-contained network data processing
  */
 export function extractNetwork(deviceModules: any): NetworkInfo {
-  console.log('[NETWORK MODULE] Processing network data')
-  
+    
   // Initialize with defaults
   const networkInfo: NetworkInfo = {}
 
   if (!deviceModules?.modules) {
-    console.log('[NETWORK MODULE] No modules data found')
-    return networkInfo
+        return networkInfo
   }
 
   const modules = deviceModules.modules
@@ -70,12 +68,10 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
   // Check for network data in modules.network
   const network = modules?.network
   if (!network) {
-    console.log('[NETWORK MODULE] No network module found')
-    return networkInfo
+        return networkInfo
   }
 
-  console.log('[NETWORK MODULE] Found network module with keys:', Object.keys(network))
-
+  
   // Extract active connection information - support both snake_case (new) and camelCase (legacy)
   const activeConnection = network.active_connection || network.activeConnection
   if (activeConnection) {
@@ -117,12 +113,7 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
   // Extract NETBIOS information for active connection
   if (network.netbios && network.netbios.localNames && Array.isArray(network.netbios.localNames)) {
-    console.log('[NETWORK MODULE] Processing NetBIOS data:', {
-      localNamesCount: network.netbios.localNames.length,
-      activeInterface: networkInfo.interfaceName,
-      localNames: network.netbios.localNames.map((n: any) => ({ name: n.name, type: n.type, interface: n.interface }))
-    })
-
+    
     const activeInterface = networkInfo.interfaceName
     
     // Find NETBIOS name for the active interface, prefer "File Server Service" type
@@ -134,15 +125,7 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
                                activeInterface.includes(entry.interface) ||
                                entry.interface === activeInterface
         const isFileServer = entry.type === 'File Server Service'
-        console.log('[NETWORK MODULE] Checking NetBIOS entry:', {
-          name: entry.name,
-          type: entry.type,
-          interface: entry.interface,
-          interfaceMatch,
-          isFileServer,
-          matches: interfaceMatch && isFileServer
-        })
-        return interfaceMatch && isFileServer
+                return interfaceMatch && isFileServer
       }
       return false
     })
@@ -158,22 +141,10 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     if (anyNetbiosEntry) {
       networkInfo.activeNetbiosName = anyNetbiosEntry.name
       networkInfo.activeNetbiosType = anyNetbiosEntry.type
-      console.log('[NETWORK MODULE] Selected NetBIOS entry:', {
-        name: anyNetbiosEntry.name,
-        type: anyNetbiosEntry.type,
-        interface: anyNetbiosEntry.interface,
-        source: activeNetbiosEntry ? 'interface-match' : fallbackEntry ? 'fallback-fileserver' : 'any-entry'
-      })
-    } else {
-      console.log('[NETWORK MODULE] No suitable NetBIOS entry found')
-    }
+          } else {
+          }
   } else {
-    console.log('[NETWORK MODULE] No NetBIOS data available:', {
-      hasNetbios: !!network.netbios,
-      hasLocalNames: !!(network.netbios && network.netbios.localNames),
-      isArray: network.netbios && network.netbios.localNames ? Array.isArray(network.netbios.localNames) : false
-    })
-  }
+      }
 
   // Extract all network interfaces
   if (network.interfaces && Array.isArray(network.interfaces)) {
@@ -286,8 +257,7 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     if (!network.activeConnection && physicalInterfaces.length > 0) {
       const activeInterface = physicalInterfaces.find((iface: NetworkInterface) => iface.isActive)
       if (activeInterface) {
-        console.log('[NETWORK MODULE] Using first active interface as fallback for active connection:', activeInterface.name)
-        networkInfo.ipAddress = networkInfo.ipAddress || activeInterface.ipAddress
+                networkInfo.ipAddress = networkInfo.ipAddress || activeInterface.ipAddress
         networkInfo.macAddress = networkInfo.macAddress || activeInterface.macAddress
         networkInfo.interfaceName = networkInfo.interfaceName || activeInterface.friendlyName || activeInterface.name
         networkInfo.connectionType = networkInfo.connectionType || activeInterface.type
@@ -353,15 +323,6 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     networkInfo.dnsAddress = networkInfo.activeDnsServers[0]
   }
 
-  console.log('[NETWORK MODULE] Network info extracted:', {
-    hasActiveConnection: !!network.activeConnection,
-    interfacesCount: networkInfo.interfaces?.length || 0,
-    wifiNetworksCount: networkInfo.wifiNetworks?.length || 0,
-    vpnConnectionsCount: networkInfo.vpnConnections?.length || 0,
-    routesCount: networkInfo.routes?.length || 0,
-    connectionType: networkInfo.connectionType,
-    ssid: networkInfo.ssid
-  })
-
+  
   return networkInfo
 }

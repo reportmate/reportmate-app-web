@@ -13,8 +13,7 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
  * Uses /api/devices/installs/full for complete device structure with config data
  */
 async function fetchBulkInstallRecords(API_BASE_URL: string): Promise<any[]> {
-  console.log('[INSTALLS FILTERS] Fetching bulk install records (full structure)');
-  
+    
   // Use shared auth headers for internal API calls
   const headers = getInternalApiHeaders();
   
@@ -31,8 +30,7 @@ async function fetchBulkInstallRecords(API_BASE_URL: string): Promise<any[]> {
   // FastAPI endpoint returns array of devices directly
   const records = Array.isArray(data) ? data : (Array.isArray(data.devices) ? data.devices : []);
   
-  console.log(`[INSTALLS FILTERS] Received ${records.length} devices with full installs data`);
-  return records;
+    return records;
 }
 
 export async function GET(request: Request) {
@@ -41,8 +39,7 @@ export async function GET(request: Request) {
   try {
     // Check cache first
     if (cachedFiltersData && (Date.now() - cachedFiltersData.timestamp) < CACHE_TTL) {
-      console.log('[INSTALLS FILTERS] Using cached filter data');
-      return NextResponse.json(cachedFiltersData.data);
+            return NextResponse.json(cachedFiltersData.data);
     }
 
     // Fetch full device records from optimized FastAPI endpoint

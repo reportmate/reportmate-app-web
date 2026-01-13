@@ -43,21 +43,13 @@ export interface HardwareInfo {
  */
 export function extractHardware(deviceModules: any): HardwareInfo {
   if (!deviceModules?.hardware) {
-    console.log('[HARDWARE MODULE] No hardware data found in modules')
-    return {}
+        return {}
   }
 
   const hardware = deviceModules.hardware
   const system = deviceModules.system
   
-  console.log('[HARDWARE MODULE] Processing hardware data:', {
-    hasProcessor: !!hardware.processor,
-    hasMemory: !!hardware.memory,
-    hasStorage: !!hardware.storage,
-    hasGraphics: !!hardware.graphics,
-    hasBattery: !!hardware.battery
-  })
-
+  
   const hardwareInfo: HardwareInfo = {
     processor: hardware.processor?.name,
     // Support both snake_case and camelCase for processor speed
@@ -131,6 +123,5 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     hardwareInfo.temperature = hardware.performance.temperature
   }
 
-  console.log('[HARDWARE MODULE] Hardware info extracted:', Object.keys(hardwareInfo))
-  return hardwareInfo
+    return hardwareInfo
 }

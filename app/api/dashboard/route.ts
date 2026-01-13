@@ -18,8 +18,7 @@ export const revalidate = 0
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
-  console.log('[DASHBOARD API] Request received')
-
+  
   try {
     const apiBaseUrl = process.env.API_BASE_URL || 'http://reportmate-functions-api'
     
@@ -28,8 +27,7 @@ export async function GET(request: NextRequest) {
     const queryString = incomingParams.toString()
     const dashboardUrl = `${apiBaseUrl}/api/dashboard${queryString ? `?${queryString}` : ''}`
     
-    console.log('[DASHBOARD API] Fetching consolidated data from:', dashboardUrl)
-    
+        
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -52,10 +50,7 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
     
-    console.log('[DASHBOARD API] Consolidated response - devices:', data.devices?.length || 0, 
-                'events:', data.events?.length || 0,
-                'installStats:', data.installStats ? 'present' : 'missing')
-    
+        
     return NextResponse.json(data)
     
   } catch (error) {

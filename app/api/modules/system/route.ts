@@ -22,8 +22,7 @@ export async function GET(request: Request) {
     // Call FastAPI bulk endpoint
     try {
       const url = `${apiBaseUrl}/api/devices/system?limit=${limit}`
-      console.log(`[SYSTEM API] ${timestamp} - Calling FastAPI: ${url}`)
-      
+            
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
       headers['Content-Type'] = 'application/json'
@@ -37,8 +36,7 @@ export async function GET(request: Request) {
       }
       
       const systemData = await response.json()
-      console.log(`[SYSTEM API] ${timestamp} - Successfully fetched ${systemData.length || 0} system records from FastAPI`)
-      
+            
       return NextResponse.json(systemData, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
