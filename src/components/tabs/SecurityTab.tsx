@@ -2,52 +2,74 @@
  * Security Tab Component  
  * Security features and compliance information with 3x2 grid design
  * Supports both Windows and macOS platforms
+ * 
+ * Card Structure:
+ * 1. Encryption - BitLocker (Win) / FileVault (Mac)
+ * 2. Authentication - Windows Hello (Win) / Platform SSO (Mac)
+ * 3. Protection - Defender (Win) / Gatekeeper + MRT + XProtect (Mac)
+ * 4. Tampering - TPM (Win) / SIP (Mac)
+ * 5. Firewall - Both platforms
+ * 6. Remote Access - SSH + RDP (Win) / SSH + Screen Sharing (Mac)
  */
 
 import React from 'react'
-import { convertPowerShellObjects, normalizeKeys } from '../../lib/utils/powershell-parser'
+import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
 import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Eye } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
 }
 
-const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled' }: { 
+const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled', neutral }: { 
   enabled: boolean | undefined, 
   activeLabel?: string, 
-  inactiveLabel?: string 
+  inactiveLabel?: string,
+  neutral?: boolean
 }) => {
   if (enabled === undefined) {
     return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400">
+      <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
         Unknown
       </span>
     )
   }
   
+  // All statuses now use simple text - green for positive, black/white for negative/neutral
+  if (neutral || !enabled) {
+    return (
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+        {enabled ? activeLabel : inactiveLabel}
+      </span>
+    )
+  }
+  
   return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-      enabled 
-        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-    }`}>
-      {enabled ? activeLabel : inactiveLabel}
+    <span className="text-sm font-medium text-green-600 dark:text-green-400">
+      {activeLabel}
     </span>
   )
 }
 
-const DetailRow = ({ label, value, isStatus, enabled }: { 
+const DetailRow = ({ label, value, isStatus, enabled, mono, neutral, tooltip }: { 
   label: string, 
   value?: string, 
   isStatus?: boolean, 
-  enabled?: boolean 
+  enabled?: boolean,
+  mono?: boolean,
+  neutral?: boolean,
+  tooltip?: string
 }) => (
   <div className="flex items-center justify-between py-1">
-    <span className="text-xs text-gray-500 dark:text-gray-400">{label}</span>
+    <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
     {isStatus ? (
-      <StatusBadge enabled={enabled} activeLabel={value || 'Yes'} inactiveLabel={value || 'No'} />
+      <StatusBadge enabled={enabled} activeLabel={value || 'Yes'} inactiveLabel={value || 'No'} neutral={neutral} />
     ) : (
-      <span className="text-xs font-medium text-gray-900 dark:text-white">{value || 'Unknown'}</span>
+      <span 
+        className={`text-sm font-medium text-gray-900 dark:text-white ${mono ? 'font-mono' : ''} ${tooltip ? 'cursor-help' : ''}`}
+        title={tooltip}
+      >
+        {value || 'Unknown'}
+      </span>
     )}
   </div>
 )
@@ -70,6 +92,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
   const secureShell = security?.secureShell
   const isMac = isMacOS(device)
+  
+  // Get remote management data from Management module (Mac collects screen sharing there)
+  const rawManagement = device?.modules?.management || device?.management
+  const management = rawManagement ? normalizeKeys(convertPowerShellObjects(rawManagement)) as any : null
+  const remoteManagement = management?.remoteManagement || management?.remote_management || security?.remoteManagement || {}
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'
@@ -142,7 +169,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const firewallEnabled = security?.firewall?.isEnabled || 
                           security?.firewall?.enabled === 1 || 
                           security?.firewall?.enabled === true ||
-                          security?.firewall?.globalState?.toLowerCase() === 'on'
+                          (typeof security?.firewall?.globalState === 'string' 
+                            ? security.firewall.globalState.toLowerCase() === 'on'
+                            : security?.firewall?.globalState === 1)
 
   return (
     <div className="space-y-6">
@@ -175,42 +204,65 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         
         {/* 1. Encryption Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <StatusBadge 
-              enabled={isMac ? fileVaultEnabled : security?.encryption?.bitLocker?.isEnabled} 
-              activeLabel="Encrypted" 
-              inactiveLabel="Not Encrypted" 
-            />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS FileVault
+              // macOS FileVault + SecureToken + BootstrapToken
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   FileVault Disk Encryption
                 </div>
-                <DetailRow label="Status" value={security?.fileVault?.status || (fileVaultEnabled ? 'On' : 'Off')} />
                 <DetailRow label="Encrypted Volumes" value={
                   security?.fileVault?.encryptedVolumes?.length > 0 
                     ? security.fileVault.encryptedVolumes.map((v: any) => v.name || v.volumeName || v).join(', ')
                     : fileVaultEnabled ? 'System Volume' : 'None'
                 } />
+                <DetailRow label="Status" isStatus enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
+                {/* Secure Token + Bootstrap Token */}
                 <DetailRow 
-                  label="Encryption Type" 
-                  value={security?.fileVault?.encryptedVolumes?.[0]?.encryptionType || 'XTS-AES 128'} 
+                  label="Secure Token" 
+                  isStatus 
+                  enabled={security?.secureToken?.enabled === true || security?.secureToken?.enabled === 1 || security?.secureToken?.tokenGrantedCount > 0} 
+                  value={(security?.secureToken?.enabled === true || security?.secureToken?.enabled === 1 || security?.secureToken?.tokenGrantedCount > 0) ? 'Granted' : 'Not Granted'}
                 />
+                <DetailRow 
+                  label="Bootstrap Token" 
+                  isStatus 
+                  enabled={security?.bootstrapToken?.escrowed === true || security?.bootstrapToken?.escrowed === 1} 
+                  value={(security?.bootstrapToken?.escrowed === true || security?.bootstrapToken?.escrowed === 1) ? 'Escrowed' : 'Not Escrowed'}
+                />
+                <DetailRow 
+                  label="Token Holders · Volume Owners" 
+                  value={security?.secureToken?.usersWithToken?.length > 0 
+                    ? security.secureToken.usersWithToken.join(', ') 
+                    : 'None'} 
+                />
+                {/* Recovery Keys - Critical for MDM */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="Personal Recovery Key" 
+                    isStatus 
+                    enabled={security?.fileVault?.personalRecoveryKey === true || security?.fileVault?.personalRecoveryKey === 1} 
+                    value={(security?.fileVault?.personalRecoveryKey === true || security?.fileVault?.personalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
+                  />
+                  <DetailRow 
+                    label="Institutional Recovery Key" 
+                    isStatus 
+                    enabled={security?.fileVault?.institutionalRecoveryKey === true || security?.fileVault?.institutionalRecoveryKey === 1} 
+                    value={(security?.fileVault?.institutionalRecoveryKey === true || security?.fileVault?.institutionalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
+                  />
+                </div>
               </>
             ) : (
               // Windows BitLocker (now all camelCase after normalization)
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   BitLocker Drive Encryption
                 </div>
                 {security?.encryption?.bitLocker?.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 ? (
@@ -225,43 +277,88 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 2. Authentication/SIP Card - Platform Specific */}
+        {/* 2. Authentication Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-                {isMac ? (
-                  <ShieldCheck className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                ) : (
-                  <Fingerprint className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                )}
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isMac ? 'System Integrity' : 'Authentication'}
-              </h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+              <Fingerprint className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
-            <StatusBadge enabled={isMac ? sipEnabled : windowsHelloEnabled} />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Authentication</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS System Integrity Protection
+              // macOS Platform SSO
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  System Integrity Protection
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
+                  Platform Single Sign-On
                 </div>
-                <DetailRow label="SIP Enabled" isStatus enabled={sipEnabled} />
                 <DetailRow 
-                  label="Status" 
-                  value={security?.systemIntegrityProtection?.status || 
-                         security?.systemIntegrityProtection?.details?.split('\n')[0] || 
-                         (sipEnabled ? 'Enabled' : 'Disabled')} 
+                  label="Provider" 
+                  value={security?.platformSSO?.provider || 'Not configured'}
+                  tooltip={security?.platformSSO?.extensionIdentifier}
                 />
+                <DetailRow 
+                  label="Registration" 
+                  isStatus
+                  enabled={security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1}
+                  value={(security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1) ? 'Registered' : 'Not Registered'}
+                />
+                {/* SSO Tokens - device level (shown right after Registration) */}
+                {!(security?.platformSSO?.users?.length > 0) && (
+                  <DetailRow 
+                    label="SSO Tokens" 
+                    isStatus
+                    enabled={security?.platformSSO?.tokensPresent === true || security?.platformSSO?.tokensPresent === 1 || security?.platformSSO?.tokenStatus === 'Present'}
+                    value={(security?.platformSSO?.tokensPresent === true || security?.platformSSO?.tokensPresent === 1 || security?.platformSSO?.tokenStatus === 'Present') ? 'Present' : 'Missing'}
+                  />
+                )}
+                <DetailRow 
+                  label="Method" 
+                  value={security?.platformSSO?.method || 'Unknown'} 
+                />
+                {/* Show registered users - no divider */}
+                {security?.platformSSO?.users?.length > 0 && (
+                  security.platformSSO.users.map((user: any, index: number) => (
+                    <div key={index} className={index > 0 ? "mt-2 pt-2 border-t border-gray-100 dark:border-gray-700" : "mt-2"}>
+                      <DetailRow 
+                        label={user.username ? `/Users/${user.username}` : 'User'} 
+                        value={user.loginEmail || user.upn || '—'} 
+                      />
+                      <DetailRow 
+                        label="SSO Tokens" 
+                        isStatus
+                        enabled={user.tokensPresent === true || user.tokensPresent === 1}
+                        value={(user.tokensPresent === true || user.tokensPresent === 1) ? 'Present' : 'Missing'}
+                      />
+                    </div>
+                  ))
+                )}
+                {/* Activation Lock & Find My Mac - moved from Tampering */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="Activation Lock" 
+                    isStatus
+                    enabled={!(security?.activationLock?.status === 'Enabled' || security?.activationLock?.status === 'Likely Enabled')}
+                    value={(security?.activationLock?.status === 'Enabled' || security?.activationLock?.status === 'Likely Enabled') ? 'Locked' : 'Unlocked'}
+                  />
+                  <DetailRow 
+                    label="Find My Mac" 
+                    isStatus
+                    enabled={security?.activationLock?.findMyMac === 'Enabled'}
+                    value={security?.activationLock?.findMyMac === 'Enabled' ? 'Enabled' : 'Disabled'}
+                  />
+                  {/* Always show iCloud account - critical for tracking down user to deactivate */}
+                  <DetailRow 
+                    label="iCloud Account" 
+                    value={security?.activationLock?.email || security?.activationLock?.ownerDisplayName || '—'} 
+                  />
+                </div>
               </>
             ) : (
               // Windows Hello (all camelCase after normalization)
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   Windows Hello
                 </div>
                 <DetailRow 
@@ -289,48 +386,56 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 3. Protection/Gatekeeper Card - Platform Specific */}
+        {/* 3. Protection Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
-                <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isMac ? 'Gatekeeper' : 'Protection'}
-              </h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+              <Shield className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
-            {/* Support both snake_case and camelCase for antivirus enabled status */}
-            <StatusBadge enabled={isMac ? gatekeeperEnabled : security?.antivirus?.isEnabled} />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Protection</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS Gatekeeper
+              // macOS Protection: Gatekeeper + MRT + XProtect
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  App Security
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
+                  Malware Defenses
                 </div>
-                <DetailRow label="Gatekeeper" isStatus enabled={gatekeeperEnabled} />
+                {/* Gatekeeper */}
+                <DetailRow label="Gatekeeper" isStatus enabled={gatekeeperEnabled} value={gatekeeperEnabled ? 'Enabled' : 'Disabled'} />
                 <DetailRow 
-                  label="Status" 
-                  value={security?.gatekeeper?.status || (gatekeeperEnabled ? 'Enabled' : 'Disabled')} 
+                  label="Allow Apps From" 
+                  value={(security?.gatekeeper?.developerIdEnabled === 1 || security?.gatekeeper?.developerIdEnabled === true) 
+                    ? 'App Store & Known Developers' 
+                    : 'Anywhere'}
                 />
-                <DetailRow 
-                  label="Assessments" 
-                  isStatus 
-                  enabled={security?.gatekeeper?.assessmentsEnabled === 1 || security?.gatekeeper?.assessmentsEnabled === true} 
-                />
-                <DetailRow 
-                  label="Developer ID" 
-                  isStatus 
-                  enabled={security?.gatekeeper?.developerIdEnabled === 1 || security?.gatekeeper?.developerIdEnabled === true} 
-                />
+                {/* XProtect */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="XProtect" 
+                    isStatus 
+                    enabled={security?.xprotect?.enabled === true || security?.xprotect?.enabled === 1 || security?.xprotect?.enabled === "true"}
+                    value={(security?.xprotect?.enabled === true || security?.xprotect?.enabled === 1 || security?.xprotect?.enabled === "true") ? 'Active' : 'Inactive'}
+                  />
+                  <DetailRow label="XProtect Version" value={security?.xprotect?.version} mono />
+                  <DetailRow label="Signatures" value={security?.xprotect?.signatureCount?.toString()} mono />
+                </div>
+                {/* MRT */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="MRT (Malware Removal)" 
+                    isStatus 
+                    enabled={security?.mrt?.enabled === true || security?.mrt?.enabled === 1 || security?.mrt?.enabled === "true"}
+                    value={(security?.mrt?.enabled === true || security?.mrt?.enabled === 1 || security?.mrt?.enabled === "true") ? 'Installed' : 'Not Installed'}
+                  />
+                  <DetailRow label="MRT Version" value={security?.mrt?.version} mono />
+                </div>
               </>
             ) : (
               // Windows Antivirus (all camelCase after normalization)
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   {security?.antivirus?.name || 'Windows Defender'}
                 </div>
                 <DetailRow label="Version" value={security?.antivirus?.version} />
@@ -342,51 +447,68 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 4. Tampering/Secure Boot Card - Platform Specific */}
+        {/* 4. Tampering Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-                {isMac ? (
-                  <Key className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                ) : (
-                  <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                )}
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                {isMac ? 'Boot Security' : 'Tampering'}
-              </h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+              {isMac ? (
+                <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              ) : (
+                <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              )}
             </div>
-            <StatusBadge 
-              enabled={isMac ? (macSecureBootEnabled || firmwarePasswordEnabled) : tpmActive} 
-              activeLabel="Secure" 
-              inactiveLabel="Not Secure" 
-            />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tampering</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS Secure Boot & Firmware
+              // macOS: SIP + Secure Enclave + Root User + Secure Boot
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  Startup Security
+                <DetailRow label="System Integrity Protection" isStatus neutral enabled={sipEnabled} value={sipEnabled ? 'Enabled' : 'Disabled'} />
+                {/* Secure Enclave - no divider */}
+                <DetailRow 
+                  label="Secure Enclave" 
+                  isStatus 
+                  neutral
+                  enabled={security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true} 
+                  value={(security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true) ? 'Present' : 'Not Present'}
+                />
+                <DetailRow 
+                  label="Biometric" 
+                  isStatus 
+                  neutral
+                  enabled={security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true} 
+                  value={(security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true) ? 'Supported' : 'Not Supported'}
+                />
+                {/* Secure Boot - Apple Silicon */}
+                {security?.secureBoot?.externalBootAllowed && (
+                  <DetailRow 
+                    label="External Boot" 
+                    value={security.secureBoot.externalBootAllowed}
+                  />
+                )}
+                {/* Root User - security concern if enabled */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="Root User" 
+                    isStatus 
+                    neutral
+                    enabled={!(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true)}
+                    value={(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true) ? 'Enabled' : 'Disabled'}
+                  />
+                  <DetailRow 
+                    label="Authenticated Root" 
+                    isStatus 
+                    neutral
+                    enabled={!(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1)}
+                    value={(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1) ? 'Allowed' : 'Required'}
+                  />
                 </div>
-                <DetailRow label="Secure Boot" isStatus enabled={macSecureBootEnabled} />
-                <DetailRow 
-                  label="Security Level" 
-                  value={security?.secureBoot?.securityLevel || 'Unknown'} 
-                />
-                <DetailRow label="Firmware Password" isStatus enabled={firmwarePasswordEnabled} />
-                <DetailRow 
-                  label="EFI Protection" 
-                  value={security?.firmwarePassword?.details?.split('\n')[0] || 
-                         (firmwarePasswordEnabled ? 'Protected' : 'Not configured')} 
-                />
               </>
             ) : (
               // Windows TPM - support both snake_case and camelCase
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   Trusted Platform Module
                 </div>
                 <DetailRow label="Present" isStatus enabled={tpm?.is_present || tpm?.isPresent} />
@@ -401,47 +523,50 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
 
         {/* 5. Firewall Card - Common */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                <BrickWall className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Firewall</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+              <BrickWall className="w-5 h-5 text-blue-600 dark:text-blue-400" />
             </div>
-            <StatusBadge enabled={firewallEnabled} />
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Firewall</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
               // macOS Firewall
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  Application Firewall
-                </div>
                 <DetailRow 
                   label="Global State" 
-                  value={security?.firewall?.globalState || (firewallEnabled ? 'on' : 'off')} 
+                  isStatus
+                  neutral
+                  enabled={firewallEnabled}
+                  value={firewallEnabled ? 'On' : 'Off'} 
                 />
                 <DetailRow 
                   label="Stealth Mode" 
                   isStatus 
-                  enabled={security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true} 
+                  neutral
+                  enabled={security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true}
+                  value={(security?.firewall?.stealthMode === 1 || security?.firewall?.stealthMode === true) ? 'Enabled' : 'Disabled'}
                 />
                 <DetailRow 
                   label="Logging" 
                   isStatus 
-                  enabled={security?.firewall?.loggingEnabled === 1 || security?.firewall?.loggingEnabled === true} 
+                  neutral
+                  enabled={security?.firewall?.loggingEnabled === 1 || security?.firewall?.loggingEnabled === true}
+                  value={(security?.firewall?.loggingEnabled === 1 || security?.firewall?.loggingEnabled === true) ? 'Enabled' : 'Disabled'}
                 />
                 <DetailRow 
                   label="Allow Signed Apps" 
                   isStatus 
-                  enabled={security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true} 
+                  neutral
+                  enabled={security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true}
+                  value={(security?.firewall?.allowSignedSoftware === 1 || security?.firewall?.allowSignedSoftware === true) ? 'Allowed' : 'Blocked'}
                 />
               </>
             ) : (
               // Windows Firewall - support both snake_case and camelCase
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   Windows Firewall
                 </div>
                 <DetailRow label="Profile" value={security.firewall?.profile || 'Domain/Private/Public'} />
@@ -452,58 +577,110 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 6. Secure Shell Card - Common */}
+        {/* 6. Remote Access Card - Both platforms */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
-                <Terminal className="w-5 h-5 text-slate-700 dark:text-slate-300" />
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Secure Shell</h3>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center">
+              <Terminal className="w-5 h-5 text-slate-700 dark:text-slate-300" />
             </div>
-            {isMac ? (
-              <StatusBadge 
-                enabled={macSshEnabled} 
-                activeLabel="Enabled" 
-                inactiveLabel="Disabled" 
-              />
-            ) : (
-              <StatusBadge 
-                enabled={sshConfigured} 
-                activeLabel={secureShellData?.status_display || secureShellData?.statusDisplay || 'Configured'} 
-                inactiveLabel={secureShellData?.status_display || secureShellData?.statusDisplay || 'Not Configured'} 
-              />
-            )}
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Remote Access</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS SSH/Remote Login
+              // macOS: Secure Shell + Screen Sharing + ARD
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  Remote Login
+                {/* Secure Shell/Remote Login - use collected SSH data */}
+                <DetailRow 
+                  label="Secure Shell (Remote Login)" 
+                  isStatus 
+                  neutral
+                  enabled={isPowerShellTrue(security?.ssh?.enabled) || 
+                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) || 
+                          isPowerShellTrue(remoteManagement?.remote_login_enabled)}
+                  value={(isPowerShellTrue(security?.ssh?.enabled) || 
+                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) || 
+                          isPowerShellTrue(remoteManagement?.remote_login_enabled)) ? 'Enabled' : 'Disabled'}
+                />
+                {(security?.ssh?.enabled === 1 || security?.ssh?.enabled === true) && (
+                  <>
+                    <DetailRow 
+                      label="Authorized Users" 
+                      value={security?.ssh?.authorizedUsers === 'all' ? 'All' : (security?.ssh?.authorizedUsers || 'Not set')} 
+                    />
+                    {/* Authentication methods - show as plain text */}
+                    {(security?.ssh?.pubkeyAuthentication === 'yes' || security?.ssh?.passwordAuthentication === 'yes') && (
+                      <DetailRow 
+                        label="Authentication" 
+                        value={[
+                          security?.ssh?.pubkeyAuthentication === 'yes' ? 'Public Key' : null,
+                          security?.ssh?.passwordAuthentication === 'yes' ? 'Password' : null
+                        ].filter(Boolean).join(', ')} 
+                      />
+                    )}
+                  </>
+                )}
+                {/* Remote Management / Screen Sharing - if RM enabled, Screen Sharing is controlled by it */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  {(() => {
+                    const rmEnabled = isPowerShellTrue(remoteManagement?.ardEnabled) || 
+                                     isPowerShellTrue(remoteManagement?.ard_enabled);
+                    
+                    const ssEnabled = rmEnabled || 
+                                     isPowerShellTrue(remoteManagement?.screenSharingEnabled) || 
+                                     isPowerShellTrue(remoteManagement?.screen_sharing_enabled);
+                    
+                    return (
+                      <>
+                        <DetailRow 
+                          label="Remote Management" 
+                          isStatus 
+                          neutral
+                          enabled={rmEnabled}
+                          value={rmEnabled ? 'Enabled' : 'Disabled'}
+                        />
+                        <DetailRow 
+                          label="Screen Sharing" 
+                          isStatus 
+                          neutral
+                          enabled={ssEnabled}
+                          value={ssEnabled ? 'Enabled' : 'Disabled'}
+                        />
+                      </>
+                    );
+                  })()}
+                  {(remoteManagement?.ardAllowedUsers || remoteManagement?.ard_allowed_users) && (
+                    <DetailRow 
+                      label="Allowed Users" 
+                      value={(String(remoteManagement.ardAllowedUsers) === 'true' || String(remoteManagement.ard_allowed_users) === 'true') ? 'All Users' : (remoteManagement.ardAllowedUsers || remoteManagement.ard_allowed_users)} 
+                    />
+                  )}
                 </div>
-                <DetailRow label="Status" isStatus enabled={macSshEnabled} />
-                <DetailRow 
-                  label="Details" 
-                  value={security?.ssh?.details || (macSshEnabled ? 'Remote Login: On' : 'Remote Login: Off')} 
-                />
-                <DetailRow 
-                  label="Service" 
-                  value={macSshEnabled ? 'Running' : 'Stopped'} 
-                />
               </>
             ) : (
-              // Windows OpenSSH - support both snake_case and camelCase
+              // Windows: RDP + Secure Shell
               <>
-                <div className="text-sm font-medium text-gray-900 dark:text-white mb-3">
-                  OpenSSH Server
+                {/* RDP */}
+                <DetailRow 
+                  label="Remote Desktop (RDP)" 
+                  isStatus 
+                  enabled={security?.rdp?.isEnabled || security?.rdp?.is_enabled} 
+                />
+                <DetailRow 
+                  label="RDP Port" 
+                  value={security?.rdp?.port || '3389'} 
+                />
+                <DetailRow 
+                  label="Network Level Auth" 
+                  isStatus 
+                  enabled={security?.rdp?.nlaEnabled || security?.rdp?.nla_enabled} 
+                />
+                {/* Secure Shell/OpenSSH */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow label="OpenSSH Installed" isStatus enabled={secureShellData?.is_installed || secureShellData?.isInstalled} />
+                  <DetailRow label="Secure Shell Service" isStatus enabled={secureShellData?.is_service_running || secureShellData?.isServiceRunning} />
+                  <DetailRow label="Secure Shell Firewall Rule" isStatus enabled={secureShellData?.is_firewall_rule_present || secureShellData?.isFirewallRulePresent} />
                 </div>
-                <DetailRow label="Installed" isStatus enabled={secureShellData?.is_installed || secureShellData?.isInstalled} />
-                <DetailRow label="Service Running" isStatus enabled={secureShellData?.is_service_running || secureShellData?.isServiceRunning} />
-                <DetailRow label="Firewall Rule" isStatus enabled={secureShellData?.is_firewall_rule_present || secureShellData?.isFirewallRulePresent} />
-                <DetailRow label="Keys Deployed" isStatus enabled={secureShellData?.is_key_deployed || secureShellData?.isKeyDeployed} />
-                <DetailRow label="Service Status" value={secureShellData?.service_status || secureShellData?.serviceStatus || 'Unknown'} />
               </>
             )}
           </div>
