@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
@@ -38,6 +38,9 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "ReportMate",
   },
+};
+
+export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#0ea5e9" },
     { media: "(prefers-color-scheme: dark)", color: "#0c4a6e" },
