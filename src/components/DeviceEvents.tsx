@@ -39,12 +39,10 @@ export default function DeviceEvents({ events }: DeviceEventsProps) {
     setLoadingPayloads(prev => new Set(prev).add(eventId))
     
     try {
-      console.log(`[DEVICE EVENTS] Fetching full payload for event: ${eventId}`)
       const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
       
       if (response.ok) {
         const data = await response.json()
-        console.log(`[DEVICE EVENTS] Successfully fetched full payload for ${eventId}`)
         
         setFullPayloads(prev => ({
           ...prev,

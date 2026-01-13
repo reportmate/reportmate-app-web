@@ -150,12 +150,6 @@ function EventsPageContent() {
     const fetchEvents = async () => {
       try {
         setLoading(true)
-        console.log('[EVENTS PAGE] Fetching events with pagination and date range...', { 
-          currentPage, 
-          EVENTS_PER_PAGE, 
-          startDate, 
-          endDate 
-        })
         
         // Calculate offset for API pagination
         const offset = (currentPage - 1) * EVENTS_PER_PAGE
@@ -183,12 +177,9 @@ function EventsPageContent() {
         }
         
         const data = await response.json()
-        console.log('[EVENTS PAGE] Raw API response:', data)
         
         // API returns: {success: true, events: [...]}
         if (data.success && Array.isArray(data.events)) {
-          console.log('[EVENTS PAGE] Sample event structure:', data.events[0])
-          console.log('[EVENTS PAGE] Event timestamps:', data.events.map((e: any) => ({ id: e.id, ts: e.ts, timestamp: e.timestamp })).slice(0, 3))
           
           // Filter events to only include valid categories
           const filteredEvents = data.events.filter((event: Event) => 
@@ -348,8 +339,6 @@ function EventsPageContent() {
     setLoadingPayloads(prev => new Set(prev).add(eventIdStr))
     
     try {
-      console.log(`[EVENTS PAGE] Fetching full payload for event: ${eventIdStr}`)
-      
       // Check if this is a bundled event
       const eventObj = filteredEvents.find(e => e.id === eventIdStr)
       const isBundle = eventIdStr.startsWith('bundle-') || (eventObj && eventObj.isBundle)
@@ -412,8 +401,6 @@ function EventsPageContent() {
       
       if (response.ok) {
         const data = await response.json()
-        console.log(`[EVENTS PAGE] Successfully fetched full payload for ${eventIdStr}`)
-        
         setFullPayloads(prev => ({
           ...prev,
           [eventIdStr]: data.payload

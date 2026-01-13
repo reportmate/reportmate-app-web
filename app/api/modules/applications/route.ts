@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
     
     const timestamp = new Date().toISOString()
-    console.log(`[APPLICATIONS API] ${timestamp} - Fetching applications data (limit: ${limit})`)
+    `)
 
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -24,8 +24,6 @@ export async function GET(request: Request) {
     // NO LOCAL FALLBACK: Call FastAPI container directly
     try {
       const url = `${apiBaseUrl}/api/modules/applications?limit=${limit}`
-      console.log(`[APPLICATIONS API] ${timestamp} - Calling FastAPI: ${url}`)
-      
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
       
@@ -39,8 +37,6 @@ export async function GET(request: Request) {
       }
       
       const applicationsData = await response.json()
-      console.log(`[APPLICATIONS API] ${timestamp} - Successfully fetched ${applicationsData.length || 0} applications from FastAPI`)
-      
       return NextResponse.json(applicationsData, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',

@@ -115,16 +115,6 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     dnsAddress: network.dnsAddress
   }
   
-  // Debug logging
-  console.log('[NetworkWidget] Device data:', {
-    deviceId: device.id,
-    hasModules: !!device.modules,
-    hasNetworkModule: !!device.modules?.network,
-    networkData: network,
-    activeConnectionData: activeConnectionData,
-    activeDnsCount: activeConnectionData.activeDnsServers?.length || 0
-  })
-  
   const hasNetworkInfo = activeConnectionData.ipAddress || activeConnectionData.connectionType !== 'Unknown'
 
   if (!hasNetworkInfo) {

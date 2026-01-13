@@ -154,7 +154,7 @@ class ModuleRegistry {
       this.enabledModules.add(module.id)
     }
     
-    console.log(`Module registered: ${module.name} (${module.id})`)
+    `)
   }
   
   /**

@@ -36,13 +36,6 @@ export function calculateDeviceStatus(
     const now = new Date()
     const diffHours = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
     
-    console.log(`[DEVICE STATUS MODULE] Calculating status:`, {
-      lastSeen: lastSeenDate.toISOString(),
-      now: now.toISOString(),
-      diffHours: diffHours.toFixed(2),
-      thresholds: finalConfig
-    })
-    
     if (diffHours < finalConfig.activeThresholdHours) return 'active'
     if (diffHours < finalConfig.staleThresholdHours) return 'stale'
     return 'missing'
@@ -67,7 +60,6 @@ export function normalizeLastSeen(lastSeenValue: any): string {
       (lastSeenValue instanceof Date && isNaN(lastSeenValue.getTime())) ||
       (typeof lastSeenValue === 'string' && isNaN(new Date(lastSeenValue).getTime()))) {
     
-    console.warn('[DEVICE STATUS MODULE] Invalid lastSeen value:', lastSeenValue, 'using current time')
     return new Date().toISOString()
   }
   
