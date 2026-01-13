@@ -8,6 +8,7 @@ export { StatusDonutChart } from './StatusDonutChart'
 
 // System Charts
 export { OSVersionBarChart } from './OSVersionBarChart'
+export { OSVersionPieChart } from './OSVersionPieChart'
 export { PlatformDistributionChart } from './PlatformDistributionChart'
 
 // Hardware Charts
