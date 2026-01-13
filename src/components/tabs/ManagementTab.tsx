@@ -1,13 +1,83 @@
 /**
  * Management Tab Component
  * Comprehensive device management status and enrollment details
- * Based on the rich Management widget with enhanced tab layout
+ * Supports both:
+ * - Mac: osquery-style snake_case fields and string booleans
+ * - Windows: Legacy camelCase fields with native booleans
  */
 
 import React from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
+
+// Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
+function parseBool(value: any): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase()
+    return lower === 'true' || lower === '1' || lower === 'yes'
+  }
+  return false
+}
+
+// Detect MDM provider from server URL, certificate issuer, or explicit provider field
+function detectMdmProvider(serverUrl?: string, certificateIssuer?: string, explicitProvider?: string): string | undefined {
+  // First check explicit provider from data
+  if (explicitProvider) return explicitProvider
+  
+  // Check certificate issuer for open-source MDMs
+  if (certificateIssuer) {
+    const issuer = certificateIssuer.toLowerCase()
+    if (issuer.includes('micromdm')) return 'MicroMDM'
+    if (issuer.includes('nanomdm')) return 'NanoMDM'
+    if (issuer.includes('jamf')) return 'Jamf Pro'
+    if (issuer.includes('microsoft')) return 'Microsoft Intune'
+  }
+  
+  if (!serverUrl) return undefined
+  const url = serverUrl.toLowerCase()
+  
+  // Open-source MDMs first
+  if (url.includes('micromdm')) return 'MicroMDM'
+  if (url.includes('nanomdm')) return 'NanoMDM'
+  
+  // Commercial MDMs
+  if (url.includes('jamf') || url.includes('jamfcloud')) return 'Jamf Pro'
+  if (url.includes('manage.microsoft.com') || url.includes('intune')) return 'Microsoft Intune'
+  if (url.includes('mosyle')) return 'Mosyle'
+  if (url.includes('kandji')) return 'Kandji'
+  if (url.includes('addigy')) return 'Addigy'
+  if (url.includes('simplemdm')) return 'SimpleMDM'
+  if (url.includes('airwatch') || url.includes('awmdm') || url.includes('awsmdm')) return 'Workspace ONE'
+  if (url.includes('meraki')) return 'Cisco Meraki'
+  if (url.includes('maas360')) return 'MaaS360'
+  if (url.includes('mobileiron') || url.includes('ivanti')) return 'Ivanti'
+  
+  // Fallback: extract hostname as provider hint
+  try {
+    const hostname = new URL(url).hostname
+    return hostname.split('.')[0].replace(/mdm/i, '').replace(/-/g, ' ').trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+
+// Detect if data is from a Mac based on Mac-specific fields in mdmEnrollment
+function detectMacFromData(mdmEnrollment: any): boolean {
+  // Mac osquery mdm table has these specific fields
+  return !!(mdmEnrollment?.installed_from_dep !== undefined ||
+            mdmEnrollment?.installedFromDep !== undefined ||
+            mdmEnrollment?.user_approved !== undefined ||
+            mdmEnrollment?.userApproved !== undefined ||
+            mdmEnrollment?.dep_capable !== undefined ||
+            mdmEnrollment?.depCapable !== undefined ||
+            mdmEnrollment?.has_scep_payload !== undefined ||
+            mdmEnrollment?.hasScepPayload !== undefined ||
+            mdmEnrollment?.checkin_url !== undefined ||
+            mdmEnrollment?.checkinUrl !== undefined)
+}
 
 interface ManagementTabProps {
   device: Record<string, unknown>
@@ -48,18 +118,57 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     )
   }
 
-  // Extract key data from the management structure - support both snake_case and camelCase
-  const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment
+  // Extract key data from the management structure - support both snake_case (Mac) and camelCase (Windows)
+  const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment || {}
+  const mdmCertificate = management.mdm_certificate || management.mdmCertificate || {}
   const deviceState = management.device_state || management.deviceState
-  const tenantDetails = management.tenant_details || management.tenantDetails
-  const deviceDetails = management.device_details || management.deviceDetails
+  const tenantDetails = management.tenant_details || management.tenantDetails || {}
+  const deviceDetails = management.device_details || management.deviceDetails || {}
+  const complianceStatus = management.compliance_status || management.complianceStatus || {}
+  const remoteManagement = management.remote_management || management.remoteManagement || {}
+  const installedProfiles = management.installed_profiles || management.installedProfiles || []
+  const profiles = management.profiles || []
   
-  const isEnrolled = mdmEnrollment?.is_enrolled || mdmEnrollment?.isEnrolled || false
-  const provider = mdmEnrollment?.provider
-  const enrollmentType = mdmEnrollment?.enrollment_type || mdmEnrollment?.enrollmentType || deviceState?.status
-  const tenantName = tenantDetails?.tenant_name || tenantDetails?.tenantName
-  const deviceAuthStatus = deviceDetails?.device_auth_status || deviceDetails?.deviceAuthStatus
-  const profileCount = management.profiles?.length || 0
+  // Parse enrolled status - osquery returns string "true"/"false", Windows returns boolean
+  const isEnrolled = parseBool(mdmEnrollment.enrolled) || 
+                     parseBool(mdmEnrollment.is_enrolled) || 
+                     parseBool(mdmEnrollment.isEnrolled) || 
+                     false
+  
+  // Get server URL and detect provider (with certificate issuer for MicroMDM/NanoMDM detection)
+  const serverUrl = mdmEnrollment.server_url || mdmEnrollment.serverUrl
+  const certificateIssuer = mdmCertificate.certificate_issuer || mdmCertificate.certificateIssuer
+  const explicitProvider = mdmCertificate.mdm_provider || mdmCertificate.mdmProvider || mdmEnrollment.provider
+  const provider = detectMdmProvider(serverUrl, certificateIssuer, explicitProvider)
+  
+  // Enrollment type - Mac uses ADE/User Approved, Windows uses Entra/Domain Join
+  // Detect Mac from platform field OR from Mac-specific MDM fields in data
+  const platform = (device as any).platform?.toLowerCase() || ''
+  const isMac = platform === 'macos' || platform === 'darwin' || platform === 'mac' || detectMacFromData(mdmEnrollment)
+  
+  let enrollmentType: string | undefined
+  if (isMac) {
+    const installedFromDep = parseBool(mdmEnrollment.installed_from_dep || mdmEnrollment.installedFromDep)
+    const userApproved = parseBool(mdmEnrollment.user_approved || mdmEnrollment.userApproved)
+    
+    if (installedFromDep) {
+      enrollmentType = 'ADE Enrolled'
+    } else if (userApproved) {
+      enrollmentType = 'User Approved'
+    } else if (isEnrolled) {
+      enrollmentType = 'MDM Enrolled'
+    }
+  } else {
+    enrollmentType = mdmEnrollment.enrollment_type || mdmEnrollment.enrollmentType || deviceState?.status
+  }
+  
+  const tenantName = tenantDetails.tenant_name || tenantDetails.tenantName || tenantDetails.organization
+  const deviceAuthStatus = deviceDetails.device_auth_status || deviceDetails.deviceAuthStatus
+  const profileCount = installedProfiles.length || profiles.length || 0
+  
+  // Mac-specific data - Compliance moved to Security tab, Remote Management moved to Security/Remote Access
+  const deviceIdentifiers = management.deviceIdentifiers || management.device_identifiers || {}
+  const adeConfiguration = management.adeConfiguration || management.ade_configuration || {}
 
   // Helper functions
   const formatExpiryDate = (dateString?: string) => {
@@ -198,6 +307,154 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <div className="flex items-start">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Profiles:</span>
                     <span className="text-sm font-medium text-gray-900 dark:text-white ml-4">{profileCount}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mac: Enrollment Details */}
+          {isEnrolled && isMac && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Enrollment Details</h3>
+              <div className="space-y-4">
+                {/* MDM Server URL */}
+                {serverUrl && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Server:</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white ml-4 break-all">
+                      {serverUrl.replace(/^https?:\/\//, '').split('/')[0]}
+                    </span>
+                  </div>
+                )}
+
+                {/* Check-in URL */}
+                {(mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Check-in:</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white ml-4 break-all">
+                      {(mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl).replace(/^https?:\/\//, '').split('/')[0]}
+                    </span>
+                  </div>
+                )}
+
+                {/* User Approved */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">User Approved</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    parseBool(mdmEnrollment.user_approved || mdmEnrollment.userApproved)
+                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {parseBool(mdmEnrollment.user_approved || mdmEnrollment.userApproved) ? 'Yes' : 'No'}
+                  </span>
+                </div>
+
+                {/* DEP/ADE Capable */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">ADE Capable</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    parseBool(mdmEnrollment.dep_capable || mdmEnrollment.depCapable)
+                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {parseBool(mdmEnrollment.dep_capable || mdmEnrollment.depCapable) ? 'Yes' : 'No'}
+                  </span>
+                </div>
+
+                {/* SCEP Payload */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">SCEP Certificate</span>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload)
+                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                      : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                  }`}>
+                    {parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload) ? 'Yes' : 'No'}
+                  </span>
+                </div>
+
+                {/* Access Rights */}
+                {mdmEnrollment.access_rights && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Access Rights:</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white ml-4">
+                      {mdmEnrollment.access_rights}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mac: Certificate & SCEP Details - Shows Topic, SCEP Server, Certificate info */}
+          {isEnrolled && isMac && (mdmCertificate.push_topic || mdmCertificate.pushTopic || mdmCertificate.certificate_name || mdmCertificate.certificateName || mdmCertificate.scep_url || mdmCertificate.scepUrl) && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Certificate & Push Details</h3>
+              <div className="space-y-3">
+                {/* APNs Push Topic - Super important for Macs */}
+                {(mdmCertificate.push_topic || mdmCertificate.pushTopic) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Topic:</span>
+                    <div className="flex items-center gap-2 ml-4">
+                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all">
+                        {mdmCertificate.push_topic || mdmCertificate.pushTopic}
+                      </span>
+                      <CopyButton value={mdmCertificate.push_topic || mdmCertificate.pushTopic} />
+                    </div>
+                  </div>
+                )}
+
+                {/* SCEP Server URL */}
+                {(mdmCertificate.scep_url || mdmCertificate.scepUrl) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">SCEP Server:</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white ml-4 break-all">
+                      {mdmCertificate.scep_url || mdmCertificate.scepUrl}
+                    </span>
+                  </div>
+                )}
+
+                {/* Certificate Name/Identity */}
+                {(mdmCertificate.certificate_name || mdmCertificate.certificateName) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Certificate:</span>
+                    <span className="text-sm text-gray-900 dark:text-white ml-4">
+                      {mdmCertificate.certificate_name || mdmCertificate.certificateName}
+                    </span>
+                  </div>
+                )}
+
+                {/* Certificate Issuer */}
+                {(mdmCertificate.certificate_issuer || mdmCertificate.certificateIssuer) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-24">Issuer:</span>
+                    <span className="text-sm text-gray-900 dark:text-white ml-4">
+                      {mdmCertificate.certificate_issuer || mdmCertificate.certificateIssuer}
+                    </span>
+                  </div>
+                )}
+
+                {/* Certificate Expiry */}
+                {(mdmCertificate.certificate_expires || mdmCertificate.certificateExpires) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Expires:</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      (() => {
+                        const expiryStr = mdmCertificate.certificate_expires || mdmCertificate.certificateExpires
+                        if (!expiryStr) return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        try {
+                          const expiry = new Date(expiryStr)
+                          const now = new Date()
+                          const daysUntilExpiry = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                          if (daysUntilExpiry < 0) return 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                          if (daysUntilExpiry < 30) return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                          return 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        } catch { return 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400' }
+                      })()
+                    }`}>
+                      {formatExpiryDate(mdmCertificate.certificate_expires || mdmCertificate.certificateExpires)}
+                    </span>
                   </div>
                 )}
               </div>

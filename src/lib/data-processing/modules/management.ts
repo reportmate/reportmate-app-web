@@ -2,7 +2,23 @@
  * Management Module - Reader Only
  * Frontend reads pre-processed management/policy data from device collection
  * NO heavy processing - device should provide clean, standardized management status
+ * 
+ * Field naming follows osquery conventions (snake_case) where possible.
+ * Supports both:
+ * - Mac: osquery output with snake_case fields and string booleans ("true"/"false")
+ * - Windows: Legacy camelCase fields with native booleans
  */
+
+// Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
+function parseBool(value: any): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') {
+    const lower = value.toLowerCase()
+    return lower === 'true' || lower === '1' || lower === 'yes'
+  }
+  return false
+}
 
 export interface ManagementInfo {
   mdmEnrollment: MdmEnrollmentInfo
@@ -20,14 +36,21 @@ export interface ManagementInfo {
 
 export interface MdmEnrollmentInfo {
   enrolled: boolean
-  provider?: string  // 'intune', 'jamf', 'workspace_one', etc.
+  provider?: string  // 'intune', 'jamf', 'workspace_one', 'mosyle', etc.
   enrollmentId?: string
   serverUrl?: string
+  checkinUrl?: string           // Mac: MDM check-in URL
   lastSync?: string
   status: 'enrolled' | 'not_enrolled' | 'pending' | 'error' | 'disconnected'
   complianceState: 'compliant' | 'non_compliant' | 'unknown' | 'not_evaluated'
   managementType?: 'mdm' | 'mam' | 'hybrid'
   enrollmentDate?: string
+  // Mac-specific osquery mdm table fields
+  userApproved?: boolean        // Mac: User-approved MDM enrollment
+  depCapable?: boolean          // Mac: Device is DEP/ADE capable
+  installedFromDep?: boolean    // Mac: Enrolled via ADE (formerly DEP)
+  accessRights?: number         // Mac: MDM access rights bitmask
+  hasScepPayload?: boolean      // Mac: Has SCEP certificate payload
 }
 
 export interface DomainInfo {
@@ -164,6 +187,9 @@ export interface ManagementSummary {
 /**
  * Extract management information from device modules
  * READER ONLY: Expects device to provide pre-processed management analysis
+ * Supports both:
+ * - Mac: osquery-style snake_case keys (mdm_enrollment, compliance_status, etc.)
+ * - Windows: Legacy camelCase keys (mdmEnrollment, complianceStatus, etc.)
  */
 export function extractManagement(deviceModules: any): ManagementInfo {
   if (!deviceModules?.management) {
@@ -174,20 +200,26 @@ export function extractManagement(deviceModules: any): ManagementInfo {
   const management = deviceModules.management
   
   console.log('[MANAGEMENT MODULE] Reading pre-processed management data:', {
-    hasMdmEnrollment: !!(management.mdmEnrollment || management.mdm_enrollment),
-    hasDomainStatus: !!(management.domainStatus || management.domain_status || management.device_state),
+    // Check for both snake_case (Mac/osquery) and camelCase (Windows/legacy) keys
+    hasMdmEnrollment: !!(management.mdm_enrollment || management.mdmEnrollment),
+    hasDomainStatus: !!(management.domain_status || management.domainStatus || management.device_state),
     hasPolicies: !!management.policies,
-    hasCompliance: !!management.compliance,
+    hasCompliance: !!(management.compliance_status || management.compliance || management.complianceStatus),
     hasCertificates: !!management.certificates,
-    hasBitlocker: !!(management.bitlockerStatus || management.bitlocker_status),
-    hasWindowsUpdate: !!(management.windowsUpdate || management.windows_update),
-    hasGroupPolicies: !!(management.groupPolicies || management.group_policies),
-    hasLocalUsers: !!(management.localUsers || management.local_users),
-    hasRemoteAccess: !!(management.remoteAccess || management.remote_access),
-    hasDeviceState: !!management.device_state
+    hasBitlocker: !!(management.bitlocker_status || management.bitlockerStatus),
+    hasWindowsUpdate: !!(management.windows_update || management.windowsUpdate),
+    hasGroupPolicies: !!(management.group_policies || management.groupPolicies),
+    hasLocalUsers: !!(management.local_users || management.localUsers),
+    hasRemoteAccess: !!(management.remote_management || management.remote_access || management.remoteAccess),
+    hasDeviceState: !!management.device_state,
+    // Mac-specific
+    hasAdeConfiguration: !!(management.ade_configuration || management.adeConfiguration),
+    hasDeviceIdentifiers: !!(management.device_identifiers || management.deviceIdentifiers),
+    hasInstalledProfiles: !!(management.installed_profiles || management.installedProfiles)
   })
 
-  // Support both snake_case (new) and camelCase (legacy) field names throughout
+  // Support both snake_case (Mac/osquery) and camelCase (Windows/legacy) field names
+  // Mac uses snake_case from osquery output
   const mdmData = management.mdm_enrollment || management.mdmEnrollment
   const domainData = management.domain_status || management.domainStatus
   const deviceStateData = management.device_state || management.deviceState
@@ -195,7 +227,8 @@ export function extractManagement(deviceModules: any): ManagementInfo {
   const windowsUpdateData = management.windows_update || management.windowsUpdate
   const groupPoliciesData = management.group_policies || management.groupPolicies
   const localUsersData = management.local_users || management.localUsers
-  const remoteAccessData = management.remote_access || management.remoteAccess
+  const remoteAccessData = management.remote_management || management.remote_access || management.remoteAccess
+  const complianceData = management.compliance_status || management.compliance || management.complianceStatus
 
   const managementInfo: ManagementInfo = {
     // Read MDM enrollment status (device should detect and analyze)
@@ -209,7 +242,8 @@ export function extractManagement(deviceModules: any): ManagementInfo {
     policies: management.policies ? management.policies.map(mapPolicy) : [],
     
     // Read compliance analysis (device should calculate)
-    compliance: management.compliance ? mapCompliance(management.compliance) : createEmptyCompliance(),
+    // Mac sends compliance_status, Windows sends compliance
+    compliance: complianceData ? mapCompliance(complianceData) : createEmptyCompliance(),
     
     // Read certificate inventory
     certificates: management.certificates ? management.certificates.map(mapCertificate) : [],
@@ -226,7 +260,7 @@ export function extractManagement(deviceModules: any): ManagementInfo {
     // Read local user accounts - support both snake_case and camelCase
     localUsers: localUsersData ? localUsersData.map(mapLocalUser) : [],
     
-    // Read remote access configuration - support both snake_case and camelCase
+    // Read remote access configuration - Mac sends remote_management, Windows sends remote_access
     remoteAccess: remoteAccessData ? mapRemoteAccess(remoteAccessData) : createEmptyRemoteAccess(),
     
     // Use device-calculated summary
@@ -249,18 +283,53 @@ export function extractManagement(deviceModules: any): ManagementInfo {
 }
 
 // Helper functions for mapping device data (minimal processing)
+// Supports both Mac (osquery snake_case + string booleans) and Windows (camelCase + native booleans)
 function mapMdmEnrollment(mdm: any): MdmEnrollmentInfo {
+  // Parse enrolled status - osquery returns string "true"/"false", Windows returns boolean
+  const isEnrolled = parseBool(mdm.enrolled) || parseBool(mdm.isEnrolled) || parseBool(mdm.is_enrolled)
+  
+  // Detect MDM provider from server URL if not explicitly provided
+  const serverUrl = mdm.server_url || mdm.serverUrl
+  const provider = mdm.provider || detectMdmProvider(serverUrl)
+  
   return {
-    enrolled: mdm.enrolled || false,
-    provider: mdm.provider,
-    enrollmentId: mdm.enrollmentId || mdm.enrollment_id,
-    serverUrl: mdm.serverUrl || mdm.server_url,
-    lastSync: mdm.lastSync || mdm.last_sync,
-    status: mdm.status || 'not_enrolled',
-    complianceState: mdm.complianceState || mdm.compliance_state || 'unknown',
-    managementType: mdm.managementType || mdm.management_type,
-    enrollmentDate: mdm.enrollmentDate || mdm.enrollment_date
+    enrolled: isEnrolled,
+    provider: provider,
+    enrollmentId: mdm.enrollment_id || mdm.enrollmentId,
+    serverUrl: serverUrl,
+    checkinUrl: mdm.checkin_url || mdm.checkinUrl,
+    lastSync: mdm.last_sync || mdm.lastSync,
+    status: isEnrolled ? 'enrolled' : (mdm.status || 'not_enrolled'),
+    complianceState: mdm.compliance_state || mdm.complianceState || 'unknown',
+    managementType: mdm.management_type || mdm.managementType,
+    enrollmentDate: mdm.enrollment_date || mdm.enrollmentDate,
+    // Mac-specific osquery fields (string booleans)
+    userApproved: parseBool(mdm.user_approved || mdm.userApproved),
+    depCapable: parseBool(mdm.dep_capable || mdm.depCapable),
+    installedFromDep: parseBool(mdm.installed_from_dep || mdm.installedFromDep),
+    accessRights: parseInt(mdm.access_rights || mdm.accessRights) || undefined,
+    hasScepPayload: parseBool(mdm.has_scep_payload || mdm.hasScepPayload)
   }
+}
+
+// Detect MDM provider from server URL
+function detectMdmProvider(serverUrl?: string): string | undefined {
+  if (!serverUrl) return undefined
+  const url = serverUrl.toLowerCase()
+  
+  if (url.includes('jamf') || url.includes('jamfcloud')) return 'Jamf Pro'
+  if (url.includes('manage.microsoft.com') || url.includes('intune')) return 'Microsoft Intune'
+  if (url.includes('mosyle')) return 'Mosyle'
+  if (url.includes('kandji')) return 'Kandji'
+  if (url.includes('addigy')) return 'Addigy'
+  if (url.includes('simplemdm')) return 'SimpleMDM'
+  if (url.includes('fleetsmith') || url.includes('fleet')) return 'Fleet'
+  if (url.includes('airwatch') || url.includes('awmdm')) return 'Workspace ONE'
+  if (url.includes('meraki')) return 'Cisco Meraki'
+  if (url.includes('hexnode')) return 'Hexnode'
+  if (url.includes('filewave')) return 'FileWave'
+  
+  return undefined
 }
 
 function mapDomainInfo(domain: any): DomainInfo {
@@ -323,14 +392,17 @@ function mapPolicy(policy: any): PolicyInfo {
 }
 
 function mapCompliance(compliance: any): ComplianceInfo {
+  // Handle Mac's compliance_status format (snake_case with string booleans)
+  // and Windows' compliance format (camelCase with native types)
   return {
-    overallStatus: compliance.overallStatus || compliance.overall_status || 'unknown',
-    lastEvaluation: compliance.lastEvaluation || compliance.last_evaluation,
-    complianceScore: compliance.complianceScore || compliance.compliance_score,
-    policiesEvaluated: compliance.policiesEvaluated || compliance.policies_evaluated || 0,
-    policiesPassed: compliance.policiesPassed || compliance.policies_passed || 0,
-    policiesFailed: compliance.policiesFailed || compliance.policies_failed || 0,
-    criticalFailures: compliance.criticalFailures || compliance.critical_failures || 0,
+    overallStatus: compliance.overall_status || compliance.overallStatus || 
+                   (parseBool(compliance.is_compliant) ? 'compliant' : 'unknown'),
+    lastEvaluation: compliance.last_evaluation || compliance.lastEvaluation,
+    complianceScore: compliance.compliance_score ?? compliance.complianceScore,
+    policiesEvaluated: compliance.policies_evaluated || compliance.policiesEvaluated || 0,
+    policiesPassed: compliance.policies_passed || compliance.policiesPassed || 0,
+    policiesFailed: compliance.policies_failed || compliance.policiesFailed || 0,
+    criticalFailures: compliance.critical_failures || compliance.criticalFailures || 0,
     warnings: compliance.warnings || 0
   }
 }
@@ -412,15 +484,23 @@ function mapLocalUser(user: any): LocalUserInfo {
 }
 
 function mapRemoteAccess(remote: any): RemoteAccessInfo {
+  // Handle Mac's remote_management format (ard_enabled, screen_sharing_enabled, etc.)
+  // and Windows' remote_access format (rdpEnabled, sshEnabled, etc.)
   return {
-    rdpEnabled: remote.rdpEnabled || remote.rdp_enabled || false,
-    sshEnabled: remote.sshEnabled || remote.ssh_enabled || false,
-    vpnConnections: remote.vpnConnections || remote.vpn_connections ? 
-      (remote.vpnConnections || remote.vpn_connections).map(mapVpnConnection) : [],
-    remoteDesktopUsers: remote.remoteDesktopUsers || remote.remote_desktop_users || [],
-    networkLevelAuth: remote.networkLevelAuth || remote.network_level_auth || false,
-    firewallExceptions: remote.firewallExceptions || remote.firewall_exceptions || []
-  }
+    // Mac uses ARD (Apple Remote Desktop), Windows uses RDP
+    rdpEnabled: parseBool(remote.rdp_enabled || remote.rdpEnabled),
+    sshEnabled: parseBool(remote.ssh_enabled || remote.sshEnabled || 
+                         remote.remote_login_enabled || remote.remoteLoginEnabled),
+    vpnConnections: remote.vpn_connections || remote.vpnConnections ? 
+      (remote.vpn_connections || remote.vpnConnections).map(mapVpnConnection) : [],
+    remoteDesktopUsers: remote.remote_desktop_users || remote.remoteDesktopUsers || 
+                        remote.ard_allowed_users || remote.ardAllowedUsers || [],
+    networkLevelAuth: parseBool(remote.network_level_auth || remote.networkLevelAuth),
+    firewallExceptions: remote.firewall_exceptions || remote.firewallExceptions || [],
+    // Mac-specific ARD fields (converted for cross-platform compatibility)
+    ardEnabled: parseBool(remote.ard_enabled || remote.ardEnabled),
+    screenSharingEnabled: parseBool(remote.screen_sharing_enabled || remote.screenSharingEnabled)
+  } as RemoteAccessInfo
 }
 
 function mapVpnConnection(vpn: any): VpnConnectionInfo {
