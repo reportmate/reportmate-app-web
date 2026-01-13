@@ -90,16 +90,11 @@ export default async function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
-                console.log('[Theme Init] Starting theme initialization...');
-                console.log('[Theme Init] User agent:', navigator.userAgent);
-                
                 function getStoredTheme() {
                   try {
                     const stored = localStorage.getItem('reportmate-theme') || localStorage.getItem('theme');
-                    console.log('[Theme Init] Stored theme:', stored);
                     return stored;
                   } catch (e) {
-                    console.log('[Theme Init] Failed to read localStorage:', e);
                     return null;
                   }
                 }
@@ -109,15 +104,11 @@ export default async function RootLayout({
                     try {
                       const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
                       const matches = mediaQuery.matches;
-                      console.log('[Theme Init] Media query:', mediaQuery);
-                      console.log('[Theme Init] System prefers dark mode:', matches);
                       return matches ? 'dark' : 'light';
                     } catch (error) {
-                      console.log('[Theme Init] matchMedia error:', error);
                       return 'light';
                     }
                   }
-                  console.log('[Theme Init] matchMedia not available');
                   return 'light';
                 }
                 
@@ -128,16 +119,13 @@ export default async function RootLayout({
                   if (theme === 'system') {
                     const systemTheme = getSystemTheme();
                     root.classList.add(systemTheme);
-                    console.log('[Theme Init] Applied system theme:', systemTheme);
-                  } else {
+                    } else {
                     root.classList.add(theme);
-                    console.log('[Theme Init] Applied stored theme:', theme);
-                  }
+                    }
                 }
                 
                 const storedTheme = getStoredTheme();
                 const finalTheme = storedTheme || 'system';
-                console.log('[Theme Init] Final theme to apply:', finalTheme);
                 setTheme(finalTheme);
                 
                 // Listen for system theme changes if using system theme
@@ -146,7 +134,6 @@ export default async function RootLayout({
                     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
                     
                     const handleChange = function(e) {
-                      console.log('[Theme Init] System theme changed:', e.matches ? 'dark' : 'light');
                       setTheme('system');
                     };
                     
@@ -157,8 +144,7 @@ export default async function RootLayout({
                       mediaQuery.addListener(handleChange);
                     }
                   } catch (error) {
-                    console.log('[Theme Init] Failed to set up media query listener:', error);
-                  }
+                    }
                 }
               })();
             `

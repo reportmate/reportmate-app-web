@@ -302,7 +302,6 @@ export class DynamicModuleLoader {
       }
       localStorage.setItem('reportmate_installed_modules', JSON.stringify(installedModules))
       
-      console.log(`Successfully installed module: ${manifest.name}`)
       return true
       
     } catch (error) {
@@ -376,7 +375,6 @@ export class DynamicModuleLoader {
         lastLoaded: new Date()
       })
 
-      console.log(`Module ${moduleId} loaded successfully`)
       return true
       
     } catch (error) {
@@ -600,7 +598,6 @@ export class DynamicModuleLoader {
       
       localStorage.setItem('reportmate_module_repositories', JSON.stringify(repositories))
       
-      console.log(`Added module repository: ${manifest.name}`)
       return true
       
     } catch (error) {

@@ -93,7 +93,6 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
   if (!deviceModules?.profiles) {
     // Check in modules.profiles
     if (!deviceModules?.modules?.profiles) {
-      console.log('[PROFILES MODULE] No profiles data found')
       return {
         totalProfiles: 0,
         systemProfiles: 0,
@@ -105,8 +104,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
 
   const profilesData = deviceModules.profiles || deviceModules.modules?.profiles
   
-  console.log('[PROFILES MODULE] Reading profiles data:', {
-    keys: Object.keys(profilesData || {}),
+  ,
     hasIntunePolicies: !!profilesData?.intunePolicies,
     hasConfigurationProfiles: !!profilesData?.configurationProfiles,
     hasProfilesC: !!profilesData?.profiles_C,
@@ -118,7 +116,6 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
 
   // Handle Mac raw profiles output (profiles -C / profiles -P)
   if (profilesData?.profiles_C || profilesData?.profiles_P) {
-    console.log('[PROFILES MODULE] Parsing Mac profiles raw output')
     // Combine both computer-level and user profiles
     const macProfiles = [
       ...parseMacProfilesOutput(profilesData.profiles_C || ''),
@@ -134,8 +131,7 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
       }
     })
     
-    console.log('[PROFILES MODULE] Parsed Mac profiles:', profiles.length)
-  }
+    }
 
   // Add Intune policies - Ensure it's an array
   if (profilesData?.intunePolicies && Array.isArray(profilesData.intunePolicies)) {

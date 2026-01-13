@@ -126,7 +126,6 @@ export function triggerMemoryCleanup(): void {
     // Force garbage collection if available (only works in dev/debug environments)
     if (typeof (window as any).gc === 'function') {
       (window as any).gc()
-      console.log('[Memory] Garbage collection triggered')
     }
 
     // Clear any unused caches

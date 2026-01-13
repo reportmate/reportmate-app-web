@@ -7,8 +7,6 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[HARDWARE API] ${timestamp} - Fetching hardware data`)
-
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
@@ -21,8 +19,6 @@ export async function GET() {
     // NO LOCAL FALLBACK: Call FastAPI container directly
     try {
       const url = `${apiBaseUrl}/api/modules/hardware`
-      console.log(`[HARDWARE API] ${timestamp} - Calling FastAPI: ${url}`)
-      
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
       
@@ -36,8 +32,6 @@ export async function GET() {
       }
       
       const hardwareData = await response.json()
-      console.log(`[HARDWARE API] ${timestamp} - Successfully fetched hardware data from FastAPI`)
-      
       return NextResponse.json(hardwareData, {
         headers: {
           'Cache-Control': 'no-cache, no-store, must-revalidate',

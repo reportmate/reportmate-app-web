@@ -119,14 +119,6 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   const rawHardware = device.modules?.hardware
   const hardwareModule = rawHardware ? normalizeKeys(rawHardware) as any : null
   const legacyHardware = hardwareModule || {}
-  
-  console.log('[HardwareWidget] Debug data access:', {
-    deviceId: device.id,
-    hasModules: !!device.modules,
-    hasHardwareModule: !!device.modules?.hardware,
-    normalizedHardware: hardwareModule,
-    hardwareModuleKeys: hardwareModule ? Object.keys(hardwareModule) : [],
-  })
 
   // Helper function to format bytes to human readable format
   const formatBytes = (bytes: number) => {

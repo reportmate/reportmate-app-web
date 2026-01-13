@@ -351,7 +351,6 @@ export function useLiveEvents() {
         
         ws.onclose = (event) => {
           if (!isActive) return
-          console.log('WebSocket closed:', event.code, event.reason)
           wsRef.current = null
           
           // Attempt reconnection with exponential backoff
@@ -364,7 +363,6 @@ export function useLiveEvents() {
               if (isActive) connectWebSocket()
             }, delay)
           } else {
-            console.log('Max reconnect attempts reached, falling back to polling')
             startPolling()
           }
         }

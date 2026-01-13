@@ -198,19 +198,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     const profilesData = device?.modules?.profiles || device?.profiles || data?.profiles || data
     
     if (!profilesData) {
-      console.log('[ProfilesTab] No profiles data found')
       return { policyGroups: [], policyTypes: [], totalSettings: 0 }
     }
-
-    console.log('[ProfilesTab] Processing profiles data:', {
-      keys: Object.keys(profilesData),
-      hasIntunePolicies: !!(profilesData.intune_policies || profilesData.intunePolicies),
-      intunePoliciesCount: (profilesData.intune_policies || profilesData.intunePolicies || []).length,
-      hasSecurityPolicies: !!(profilesData.security_policies || profilesData.securityPolicies),
-      securityPoliciesCount: (profilesData.security_policies || profilesData.securityPolicies || []).length,
-      hasRegistryPolicies: !!(profilesData.registry_policies || profilesData.registryPolicies),
-      registryPoliciesCount: (profilesData.registry_policies || profilesData.registryPolicies || []).length
-    })
 
     // ============================================
     // INTUNE POLICIES - Group by policy_name (CSP area like Defender, Browser, etc.)
@@ -220,7 +209,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     // all policies with the same policy_name to build complete policy groups
     // ============================================
     const intunePolicies = profilesData.intune_policies || profilesData.intunePolicies || []
-    console.log('[ProfilesTab] Processing', intunePolicies.length, 'intune policies')
     
     if (Array.isArray(intunePolicies) && intunePolicies.length > 0) {
       // Group by policy_name (CSP area) - aggregate multiple policy entries into one group
@@ -277,19 +265,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
             }
           }
         })
-      })
-      
-      console.log('[ProfilesTab] Intune policies processing:', {
-        total: intunePolicies.length,
-        skippedUUID,
-        skippedEmpty,
-        processedPolicies,
-        groupsCreated: Object.keys(groupedByArea).length,
-        groupDetails: Object.entries(groupedByArea).map(([name, data]) => ({
-          name,
-          policies: data.policies.length,
-          settings: data.settings.size
-        }))
       })
 
       // Convert to PolicyGroup array
@@ -554,8 +529,6 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
 
     // Sort groups by settings count (most settings first)
     allGroups.sort((a, b) => b.settingsCount - a.settingsCount)
-
-    console.log('[ProfilesTab] Processed policy groups:', allGroups.length, 'total settings:', settingsCount)
 
     return {
       policyGroups: allGroups,

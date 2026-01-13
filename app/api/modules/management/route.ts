@@ -7,16 +7,12 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[MANAGEMENT API] ${timestamp} - Fetching bulk management data from FastAPI`)
-    
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
       throw new Error('API_BASE_URL not configured')
     }
     
     const fastApiUrl = `${apiBaseUrl}/api/devices/management`
-    console.log(`[MANAGEMENT API] Calling: ${fastApiUrl}`)
-    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -33,7 +29,7 @@ export async function GET() {
     
     const managementData = await response.json()
     
-    console.log(`[MANAGEMENT API] Received ${Array.isArray(managementData) ? managementData.length : 0} devices with management data`)
+    ? managementData.length : 0} devices with management data`)
     
     return NextResponse.json(managementData, {
       headers: {

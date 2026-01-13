@@ -167,14 +167,12 @@ export interface ManagementSummary {
  */
 export function extractManagement(deviceModules: any): ManagementInfo {
   if (!deviceModules?.management) {
-    console.log('[MANAGEMENT MODULE] No management data found in modules')
     return createEmptyManagementInfo()
   }
 
   const management = deviceModules.management
   
-  console.log('[MANAGEMENT MODULE] Reading pre-processed management data:', {
-    hasMdmEnrollment: !!(management.mdmEnrollment || management.mdm_enrollment),
+  ,
     hasDomainStatus: !!(management.domainStatus || management.domain_status || management.device_state),
     hasPolicies: !!management.policies,
     hasCompliance: !!management.compliance,
@@ -232,18 +230,6 @@ export function extractManagement(deviceModules: any): ManagementInfo {
     // Use device-calculated summary
     summary: management.summary || createEmptySummary()
   }
-
-  console.log('[MANAGEMENT MODULE] Management info read:', {
-    mdmEnrolled: managementInfo.mdmEnrollment.enrolled,
-    domainJoined: managementInfo.domainStatus.joined,
-    policiesCount: managementInfo.policies.length,
-    complianceScore: managementInfo.compliance.complianceScore,
-    certificatesCount: managementInfo.certificates.length,
-    bitlockerEnabled: managementInfo.bitlockerStatus.enabled,
-    pendingUpdates: managementInfo.windowsUpdate.pendingUpdates,
-    groupPoliciesCount: managementInfo.groupPolicies.length,
-    localUsersCount: managementInfo.localUsers.length
-  })
 
   return managementInfo
 }

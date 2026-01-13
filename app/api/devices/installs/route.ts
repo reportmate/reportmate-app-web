@@ -26,20 +26,9 @@ export async function GET(request: Request) {
     const selectedFleets = searchParams.getAll('fleets');
     const selectedPlatforms = searchParams.getAll('platforms').map(p => p.toLowerCase());
     
-    console.log('[INSTALLS API] Filters:', {
-      installs: selectedInstalls.length,
-      usages: selectedUsages.length,
-      catalogs: selectedCatalogs.length,
-      rooms: selectedRooms.length,
-      fleets: selectedFleets.length,
-      platforms: selectedPlatforms.length
-    });
-    
     // If device ID is provided, return data for specific device
     if (deviceId) {
       const timestamp = new Date().toISOString();
-      console.log(`[INSTALLS API] ${timestamp} - Fetching installs data for device: ${deviceId}`);
-
       // Use shared authentication headers
       const headers = getInternalApiHeaders();
 
@@ -53,7 +42,7 @@ export async function GET(request: Request) {
         console.error('[INSTALLS API] API fetch failed:', apiResponse.status, apiResponse.statusText);
         
         // Following .instructions.md: NO FAKE DATA - return empty state for broken backend
-        console.log('[INSTALLS API] Backend unavailable, returning empty state (NO FAKE DATA)');
+        ');
         return NextResponse.json({
           success: true,
           deviceId: deviceId,
@@ -70,8 +59,6 @@ export async function GET(request: Request) {
       }
       
       const deviceData = await apiResponse.json();
-      console.log('[INSTALLS API] Raw API response received for device:', deviceId);
-      
       // Extract installs data from the device response (new API format)
       // Data is now at root level: deviceData.modules.installs
       const installsData = deviceData?.modules?.installs || {};
@@ -87,25 +74,14 @@ export async function GET(request: Request) {
 
     // No device ID - use the shared data fetcher directly (no HTTP call needed)
     const timestamp = new Date().toISOString();
-    console.log(`[INSTALLS API] ${timestamp} - Fetching installs data using shared module`);
-    
     // Direct function call - no internal HTTP request, no middleware interception
     const dataResult = await getDevicesWithInstalls();
     const devicesWithInstalls = dataResult.devices || [];
     
-    console.log(`[INSTALLS API] Received ${devicesWithInstalls.length} devices with installs data`);
-    
     // Debug: log first device structure
     if (devicesWithInstalls.length > 0) {
       const firstDevice = devicesWithInstalls[0];
-      console.log(`[INSTALLS API] First device:`, {
-        serial: firstDevice.serialNumber,
-        hasModules: !!firstDevice.modules,
-        hasInstalls: !!firstDevice.modules?.installs,
-        hasCimian: !!firstDevice.modules?.installs?.cimian,
-        itemsCount: firstDevice.modules?.installs?.cimian?.items?.length || 0
-      });
-    }
+      }
 
     // Transform device data into install records for the report
     const installRecords: any[] = [];
@@ -179,8 +155,6 @@ export async function GET(request: Request) {
         });
       }
     }
-    
-    console.log(`[INSTALLS API] Generated ${installRecords.length} install records from ${devicesWithInstalls.length} devices`);
     
     // Return install records (not raw device data)
     return NextResponse.json(installRecords);

@@ -14,14 +14,10 @@ export async function GET(request: Request) {
     const timestamp = new Date().toISOString()
     const { searchParams } = new URL(request.url)
     
-    console.log(`[APPLICATIONS PROXY] ${timestamp} - Forwarding to FastAPI`)
-    
     // Use internal API URL for container-to-container communication
     const API_BASE_URL = process.env.API_BASE_URL || 'http://reportmate-functions-api'
     
     const fastApiUrl = `${API_BASE_URL}/api/devices/applications?${searchParams.toString()}`
-    console.log(`[APPLICATIONS PROXY] Calling: ${fastApiUrl}`)
-    
     // Use shared auth headers for internal API calls
     const headers = getInternalApiHeaders()
     
@@ -37,7 +33,7 @@ export async function GET(request: Request) {
     }
     
     const data = await response.json()
-    console.log(`[APPLICATIONS PROXY] Received ${Array.isArray(data) ? data.length : 0} applications`)
+    ? data.length : 0} applications`)
     
     return NextResponse.json(data, {
       headers: {

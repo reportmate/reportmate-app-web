@@ -26,7 +26,6 @@ export const useDevicesList = () => {
 
   useEffect(() => {
     const fetchDevices = async () => {
-      console.log('[useDevicesList] Fetching fast devices list...')
       setLoading(true)
       setError(null)
 
@@ -43,7 +42,6 @@ export const useDevicesList = () => {
         }
 
         const data = await response.json()
-        console.log(`[useDevicesList] Got ${data.length} devices quickly`)
         setDevices(data)
       } catch (error) {
         console.error('[useDevicesList] Error:', error)
@@ -74,7 +72,6 @@ export const useChartData = () => {
 
   useEffect(() => {
     const fetchChartData = async () => {
-      console.log('[useChartData] Fetching chart data...')
       setLoading(true)
       setError(null)
 
@@ -91,7 +88,6 @@ export const useChartData = () => {
         }
 
         const data = await response.json()
-        console.log(`[useChartData] Got chart data for ${data.sampledDevices} devices`)
         setChartData(data)
       } catch (error) {
         console.error('[useChartData] Error:', error)
