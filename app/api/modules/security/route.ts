@@ -9,6 +9,8 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
     const timestamp = new Date().toISOString()
+    console.log(`[SECURITY API] ${timestamp} - Fetching security data`)
+
     const apiBaseUrl = process.env.API_BASE_URL
     
     if (!apiBaseUrl) {
@@ -21,6 +23,8 @@ export async function GET(request: Request) {
     // Call FastAPI bulk endpoint
     try {
       const url = `${apiBaseUrl}/api/devices/security?limit=${limit}`
+      console.log(`[SECURITY API] ${timestamp} - Calling FastAPI: ${url}`)
+      
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
       headers['Content-Type'] = 'application/json'
@@ -34,6 +38,8 @@ export async function GET(request: Request) {
       }
       
       const securityData = await response.json()
+      console.log(`[SECURITY API] ${timestamp} - Successfully fetched ${securityData.length || 0} security records from FastAPI`)
+      
       // Map the raw API data to the frontend Security interface
       const mappedData = Array.isArray(securityData) ? securityData.map((item: any) => {
         const raw = item.raw || {};

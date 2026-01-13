@@ -15,6 +15,8 @@ export async function GET(
     const limit = parseInt(searchParams.get('limit') || '10')
     const offset = parseInt(searchParams.get('offset') || '0')
 
+    console.log('[INSTALL SESSIONS API] Fetching install sessions for device:', deviceId)
+
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -31,7 +33,7 @@ export async function GET(
     apiUrl.searchParams.set('limit', limit.toString())
     apiUrl.searchParams.set('offset', offset.toString())
     
-    )
+    console.log('[INSTALL SESSIONS API] Using API URL:', apiUrl.toString())
     const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl.toString(), {
       cache: 'no-store',
@@ -66,6 +68,8 @@ export async function GET(
     }
 
     const data = await response.json()
+    console.log('[INSTALL SESSIONS API] Successfully fetched install sessions from Azure Functions')
+    
     return NextResponse.json(data, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',

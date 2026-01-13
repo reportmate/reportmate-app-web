@@ -16,6 +16,8 @@ export async function GET(
   }
   try {
     const { eventId } = await params
+    console.log('[EVENT PAYLOAD API] Fetching payload for event:', eventId)
+
     // Get authentication headers for internal API calls
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -30,6 +32,7 @@ export async function GET(
 
       if (response.ok) {
         const data = await response.json();
+        console.log('[EVENT PAYLOAD API] Successfully fetched payload from API');
         return NextResponse.json(data, {
           headers: {
             'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
@@ -39,6 +42,7 @@ export async function GET(
         });
       } else {
         const errorText = await response.text();
+        console.log('[EVENT PAYLOAD API] API error:', response.status, response.statusText, errorText);
         return NextResponse.json({
           error: 'Event payload not available',
           message: `API returned ${response.status}: ${response.statusText}`,
@@ -53,7 +57,7 @@ export async function GET(
         });
       }
     } catch (fetchError) {
-      );
+      console.log('[EVENT PAYLOAD API] API fetch error:', fetchError instanceof Error ? fetchError.message : String(fetchError));
       
       return NextResponse.json({
         error: 'Event payload not available',

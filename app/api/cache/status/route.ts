@@ -7,6 +7,8 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
+    console.log(`[CACHE STATUS] ${timestamp} - Cache status request`)
+    
     // This is a simplified version - in production we'd check actual cache states
     const cacheStatus = {
       timestamp,

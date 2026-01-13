@@ -190,11 +190,25 @@ export interface PerformanceSummary {
  */
 export function extractPerformance(deviceModules: any): PerformanceInfo {
   if (!deviceModules?.performance) {
+    console.log('[PERFORMANCE MODULE] No performance data found in modules')
     return createEmptyPerformanceInfo()
   }
 
   const performance = deviceModules.performance
   
+  console.log('[PERFORMANCE MODULE] Reading pre-processed performance data:', {
+    hasCpu: !!performance.cpu,
+    hasMemory: !!performance.memory,
+    hasDisk: !!performance.disk,
+    hasNetwork: !!performance.network,
+    hasProcesses: !!performance.processes,
+    hasSystemLoad: !!performance.systemLoad,
+    hasBootTime: !!performance.bootTime,
+    hasThermals: !!performance.thermals,
+    hasPower: !!performance.power,
+    hasUptime: !!performance.uptime
+  })
+
   const performanceInfo: PerformanceInfo = {
     // Read CPU performance metrics (device should calculate averages, peaks)
     cpu: performance.cpu ? mapCpuPerformance(performance.cpu) : createEmptyCpuPerformance(),
@@ -229,6 +243,15 @@ export function extractPerformance(deviceModules: any): PerformanceInfo {
     // Use device-calculated performance summary
     summary: performance.summary || createEmptySummary()
   }
+
+  console.log('[PERFORMANCE MODULE] Performance info read:', {
+    cpuUsage: performanceInfo.cpu.usage,
+    memoryUsagePercentage: performanceInfo.memory.usagePercentage,
+    diskCount: performanceInfo.disk.length,
+    processCount: performanceInfo.processes.length,
+    overallScore: performanceInfo.summary.overallScore,
+    healthStatus: performanceInfo.summary.healthStatus
+  })
 
   return performanceInfo
 }
