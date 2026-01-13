@@ -70,14 +70,12 @@ export function useProgressiveModuleLoading(
     let existingData: any = null
     setModuleStates(prev => {
       if (prev[moduleName]?.state === 'loaded' || prev[moduleName]?.state === 'loading') {
-        console.log(`[PROGRESSIVE] Module '${moduleName}' already ${prev[moduleName].state}`)
         shouldLoad = false
         existingData = prev[moduleName]?.data ?? null
         return prev // No change
       }
       
       // Set loading state
-      console.log(`[PROGRESSIVE] Loading module '${moduleName}' for device ${deviceId}`)
       return {
         ...prev,
         [moduleName]: { state: 'loading', data: null, error: null }
@@ -103,8 +101,6 @@ export function useProgressiveModuleLoading(
       if (!result.success) {
         throw new Error(result.error || 'Failed to load module')
       }
-      
-      console.log(`[PROGRESSIVE] Module '${moduleName}' loaded successfully`)
       
       // Update state with loaded data
       setModuleStates(prev => ({
@@ -203,8 +199,6 @@ export function useProgressiveModuleLoading(
       setInfoLoading(true)
       setInfoError(null)
       
-      console.log(`[PROGRESSIVE] Loading fast info data for device ${deviceId}`)
-      
       try {
         const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/info`)
         
@@ -224,8 +218,6 @@ export function useProgressiveModuleLoading(
         if (!result.success) {
           throw new Error(result.error || 'Failed to load device info')
         }
-        
-        console.log(`[PROGRESSIVE] Fast info data loaded successfully`)
         
         // Process data through mapDeviceData to ensure proper structure
         const processedDevice = mapDeviceData(result.device)

@@ -39,21 +39,16 @@ export default function ProgressiveDashboard() {
   // State for ALL devices data with system info (loads in background)
   const [allDevices, setAllDevices] = useState<any[]>([])
 
-  console.log('[PROGRESSIVE DASHBOARD] Fast devices:', fastDevices.length, 'All devices:', allDevices.length)
-
   // Load FAST devices list first (inventory only - shows within 3 seconds)
   useEffect(() => {
     const loadFastDevices = async () => {
       try {
-        console.log('[PROGRESSIVE DASHBOARD] Loading FAST devices list first')
         const response = await fetch('/api/modules/devices-list', {
           cache: 'no-store'
         })
 
         if (response.ok) {
           const devices = await response.json()
-          console.log(`[PROGRESSIVE DASHBOARD] Got FAST device list: ${devices.length} devices`)
-          
           setFastDevices(devices)
           setFastLoading(false)
         }
@@ -70,15 +65,12 @@ export default function ProgressiveDashboard() {
   useEffect(() => {
     const loadAllDevicesData = async () => {
       try {
-        console.log('[PROGRESSIVE DASHBOARD] Loading ALL devices for complete charts in background')
         const response = await fetch('/api/devices', {
           cache: 'no-store'
         })
 
         if (response.ok) {
           const devices = await response.json()
-          console.log(`[PROGRESSIVE DASHBOARD] Loaded ALL ${devices.length} devices with system data`)
-          
           setAllDevices(devices)
         }
       } catch (error) {

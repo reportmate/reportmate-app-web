@@ -11,16 +11,12 @@ export const revalidate = 0
 export async function GET() {
   try {
     const timestamp = new Date().toISOString()
-    console.log(`[PERIPHERALS API] ${timestamp} - Fetching bulk peripherals data from FastAPI`)
-    
     const API_BASE_URL = process.env.API_BASE_URL
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL not configured')
     }
     
     const fastApiUrl = `${API_BASE_URL}/api/devices/peripherals`
-    console.log(`[PERIPHERALS API] Calling: ${fastApiUrl}`)
-    
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     headers['Content-Type'] = 'application/json'
@@ -37,7 +33,7 @@ export async function GET() {
     
     const peripheralsData = await response.json()
     
-    console.log(`[PERIPHERALS API] Received ${Array.isArray(peripheralsData) ? peripheralsData.length : 0} devices with peripherals data`)
+    ? peripheralsData.length : 0} devices with peripherals data`)
     
     return NextResponse.json(peripheralsData, {
       headers: {
