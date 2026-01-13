@@ -59,7 +59,15 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const enrollmentType = mdmEnrollment?.enrollment_type || mdmEnrollment?.enrollmentType || deviceState?.status
   const tenantName = tenantDetails?.tenant_name || tenantDetails?.tenantName
   const deviceAuthStatus = deviceDetails?.device_auth_status || deviceDetails?.deviceAuthStatus
-  const profileCount = management.profiles?.length || 0
+  
+  // Get profiles, compliance policies, and managed apps - support both snake_case and camelCase
+  const profiles = management.profiles || []
+  const compliancePolicies = management.compliance_policies || management.compliancePolicies || []
+  const managedApps = management.managed_apps || management.managedApps || []
+  
+  const profileCount = profiles.length
+  const compliancePolicyCount = compliancePolicies.length
+  const managedAppCount = managedApps.length
 
   // Helper functions
   const formatExpiryDate = (dateString?: string) => {
@@ -323,36 +331,45 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   {profileCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                  Profiles
+                  Configuration Profiles
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  MDM policy areas applied
+                </p>
               </div>
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-green-600 dark:text-green-400">
-                  {management.compliancePolicies?.length || 0}
+                  {compliancePolicyCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Compliance Policies
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  Security & health requirements
+                </p>
               </div>
               
               <div className="text-left">
                 <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                  {management.metadata?.Applications?.length || 0}
+                  {managedAppCount}
                 </div>
                 <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   Managed Apps
                 </div>
+                <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                  Apps deployed via Intune
+                </p>
               </div>
             </div>
 
             {/* Compliance Status with pill on right */}
             <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-              {management.compliancePolicies && management.compliancePolicies.length > 0 ? (
+              {compliancePolicyCount > 0 ? (
                 <div className="flex items-center justify-between">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies Applied</span>
+                  <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies</span>
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    {management.compliancePolicies.length} policies
+                    {compliancePolicyCount} applied
                   </span>
                 </div>
               ) : (
@@ -369,12 +386,15 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       </div>
 
       {/* Configuration Profiles */}
-      {isEnrolled && management.profiles && management.profiles.length > 0 && (
+      {isEnrolled && profiles.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
               Configuration Profiles
             </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              MDM policy areas and configuration settings applied to this device
+            </p>
           </div>
           <div className="p-6">
             <div className="overflow-x-auto">
@@ -388,35 +408,175 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       Type
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Status
+                      Settings
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Installed
+                      Status
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {management.profiles.map((profile: any, index: number) => (
-                    <tr key={profile.id || index}>
+                  {profiles.map((profile: any, index: number) => (
+                    <tr key={profile.identifier || profile.id || index}>
                       <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                        {profile.displayName || profile.name || 'Unknown Profile'}
+                        {profile.name || profile.displayName || 'Unknown Profile'}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {profile.type || 'Configuration'}
-                      </td>
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                          (profile.status || profile.installState || '').toLowerCase().includes('install') 
-                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                            : (profile.status || profile.installState || '').toLowerCase().includes('pending') 
-                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
-                            : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
-                        }`}>
-                          {profile.status || profile.installState || 'Unknown'}
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200">
+                          {profile.type || 'Configuration'}
                         </span>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
-                        {profile.installDate ? formatExpiryDate(profile.installDate) : 'Unknown'}
+                        {(profile.setting_count ?? profile.settingCount ?? 0) > 0 ? (
+                          <span className="text-gray-900 dark:text-white font-medium">
+                            {profile.setting_count ?? profile.settingCount} settings
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          (profile.status || '').toLowerCase() === 'applied' || (profile.status || '').toLowerCase() === 'installed'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : (profile.status || '').toLowerCase().includes('pending') 
+                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
+                            : (profile.status || '').toLowerCase().includes('fail') || (profile.status || '').toLowerCase().includes('error')
+                            ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                            : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {profile.status || 'Unknown'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Managed Apps */}
+      {isEnrolled && managedApps.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Managed Applications
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Applications deployed to this device via Microsoft Intune
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Application Name
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Assignment
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Install Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {managedApps.map((app: any, index: number) => (
+                    <tr key={app.app_id || app.appId || index}>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {app.name || 'Unknown App'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200">
+                          {app.app_type || app.appType || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          (app.target_type || app.targetType || '').toLowerCase() === 'required'
+                            ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
+                            : 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200'
+                        }`}>
+                          {app.target_type || app.targetType || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          (app.install_state || app.installState || '').toLowerCase() === 'installed'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : (app.install_state || app.installState || '').toLowerCase() === 'installing' || (app.install_state || app.installState || '').toLowerCase() === 'downloading'
+                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
+                            : (app.install_state || app.installState || '').toLowerCase() === 'failed' || (app.install_state || app.installState || '').toLowerCase().includes('error')
+                            ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                            : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {app.install_state || app.installState || 'Unknown'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Compliance Policies */}
+      {isEnrolled && compliancePolicies.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Compliance Policies
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Security and health compliance requirements applied to this device
+            </p>
+          </div>
+          <div className="p-6">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Policy Name
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                      Last Evaluated
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  {compliancePolicies.map((policy: any, index: number) => (
+                    <tr key={policy.policy_id || policy.policyId || index}>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        {policy.name || 'Unknown Policy'}
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                          (policy.status || '').toLowerCase() === 'compliant' || (policy.status || '').toLowerCase() === 'applied'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : (policy.status || '').toLowerCase() === 'not compliant' || (policy.status || '').toLowerCase().includes('fail')
+                            ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                            : (policy.status || '').toLowerCase().includes('grace') || (policy.status || '').toLowerCase() === 'pending'
+                            ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' 
+                            : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
+                        }`}>
+                          {policy.status || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 dark:text-gray-300">
+                        {policy.last_evaluated || policy.lastEvaluated ? formatExpiryDate(policy.last_evaluated || policy.lastEvaluated) : '—'}
                       </td>
                     </tr>
                   ))}
