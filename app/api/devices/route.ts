@@ -80,7 +80,6 @@ function convertPowerShellObjects(obj: unknown, parentKey?: string, originalObj?
 export async function GET(request: NextRequest) {
   const timestamp = new Date().toISOString()
   
-  
   try {
     const apiBaseUrl = process.env.API_BASE_URL
     
@@ -93,7 +92,6 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
 
-    
     const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
     const queryString = incomingParams.toString()
     const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
@@ -101,10 +99,17 @@ export async function GET(request: NextRequest) {
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     
+    // Create abort controller with 30 second timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+    
     const response = await fetch(devicesUrl, {
       cache: 'no-store',
-      headers
+      headers,
+      signal: controller.signal
     })
+    
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
       console.error('[DEVICES API] FastAPI error:', response.status, response.statusText)
@@ -134,6 +139,16 @@ export async function GET(request: NextRequest) {
     })
     
   } catch (error) {
+    // Handle timeout specifically
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.error('[DEVICES API] Request timed out after 30 seconds')
+      return NextResponse.json({
+        error: 'Request timeout',
+        details: 'The backend API took too long to respond. Please try again.',
+        timestamp
+      }, { status: 504 })
+    }
+    
     console.error('[DEVICES API] Unexpected error:', error)
     return NextResponse.json({
       error: 'Internal server error',
