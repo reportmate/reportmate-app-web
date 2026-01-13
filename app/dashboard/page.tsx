@@ -8,7 +8,7 @@ import ErrorBoundary from "../../src/components/ErrorBoundary"
 import { WarningStatsWidget, ErrorStatsWidget, InstallStatsData } from "../../src/lib/modules/widgets/DashboardStats"
 import { RecentEventsTable } from "../../src/lib/modules/widgets/RecentEventsWidget"
 import { NewClientsWidget } from "../../src/lib/modules/widgets/NewClientsWidget"
-import { OSVersionWidget } from "../../src/lib/modules/widgets/OSVersionWidget"
+import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWidget"
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
@@ -469,10 +469,10 @@ export default function Dashboard() {
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* macOS Versions */}
-                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
+                <OSVersionPieWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
                 
                 {/* Windows Versions */}
-                <OSVersionWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
+                <OSVersionPieWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
               </div>
             </ErrorBoundary>
           </div>

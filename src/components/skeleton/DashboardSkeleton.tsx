@@ -246,26 +246,22 @@ const OSVersionWidgetSkeleton: React.FC<{ osType: 'macOS' | 'Windows' }> = ({ os
     </div>
     
     <div className="p-6">
-      <div className="space-y-4">
-        {[...Array(8)].map((_, i) => (
-          <div key={i} className="flex items-center gap-4">
-            <div className="w-20 text-sm">
-              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+      <div className="flex gap-4 items-center">
+        {/* Donut Chart Skeleton */}
+        <div className="w-36 h-36 flex-shrink-0 relative">
+          <div className="absolute inset-0 rounded-full border-[16px] border-gray-200 dark:border-gray-700 animate-pulse"></div>
+        </div>
+
+        {/* Bar Chart Skeleton */}
+        <div className="flex-1 space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="flex-1 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="w-8 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
             </div>
-            <div className="flex-1 flex items-center gap-3">
-              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative overflow-hidden">
-                <div 
-                  className="h-full rounded-full bg-gray-300 dark:bg-gray-600 animate-pulse"
-                  style={{ width: `${Math.random() * 80 + 20}%` }}
-                >
-                </div>
-              </div>
-              <div className="w-12 text-right">
-                <div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              </div>
-            </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   </div>
