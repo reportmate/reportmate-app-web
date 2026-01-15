@@ -85,6 +85,9 @@ const CopyableValue: React.FC<{
 }
 
 export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading = false }) => {
+  // State for collapsing disconnected interfaces
+  const [showDisconnected, setShowDisconnected] = useState(false)
+  
   // Helper function to filter IPv6 addresses and return only IPv4
   const getIPv4Address = (ipAddress: string | undefined): string | undefined => {
     if (!ipAddress || ipAddress === 'N/A') return undefined;
@@ -132,11 +135,15 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
           </div>
         </div>
         {/* Connection Type - Top Right */}
-        {networkData.connectionType && (
+        {(networkData.connectionType || networkData.vpnActive) && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Active Connection</div>
             <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
-              {networkData.connectionType}
+              {networkData.vpnActive 
+                ? (networkData.connectionType?.includes('VPN') 
+                    ? networkData.connectionType 
+                    : `VPN${networkData.vpnName ? ` (${networkData.vpnName})` : ''}`)
+                : networkData.connectionType}
             </div>
           </div>
         )}
@@ -219,130 +226,163 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
       </div>
 
       {/* Network Interfaces Table */}
-      {!isLoading && networkData.interfaces && networkData.interfaces.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Interfaces</h3>
+      {!isLoading && networkData.interfaces && networkData.interfaces.length > 0 && (() => {
+        // Separate active and disconnected interfaces
+        const sortedInterfaces = [...networkData.interfaces].sort((a: any, b: any) => {
+          const aActive = (a.isActive === true || a.status === 'Active' || a.status === 'Connected') ? 1 : 0;
+          const bActive = (b.isActive === true || b.status === 'Active' || b.status === 'Connected') ? 1 : 0;
+          if (aActive !== bActive) return bActive - aActive;
+          const aWired = (a.type?.toLowerCase().includes('ethernet') || a.type?.toLowerCase().includes('wired')) ? 1 : 0;
+          const bWired = (b.type?.toLowerCase().includes('ethernet') || b.type?.toLowerCase().includes('wired')) ? 1 : 0;
+          if (aWired !== bWired) return bWired - aWired;
+          return (a.name || '').localeCompare(b.name || '');
+        });
+        
+        const activeInterfaces = sortedInterfaces.filter((iface: any) => 
+          iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected'
+        );
+        const disconnectedInterfaces = sortedInterfaces.filter((iface: any) => 
+          !(iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected')
+        );
+        
+        const renderInterfaceRow = (iface: any, index: number, isDisconnected: boolean) => (
+          <tr key={iface.name || index} className={`${
+            isDisconnected 
+              ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700' 
+              : 'hover:bg-gray-50 dark:hover:bg-gray-700'
+          }`}>
+            <td className="px-6 py-4">
+              <div className={`text-sm font-medium ${
+                isDisconnected 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-gray-900 dark:text-white'
+              }`}>
+                {iface.name}
+              </div>
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+              {!isDisconnected ? (
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  iface.type?.toLowerCase().includes('wireless') || iface.type?.toLowerCase().includes('wifi') || iface.type?.toLowerCase().includes('802.11')
+                    ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                    : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                }`}>
+                  {iface.type || 'Unknown'}
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400 dark:text-gray-500">
+                  {iface.type || 'Unknown'}
+                </span>
+              )}
+            </td>
+            <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+              {iface.wirelessProtocol || ''}
+            </td>
+            <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+              {iface.wirelessBand || ''}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap">
+              {!isDisconnected ? (
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  Active
+                </span>
+              ) : (
+                <span className="text-sm text-gray-400 dark:text-gray-500">
+                  Disconnected
+                </span>
+              )}
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+              <CopyableValue 
+                value={getIPv4Address(iface.ipAddress)} 
+                className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                placeholder=""
+                showCopy={!!getIPv4Address(iface.ipAddress)}
+              />
+            </td>
+            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
+              <CopyableValue 
+                value={iface.macAddress && iface.macAddress !== 'N/A' ? iface.macAddress : ''} 
+                className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
+                placeholder=""
+                showCopy={iface.macAddress && iface.macAddress !== 'N/A'}
+              />
+            </td>
+            <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+              {iface.linkSpeed || ''}
+            </td>
+            <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
+              {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
+            </td>
+          </tr>
+        );
+        
+        return (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Network Interfaces</h3>
+              <div className="text-sm text-gray-500 dark:text-gray-400">
+                {activeInterfaces.length} active, {disconnectedInterfaces.length} disconnected
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interface</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Band</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Address</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MAC Address</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link Speed</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {/* Active interfaces always shown */}
+                  {activeInterfaces.map((iface: any, index: number) => 
+                    renderInterfaceRow(iface, index, false)
+                  )}
+                  
+                  {/* Disconnected interfaces collapsible */}
+                  {disconnectedInterfaces.length > 0 && (
+                    <>
+                      <tr 
+                        className="bg-gray-50 dark:bg-gray-900/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800"
+                        onClick={() => setShowDisconnected(!showDisconnected)}
+                      >
+                        <td colSpan={9} className="px-6 py-3">
+                          <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                            <svg 
+                              className={`w-4 h-4 transition-transform ${showDisconnected ? 'rotate-90' : ''}`} 
+                              fill="none" 
+                              stroke="currentColor" 
+                              viewBox="0 0 24 24"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                            <span className="font-medium">
+                              {showDisconnected ? 'Hide' : 'Show'} {disconnectedInterfaces.length} disconnected interface{disconnectedInterfaces.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                      {showDisconnected && disconnectedInterfaces.map((iface: any, index: number) => 
+                        renderInterfaceRow(iface, activeInterfaces.length + index, true)
+                      )}
+                    </>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-              <thead className="bg-gray-50 dark:bg-gray-900">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Interface</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Protocol</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Band</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">IP Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MAC Address</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Link Speed</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">MTU</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {networkData.interfaces
-                  .sort((a: any, b: any) => {
-                    // First priority: Active status (use isActive property + status check)
-                    const aActive = (a.isActive === true || a.status === 'Active' || a.status === 'Connected') ? 1 : 0;
-                    const bActive = (b.isActive === true || b.status === 'Active' || b.status === 'Connected') ? 1 : 0;
-                    if (aActive !== bActive) {
-                      return bActive - aActive; // Active first
-                    }
-                    
-                    // Second priority: Wired/Ethernet interfaces first (among active interfaces)
-                    const aWired = (a.type?.toLowerCase().includes('ethernet') || a.type?.toLowerCase().includes('wired')) ? 1 : 0;
-                    const bWired = (b.type?.toLowerCase().includes('ethernet') || b.type?.toLowerCase().includes('wired')) ? 1 : 0;
-                    if (aWired !== bWired) {
-                      return bWired - aWired; // Wired/Ethernet first
-                    }
-                    
-                    // Third priority: Sort by interface name
-                    return (a.name || '').localeCompare(b.name || '');
-                  })
-                  .map((iface: any, index: number) => {
-                    const isActive = iface.isActive === true || iface.status === 'Connected' || iface.status === 'Active';
-                    const isDisconnected = !isActive;
-                    
-                    return (
-                    <tr key={iface.name || index} className={`${
-                      isDisconnected 
-                        ? 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700' 
-                        : 'hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}>
-                      <td className="px-6 py-4">
-                        <div className={`text-sm font-medium ${
-                          isDisconnected 
-                            ? 'text-gray-400 dark:text-gray-500' 
-                            : 'text-gray-900 dark:text-white'
-                        }`}>
-                          {iface.name}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {isActive ? (
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            iface.type?.toLowerCase().includes('wireless') || iface.type?.toLowerCase().includes('802.11')
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
-                          }`}>
-                            {iface.type || 'Unknown'}
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400 dark:text-gray-500">
-                            {iface.type || 'Unknown'}
-                          </span>
-                        )}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.wirelessProtocol || ''}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.wirelessBand || ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        {isActive ? (
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            Active
-                          </span>
-                        ) : (
-                          <span className="text-sm text-gray-400 dark:text-gray-500">
-                            Disconnected
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                        <CopyableValue 
-                          value={getIPv4Address(iface.ipAddress)} 
-                          className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
-                          placeholder=""
-                          showCopy={!!getIPv4Address(iface.ipAddress)}
-                        />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono">
-                        <CopyableValue 
-                          value={iface.macAddress && iface.macAddress !== 'N/A' ? iface.macAddress : ''} 
-                          className={`font-mono ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}
-                          placeholder=""
-                          showCopy={iface.macAddress && iface.macAddress !== 'N/A'}
-                        />
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.linkSpeed || ''}
-                      </td>
-                      <td className={`px-6 py-4 whitespace-nowrap text-sm ${isDisconnected ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>
-                        {iface.mtu && iface.mtu !== 0 ? iface.mtu : ''}
-                      </td>
-                    </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+        );
+      })()}
 
-      {/* VPN Connection Card - Only show if VPN is active */}
-      {networkData.vpnActive && networkData.vpnName && (
+      {/* VPN Connection Card - Show if VPN is active or any VPN is connected */}
+      {(networkData.vpnActive || networkData.vpnConnections?.some((vpn: any) => vpn.status === 'Connected')) && (
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-4 mb-4">
             <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
@@ -355,28 +395,40 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
               <p className="text-sm text-gray-600 dark:text-gray-400">Secure tunnel active</p>
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div className="text-center">
-              <div className="text-sm text-gray-500 dark:text-gray-500">VPN Name</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {networkData.vpnName}
-              </div>
+          {/* Show all VPN connections if available */}
+          {networkData.vpnConnections && networkData.vpnConnections.length > 0 ? (
+            <div className="space-y-3">
+              {networkData.vpnConnections.map((vpn: any, index: number) => (
+                <div key={vpn.name || index} className="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-2 h-2 rounded-full ${vpn.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                    <div>
+                      <div className="font-medium text-gray-900 dark:text-white">{vpn.name}</div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{vpn.type || 'VPN'}</div>
+                    </div>
+                  </div>
+                  <span className={`text-sm font-medium ${vpn.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {vpn.status}
+                  </span>
+                </div>
+              ))}
             </div>
-            <div className="text-center">
-              <div className="text-sm text-gray-500 dark:text-gray-500">Status</div>
-              <div className="text-lg font-semibold text-green-600 dark:text-green-400">
-                Connected
-              </div>
-            </div>
-            {networkData.vpnConnections && networkData.vpnConnections.length > 0 && (
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div className="text-center">
-                <div className="text-sm text-gray-500 dark:text-gray-500">Total VPN Configs</div>
+                <div className="text-sm text-gray-500 dark:text-gray-500">VPN Name</div>
                 <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                  {networkData.vpnConnections.length}
+                  {networkData.vpnName || 'Unknown'}
                 </div>
               </div>
-            )}
-          </div>
+              <div className="text-center">
+                <div className="text-sm text-gray-500 dark:text-gray-500">Status</div>
+                <div className="text-lg font-semibold text-green-600 dark:text-green-400">
+                  Connected
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
