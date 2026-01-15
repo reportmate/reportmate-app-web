@@ -153,8 +153,6 @@ class ModuleRegistry {
     if (module.enabled) {
       this.enabledModules.add(module.id)
     }
-    
-    `)
   }
   
   /**

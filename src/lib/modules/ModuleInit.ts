@@ -76,8 +76,6 @@ export async function initializeCoreModules(): Promise<void> {
       // Register the manifest, casting to handle type compatibility
       moduleRegistry.register(moduleInstance.manifest as any)
     }
-    
-    `)
   } catch (error) {
     console.error('Failed to initialize core modules:', error)
     throw error
@@ -101,7 +99,8 @@ export async function loadCustomModules(sources: string[]): Promise<void> {
   }
   
   if (loadedCount > 0) {
-    }
+    console.log(`Loaded ${loadedCount} custom modules`)
+  }
 }
 
 /**
@@ -120,7 +119,7 @@ export async function initializeModules(customModuleSources: string[] = []): Pro
   
   // Log enabled modules
   enabled.forEach(moduleManifest => {
-    `)
+    console.log(`Module: ${moduleManifest.id} - ${moduleManifest.name}`)
   })
 }
 
