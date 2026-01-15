@@ -34,7 +34,7 @@ function normalizeState(state: string): { label: string; status: StatusFilter } 
   
   // Handle "activated_waiting_for_user" format
   if (stateLower.includes('waiting')) {
-    return { label: 'Waiting for User', status: 'waiting' }
+    return { label: 'Waiting', status: 'waiting' }
   }
   // All activated and enabled states are treated as "Enabled"
   if (stateLower.includes('activated') || stateLower.includes('enabled') || stateLower === 'active') {
@@ -197,24 +197,28 @@ function getAppName(ext: Extension): string {
     }
     
     // Check each part for known app names
-    for (let i = 2; i < parts.length - 1; i++) {
+    for (let i = 2; i < parts.length; i++) {
       const partLower = parts[i].toLowerCase()
       if (knownApps[partLower]) {
         return knownApps[partLower]
       }
     }
     
-    // Get the app name part (usually second to last)
-    if (parts.length >= 4) {
-      appPart = parts[parts.length - 2]
-    } else {
-      appPart = parts[2]
+    // Extension types to skip
+    const extensionTypes = ['extension', 'widget', 'intent', 'intents', 'share', 'sharing', 'action', 'quicklook', 'spotlight', 'finder', 'provider', 'network', 'endpoint', 'security', 'helper', 'service', 'daemon', 'agent']
+    
+    // Find first non-extension part after domain
+    for (let i = 2; i < parts.length; i++) {
+      const partLower = parts[i].toLowerCase()
+      if (!extensionTypes.some(t => partLower.includes(t)) && partLower.length > 2) {
+        appPart = parts[i]
+        break
+      }
     }
     
-    // Skip if it looks like an extension type
-    const extensionTypes = ['extension', 'widget', 'intent', 'intents', 'share', 'sharing', 'action', 'quicklook', 'spotlight', 'finder', 'provider', 'network', 'endpoint', 'security']
-    if (extensionTypes.some(t => appPart.toLowerCase().includes(t))) {
-      appPart = parts[2] // Fall back to third part
+    // Fallback if no good part found
+    if (!appPart && parts.length >= 3) {
+      appPart = parts[2]
     }
     
     // Convert from identifier format to display name
@@ -449,21 +453,11 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
             {/* Separator */}
             <div className="h-6 w-px bg-gray-300 dark:bg-gray-600 hidden sm:block" />
 
-            {/* Status Filters - inline with toggle */}
+            {/* Status Filters - toggle on/off */}
             <div className="flex flex-wrap gap-1.5">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
-                  statusFilter === 'all'
-                    ? 'bg-gray-200 dark:bg-gray-600 text-gray-900 dark:text-white'
-                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-600'
-                }`}
-              >
-                All ({statusCounts.all})
-              </button>
               {statusCounts.enabled > 0 && (
                 <button
-                  onClick={() => setStatusFilter('enabled')}
+                  onClick={() => setStatusFilter(statusFilter === 'enabled' ? 'all' : 'enabled')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                     statusFilter === 'enabled'
                       ? 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100'
@@ -475,19 +469,19 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
               )}
               {statusCounts.waiting > 0 && (
                 <button
-                  onClick={() => setStatusFilter('waiting')}
+                  onClick={() => setStatusFilter(statusFilter === 'waiting' ? 'all' : 'waiting')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                     statusFilter === 'waiting'
                       ? 'bg-yellow-200 dark:bg-yellow-800 text-yellow-900 dark:text-yellow-100'
                       : 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800'
                   }`}
                 >
-                  Waiting ({statusCounts.waiting})
+                  Waiting for User Action ({statusCounts.waiting})
                 </button>
               )}
               {statusCounts.disabled > 0 && (
                 <button
-                  onClick={() => setStatusFilter('disabled')}
+                  onClick={() => setStatusFilter(statusFilter === 'disabled' ? 'all' : 'disabled')}
                   className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                     statusFilter === 'disabled'
                       ? 'bg-gray-300 dark:bg-gray-500 text-gray-800 dark:text-gray-100'
@@ -555,32 +549,28 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
                 {expandedItems.has(`cat-${category}`) && (
                   <div className="px-6 pb-4">
                     <div className="ml-11 space-y-2">
-                      {exts.map((ext, idx) => (
-                        <div key={ext.identifier || idx} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{getAppName(ext)}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{ext.identifier}</div>
-                          </div>
-                          <div className="flex items-center gap-2">
+                      {exts.map((ext, idx) => {
+                        const { label, status } = normalizeState(ext.state)
+                        return (
+                          <div key={ext.identifier || idx} className="grid grid-cols-[auto_1fr_auto] gap-3 items-start py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${getStatusBadgeClass(status)}`}>
+                              {label}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{getAppName(ext)}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">{ext.identifier}</div>
+                            </div>
                             {ext.managedByProfile && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200" title={ext.profileIdentifier || 'Managed by MDM Profile'}>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 whitespace-nowrap" title={ext.profileIdentifier || 'Managed by MDM Profile'}>
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                 </svg>
                                 Managed
                               </span>
                             )}
-                            {(() => {
-                              const { label, status } = normalizeState(ext.state)
-                              return (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(status)}`}>
-                                  {label}
-                                </span>
-                              )
-                            })()}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}
@@ -621,32 +611,28 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
                 {expandedItems.has(`app-${appName}`) && (
                   <div className="px-6 pb-4">
                     <div className="ml-11 space-y-2">
-                      {exts.map((ext, idx) => (
-                        <div key={ext.identifier || idx} className="flex items-center justify-between py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                          <div>
-                            <div className="text-sm font-medium text-gray-900 dark:text-white">{getExtensionCategory(ext)}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{ext.identifier}</div>
-                          </div>
-                          <div className="flex items-center gap-2">
+                      {exts.map((ext, idx) => {
+                        const { label, status } = normalizeState(ext.state)
+                        return (
+                          <div key={ext.identifier || idx} className="grid grid-cols-[auto_1fr_auto] gap-3 items-start py-2 px-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${getStatusBadgeClass(status)}`}>
+                              {label}
+                            </span>
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{getExtensionCategory(ext)}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">{ext.identifier}</div>
+                            </div>
                             {ext.managedByProfile && (
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200" title={ext.profileIdentifier || 'Managed by MDM Profile'}>
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 whitespace-nowrap" title={ext.profileIdentifier || 'Managed by MDM Profile'}>
                                 <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                                 </svg>
                                 Managed
                               </span>
                             )}
-                            {(() => {
-                              const { label, status } = normalizeState(ext.state)
-                              return (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeClass(status)}`}>
-                                  {label}
-                                </span>
-                              )
-                            })()}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}
