@@ -1,13 +1,51 @@
 /**
  * System Tab Component
  * Detailed system information and operating system details
+ * Supports both Windows and macOS platforms
  */
 
-import { formatExactTime } from '../../lib/time'
+import { formatRelativeTime, formatExactTime, parseInstallTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { extractSystem } from '../../lib/data-processing/modules/system'
 import { ScheduledTasksTable } from '../tables/ScheduledTasksTable'
+import { LaunchdTable } from '../tables/LaunchdTable'
+import { ExtensionsTable } from '../tables/ExtensionsTable'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
+
+// Get macOS marketing name from version number
+function getMacOSMarketingName(version: string | undefined): string {
+  if (!version) return 'Unknown'
+  
+  // Parse major version
+  const major = parseInt(version.split('.')[0], 10)
+  
+  // macOS version to marketing name mapping
+  const versionNames: Record<number, string> = {
+    26: 'Tahoe',
+    15: 'Sequoia',
+    14: 'Sonoma',
+    13: 'Ventura',
+    12: 'Monterey',
+    11: 'Big Sur',
+    10: 'Catalina', // 10.15, but major=10 doesn't work well, handle separately
+  }
+  
+  if (major === 10) {
+    // Handle 10.x versions
+    const minor = parseInt(version.split('.')[1] || '0', 10)
+    const catalinaMajor: Record<number, string> = {
+      15: 'Catalina',
+      14: 'Mojave',
+      13: 'High Sierra',
+      12: 'Sierra',
+      11: 'El Capitan',
+      10: 'Yosemite',
+    }
+    return catalinaMajor[minor] || 'macOS'
+  }
+  
+  return versionNames[major] || 'macOS'
+}
 
 interface DeviceData {
   id: string;
@@ -57,11 +95,27 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   
   // Process system data using the centralized data processing function
   const systemTabData = extractSystem(normalizedDevice)
-  const { services, environment, updates, scheduledTasks, runningServices } = systemTabData
+  const { services, environment, updates, scheduledTasks, runningServices, isMac, pendingAppleUpdates, installHistory, loginItems, systemExtensions, kernelExtensions, privilegedHelperTools } = systemTabData
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
+  // State for launchd scope filter (Mac)
+  const [launchdScopeFilter, setLaunchdScopeFilter] = useState<'all' | 'system' | 'user' | 'apple'>('all')
+  // State for privileged helper tools search
+  const [helperSearch, setHelperSearch] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // Filter privileged helper tools by search
+  const filteredHelpers = useMemo(() => {
+    if (!helperSearch.trim()) return privilegedHelperTools
+    const searchLower = helperSearch.toLowerCase()
+    return privilegedHelperTools.filter(helper => 
+      helper.name?.toLowerCase().includes(searchLower) ||
+      helper.bundleIdentifier?.toLowerCase().includes(searchLower) ||
+      helper.teamId?.toLowerCase().includes(searchLower) ||
+      helper.path?.toLowerCase().includes(searchLower)
+    )
+  }, [privilegedHelperTools, helperSearch])
   
   // Handle scrollbar visibility for services table
   useEffect(() => {
@@ -200,32 +254,53 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* First Column */}
           <div className="space-y-4">
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Version</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.displayVersion || 'Unknown'}</p>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
-              <p className="text-gray-900 dark:text-white">
-                {osInfo?.version || 'Unknown'}
-              </p>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Feature Update</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.featureUpdate || 'Unknown'}</p>
-            </div>
+            {isMac ? (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
+                  <p className="text-gray-900 dark:text-white">{getMacOSMarketingName(osInfo?.displayVersion || osInfo?.version)}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
+                  <p className="text-gray-900 dark:text-white font-mono">{osInfo?.displayVersion || 'Unknown'}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Build</label>
+                  <p className="text-gray-900 dark:text-white font-mono">{osInfo?.build || 'Unknown'}</p>
+                </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Version</label>
+                  <p className="text-gray-900 dark:text-white">{osInfo?.displayVersion || 'Unknown'}</p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {osInfo?.version || 'Unknown'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Feature Update</label>
+                  <p className="text-gray-900 dark:text-white">{osInfo?.featureUpdate || 'Unknown'}</p>
+                </div>
+              </>
+            )}
           </div>
           
           {/* Second Column */}
           <div className="space-y-4">
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.edition || 'Unknown'}</p>
-            </div>
+            {!isMac && (
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
+                <p className="text-gray-900 dark:text-white">{osInfo?.edition || 'Unknown'}</p>
+              </div>
+            )}
             
             <div>
               <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
@@ -254,16 +329,18 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               <p className="text-gray-900 dark:text-white">{osInfo?.timeZone || 'Unknown'}</p>
             </div>
             
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Keyboard Layout</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.activeKeyboardLayout || 'Unknown'}</p>
-            </div>
+            {!isMac && (
+              <div>
+                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Keyboard Layout</label>
+                <p className="text-gray-900 dark:text-white">{osInfo?.activeKeyboardLayout || 'Unknown'}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Recent Windows Updates - Second from top */}
-      {updates.length > 0 && (
+      {!isMac && updates.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Windows Updates</h3>
@@ -318,38 +395,196 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           </div>
         </div>
       )}
+
+      {/* macOS Updates */}
+      {isMac && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">macOS Updates</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {pendingAppleUpdates.length > 0 
+                    ? `${pendingAppleUpdates.length} available system update${pendingAppleUpdates.length !== 1 ? 's' : ''} from Apple`
+                    : 'System software and security updates'}
+                </p>
+              </div>
+              {/* Status indicator in header */}
+              {pendingAppleUpdates.length === 0 ? (
+                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm font-medium">Up to date</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm font-medium">{pendingAppleUpdates.length} pending</span>
+                </div>
+              )}
+            </div>
+          </div>
+          {/* Pending Updates */}
+          {pendingAppleUpdates.length > 0 && (
+            <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-2 bg-yellow-50 dark:bg-yellow-900/20">
+                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Pending Updates</span>
+              </div>
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-900">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Restart</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {pendingAppleUpdates.map((update, index) => (
+                  <tr key={update.productKey || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{update.name}</div>
+                        {update.productKey && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.productKey}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {update.version || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        {update.isSecurity && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                            Security
+                          </span>
+                        )}
+                        {update.recommended && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            Recommended
+                          </span>
+                        )}
+                        {!update.isSecurity && !update.recommended && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                            Optional
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        update.restartRequired 
+                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      }`}>
+                        {update.restartRequired ? 'Required' : 'No'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          )}
+          
+          {/* Recently Installed System Updates (from Install History - macOS updates only) */}
+          {(() => {
+            const systemUpdates = installHistory
+              .filter(item => 
+                item.packageId?.toLowerCase().includes('com.apple') ||
+                item.packageId?.toLowerCase().includes('macos') ||
+                item.packageId?.toLowerCase().includes('securityupdate') ||
+                item.packageId?.toLowerCase().includes('safari') ||
+                item.packageId?.toLowerCase().includes('xprotect')
+              )
+              .slice(0, 10)
+            
+            return systemUpdates.length > 0 && (
+              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
+                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Installed</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {systemUpdates.map((item, index) => (
+                      <tr key={item.packageId || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-3">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{item.packageId}</div>
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          {item.version || 'Unknown'}
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                          {item.installTime ? formatRelativeTime(new Date(parseInstallTime(item.installTime)).toISOString()) : 'Unknown'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )
+          })()}
+        </div>
+      )}
       
       {/* System Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className={`grid grid-cols-1 ${isMac ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-4`}>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{services.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Total Services</div>
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {isMac ? (services.length + scheduledTasks.length) : services.length}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">{isMac ? 'Background Items' : 'Total Services'}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
           <div className="text-2xl font-bold text-green-600 dark:text-green-400">{runningServices}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Running Services</div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">Running</div>
+        </div>
+        {!isMac && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+              {updates.length}
+            </div>
+            <div className="text-sm text-gray-600 dark:text-gray-400">Windows Updates</div>
+          </div>
+        )}
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+            {isMac ? systemExtensions.length : environment.length}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">{isMac ? 'Extensions' : 'Environment Vars'}</div>
         </div>
         <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{updates.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Windows Updates</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">{environment.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Environment Variables</div>
-        </div>
-        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-          <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">{scheduledTasks.length}</div>
-          <div className="text-sm text-gray-600 dark:text-gray-400">Scheduled Tasks</div>
+          <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">
+            {isMac ? loginItems.length : scheduledTasks.length}
+          </div>
+          <div className="text-sm text-gray-600 dark:text-gray-400">{isMac ? 'Open at Login' : 'Scheduled Tasks'}</div>
         </div>
       </div>
 
-      {/* Scheduled Tasks Table */}
-      {scheduledTasks.length > 0 && (
+      {/* Scheduled Tasks Table (Windows) / Background Activity (Mac) */}
+      {!isMac && scheduledTasks.length > 0 && (
         <ScheduledTasksTable scheduledTasks={scheduledTasks} />
       )}
 
-      {/* Services Table */}
-      {services.length > 0 && (
+      {/* Mac: Background Activity - Consolidated launchd services and scheduled tasks */}
+      {isMac && (scheduledTasks.length > 0 || services.length > 0) && (
+        <LaunchdTable 
+          launchdItems={[...scheduledTasks, ...services]} 
+          title="Background Activity" 
+          defaultScope="system"
+        />
+      )}
+
+      {/* Services Table (Windows) */}
+      {!isMac && services.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -435,6 +670,219 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
         </div>
       )}
 
+      {/* Mac: Extensions (By App / By Category) */}
+      {isMac && systemExtensions.length > 0 && (
+        <ExtensionsTable extensions={systemExtensions} title="Extensions" />
+      )}
+
+      {/* Mac: Kernel Extensions */}
+      {isMac && kernelExtensions.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Kernel Extensions</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Third-party kernel extensions (kexts) - {kernelExtensions.length} loaded
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Size</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {kernelExtensions.map((kext, index) => (
+                  <tr key={kext.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{kext.name}</div>
+                        {kext.path && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-md">{kext.path}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {kext.version || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {kext.size ? `${(kext.size / 1024).toFixed(1)} KB` : 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        kext.loaded 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                      }`}>
+                        {kext.loaded ? 'Loaded' : 'Not Loaded'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Mac: Privileged Helper Tools */}
+      {isMac && privilegedHelperTools.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Privileged Helper Tools</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Background services installed by applications ({filteredHelpers.length} of {privilegedHelperTools.length} tools)
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full sm:w-64 pl-9 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Search helpers..."
+                  value={helperSearch}
+                  onChange={(e) => setHelperSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bundle ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Team ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Signed</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredHelpers.map((helper, index) => (
+                  <tr key={helper.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{helper.name}</div>
+                        {helper.path && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-md">{helper.path}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
+                      {helper.bundleIdentifier || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
+                      {helper.teamId || 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                        helper.signed 
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}>
+                        {helper.signed ? 'Signed' : 'Unsigned'}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Mac: Open at Login - after Privileged Helper Tools */}
+      {isMac && loginItems.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Open at Login</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Applications that open automatically when you log in ({loginItems.length} items)</p>
+          </div>
+          <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kind</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {loginItems.map((item, index) => (
+                  <tr key={item.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-3">
+                      <div className="flex items-center">
+                        <div className="w-6 h-6 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
+                          <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                      {item.type || 'Application'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Mac: Install History */}
+      {isMac && installHistory.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Install History</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Packages installed in the last 30 days ({installHistory.length} packages)
+            </p>
+          </div>
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {[...installHistory]
+                  .sort((a, b) => parseInstallTime(b.installTime) - parseInstallTime(a.installTime))
+                  .map((item, index) => (
+                  <tr key={item.packageId || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {item.installTime ? formatExactTime(item.installTime) : 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{item.packageId}</div>
+                        {item.packageFilename && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{item.packageFilename}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {item.version || 'Unknown'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Environment Variables Table */}
       {environment.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -442,29 +890,53 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Environment Variables</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">System environment variables</p>
           </div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Variable</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-48">Variable</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Value</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {environment.slice(0, 10).map((env: any, index: number) => (
-                  <tr key={env.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">
-                        {env.name}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white font-mono max-w-md truncate">
-                        {env.value}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {/* Sort PATH to top */}
+                {[...environment].sort((a, b) => {
+                  if (a.name === 'PATH' || a.name === 'path') return -1
+                  if (b.name === 'PATH' || b.name === 'path') return 1
+                  return (a.name || '').localeCompare(b.name || '')
+                }).map((env: any, index: number) => {
+                  const isPath = env.name === 'PATH' || env.name === 'path'
+                  const pathParts = isPath ? (env.value || '').split(':').filter(Boolean) : []
+                  
+                  return (
+                    <tr key={env.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap align-top">
+                        <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">
+                          {env.name}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        {isPath ? (
+                          <details className="group" open>
+                            <summary className="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                              <span>{pathParts.length} paths</span>
+                              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </summary>
+                            <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto whitespace-pre-wrap break-all">
+                              {pathParts.join('\n')}
+                            </pre>
+                          </details>
+                        ) : (
+                          <div className="text-sm text-gray-900 dark:text-white font-mono break-all">
+                            {env.value}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
