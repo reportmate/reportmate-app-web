@@ -157,10 +157,8 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     if (connectedVpn) {
       networkInfo.vpnActive = true
       networkInfo.vpnName = connectedVpn.name
-      // If we're on VPN, the connection type should reflect that
-      if (activeConnection?.interface?.startsWith('utun')) {
-        networkInfo.connectionType = `VPN (${connectedVpn.type || 'IPSec'})`
-      }
+      // DO NOT override connectionType - keep the physical interface type (Ethernet/WiFi)
+      // VPN status is shown separately via vpnActive and vpnName
     }
     networkInfo.vpnConnections = filteredVpnConnections
   }
