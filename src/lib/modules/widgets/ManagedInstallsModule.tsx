@@ -32,11 +32,6 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
         
         if (response.ok) {
           const data = await response.json()
-          .toISOString(),
-            hasDevice: !!data.device,
-            cacheHeaders: response.headers.get('X-Fetched-At'),
-            dataSource: response.headers.get('X-Data-Source')
-          })
           
           // Import modular data processing functions
           const { extractInstalls } = await import('../../data-processing/modules/installs')
@@ -44,8 +39,6 @@ const ManagedInstallsOverviewWidget: React.FC<DeviceWidgetProps> = ({ deviceId, 
           
           if (installsData) {
             setInstallsData(installsData)
-          } else {
-            })
           }
         }
       } catch (error) {
