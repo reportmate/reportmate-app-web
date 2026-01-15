@@ -659,29 +659,151 @@ function SystemTabSkeleton() {
 function ManagementTabSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Management status */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center gap-4 mb-4">
-          <div className="w-12 h-12 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+      {/* Header with Icon and Provider - matches actual layout */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          {/* Shield icon skeleton */}
+          <div className="w-12 h-12 bg-yellow-200 dark:bg-yellow-800 rounded-lg animate-pulse"></div>
           <div>
-            <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            {/* Title */}
+            <div className="h-6 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            {/* Subtitle */}
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
           </div>
+        </div>
+        {/* Provider - Top Right */}
+        <div className="text-right mr-8">
+          <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+          <div className="h-6 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
         </div>
       </div>
 
-      {/* Configuration details */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-        </div>
-        <div className="p-6 space-y-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="flex justify-between items-center">
-              <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-              <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+      {/* Top Row - Split 60/40 between Enrollment and Certificate */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+        {/* Left Card - Enrollment (60% - 3 columns) */}
+        <div className="lg:col-span-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          {/* Enrollment header */}
+          <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-6"></div>
+          
+          {/* Enrollment Status pills */}
+          <div className="space-y-4 mb-6">
+            {/* Enrollment Status */}
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-7 w-20 bg-green-100 dark:bg-green-900 rounded-full animate-pulse"></div>
             </div>
-          ))}
+            {/* Enrollment Type */}
+            <div className="flex items-center gap-3">
+              <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-7 w-40 bg-green-100 dark:bg-green-900 rounded-full animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
+
+          {/* Device Details */}
+          <div className="mb-6">
+            <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3"></div>
+            <div className="space-y-4">
+              {/* Organization */}
+              <div className="flex items-start">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse ml-3"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
+
+          {/* Enrollment Details */}
+          <div>
+            <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3"></div>
+            {/* Grid of status pills */}
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {['ADE Enrolled', 'User Approved', 'ADE Capable', 'SCEP Certificate'].map((label, i) => (
+                <div key={label} className="flex items-center gap-3">
+                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-6 w-12 bg-green-100 dark:bg-green-900 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.05}s` }}></div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Server URLs */}
+            <div className="space-y-4 pt-2">
+              {/* Server URL */}
+              <div className="flex flex-col gap-1">
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-full bg-gray-50 dark:bg-gray-900 rounded animate-pulse"></div>
+              </div>
+              {/* Check-in URL */}
+              <div className="flex flex-col gap-1">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-8 w-full bg-gray-50 dark:bg-gray-900 rounded animate-pulse"></div>
+              </div>
+            </div>
+          </div>
+
+          {/* Divider */}
+          <div className="border-t border-gray-200 dark:border-gray-700 my-6"></div>
+
+          {/* Push Notification */}
+          <div>
+            <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3"></div>
+            <div className="flex flex-col gap-1">
+              <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-8 w-full bg-gray-50 dark:bg-gray-900 rounded animate-pulse"></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Card - Certificate (40% - 2 columns) */}
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          {/* Certificate Header with Seal Icon */}
+          <div className="flex items-start gap-4 mb-6">
+            {/* Large Seal Icon */}
+            <div className="w-12 h-12 text-yellow-500 dark:text-yellow-400">
+              <div className="w-12 h-12 bg-yellow-200 dark:bg-yellow-800 rounded-full animate-pulse"></div>
+            </div>
+            <div className="flex-1">
+              <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+              <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          </div>
+
+          {/* Certificate Details */}
+          <div className="space-y-4">
+            {/* Certificate Name */}
+            <div>
+              <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-52 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+
+            {/* Issued By */}
+            <div>
+              <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+
+            {/* Expires */}
+            <div>
+              <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-32 bg-green-200 dark:bg-green-900 rounded animate-pulse"></div>
+            </div>
+
+            {/* SCEP Server */}
+            <div>
+              <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+              <div className="h-4 w-full bg-gray-50 dark:bg-gray-900 rounded animate-pulse"></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
