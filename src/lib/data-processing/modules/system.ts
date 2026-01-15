@@ -234,7 +234,10 @@ export function extractSystem(deviceModules: any): SystemInfo {
           disabled: service.disabled ?? false,
           path: service.path || '',
           program: service.program || '',
-          programArguments: service.programArguments || service.program_arguments || []
+          programArguments: service.programArguments || service.program_arguments || [],
+          plistContent: service.plistContent || service.plist_content || undefined,
+          type: service.type || '',
+          source: service.source || ''
         }
       }
       // Windows format

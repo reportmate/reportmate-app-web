@@ -105,6 +105,20 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   const [helperSearch, setHelperSearch] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // State for tracking which row's Team ID was copied (by index)
+  const [copiedRowIndex, setCopiedRowIndex] = useState<number | null>(null)
+
+  // Copy Team ID to clipboard
+  const handleCopyTeamId = async (teamId: string, rowIndex: number) => {
+    try {
+      await navigator.clipboard.writeText(teamId)
+      setCopiedRowIndex(rowIndex)
+      setTimeout(() => setCopiedRowIndex(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+    }
+  }
+
   // Filter privileged helper tools by search
   const filteredHelpers = useMemo(() => {
     if (!helperSearch.trim()) return privilegedHelperTools
@@ -411,11 +425,11 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               </div>
               {/* Status indicator in header */}
               {pendingAppleUpdates.length === 0 ? (
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/40 rounded-full mr-2">
+                  <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
-                  <span className="text-sm font-medium">Up to date</span>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Up to Date</span>
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
@@ -755,14 +769,14 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto max-h-[320px] overflow-y-auto">
+          <div className="overflow-x-auto max-h-[416px] overflow-y-auto">
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bundle ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Team ID</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Signed</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Bundle ID</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -776,11 +790,27 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
-                      {helper.bundleIdentifier || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white font-mono">
-                      {helper.teamId || 'Unknown'}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-900 dark:text-white font-mono">{helper.teamId || 'Unknown'}</span>
+                        {helper.teamId && helper.teamId !== 'Unknown' && (
+                          <button
+                            onClick={() => handleCopyTeamId(helper.teamId!, index)}
+                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                            title="Copy Team ID"
+                          >
+                            {copiedRowIndex === index ? (
+                              <svg className="w-4 h-4 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -790,6 +820,9 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                       }`}>
                         {helper.signed ? 'Signed' : 'Unsigned'}
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
+                      {helper.bundleIdentifier || 'Unknown'}
                     </td>
                   </tr>
                 ))}
