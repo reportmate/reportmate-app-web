@@ -44,11 +44,36 @@ export function formatRelativeTime(timestamp: string): string {
   }
 }
 
-export function formatExactTime(timestamp: string): string {
+export function formatExactTime(timestamp: string | number): string {
   try {
-    const date = new Date(timestamp)
-    if (isNaN(date.getTime())) {
-      return 'Invalid Date'
+    if (!timestamp || timestamp === '' || timestamp === 'null' || timestamp === 'undefined') {
+      return 'Unknown'
+    }
+    
+    let date: Date
+    
+    // Handle Unix timestamp (number or string of digits, possibly with decimals)
+    if (typeof timestamp === 'number' || /^[\d.]+$/.test(String(timestamp))) {
+      const tsStr = String(timestamp)
+      // Parse as float to handle decimals like "1765940509.72615"
+      const ts = parseFloat(tsStr)
+      if (isNaN(ts)) {
+        return 'Unknown'
+      }
+      // If timestamp is in seconds (Unix - typically 10 digits before decimal), convert to ms
+      // Unix timestamps are typically 10 digits, ms timestamps are 13 digits
+      if (ts < 10000000000) {
+        date = new Date(ts * 1000)
+      } else {
+        date = new Date(ts)
+      }
+    } else {
+      // Try parsing as ISO date string
+      date = new Date(timestamp)
+    }
+    
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
+      return 'Unknown'
     }
     
     // Format as YYYY.MM.DD HH:MM:ss
@@ -62,6 +87,36 @@ export function formatExactTime(timestamp: string): string {
     return `${year}.${month}.${day} ${hours}:${minutes}:${seconds}`
   } catch (_error) {
     console.error('[TIME UTIL] Failed to format timestamp:', _error)
-    return 'Invalid Date'
+    return 'Unknown'
   }
+}
+
+// Parse install time for sorting (returns Unix timestamp in ms)
+export function parseInstallTime(timestamp: string | number | undefined): number {
+  if (!timestamp || timestamp === '' || timestamp === 'null' || timestamp === 'undefined') {
+    return 0
+  }
+  
+  try {
+    // Handle Unix timestamp (number or string of digits, possibly with decimals)
+    if (typeof timestamp === 'number' || /^[\d.]+$/.test(String(timestamp))) {
+      const ts = parseFloat(String(timestamp))
+      if (isNaN(ts)) return 0
+      // If timestamp is in seconds (Unix), convert to ms
+      if (ts < 10000000000) {
+        return ts * 1000
+      }
+      return ts
+    }
+    
+    // Try parsing as ISO date string
+    const date = new Date(timestamp)
+    if (!isNaN(date.getTime())) {
+      return date.getTime()
+    }
+  } catch {
+    // Fall through
+  }
+  
+  return 0
 }
