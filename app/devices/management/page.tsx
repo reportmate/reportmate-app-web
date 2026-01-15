@@ -315,6 +315,7 @@ function ManagementPageContent() {
     // Normalize labels
     if (type === 'Hybrid Entra Join') type = 'Domain Joined'
     if (type === 'Entra Join') type = 'Entra Joined'
+    // Mac enrollment types - keep as-is (Automated Device Enrollment, User Approved Enrollment, MDM Enrolled)
     // Include all types except Unknown and N/A
     if (type !== 'Unknown' && type !== 'N/A') {
       acc[type] = (acc[type] || 0) + 1
@@ -430,6 +431,15 @@ function ManagementPageContent() {
         // Entra Joined filter - cloud-only devices (Entra but NOT domain-joined)
         const isEntraOnly = deviceState?.entraJoined === true && !isDomainJoined
         if (!isEntraOnly) return false
+      } else if (typeFilter === 'Automated Device Enrollment' || typeFilter === 'ADE') {
+        // Mac ADE filter
+        if (m.enrollmentType !== 'Automated Device Enrollment') return false
+      } else if (typeFilter === 'User Approved Enrollment' || typeFilter === 'User Approved') {
+        // Mac User Approved filter
+        if (m.enrollmentType !== 'User Approved Enrollment') return false
+      } else if (typeFilter === 'MDM Enrolled') {
+        // Mac generic MDM filter
+        if (m.enrollmentType !== 'MDM Enrolled') return false
       } else {
         // Other filters - match the enrollmentType directly
         if (m.enrollmentType !== typeFilter) return false
@@ -994,9 +1004,13 @@ function ManagementPageContent() {
                     // Note: 'Unmanaged' is an enrollmentType from the client (not domain-joined devices without MDM)
                     ...Object.entries(enrollmentTypeCounts)
                       .sort(([a], [b]) => {
-                        // Entra Joined first, Domain Joined second
+                        // Entra Joined first, Domain Joined second, Mac types third
                         if (a === 'Entra Joined') return -1
                         if (b === 'Entra Joined') return 1
+                        if (a === 'Domain Joined') return -1
+                        if (b === 'Domain Joined') return 1
+                        if (a === 'Automated Device Enrollment') return -1
+                        if (b === 'Automated Device Enrollment') return 1
                         return a.localeCompare(b)
                       })
                       .map(([label, value]) => ({ label, value })),
@@ -1008,6 +1022,9 @@ function ManagementPageContent() {
                   colors={{
                     'Entra Joined': '#10b981', // emerald-500
                     'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
+                    'Automated Device Enrollment': '#3b82f6', // blue-500 - Mac ADE
+                    'User Approved Enrollment': '#06b6d4', // cyan-500 - Mac User Approved
+                    'MDM Enrolled': '#8b5cf6', // violet-500 - Mac generic MDM
                     'Unmanaged': '#ef4444', // red-500 - unmanaged (critical issue)
                     'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
                     'Broken Trust': '#ef4444', // red-500 - broken trust
@@ -1219,6 +1236,9 @@ function ManagementPageContent() {
                             let displayType = mgmt.enrollmentType || '-'
                             if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
                             if (displayType === 'Entra Join') displayType = 'Entra Joined'
+                            // Shorten Mac enrollment types for table display
+                            if (displayType === 'Automated Device Enrollment') displayType = 'ADE'
+                            if (displayType === 'User Approved Enrollment') displayType = 'User Approved'
                             return (
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
                                 displayType === 'Entra Joined' || displayType === 'AxM Assigned'
@@ -1227,6 +1247,8 @@ function ManagementPageContent() {
                                   ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                                   : displayType === 'Unmanaged'
                                   ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  : displayType === 'ADE' || displayType === 'User Approved' || displayType === 'MDM Enrolled'
+                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                                   : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
                               }`}>
                                 {displayType}
