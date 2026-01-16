@@ -4,13 +4,34 @@
  * Supports both Windows and macOS platforms
  */
 
-import { formatRelativeTime, formatExactTime, parseInstallTime } from '../../lib/time'
+import { formatRelativeTime, formatExactTime, formatBootTime, parseInstallTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { extractSystem } from '../../lib/data-processing/modules/system'
 import { ScheduledTasksTable } from '../tables/ScheduledTasksTable'
 import { LaunchdTable } from '../tables/LaunchdTable'
 import { ExtensionsTable } from '../tables/ExtensionsTable'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
+
+// Extract build number from Windows version string (e.g., "10.0.26200" → "26200")
+function extractBuildNumber(version: string | undefined): string {
+  if (!version) return 'Unknown'
+  // Windows version format: 10.0.26200 - extract the last number
+  const parts = version.split('.')
+  if (parts.length >= 3) {
+    return parts[2] // Return just the build number (e.g., "26200")
+  }
+  return version
+}
+
+// Format Mac version to always show major.minor.patch
+function formatMacVersion(version: string | undefined): string {
+  if (!version) return 'Unknown'
+  const parts = version.split('.')
+  const major = parts[0] || '0'
+  const minor = parts[1] || '0'
+  const patch = parts[2] || '0'
+  return `${major}.${minor}.${patch}`
+}
 
 // Get macOS marketing name from version number
 function getMacOSMarketingName(version: string | undefined): string {
@@ -45,6 +66,37 @@ function getMacOSMarketingName(version: string | undefined): string {
   }
   
   return versionNames[major] || 'macOS'
+}
+
+// Get Windows marketing name from display version
+function getWindowsMarketingName(displayVersion: string | undefined): string {
+  if (!displayVersion) return ''
+  
+  // Map display versions to marketing names
+  const marketingNames: Record<string, string> = {
+    '25H2': '25H2',
+    '24H2': '24H2',
+    '23H2': '23H2',
+    '22H2': '22H2',
+    '21H2': '21H2',
+    '21H1': '21H1',
+    '20H2': '20H2',
+  }
+  
+  return marketingNames[displayVersion] || displayVersion
+}
+
+// Get dynamic OS label ("macOS" or "Windows 10" / "Windows 11")
+function getOSLabel(osInfo: any, isMac: boolean): string {
+  if (isMac) return 'macOS'
+  
+  // For Windows, extract version number (10 or 11)
+  const osName = osInfo?.name || ''
+  if (osName.includes('Windows 11')) return 'Windows 11'
+  if (osName.includes('Windows 10')) return 'Windows 10'
+  
+  // Fallback to generic Windows
+  return 'Windows'
 }
 
 interface DeviceData {
@@ -203,6 +255,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
     } : undefined
   } : undefined
 
+  // Dynamic OS label and marketing name (for Mac and Windows)
+  const osLabel = getOSLabel(osInfo, isMac)
+  const osMarketingName = isMac 
+    ? getMacOSMarketingName(osInfo?.version)
+    : getWindowsMarketingName(osInfo?.displayVersion)
+
   // Filter services based on search
   const filteredServices = useMemo(() => {
     if (!servicesSearch.trim()) return services
@@ -232,133 +290,201 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             <p className="text-base text-gray-600 dark:text-gray-400">Operating system and hardware details</p>
           </div>
         </div>
-        {/* Operating System - Top Right */}
-        {osInfo?.name && (
-          <div className="text-right mr-8">
-            <div className="text-sm text-gray-500 dark:text-gray-400">Operating System</div>
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-              {osInfo.name}
+        {/* Update Status Badge - Top Right */}
+        {(() => {
+          const hasUpdates = isMac 
+            ? pendingAppleUpdates.length > 0
+            : false; // TODO: Windows doesn't currently track pending updates
+          
+          return (
+            <div className="text-right mr-8">
+              <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">Software Update</div>
+              {hasUpdates ? (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-yellow-100 dark:bg-yellow-900/40 rounded-full">
+                  <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                    {isMac ? `${pendingAppleUpdates.length} Pending Update${pendingAppleUpdates.length !== 1 ? 's' : ''}` : 'Pending Updates'}
+                  </span>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/40 rounded-full">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Up to Date</span>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+        })()}
       </div>
 
-      {/* Detailed System Information */}
+      {/* Detailed System Information - Redesigned */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">Operating System Details</h3>
-          {/* Windows Activation Badge */}
-          {osInfo?.activation && (
-            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium ${
-              osInfo.activation.isActivated 
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-            }`}>
-              <svg className={`w-4 h-4 mr-1.5 ${osInfo.activation.isActivated ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`} fill="currentColor" viewBox="0 0 20 20">
-                {osInfo.activation.isActivated ? (
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                ) : (
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                )}
-              </svg>
-              Windows {osInfo.activation.isActivated ? 'Activated' : 'Not Activated'}
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {/* First Column */}
-          <div className="space-y-4">
+          {/* Row 1: Main data points */}
+          {/* Mac: 3 columns - Marketing Name | Version (major.minor.patch) | Build */}
+          {/* Windows: 4 columns - OS + Display Version | Build Number (extracted) | Feature Update | Edition + Activation */}
+          <div className={`grid grid-cols-1 md:grid-cols-2 ${isMac ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-6 mb-6`}>
             {isMac ? (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
-                  <p className="text-gray-900 dark:text-white">{getMacOSMarketingName(osInfo?.displayVersion || osInfo?.version)}</p>
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{osLabel}</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">{osMarketingName}</p>
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
-                  <p className="text-gray-900 dark:text-white font-mono">{osInfo?.displayVersion || 'Unknown'}</p>
-                </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Build</label>
-                  <p className="text-gray-900 dark:text-white font-mono">{osInfo?.build || 'Unknown'}</p>
-                </div>
-              </>
+              </div>
             ) : (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Display Version</label>
-                  <p className="text-gray-900 dark:text-white">{osInfo?.displayVersion || 'Unknown'}</p>
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{osLabel}</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">{osMarketingName}</p>
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Version</label>
-                  <p className="text-gray-900 dark:text-white">
-                    {osInfo?.version || 'Unknown'}
-                  </p>
+              </div>
+            )}
+            
+            {isMac ? (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Version</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white font-mono mt-1">{formatMacVersion(osInfo?.displayVersion)}</p>
+                  </div>
                 </div>
-                
-                <div>
-                  <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Feature Update</label>
-                  <p className="text-gray-900 dark:text-white">{osInfo?.featureUpdate || 'Unknown'}</p>
+              </div>
+            ) : (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Version</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white font-mono mt-1">{extractBuildNumber(osInfo?.version)}</p>
+                  </div>
                 </div>
-              </>
+              </div>
+            )}
+            
+            {isMac ? (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Build</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white font-mono mt-1">{osInfo?.build || 'Unknown'}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Feature</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">{osInfo?.featureUpdate || 'Unknown'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Edition card - Windows only, now in top row as 4th card */}
+            {!isMac && (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wide">Edition</label>
+                    <p className="text-lg font-bold text-gray-900 dark:text-white mt-1">{osInfo?.edition || '-'}</p>
+                    {/* Windows Activation Status */}
+                    {osInfo?.activation && (
+                      <div className="mt-2">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          osInfo.activation.isActivated 
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                            : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                        }`}>
+                          {osInfo.activation.isActivated ? 'Activated' : 'Not Activated'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             )}
           </div>
           
-          {/* Second Column */}
-          <div className="space-y-4">
-            {!isMac && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Edition</label>
-                <p className="text-gray-900 dark:text-white">{osInfo?.edition || 'Unknown'}</p>
+          {/* Row 2: Remaining data points - spread across full width */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+            {/* Uptime */}
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">System Uptime</label>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{uptimeString || 'Unknown'}</p>
+                </div>
               </div>
-            )}
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Uptime</label>
-              <p className="text-gray-900 dark:text-white">{uptimeString || 'Unknown'}</p>
             </div>
             
-            {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Boot Time</label>
-                <p className="text-gray-900 dark:text-white">{formatExactTime(systemTabData.bootTime)}</p>
+            {/* Last Boot */}
+            {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' ? (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide">Last Boot</label>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{formatBootTime(systemTabData.bootTime)}</p>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <label className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide">Last Boot</label>
+                    <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">Unknown</p>
+                  </div>
+                </div>
               </div>
             )}
             
+            {/* Locale */}
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">System Locale</label>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{osInfo?.locale || 'Unknown'}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Keyboard Layout */}
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-semibold text-pink-600 dark:text-pink-400 uppercase tracking-wide">Keyboard Layout</label>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{!isMac ? (osInfo?.activeKeyboardLayout || '-') : '-'}</p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Time Zone */}
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="flex items-start gap-3">
+                <div className="flex-1 min-w-0">
+                  <label className="text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide">Time Zone</label>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{osInfo?.timeZone || 'Unknown'}</p>
+                </div>
+              </div>
+            </div>
           </div>
-          
-          {/* Third Column */}
-          <div className="space-y-4">
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">System Locale</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.locale || 'Unknown'}</p>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Time Zone</label>
-              <p className="text-gray-900 dark:text-white">{osInfo?.timeZone || 'Unknown'}</p>
-            </div>
-            
-            {!isMac && (
-              <div>
-                <label className="text-sm font-medium text-gray-600 dark:text-gray-400">Keyboard Layout</label>
-                <p className="text-gray-900 dark:text-white">{osInfo?.activeKeyboardLayout || 'Unknown'}</p>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       {/* Recent Windows Updates - Second from top */}
       {!isMac && updates.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Windows Updates</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Recently installed system updates</p>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Recent Windows Updates</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">Recently installed system updates</p>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -423,22 +549,6 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     : 'System software and security updates'}
                 </p>
               </div>
-              {/* Status indicator in header */}
-              {pendingAppleUpdates.length === 0 ? (
-                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-100 dark:bg-green-900/40 rounded-full mr-2">
-                  <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-sm font-medium text-green-700 dark:text-green-300">Up to Date</span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 text-yellow-600 dark:text-yellow-400">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                  </svg>
-                  <span className="text-sm font-medium">{pendingAppleUpdates.length} pending</span>
-                </div>
-              )}
             </div>
           </div>
           {/* Pending Updates */}
@@ -877,7 +987,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Install History</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Packages installed in the last 30 days ({installHistory.length} packages)
+              Packages installed in the last 90 days ({installHistory.length} packages)
             </p>
           </div>
           <div className="overflow-x-auto max-h-[500px] overflow-y-auto">

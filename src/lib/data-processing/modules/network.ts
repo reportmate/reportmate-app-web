@@ -26,6 +26,25 @@ export interface NetworkInfo {
   activeNetbiosType?: string
   // Computer's DNS address/FQDN
   dnsAddress?: string
+  // WiFi-specific info (separate from active connection)
+  wifiInterface?: {
+    ssid?: string
+    protocol?: string // WiFi 6, WiFi 5, etc.
+    channel?: number | string
+    band?: string // 2.4GHz, 5GHz, 6GHz
+    signalStrength?: number | string
+  }
+  // Network quality test results (macOS)
+  networkQuality?: {
+    uplinkCapacity?: string
+    downlinkCapacity?: string
+    uplinkResponsiveness?: string
+    downlinkResponsiveness?: string
+    idleLatency?: string
+    raw?: string
+  }
+  // Current active WiFi SSID (for marking in saved list)
+  activeWifiSsid?: string
 }
 
 export interface NetworkInterface {
@@ -44,6 +63,10 @@ export interface NetworkInterface {
   linkSpeed?: string
   wirelessProtocol?: string
   wirelessBand?: string
+  // Enhanced fields from WiFi info
+  ssid?: string
+  channel?: string | number
+  dnsServers?: string[]
 }
 
 /**
@@ -230,7 +253,45 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
   // Extract all network interfaces
   if (network.interfaces && Array.isArray(network.interfaces)) {
-    const allInterfaces = network.interfaces.map((iface: any) => {
+    // First, deduplicate interfaces by name and merge their addresses
+    // Mac sends multiple entries per interface (one per address)
+    const interfaceMap = new Map<string, any>()
+    
+    for (const iface of network.interfaces) {
+      const name = iface.name || iface.interface || 'Unknown'
+      
+      if (!interfaceMap.has(name)) {
+        // First time seeing this interface - create entry
+        interfaceMap.set(name, {
+          ...iface,
+          addresses: [],
+          isUp: iface.isUp === 1 || iface.isUp === true,
+          hasIPv4: false
+        })
+      }
+      
+      const existing = interfaceMap.get(name)!
+      
+      // Merge addresses
+      if (iface.addresses && Array.isArray(iface.addresses)) {
+        existing.addresses.push(...iface.addresses)
+      }
+      
+      // If ANY entry for this interface has isUp=1, mark it as up
+      if (iface.isUp === 1 || iface.isUp === true) {
+        existing.isUp = true
+      }
+      
+      // Check if this entry has an IPv4 address
+      if (iface.addresses?.some((addr: any) => 
+        addr.family === 'IPv4' && addr.address && !addr.address.startsWith('127.')
+      )) {
+        existing.hasIPv4 = true
+      }
+    }
+    
+    // Now process the deduplicated interfaces
+    const allInterfaces = Array.from(interfaceMap.values()).map((iface: any) => {
       // Find best IP address to display
       let displayAddress = ''
       
@@ -279,13 +340,14 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
       // Normalize status - check multiple indicators
       // Interface is considered active if:
-      // 1. isUp flag is true/1
+      // 1. isUp flag is true/1 (from ANY entry for this interface)
       // 2. It has a valid non-localhost IPv4 address
       // 3. isActive flag is true
+      // 4. hasIPv4 flag set during deduplication
       const hasValidIP = ipAddresses.some((ip: string) => 
         /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && !ip.startsWith('127.') && !ip.startsWith('169.254.')
       )
-      const isActive = iface.isActive === true || iface.is_active === true || isUp || hasValidIP
+      const isActive = iface.isActive === true || iface.is_active === true || iface.isUp === true || iface.hasIPv4 || hasValidIP
       const normalizedStatus = isActive ? 'Active' : 'Disconnected'
 
       // Support both snake_case (new osquery) and camelCase (legacy) field names
@@ -309,6 +371,11 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
 
     // Filter out virtual/internal network adapters
     const physicalInterfaces = allInterfaces.filter((iface: NetworkInterface) => {
+      // On Mac: Only show en* interfaces (en0, en1, en2, etc.) - excludes bridge100, utun*, etc.
+      if (iface.name.match(/^en\d+$/)) {
+        return true; // Keep all en* interfaces on Mac
+      }
+      
       // Filter out virtual adapters by MAC address patterns
       const isVirtualMac = iface.macAddress && (
         iface.macAddress.startsWith('00:15:5d') || // Hyper-V
@@ -343,6 +410,73 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       // Sort by name as tiebreaker
       return a.name.localeCompare(b.name);
     })
+    
+    // Enhance WiFi interfaces with data from currentWiFiNetwork
+    // Mac uses currentWiFiNetwork for band, channel, protocol info
+    if (network.currentWiFiNetwork) {
+      const currentWifiData = network.currentWiFiNetwork
+      
+      // Parse output if it's a string (bash collection)
+      let wifiDetails: any = null
+      if (currentWifiData.output) {
+        try {
+          wifiDetails = JSON.parse(currentWifiData.output)
+        } catch { /* ignore */ }
+      } else if (typeof currentWifiData === 'object') {
+        wifiDetails = currentWifiData
+      }
+      
+      if (wifiDetails) {
+        // Find the WiFi interface (en0 on Mac, or type=Wireless)
+        const wifiInterface = physicalInterfaces.find((iface: NetworkInterface) => 
+          iface.name === 'en0' || 
+          iface.type === 'Wireless' || 
+          iface.type === 'WiFi' ||
+          iface.type?.toLowerCase().includes('wifi') ||
+          iface.type?.toLowerCase().includes('wireless')
+        )
+        
+        if (wifiInterface) {
+          // Add band from channel_band
+          if (wifiDetails.channel_band && !wifiInterface.wirelessBand) {
+            wifiInterface.wirelessBand = wifiDetails.channel_band
+          }
+          // Add channel
+          if (wifiDetails.channel && !wifiInterface.channel) {
+            wifiInterface.channel = wifiDetails.channel
+          }
+          // Add protocol from mode field
+          if (wifiDetails.mode && !wifiInterface.wirelessProtocol) {
+            const mode = wifiDetails.mode
+            if (mode.includes('ax') || mode === '802.11ax') wifiInterface.wirelessProtocol = 'WiFi 6'
+            else if (mode.includes('ac') || mode === '802.11ac') wifiInterface.wirelessProtocol = 'WiFi 5'
+            else if (mode.includes('n') || mode === '802.11n') wifiInterface.wirelessProtocol = 'WiFi 4'
+            else wifiInterface.wirelessProtocol = mode
+          }
+          // Add wifi_version if available
+          if (wifiDetails.wifi_version && !wifiInterface.wirelessProtocol) {
+            wifiInterface.wirelessProtocol = wifiDetails.wifi_version
+          }
+          // Add SSID to the interface
+          // If location services are disabled, use first known network as current SSID
+          if (wifiDetails.ssid && wifiDetails.ssid !== '[Location Services Required]') {
+            wifiInterface.ssid = wifiDetails.ssid
+          } else if (wifiDetails.ssid === '[Location Services Required]' && network.wifiInfo?.knownNetworks?.[0]?.ssid) {
+            // Use first known network as it's likely the currently connected one
+            wifiInterface.ssid = network.wifiInfo.knownNetworks[0].ssid
+          }
+        }
+      }
+    }
+    
+    // Add DNS servers to active interfaces
+    if (networkInfo.activeDnsServers && networkInfo.activeDnsServers.length > 0) {
+      physicalInterfaces.forEach((iface: NetworkInterface) => {
+        if (iface.isActive) {
+          iface.dnsServers = networkInfo.activeDnsServers
+        }
+      })
+    }
 
     networkInfo.interfaces = physicalInterfaces
     
@@ -371,10 +505,27 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     // Mac format - try knownNetworks first, then availableNetworks
     const wifiInfo = network.wifiInfo
     if (wifiInfo.knownNetworks && Array.isArray(wifiInfo.knownNetworks) && wifiInfo.knownNetworks.length > 0) {
+      // Get active SSID from currentWiFiNetwork if available
+      let activeSSID: string | undefined
+      if (network.currentWiFiNetwork?.output) {
+        try {
+          const wifiData = JSON.parse(network.currentWiFiNetwork.output)
+          if (wifiData.ssid && wifiData.ssid !== '[Location Services Required]') {
+            activeSSID = wifiData.ssid
+          }
+        } catch { /* ignore */ }
+      }
+      // Also check wifiInfo.currentNetwork
+      if (!activeSSID && wifiInfo.currentNetwork?.ssid) {
+        activeSSID = wifiInfo.currentNetwork.ssid
+      }
+      
+      networkInfo.activeWifiSsid = activeSSID
+      
       networkInfo.wifiNetworks = wifiInfo.knownNetworks.map((net: any) => ({
         ssid: net.ssid || net.name || net.networkName,
         security: net.security || net.securityType || 'Unknown',
-        isConnected: net.isConnected || net.connected || false,
+        isConnected: activeSSID ? (net.ssid === activeSSID) : (net.isConnected || net.connected || false),
         isSaved: net.isSaved || true,
         channel: net.channel
       }))
@@ -410,6 +561,34 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       // If connection type is WiFi, enhance it with the protocol
       if (networkInfo.connectionType === 'WiFi' && protocol) {
         networkInfo.connectionType = protocol
+      }
+    }
+    
+    // Extract WiFi interface details even if Ethernet is primary
+    // Check currentWiFiNetwork for Mac data with Location Services enabled
+    if (network.currentWiFiNetwork?.output) {
+      try {
+        const wifiData = JSON.parse(network.currentWiFiNetwork.output)
+        networkInfo.wifiInterface = {
+          ssid: wifiData.ssid !== '[Location Services Required]' ? wifiData.ssid : undefined,
+          protocol: wifiData.mode === '802.11ax' ? 'WiFi 6' : 
+                   wifiData.mode === '802.11ac' ? 'WiFi 5' :
+                   wifiData.mode === '802.11n' ? 'WiFi 4' : wifiData.mode,
+          channel: wifiData.channel,
+          band: wifiData.channel_band
+        }
+      } catch {
+        // Ignore parse errors
+      }
+    }
+    
+    // Fallback to wifiInfo.currentNetwork if available
+    if (!networkInfo.wifiInterface && wifiInfo.currentNetwork) {
+      const current = wifiInfo.currentNetwork
+      networkInfo.wifiInterface = {
+        ssid: current.ssid || current.networkName,
+        channel: current.channel,
+        signalStrength: current.rssi ? `${current.rssi} dBm` : undefined
       }
     }
   }
@@ -461,6 +640,81 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
   // FALLBACK: If no dnsAddress and we have DNS servers, use the first DNS server
   if (!networkInfo.dnsAddress && networkInfo.activeDnsServers && networkInfo.activeDnsServers.length > 0) {
     networkInfo.dnsAddress = networkInfo.activeDnsServers[0]
+  }
+
+  // Extract networkQuality data (macOS)
+  // Support both old format (raw output string) and new format (structured data)
+  if (network.networkQuality) {
+    const nq = network.networkQuality
+    
+    if (nq.output) {
+      // Old format: parse raw output string
+      const output = nq.output
+      networkInfo.networkQuality = {
+        raw: output
+      }
+      
+      // Parse and clean up the output string
+      // Format: "==== SUMMARY ====\nUplink capacity: 871.206 Mbps\nDownlink capacity: 864.179 Mbps\n..."
+      const uplinkCapacityMatch = output.match(/Uplink capacity:\s*([\d.]+)\s*Mbps/i)
+      const downlinkCapacityMatch = output.match(/Downlink capacity:\s*([\d.]+)\s*Mbps/i)
+      const uplinkResponsivenessMatch = output.match(/Uplink Responsiveness:\s*(\w+)/i)
+      const downlinkResponsivenessMatch = output.match(/Downlink Responsiveness:\s*(\w+)/i)
+      const idleLatencyMatch = output.match(/Idle Latency:\s*([\d.]+)\s*milliseconds/i)
+      
+      if (uplinkCapacityMatch) networkInfo.networkQuality.uplinkCapacity = `${Math.round(parseFloat(uplinkCapacityMatch[1]))} Mbps`
+      if (downlinkCapacityMatch) networkInfo.networkQuality.downlinkCapacity = `${Math.round(parseFloat(downlinkCapacityMatch[1]))} Mbps`
+      if (uplinkResponsivenessMatch) networkInfo.networkQuality.uplinkResponsiveness = uplinkResponsivenessMatch[1]
+      if (downlinkResponsivenessMatch) networkInfo.networkQuality.downlinkResponsiveness = downlinkResponsivenessMatch[1]
+      if (idleLatencyMatch) networkInfo.networkQuality.idleLatency = `${Math.round(parseFloat(idleLatencyMatch[1]))} ms`
+    } else if (nq.dlThroughput || nq.dl_throughput || nq.ulThroughput || nq.ul_throughput || nq.rating) {
+      // New format: structured data from Swift client
+      // Support both camelCase (after normalizeKeys) and snake_case (raw)
+      networkInfo.networkQuality = {}
+      
+      const dlThroughput = nq.dlThroughput || nq.dl_throughput
+      const ulThroughput = nq.ulThroughput || nq.ul_throughput
+      const dlRating = nq.dlRating || nq.dl_rating
+      const ulRating = nq.ulRating || nq.ul_rating
+      const idleLatency = nq.idleLatency || nq.idle_latency
+      
+      if (dlThroughput) {
+        networkInfo.networkQuality.downlinkCapacity = `${Math.round(parseFloat(dlThroughput))} Mbps`
+      }
+      if (ulThroughput) {
+        networkInfo.networkQuality.uplinkCapacity = `${Math.round(parseFloat(ulThroughput))} Mbps`
+      }
+      // dl_rating/ul_rating are High/Medium/Low
+      if (dlRating) {
+        networkInfo.networkQuality.downlinkResponsiveness = dlRating
+      }
+      if (ulRating) {
+        networkInfo.networkQuality.uplinkResponsiveness = ulRating
+      }
+      // Use idle_latency if available
+      if (idleLatency) {
+        networkInfo.networkQuality.idleLatency = `${Math.round(parseFloat(idleLatency))} ms`
+      }
+    }
+  }
+
+  // If no activeConnection but we have interfaces with IPs, create one from the first active interface
+  if (!networkInfo.ipAddress && networkInfo.interfaces && networkInfo.interfaces.length > 0) {
+    // Find the first interface with a valid IPv4 address
+    const activeIface = networkInfo.interfaces.find((iface: NetworkInterface) => 
+      iface.isActive && iface.ipAddress && /^(\d{1,3}\.){3}\d{1,3}$/.test(iface.ipAddress)
+    )
+    if (activeIface) {
+      networkInfo.ipAddress = activeIface.ipAddress
+      networkInfo.macAddress = activeIface.macAddress
+      networkInfo.interfaceName = activeIface.name
+      // Determine connection type from interface name
+      if (activeIface.name.match(/^en0$/i)) {
+        networkInfo.connectionType = 'WiFi'  // en0 is typically WiFi on Mac
+      } else if (activeIface.name.match(/^en\d+$/i)) {
+        networkInfo.connectionType = 'Ethernet'  // Other en* are typically Ethernet
+      }
+    }
   }
 
   

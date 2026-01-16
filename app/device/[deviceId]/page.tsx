@@ -1166,9 +1166,27 @@ export default function DeviceDetailPage() {
           )}
         </div>
 
-        {/* Peripherals Tab - Already in info, just display */}
+        {/* Peripherals Tab - Progressive loading */}
         <div className={activeTab === 'peripherals' ? 'block' : 'hidden'}>
-          <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
+          {isModuleError('peripherals') ? (
+            <ModuleLoadingState 
+              moduleName="peripherals" 
+              state="error" 
+              error={getModuleError('peripherals')}
+              icon="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+              accentColor="violet"
+              onRetry={() => requestModule('peripherals')}
+            />
+          ) : isModuleLoaded('peripherals') ? (
+            <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="peripherals" 
+              state="loading" 
+              icon="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"
+              accentColor="violet"
+            />
+          )}
         </div>
 
         {/* Events Tab - Progressive loading */}

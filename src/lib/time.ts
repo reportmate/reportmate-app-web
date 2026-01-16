@@ -91,6 +91,51 @@ export function formatExactTime(timestamp: string | number): string {
   }
 }
 
+// Format boot time in simple format (e.g., "Jan 14, 2026 11:32 PM")
+export function formatBootTime(timestamp: string | number): string {
+  try {
+    if (!timestamp || timestamp === '' || timestamp === 'null' || timestamp === 'undefined') {
+      return 'Unknown'
+    }
+    
+    let date: Date
+    
+    // Handle Unix timestamp (number or string of digits, possibly with decimals)
+    if (typeof timestamp === 'number' || /^[\d.]+$/.test(String(timestamp))) {
+      const ts = parseFloat(String(timestamp))
+      if (isNaN(ts)) {
+        return 'Unknown'
+      }
+      // If timestamp is in seconds (Unix), convert to ms
+      if (ts < 10000000000) {
+        date = new Date(ts * 1000)
+      } else {
+        date = new Date(ts)
+      }
+    } else {
+      // Try parsing as ISO date string
+      date = new Date(timestamp)
+    }
+    
+    if (isNaN(date.getTime()) || date.getFullYear() < 2000) {
+      return 'Unknown'
+    }
+    
+    // Format as "Jan 14, 2026 11:32 PM"
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    })
+  } catch (_error) {
+    console.error('[TIME UTIL] Failed to format boot time:', _error)
+    return 'Unknown'
+  }
+}
+
 // Parse install time for sorting (returns Unix timestamp in ms)
 export function parseInstallTime(timestamp: string | number | undefined): number {
   if (!timestamp || timestamp === '' || timestamp === 'null' || timestamp === 'undefined') {
