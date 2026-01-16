@@ -14,7 +14,7 @@
 
 import React from 'react'
 import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
-import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Eye } from 'lucide-react'
+import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Eye, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
@@ -92,6 +92,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
   const secureShell = security?.secureShell
   const isMac = isMacOS(device)
+  
+  // Certificate filter state
+  const [certFilter, setCertFilter] = React.useState<'all' | 'valid' | 'expiringsoon' | 'expired'>('all')
+  const [storeFilter, setStoreFilter] = React.useState<string>('all')
+  const [expandedStores, setExpandedStores] = React.useState<Set<string>>(new Set())
+  const [certSearch, setCertSearch] = React.useState('')
   
   // Get remote management data from Management module (Mac collects screen sharing there)
   const rawManagement = device?.modules?.management || device?.management
@@ -687,6 +693,365 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         </div>
 
       </div>
+
+      {/* Certificates Table */}
+      {(() => {
+        // Get certificates from security data - support both array formats
+        const certificates = security?.certificates || []
+        const hasCertificates = Array.isArray(certificates) && certificates.length > 0
+        
+        // Helper to format date for display
+        const formatCertDate = (dateStr?: string) => {
+          if (!dateStr) return '—'
+          try {
+            const date = new Date(dateStr)
+            if (isNaN(date.getTime())) return dateStr
+            return date.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })
+          } catch {
+            return dateStr
+          }
+        }
+        
+        // Helper to get status badge
+        const CertStatusBadge = ({ status, daysUntilExpiry }: { status: string, daysUntilExpiry?: number }) => {
+          if (status === 'Expired') {
+            return (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                <XCircle className="w-3 h-3" />
+                Expired
+              </span>
+            )
+          }
+          if (status === 'ExpiringSoon') {
+            return (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                <AlertTriangle className="w-3 h-3" />
+                {daysUntilExpiry !== undefined ? `${daysUntilExpiry}d` : 'Expiring'}
+              </span>
+            )
+          }
+          return (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+              <CheckCircle className="w-3 h-3" />
+              Valid
+            </span>
+          )
+        }
+        
+        // Count by status
+        const expiredCount = certificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length
+        const expiringCount = certificates.filter((c: any) => c.status === 'ExpiringSoon' || c.isExpiringSoon).length
+        const validCount = certificates.filter((c: any) => c.status === 'Valid' || (!c.isExpired && !c.isExpiringSoon)).length
+        
+        // Get unique stores
+        const stores = Array.from(new Set(
+          certificates.map((c: any) => {
+            const storeLocation = c.storeLocation || c.store_location || ''
+            return storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
+          })
+        )).sort()
+        
+        // Filter certificates
+        const filteredCertificates = certificates.filter((cert: any) => {
+          const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
+          const statusMatch = certFilter === 'all' || 
+            (certFilter === 'expired' && status === 'Expired') ||
+            (certFilter === 'expiringsoon' && status === 'ExpiringSoon') ||
+            (certFilter === 'valid' && status === 'Valid')
+          
+          if (!statusMatch) return false
+          
+          // Store filter
+          if (storeFilter !== 'all') {
+            const storeLocation = cert.storeLocation || cert.store_location || ''
+            const certStore = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
+            
+            if (certStore !== storeFilter) return false
+          }
+          
+          // Search filter
+          if (certSearch.trim()) {
+            const searchLower = certSearch.toLowerCase()
+            const commonName = (cert.commonName || cert.common_name || '').toLowerCase()
+            const subject = (cert.subject || '').toLowerCase()
+            const issuer = (cert.issuer || '').toLowerCase()
+            const thumbprint = (cert.thumbprint || cert.sha1 || '').toLowerCase()
+            
+            return commonName.includes(searchLower) || 
+                   subject.includes(searchLower) || 
+                   issuer.includes(searchLower) ||
+                   thumbprint.includes(searchLower)
+          }
+          
+          return true
+        })
+        
+        // Group certificates by store
+        const groupedCertificates = filteredCertificates.reduce((acc: any, cert: any) => {
+          const storeLocation = cert.storeLocation || cert.store_location || ''
+          const store = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
+          if (!acc[store]) acc[store] = []
+          acc[store].push(cert)
+          return acc
+        }, {})
+        
+        return (
+          <div className="mt-6 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-teal-100 dark:bg-teal-900 rounded-lg flex items-center justify-center">
+                    <Award className="w-5 h-5 text-teal-600 dark:text-teal-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Certificates</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {certificates.length} total certificates
+                    </p>
+                  </div>
+                </div>
+                {/* Search */}
+                <div className="relative w-64">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    className="block w-full pl-9 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 text-sm"
+                    placeholder="Search certificates..."
+                    value={certSearch}
+                    onChange={(e) => setCertSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {hasCertificates && (
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Store Filter Pills - toggle on/off (LEFT SIDE) */}
+                    {stores.length > 1 && (stores as string[]).map((store: string) => {
+                      const storeCount = certificates.filter((c: any) => {
+                        const storeLocation = c.storeLocation || c.store_location || ''
+                        const certStore = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
+                        return certStore === store
+                      }).length
+                      
+                      return (
+                        <button
+                          key={store}
+                          onClick={() => setStoreFilter(storeFilter === store ? 'all' : store)}
+                          className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                            storeFilter === store
+                              ? 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100'
+                              : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
+                          }`}
+                        >
+                          {store} ({storeCount})
+                        </button>
+                      )
+                    })}
+                    
+                    {/* Separator */}
+                    {stores.length > 1 && (
+                      <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                    )}
+                    
+                    {/* Status Filter Pills - toggle on/off (RIGHT SIDE) */}
+                    <button
+                      onClick={() => setCertFilter(certFilter === 'valid' ? 'all' : 'valid')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                        certFilter === 'valid'
+                          ? 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100'
+                          : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'
+                      }`}
+                    >
+                      Valid ({validCount})
+                    </button>
+                    <button
+                      onClick={() => setCertFilter(certFilter === 'expiringsoon' ? 'all' : 'expiringsoon')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                        certFilter === 'expiringsoon'
+                          ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100'
+                          : 'bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800'
+                      }`}
+                    >
+                      Expiring Soon ({expiringCount})
+                    </button>
+                    <button
+                      onClick={() => setCertFilter(certFilter === 'expired' ? 'all' : 'expired')}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                        certFilter === 'expired'
+                          ? 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100'
+                          : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800'
+                      }`}
+                    >
+                      Expired ({expiredCount})
+                    </button>
+                  </div>
+                  
+                  {/* Clear Filters Button - shown when any filter is active */}
+                  {(certFilter !== 'all' || storeFilter !== 'all' || certSearch.trim()) && (
+                    <button
+                      onClick={() => {
+                        setCertFilter('all')
+                        setStoreFilter('all')
+                        setCertSearch('')
+                      }}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors flex items-center gap-1.5"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {hasCertificates ? (
+              filteredCertificates.length > 0 ? (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {Object.entries(groupedCertificates).sort().map(([storeName, storeCerts]: [string, any]) => {
+                    const toggleExpanded = () => {
+                      const newSet = new Set(expandedStores)
+                      if (newSet.has(storeName)) {
+                        newSet.delete(storeName)
+                      } else {
+                        newSet.add(storeName)
+                      }
+                      setExpandedStores(newSet)
+                    }
+                    
+                    return (
+                      <div key={storeName} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <button
+                          onClick={toggleExpanded}
+                          className="w-full px-6 py-4 flex items-center justify-between text-left"
+                        >
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{storeName}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                              {storeCerts.length} certificate{storeCerts.length !== 1 ? 's' : ''}
+                            </div>
+                          </div>
+                          <svg 
+                            className={`w-5 h-5 text-gray-400 transition-transform ${expandedStores.has(storeName) ? 'rotate-180' : ''}`}
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                        
+                        {expandedStores.has(storeName) && (
+                          <div className="px-6 pb-4">
+                            <div className="overflow-x-auto">
+                              <table className="w-full">
+                                <thead className="bg-gray-50 dark:bg-gray-900/30">
+                                  <tr>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name / Subject</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Valid From</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Expires</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Issuer</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
+                                  {storeCerts.map((cert: any, index: number) => {
+                                    // Normalize field names (support both camelCase and snake_case)
+                                    const commonName = cert.commonName || cert.common_name || ''
+                                    const subject = cert.subject || ''
+                                    const issuer = cert.issuer || ''
+                                    const notBefore = cert.notBefore || cert.not_before || cert.not_valid_before || ''
+                                    const notAfter = cert.notAfter || cert.not_after || cert.not_valid_after || ''
+                                    const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
+                                    const daysUntilExpiry = cert.daysUntilExpiry ?? cert.days_until_expiry
+                                    const thumbprint = cert.thumbprint || cert.sha1 || ''
+                                    const isSelfSigned = cert.isSelfSigned || cert.is_self_signed || cert.self_signed === '1' || cert.self_signed === 1
+                                    
+                                    // Display name: prefer commonName, fallback to subject
+                                    const displayName = commonName || (subject ? subject.split(',')[0]?.replace(/^CN\s*=\s*/i, '') : '—')
+                                    
+                                    // Truncate long issuer names
+                                    const displayIssuer = issuer.length > 50 
+                                      ? issuer.substring(0, 50) + '...' 
+                                      : (issuer || '—')
+                                    
+                                    return (
+                                      <tr key={`${storeName}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
+                                        <td className="px-4 py-3">
+                                          <div className="flex flex-col">
+                                            <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                              {displayName}
+                                              {isSelfSigned && (
+                                                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(self-signed)</span>
+                                              )}
+                                            </span>
+                                            {thumbprint && (
+                                              <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[200px]" title={thumbprint}>
+                                                {thumbprint.substring(0, 20)}...
+                                              </span>
+                                            )}
+                                          </div>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <CertStatusBadge status={status} daysUntilExpiry={daysUntilExpiry} />
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                                            {formatCertDate(notBefore)}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className="text-sm text-gray-600 dark:text-gray-300">
+                                            {formatCertDate(notAfter)}
+                                          </span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          <span className="text-sm text-gray-600 dark:text-gray-300 font-mono" title={issuer}>
+                                            {displayIssuer}
+                                          </span>
+                                        </td>
+                                      </tr>
+                                    )
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="px-5 py-8 text-center">
+                  <Award className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    No certificates match the selected filters
+                  </p>
+                </div>
+              )
+            ) : (
+              <div className="px-5 py-8 text-center">
+                <Award className="w-10 h-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">No certificates collected</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  Certificate data will appear after the next device check-in
+                </p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
 
       {/* Debug Accordion for API Data */}
       <div className="mt-6">
