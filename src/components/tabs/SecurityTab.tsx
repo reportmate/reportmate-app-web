@@ -311,15 +311,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   enabled={security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1}
                   value={(security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1) ? 'Registered' : 'Not Registered'}
                 />
-                {/* SSO Tokens - device level (shown right after Registration) */}
-                {!(security?.platformSSO?.users?.length > 0) && (
-                  <DetailRow 
-                    label="SSO Tokens" 
-                    isStatus
-                    enabled={security?.platformSSO?.tokensPresent === true || security?.platformSSO?.tokensPresent === 1 || security?.platformSSO?.tokenStatus === 'Present'}
-                    value={(security?.platformSSO?.tokensPresent === true || security?.platformSSO?.tokensPresent === 1 || security?.platformSSO?.tokenStatus === 'Present') ? 'Present' : 'Missing'}
-                  />
-                )}
+                {/* Token - read from first user in users array */}
+                <DetailRow 
+                  label="Token" 
+                  isStatus
+                  enabled={security?.platformSSO?.users?.[0]?.tokensPresent === true || security?.platformSSO?.users?.[0]?.tokensPresent === 1}
+                  value={(security?.platformSSO?.users?.[0]?.tokensPresent === true || security?.platformSSO?.users?.[0]?.tokensPresent === 1) ? 'Present' : 'Missing'}
+                />
                 <DetailRow 
                   label="Method" 
                   value={security?.platformSSO?.method || 'Unknown'} 
@@ -331,12 +329,6 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <DetailRow 
                         label={user.username ? `/Users/${user.username}` : 'User'} 
                         value={user.loginEmail || user.upn || '—'} 
-                      />
-                      <DetailRow 
-                        label="SSO Tokens" 
-                        isStatus
-                        enabled={user.tokensPresent === true || user.tokensPresent === 1}
-                        value={(user.tokensPresent === true || user.tokensPresent === 1) ? 'Present' : 'Missing'}
                       />
                     </div>
                   ))

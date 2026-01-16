@@ -11,9 +11,10 @@ export interface StatProps {
   isMono?: boolean
   sublabel?: string
   showCopyButton?: boolean
+  truncate?: boolean
 }
 
-export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublabel, showCopyButton = false }) => {
+export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublabel, showCopyButton = false, truncate = false }) => {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = async () => {
@@ -55,10 +56,10 @@ export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublab
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-      <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''} flex items-center`}>
-        <span>{value || 'Unknown'}</span>
+      <dd className={`mt-1 text-sm text-gray-900 dark:text-gray-100 ${isMono ? 'font-mono' : ''} flex items-center min-w-0`}>
+        <span className={truncate ? 'truncate flex-1 min-w-0' : ''} title={truncate ? String(value || '') : undefined}>{value || 'Unknown'}</span>
         {showCopyButton && value ? (
           <button
             onClick={handleCopy}
@@ -125,25 +126,33 @@ export interface StatBlockProps {
   icon: React.ReactNode
   iconColor: string
   children: React.ReactNode
+  headerRight?: React.ReactNode
 }
 
-export const StatBlock: React.FC<StatBlockProps> = ({ title, subtitle, icon, iconColor, children }) => (
+export const StatBlock: React.FC<StatBlockProps> = ({ title, subtitle, icon, iconColor, children, headerRight }) => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
     <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-      <div className="flex items-center gap-3">
-        <div className={`w-10 h-10 ${iconColor} rounded-lg flex items-center justify-center`}>
-          {icon}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className={`w-10 h-10 ${iconColor} rounded-lg flex items-center justify-center`}>
+            {icon}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              {title}
+            </h3>
+            {subtitle && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {title}
-          </h3>
-          {subtitle && (
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              {subtitle}
-            </p>
-          )}
-        </div>
+        {headerRight && (
+          <div className="flex items-center">
+            {headerRight}
+          </div>
+        )}
       </div>
     </div>
     <div className="px-6 py-4">

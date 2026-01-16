@@ -22,7 +22,7 @@ export interface ModuleStatus {
   loadedAt?: Date
 }
 
-const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers']
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers', 'peripherals']
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (processed and ready for InfoTab)

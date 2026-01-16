@@ -32,17 +32,25 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const parsedSecurity = convertPowerShellObjects(rawSecurity)
   const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
   
-  // Detect platform for platform-aware display
+  // Detect platform for platform-aware display - check multiple locations
+  const operatingSystem = device?.modules?.system?.operatingSystem || device?.modules?.system?.operating_system
   const platform = device?.platform?.toLowerCase() || 
                   device?.modules?.metadata?.platform?.toLowerCase() ||
                   device?.metadata?.platform?.toLowerCase() ||
+                  operatingSystem?.platform?.toLowerCase() ||
+                  operatingSystem?.name?.toLowerCase() ||
                   device?.os?.toLowerCase() || 
                   device?.osName?.toLowerCase() || 
-                  'windows'
+                  ''
   
   const isWindows = platform.includes('windows')
   const isMacOS = platform.includes('mac') || platform.includes('darwin')
   const isLinux = platform.includes('linux')
+  
+  // Get remote management data from Management module (Mac collects screen sharing there)
+  const rawManagement = device?.modules?.management || device?.management
+  const management = rawManagement ? normalizeKeys(convertPowerShellObjects(rawManagement)) as any : null
+  const remoteManagement = management?.remoteManagement || management?.remote_management || security?.remoteManagement || {}
 
   const formatDate = (dateStr?: string) => {
     if (!dateStr) return 'Unknown'
@@ -166,8 +174,64 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
                 encryptionInfo.status
               )}
             />
+            
+            {/* Bootstrap Token (under FileVault) */}
+            {security?.bootstrapToken !== undefined && (
+              <div className="ml-4">
+                <StatusBadge
+                  label="Bootstrap Token"
+                  status={security.bootstrapToken.escrowed ? 'Escrowed' : 'Not Escrowed'}
+                  type={security.bootstrapToken.escrowed ? 'success' : 'error'}
+                />
+              </div>
+            )}
+            
+            {/* Personal Recovery Key (under FileVault) */}
+            {security?.fileVault?.recoveryKeyEscrowed !== undefined && (
+              <div className="ml-4">
+                <StatusBadge
+                  label="Personal Recovery Key"
+                  status={security.fileVault.recoveryKeyEscrowed ? 'Escrowed' : 'Not Escrowed'}
+                  type={security.fileVault.recoveryKeyEscrowed ? 'success' : 'error'}
+                />
+              </div>
+            )}
 
-            {/* System Integrity Protection */}
+            {/* Platform SSO - at the bottom, formatted like Windows Hello */}
+            {security?.platformSSO && (
+              <div className="space-y-2 mt-3">
+                <StatusBadge
+                  label="Platform SSO"
+                  status={(security.platformSSO.registered === true || security.platformSSO.registered === 1) ? 'Registered' : 'Not Registered'}
+                  type={getStatusType(security.platformSSO.registered === true || security.platformSSO.registered === 1)}
+                />
+                <div className="ml-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">Token:</span>
+                    <StatusBadge
+                      label=""
+                      status={security.platformSSO.users?.[0]?.tokensPresent === true || security.platformSSO.users?.[0]?.tokensPresent === 1 ? 'Present' : 'Missing'}
+                      type={getStatusType(security.platformSSO.users?.[0]?.tokensPresent === true || security.platformSSO.users?.[0]?.tokensPresent === 1)}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 dark:text-gray-400">Method:</span>
+                    <span className="text-gray-900 dark:text-white">{security.platformSSO.method || 'Unknown'}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Gatekeeper (Protection) */}
+            {security?.gatekeeper && (
+              <StatusBadge
+                label="Gatekeeper"
+                status={security.gatekeeper.enabled ? 'Enabled' : 'Disabled'}
+                type={getStatusType(security.gatekeeper.enabled)}
+              />
+            )}
+
+            {/* System Integrity Protection (Full Name) */}
             {security?.systemIntegrityProtection && (
               <StatusBadge
                 label="System Integrity Protection"
@@ -175,13 +239,13 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
                 type={getStatusType(security.systemIntegrityProtection.enabled)}
               />
             )}
-
-            {/* Gatekeeper */}
-            {security?.gatekeeper && (
+            
+            {/* Activation Lock - Disabled is good (green), Enabled is problematic (red) */}
+            {security?.activationLock !== undefined && (
               <StatusBadge
-                label="Gatekeeper"
-                status={security.gatekeeper.status || (security.gatekeeper.enabled ? 'Enabled' : 'Disabled')}
-                type={getStatusType(security.gatekeeper.enabled)}
+                label="Activation Lock"
+                status={security.activationLock?.enabled ? 'Enabled' : 'Disabled'}
+                type={security.activationLock?.enabled ? 'error' : 'success'}
               />
             )}
 
@@ -191,13 +255,13 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               status={firewallInfo.status}
               type={getStatusType(security?.firewall?.enabled || security?.firewall?.isEnabled, firewallInfo.status)}
             />
-
-            {/* Secure Boot */}
-            {security?.secureBoot && (
+            
+            {/* Screen Sharing (Remote Management) */}
+            {remoteManagement?.screenSharing !== undefined && (
               <StatusBadge
-                label="Secure Boot"
-                status={security.secureBoot.secureBootEnabled ? 'Enabled' : 'Disabled'}
-                type={getStatusType(security.secureBoot.secureBootEnabled)}
+                label="Screen Sharing"
+                status={remoteManagement.screenSharing ? 'Enabled' : 'Disabled'}
+                type={remoteManagement.screenSharing ? 'warning' : 'success'}
               />
             )}
           </>
