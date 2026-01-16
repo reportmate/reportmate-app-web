@@ -96,6 +96,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   // Certificate filter state
   const [certFilter, setCertFilter] = React.useState<'all' | 'valid' | 'expiringsoon' | 'expired'>('all')
   const [storeFilter, setStoreFilter] = React.useState<string>('all')
+  const [selfSignedFilter, setSelfSignedFilter] = React.useState<boolean>(false)
   const [expandedStores, setExpandedStores] = React.useState<Set<string>>(new Set())
   const [certSearch, setCertSearch] = React.useState('')
   
@@ -755,6 +756,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           })
         )).sort()
         
+        // Helper to expand all stores when filter changes
+        const expandAllStores = () => {
+          const allStores = new Set(stores as string[])
+          setExpandedStores(allStores)
+        }
+        
         // Filter certificates
         const filteredCertificates = certificates.filter((cert: any) => {
           const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
@@ -771,6 +778,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             const certStore = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
             
             if (certStore !== storeFilter) return false
+          }
+          
+          // Self-signed filter
+          if (selfSignedFilter) {
+            const isSelfSigned = cert.isSelfSigned || cert.is_self_signed || cert.self_signed === '1' || cert.self_signed === 1
+            if (!isSelfSigned) return false
           }
           
           // Search filter
@@ -845,7 +858,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       return (
                         <button
                           key={store}
-                          onClick={() => setStoreFilter(storeFilter === store ? 'all' : store)}
+                          onClick={() => {
+                            setStoreFilter(storeFilter === store ? 'all' : store)
+                            expandAllStores()
+                          }}
                           className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                             storeFilter === store
                               ? 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100'
@@ -864,7 +880,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     
                     {/* Status Filter Pills - toggle on/off (RIGHT SIDE) */}
                     <button
-                      onClick={() => setCertFilter(certFilter === 'valid' ? 'all' : 'valid')}
+                      onClick={() => {
+                        setCertFilter(certFilter === 'valid' ? 'all' : 'valid')
+                        expandAllStores()
+                      }}
                       className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                         certFilter === 'valid'
                           ? 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100'
@@ -874,7 +893,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       Valid ({validCount})
                     </button>
                     <button
-                      onClick={() => setCertFilter(certFilter === 'expiringsoon' ? 'all' : 'expiringsoon')}
+                      onClick={() => {
+                        setCertFilter(certFilter === 'expiringsoon' ? 'all' : 'expiringsoon')
+                        expandAllStores()
+                      }}
                       className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                         certFilter === 'expiringsoon'
                           ? 'bg-amber-200 dark:bg-amber-800 text-amber-900 dark:text-amber-100'
@@ -884,7 +906,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       Expiring Soon ({expiringCount})
                     </button>
                     <button
-                      onClick={() => setCertFilter(certFilter === 'expired' ? 'all' : 'expired')}
+                      onClick={() => {
+                        setCertFilter(certFilter === 'expired' ? 'all' : 'expired')
+                        expandAllStores()
+                      }}
                       className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
                         certFilter === 'expired'
                           ? 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100'
@@ -893,14 +918,30 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     >
                       Expired ({expiredCount})
                     </button>
+                    
+                    {/* Self-signed Filter */}
+                    <button
+                      onClick={() => {
+                        setSelfSignedFilter(!selfSignedFilter)
+                        expandAllStores()
+                      }}
+                      className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                        selfSignedFilter
+                          ? 'bg-blue-200 dark:bg-blue-800 text-blue-900 dark:text-blue-100'
+                          : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
+                      }`}
+                    >
+                      Self-signed ({certificates.filter((c: any) => c.isSelfSigned || c.is_self_signed || c.self_signed === '1' || c.self_signed === 1).length})
+                    </button>
                   </div>
                   
                   {/* Clear Filters Button - shown when any filter is active */}
-                  {(certFilter !== 'all' || storeFilter !== 'all' || certSearch.trim()) && (
+                  {(certFilter !== 'all' || storeFilter !== 'all' || selfSignedFilter || certSearch.trim()) && (
                     <button
                       onClick={() => {
                         setCertFilter('all')
                         setStoreFilter('all')
+                        setSelfSignedFilter(false)
                         setCertSearch('')
                       }}
                       className="px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors flex items-center gap-1.5"
@@ -952,16 +993,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                         </button>
                         
                         {expandedStores.has(storeName) && (
-                          <div className="px-6 pb-4">
+                          <div className="pb-4">
                             <div className="overflow-x-auto">
                               <table className="w-full">
                                 <thead className="bg-gray-50 dark:bg-gray-900/30">
                                   <tr>
-                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name / Subject</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Name / Subject / Issuer</th>
                                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Status</th>
                                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Valid From</th>
                                     <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Expires</th>
-                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Issuer</th>
+                                    <th className="px-4 py-2 text-left text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wider">Keychain</th>
                                   </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700 bg-white dark:bg-gray-800">
@@ -976,9 +1017,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                                     const daysUntilExpiry = cert.daysUntilExpiry ?? cert.days_until_expiry
                                     const thumbprint = cert.thumbprint || cert.sha1 || ''
                                     const isSelfSigned = cert.isSelfSigned || cert.is_self_signed || cert.self_signed === '1' || cert.self_signed === 1
+                                    const certPath = cert.path || ''
                                     
                                     // Display name: prefer commonName, fallback to subject
                                     const displayName = commonName || (subject ? subject.split(',')[0]?.replace(/^CN\s*=\s*/i, '') : '—')
+                                    
+                                    // Extract keychain name from path (e.g., /Library/Keychains/System.keychain → System.keychain)
+                                    const keychainName = certPath ? certPath.split('/').pop() || certPath : '—'
                                     
                                     // Truncate long issuer names
                                     const displayIssuer = issuer.length > 50 
@@ -988,15 +1033,20 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                                     return (
                                       <tr key={`${storeName}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 transition-colors">
                                         <td className="px-4 py-3">
-                                          <div className="flex flex-col">
+                                          <div className="flex flex-col gap-1">
                                             <span className="text-sm font-medium text-gray-900 dark:text-white">
                                               {displayName}
                                               {isSelfSigned && (
                                                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">(self-signed)</span>
                                               )}
                                             </span>
+                                            {issuer && (
+                                              <span className="text-xs text-gray-500 dark:text-gray-400" title={issuer}>
+                                                {displayIssuer}
+                                              </span>
+                                            )}
                                             {thumbprint && (
-                                              <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[200px]" title={thumbprint}>
+                                              <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate max-w-[300px]" title={thumbprint}>
                                                 {thumbprint.substring(0, 20)}...
                                               </span>
                                             )}
@@ -1016,8 +1066,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                                           </span>
                                         </td>
                                         <td className="px-4 py-3">
-                                          <span className="text-sm text-gray-600 dark:text-gray-300 font-mono" title={issuer}>
-                                            {displayIssuer}
+                                          <span className="text-sm text-gray-600 dark:text-gray-300 font-mono" title={certPath}>
+                                            {keychainName}
                                           </span>
                                         </td>
                                       </tr>
