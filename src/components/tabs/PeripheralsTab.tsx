@@ -32,6 +32,10 @@ interface USBDevice {
   productId?: string
   serialNumber?: string
   speed?: string
+  linkSpeed?: string
+  locationId?: string
+  powerAllocated?: string
+  usbVersion?: string
   isRemovable?: boolean
   deviceType?: string
   connectionType?: string
@@ -411,7 +415,10 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
            (peripherals.inputDevices.mice?.length || 0) > 0 || 
            (peripherals.inputDevices.trackpads?.length || 0) > 0 ||
            (peripherals.inputDevices.tablets?.length || 0) > 0) && (
-            <InputDevicesContent devices={peripherals.inputDevices} />
+            <InputDevicesContent 
+              devices={peripherals.inputDevices} 
+              bluetoothDevices={peripherals.bluetoothDevices}
+            />
           )
         )}
       </div>
@@ -510,7 +517,11 @@ const USBThunderboltContent = ({
                   {device.vendorId && <InfoRow label="Vendor ID" value={device.vendorId} />}
                   {device.productId && <InfoRow label="Product ID" value={device.productId} />}
                   {device.serialNumber && <InfoRow label="Serial" value={device.serialNumber} />}
-                  {device.speed && <InfoRow label="Speed" value={device.speed} />}
+                  {device.linkSpeed && <InfoRow label="Link Speed" value={device.linkSpeed} />}
+                  {device.speed && !device.linkSpeed && <InfoRow label="Speed" value={device.speed} />}
+                  {device.locationId && <InfoRow label="Location ID" value={device.locationId} />}
+                  {device.powerAllocated && <InfoRow label="Power" value={device.powerAllocated} />}
+                  {device.usbVersion && <InfoRow label="USB Version" value={device.usbVersion} />}
                   {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
                 </div>
               </DeviceCard>
@@ -523,8 +534,25 @@ const USBThunderboltContent = ({
 }
 
 // Input Devices Content
-const InputDevicesContent = ({ devices }: { devices: InputDevices }) => {
-  const keyboards = devices.keyboards || []
+const InputDevicesContent = ({ 
+  devices, 
+  bluetoothDevices 
+}: { 
+  devices: InputDevices
+  bluetoothDevices?: BluetoothDevice[]
+}) => {
+  // Consolidate keyboards from input devices AND Bluetooth
+  const btKeyboards = (bluetoothDevices || [])
+    .filter(d => d.deviceType === 'Keyboard' || d.deviceCategory === 'Keyboard')
+    .map(d => ({
+      name: d.name || 'Keyboard',
+      vendor: '',
+      isBuiltIn: false,
+      connectionType: 'Bluetooth',
+      deviceType: 'Keyboard'
+    }))
+  
+  const keyboards = [...(devices.keyboards || []), ...btKeyboards]
   const mice = devices.mice || []
   const trackpads = devices.trackpads || []
   const tablets = devices.tablets || []
@@ -742,39 +770,26 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
             ) : undefined}
             fullWidth={true}
           >
-            {/* Basic Info */}
+            {/* Unified Printer Info */}
             <div className="space-y-3">
-              <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Basic Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                  {device.printerType && <InfoRow label="Type" value={device.printerType} />}
-                  {device.makeAndModel && <InfoRow label="Make & Model" value={device.makeAndModel} />}
-                  {device.status && <InfoRow label="Status" value={device.status} />}
-                  {device.state && <InfoRow label="State" value={device.state} />}
-                </div>
-              </div>
-
-              {/* Connection Details */}
-              <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Connection</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                  {device.connectionType && <InfoRow label="Type" value={device.connectionType} />}
-                  {device.uri && <InfoRow label="Device URI" value={device.uri} fullWidth />}
-                  {device.printerUriSupported && device.printerUriSupported !== device.uri && (
-                    <InfoRow label="Supported URI" value={device.printerUriSupported} fullWidth />
-                  )}
-                </div>
-              </div>
-
-              {/* Driver & Software */}
-              <div>
-                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Driver & Software</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                  {device.driverName && <InfoRow label="Driver" value={device.driverName} />}
-                  {device.ppd && <InfoRow label="PPD" value={device.ppd} fullWidth />}
-                  {device.ppdVersion && <InfoRow label="PPD Version" value={device.ppdVersion} />}
-                  {device.cupsVersion && <InfoRow label="CUPS Version" value={device.cupsVersion} />}
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                {/* Left Column */}
+                {device.makeAndModel && <InfoRow label="Make & Model" value={device.makeAndModel} />}
+                {device.printerType && <InfoRow label="Type" value={device.printerType} />}
+                {device.driverName && <InfoRow label="Driver" value={device.driverName} />}
+                {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+                
+                {/* Right Column */}
+                {device.state && <InfoRow label="State" value={device.state} />}
+                {device.status && <InfoRow label="Status" value={device.status} />}
+                {device.ppdVersion && <InfoRow label="PPD Version" value={device.ppdVersion} />}
+                {device.cupsVersion && <InfoRow label="CUPS Version" value={device.cupsVersion} />}
+                
+                {/* Full width items */}
+                {device.ppd && <InfoRow label="PPD" value={device.ppd} fullWidth />}
+                {device.printerUriSupported && device.printerUriSupported !== device.uri && (
+                  <InfoRow label="Supported URI" value={device.printerUriSupported} fullWidth />
+                )}
               </div>
 
               {/* Capabilities */}
@@ -820,6 +835,13 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                   </div>
                 </div>
               )}
+
+              {/* Device URI - Full width at bottom */}
+              {device.uri && (
+                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <InfoRow label="Device URI" value={device.uri} fullWidth />
+                </div>
+              )}
             </div>
           </DeviceCard>
         ))}
@@ -858,6 +880,17 @@ const ExternalStorageContent = ({ devices }: { devices: ExternalStorageDevice[] 
     return <EmptyState icon={HardDrive} message="No external storage detected" />
   }
   
+  // Helper to get meaningful name from mount point
+  const getStorageName = (device: ExternalStorageDevice) => {
+    if (device.name && device.name !== 'External Storage') return device.name
+    if (device.mountPoint) {
+      if (device.mountPoint === '/') return 'System Drive'
+      const parts = device.mountPoint.split('/')
+      return parts[parts.length - 1] || 'External Storage'
+    }
+    return 'External Storage'
+  }
+  
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -866,12 +899,13 @@ const ExternalStorageContent = ({ devices }: { devices: ExternalStorageDevice[] 
       </h3>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {devices.map((device, idx) => (
-          <DeviceCard key={idx} title={device.name || 'External Storage'} icon={HardDrive} badge={device.storageType}>
+          <DeviceCard key={idx} title={getStorageName(device)} icon={HardDrive} badge={device.storageType}>
             <div className="space-y-2 text-sm">
-              {device.totalSize && <InfoRow label="Size" value={device.totalSize} />}
-              {device.fileSystem && <InfoRow label="File System" value={device.fileSystem} />}
+              {device.fileSystem && <InfoRow label="File System" value={device.fileSystem.toUpperCase()} />}
               {device.mountPoint && <InfoRow label="Mount Point" value={device.mountPoint} />}
-              {device.protocol && <InfoRow label="Protocol" value={device.protocol} />}
+              {device.devicePath && <InfoRow label="Device" value={device.devicePath} />}
+              {device.totalSize && device.totalSize !== '' && <InfoRow label="Size" value={device.totalSize} />}
+              {device.protocol && device.protocol !== '' && <InfoRow label="Protocol" value={device.protocol} />}
             </div>
           </DeviceCard>
         ))}
