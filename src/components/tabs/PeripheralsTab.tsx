@@ -93,10 +93,32 @@ interface PrinterDevice {
   uri?: string
   connectionType?: string
   status?: string
+  state?: string
+  stateMessage?: string
+  stateReasons?: string[]
   isDefault?: boolean
+  isShared?: boolean
+  isAcceptingJobs?: boolean
   pendingJobs?: number
   printerType?: string
   deviceType?: string
+  make?: string
+  model?: string
+  makeAndModel?: string
+  driverName?: string
+  ppd?: string
+  ppdVersion?: string
+  cupsVersion?: string
+  authInfoRequired?: string
+  printerCommands?: string[]
+  printerUriSupported?: string
+  scanningSupport?: string
+  dateAdded?: string
+  cupsFilters?: string
+  faxSupport?: string
+  pdes?: string
+  colorCapable?: boolean
+  duplexCapable?: boolean
 }
 
 interface ScannerDevice {
@@ -720,17 +742,85 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
             ) : undefined}
             fullWidth={true}
           >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              {device.printerType && <InfoRow label="Type" value={device.printerType} />}
-              {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
-              {device.status && <InfoRow label="Status" value={device.status} />}
-              {device.pendingJobs !== undefined && <InfoRow label="Pending Jobs" value={String(device.pendingJobs)} />}
-            </div>
-            {device.uri && (
-              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                <InfoRow label="URI" value={device.uri} fullWidth />
+            {/* Basic Info */}
+            <div className="space-y-3">
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Basic Information</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  {device.printerType && <InfoRow label="Type" value={device.printerType} />}
+                  {device.makeAndModel && <InfoRow label="Make & Model" value={device.makeAndModel} />}
+                  {device.status && <InfoRow label="Status" value={device.status} />}
+                  {device.state && <InfoRow label="State" value={device.state} />}
+                </div>
               </div>
-            )}
+
+              {/* Connection Details */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Connection</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  {device.connectionType && <InfoRow label="Type" value={device.connectionType} />}
+                  {device.uri && <InfoRow label="Device URI" value={device.uri} fullWidth />}
+                  {device.printerUriSupported && device.printerUriSupported !== device.uri && (
+                    <InfoRow label="Supported URI" value={device.printerUriSupported} fullWidth />
+                  )}
+                </div>
+              </div>
+
+              {/* Driver & Software */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Driver & Software</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  {device.driverName && <InfoRow label="Driver" value={device.driverName} />}
+                  {device.ppd && <InfoRow label="PPD" value={device.ppd} fullWidth />}
+                  {device.ppdVersion && <InfoRow label="PPD Version" value={device.ppdVersion} />}
+                  {device.cupsVersion && <InfoRow label="CUPS Version" value={device.cupsVersion} />}
+                </div>
+              </div>
+
+              {/* Capabilities */}
+              {(device.colorCapable !== undefined || device.duplexCapable !== undefined || device.scanningSupport || device.faxSupport) && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Capabilities</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                    {device.colorCapable !== undefined && <InfoRow label="Color" value={device.colorCapable ? 'Yes' : 'No'} />}
+                    {device.duplexCapable !== undefined && <InfoRow label="Duplex" value={device.duplexCapable ? 'Yes' : 'No'} />}
+                    {device.scanningSupport && <InfoRow label="Scanning" value={device.scanningSupport} />}
+                    {device.faxSupport && <InfoRow label="Fax" value={device.faxSupport} />}
+                  </div>
+                </div>
+              )}
+
+              {/* Additional Details */}
+              {(device.dateAdded || device.authInfoRequired || (Array.isArray(device.printerCommands) && device.printerCommands.length > 0)) && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Additional Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                    {device.dateAdded && <InfoRow label="Added" value={device.dateAdded} />}
+                    {device.authInfoRequired && device.authInfoRequired !== 'none' && (
+                      <InfoRow label="Authentication" value={device.authInfoRequired} />
+                    )}
+                    {Array.isArray(device.printerCommands) && device.printerCommands.length > 0 && device.printerCommands.filter(c => c).length > 0 && (
+                      <InfoRow label="Commands" value={device.printerCommands.filter(c => c).join(', ')} fullWidth />
+                    )}
+                    {device.cupsFilters && <InfoRow label="CUPS Filters" value={device.cupsFilters} fullWidth />}
+                  </div>
+                </div>
+              )}
+
+              {/* State Reasons (if any issues) */}
+              {Array.isArray(device.stateReasons) && device.stateReasons.length > 0 && !device.stateReasons.includes('none') && device.stateReasons.filter(r => r && r !== 'none').length > 0 && (
+                <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">State Reasons</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {device.stateReasons.filter(r => r && r !== 'none').map((reason, i) => (
+                      <span key={i} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300">
+                        {reason}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </DeviceCard>
         ))}
       </div>
