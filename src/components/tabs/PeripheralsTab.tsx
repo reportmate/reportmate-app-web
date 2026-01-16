@@ -2,16 +2,15 @@
  * Peripherals Tab Component
  * Comprehensive peripheral device information with sidebar navigation
  * 
- * Categories:
- * - USB Devices (hubs, storage, peripherals)
- * - Input Devices (keyboards, mice, trackpads, graphics tablets)
- * - Audio Devices (speakers, microphones, interfaces)
- * - Bluetooth Devices (paired and connected)
- * - Cameras (built-in and external)
- * - Thunderbolt Devices (docks, displays, storage)
- * - Printers (CUPS, network, direct-connect) - HIGH PRIORITY
- * - Scanners
- * - External Storage (USB drives, SD cards)
+ * Categories (ordered):
+ * 1. Input Devices (keyboards, mice, trackpads, graphics tablets)
+ * 2. Audio (speakers, output devices)
+ * 3. Microphones (input audio devices)
+ * 4. Printers (CUPS, network, direct-connect) - HIGH PRIORITY
+ * 5. Scanners
+ * 6. External Storage (USB drives, SD cards)
+ * 7. USB & Thunderbolt (combined - hubs, docks, displays, storage)
+ * 8. Bluetooth (actual BT peripherals only, no WiFi devices)
  * 
  * NOTE: Displays are part of the Hardware module, not Peripherals
  */
@@ -20,9 +19,9 @@
 
 import React, { useState, useMemo } from 'react'
 import { 
-  Usb, Keyboard, Volume2, Bluetooth, Camera, Zap, Printer, 
+  Usb, Keyboard, Volume2, Bluetooth, Zap, Printer, 
   ScanLine, HardDrive, Monitor, ChevronRight, Wifi, WifiOff,
-  Mouse, Tablet, Speaker
+  Mouse, Tablet, Speaker, Mic, LucideIcon
 } from 'lucide-react'
 
 // Type definitions
@@ -77,14 +76,7 @@ interface BluetoothDevice {
   deviceCategory?: string
   isAppleDevice?: boolean
   batteryLevel?: number
-}
-
-interface CameraDevice {
-  name: string
-  modelId?: string
-  isBuiltIn?: boolean
   connectionType?: string
-  deviceType?: string
 }
 
 interface ThunderboltDevice {
@@ -141,7 +133,7 @@ interface PeripheralsData {
   inputDevices?: InputDevices
   audioDevices?: AudioDevice[]
   bluetoothDevices?: BluetoothDevice[]
-  cameras?: CameraDevice[]
+  cameras?: never[] // Removed - not needed
   thunderboltDevices?: ThunderboltDevice[]
   printers?: PrinterDevice[]
   scanners?: ScannerDevice[]
@@ -167,7 +159,7 @@ interface PeripheralsTabProps {
 interface Category {
   id: string
   name: string
-  icon: React.ElementType
+  icon: LucideIcon
   count: number
   color: string
 }
@@ -177,14 +169,16 @@ const DeviceCard = ({
   children, 
   title, 
   icon: Icon, 
-  badge 
+  badge,
+  fullWidth = false
 }: { 
   children: React.ReactNode
   title: string
-  icon?: React.ElementType
+  icon?: LucideIcon
   badge?: string | React.ReactNode
+  fullWidth?: boolean
 }) => (
-  <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+  <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden ${fullWidth ? 'col-span-full' : ''}`}>
     <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
       <div className="flex items-center gap-2">
         {Icon && <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
@@ -221,22 +215,54 @@ const StatusBadge = ({ connected, label }: { connected?: boolean; label?: string
 }
 
 export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
-  const [activeCategory, setActiveCategory] = useState<string>('usb')
+  const [activeCategory, setActiveCategory] = useState<string>('input')
   
   // Extract peripherals data from device
   const peripherals: PeripheralsData = useMemo(() => {
     return device.peripherals || device.modules?.peripherals || {}
   }, [device])
   
-  // Calculate counts for each category
+  // Split audio devices into outputs and microphones
+  const audioOutputs = useMemo(() => 
+    (peripherals.audioDevices || []).filter(d => d.isOutput || d.type === 'Output'),
+    [peripherals.audioDevices]
+  )
+  
+  const microphones = useMemo(() => 
+    (peripherals.audioDevices || []).filter(d => d.isInput || d.type === 'Input'),
+    [peripherals.audioDevices]
+  )
+  
+  // Filter Bluetooth devices - only actual BT peripherals, not WiFi devices like HomePods or Apple Watch
+  const filteredBluetoothDevices = useMemo(() => {
+    const btDevices = peripherals.bluetoothDevices || []
+    return btDevices.filter(d => {
+      const name = (d.name || '').toLowerCase()
+      const category = (d.deviceCategory || '').toLowerCase()
+      // Exclude HomePods (WiFi), Apple Watch, and other non-peripheral devices
+      if (name.includes('homepod')) return false
+      if (name.includes('apple watch')) return false
+      if (name.includes('iphone')) return false
+      if (name.includes('ipad')) return false
+      if (name.includes('macbook')) return false
+      if (name.includes('imac')) return false
+      if (name.includes('mac mini')) return false
+      if (name.includes('mac pro')) return false
+      if (name.includes('mac studio')) return false
+      if (category === 'computer') return false
+      if (category === 'phone') return false
+      if (category === 'tablet') return false
+      if (category === 'watch') return false
+      if (category === 'speaker' && name.includes('homepod')) return false
+      return true
+    })
+  }, [peripherals.bluetoothDevices])
+  
+  // Combined USB + Thunderbolt count
+  const usbThunderboltCount = (peripherals.usbDevices?.length || 0) + (peripherals.thunderboltDevices?.length || 0)
+  
+  // Calculate counts for each category - reordered per requirements
   const categories: Category[] = useMemo(() => [
-    { 
-      id: 'usb', 
-      name: 'USB Devices', 
-      icon: Usb, 
-      count: peripherals.usbDevices?.length || 0,
-      color: 'text-blue-500'
-    },
     { 
       id: 'input', 
       name: 'Input Devices', 
@@ -251,29 +277,15 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
       id: 'audio', 
       name: 'Audio', 
       icon: Volume2, 
-      count: peripherals.audioDevices?.length || 0,
+      count: audioOutputs.length,
       color: 'text-green-500'
     },
     { 
-      id: 'bluetooth', 
-      name: 'Bluetooth', 
-      icon: Bluetooth, 
-      count: peripherals.bluetoothDevices?.length || 0,
-      color: 'text-cyan-500'
-    },
-    { 
-      id: 'cameras', 
-      name: 'Cameras', 
-      icon: Camera, 
-      count: peripherals.cameras?.length || 0,
-      color: 'text-pink-500'
-    },
-    { 
-      id: 'thunderbolt', 
-      name: 'Thunderbolt', 
-      icon: Zap, 
-      count: peripherals.thunderboltDevices?.length || 0,
-      color: 'text-yellow-500'
+      id: 'microphones', 
+      name: 'Microphones', 
+      icon: Mic, 
+      count: microphones.length,
+      color: 'text-rose-500'
     },
     { 
       id: 'printers', 
@@ -296,10 +308,21 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
       count: peripherals.externalStorage?.length || 0,
       color: 'text-red-500'
     },
-  ], [peripherals])
-  
-  // Total device count
-  const totalDevices = categories.reduce((sum, cat) => sum + cat.count, 0)
+    { 
+      id: 'usb-thunderbolt', 
+      name: 'USB & Thunderbolt', 
+      icon: Usb, 
+      count: usbThunderboltCount,
+      color: 'text-blue-500'
+    },
+    { 
+      id: 'bluetooth', 
+      name: 'Bluetooth', 
+      icon: Bluetooth, 
+      count: filteredBluetoothDevices.length,
+      color: 'text-cyan-500'
+    },
+  ], [peripherals, audioOutputs.length, microphones.length, usbThunderboltCount, filteredBluetoothDevices.length])
   
   // Check if we have any data
   if (!peripherals || Object.keys(peripherals).length === 0) {
@@ -321,24 +344,25 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
   // Render content based on active category
   const renderContent = () => {
     switch (activeCategory) {
-      case 'usb':
-        return <USBDevicesContent devices={peripherals.usbDevices || []} />
       case 'input':
         return <InputDevicesContent devices={peripherals.inputDevices || {}} />
       case 'audio':
-        return <AudioDevicesContent devices={peripherals.audioDevices || []} />
-      case 'bluetooth':
-        return <BluetoothDevicesContent devices={peripherals.bluetoothDevices || []} />
-      case 'cameras':
-        return <CamerasContent devices={peripherals.cameras || []} />
-      case 'thunderbolt':
-        return <ThunderboltContent devices={peripherals.thunderboltDevices || []} />
+        return <AudioDevicesContent devices={audioOutputs} />
+      case 'microphones':
+        return <MicrophonesContent devices={microphones} />
       case 'printers':
         return <PrintersContent devices={peripherals.printers || []} />
       case 'scanners':
         return <ScannersContent devices={peripherals.scanners || []} />
       case 'storage':
         return <ExternalStorageContent devices={peripherals.externalStorage || []} />
+      case 'usb-thunderbolt':
+        return <USBThunderboltContent 
+          usbDevices={peripherals.usbDevices || []} 
+          thunderboltDevices={peripherals.thunderboltDevices || []} 
+        />
+      case 'bluetooth':
+        return <BluetoothDevicesContent devices={filteredBluetoothDevices} />
       default:
         return null
     }
@@ -349,10 +373,6 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
       {/* Sidebar Navigation */}
       <div className="w-56 flex-shrink-0">
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Categories</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{totalDevices} devices total</p>
-          </div>
           <nav className="p-2">
             {categories.map((category) => {
               const isActive = activeCategory === category.id
@@ -382,15 +402,6 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
             })}
           </nav>
         </div>
-        
-        {/* Collection timestamp */}
-        {peripherals.collectedAt && (
-          <div className="mt-4 px-4 py-2 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              Last collected: {new Date(peripherals.collectedAt).toLocaleString()}
-            </p>
-          </div>
-        )}
       </div>
       
       {/* Main Content */}
@@ -401,32 +412,67 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
   )
 }
 
-// USB Devices Content
-const USBDevicesContent = ({ devices }: { devices: USBDevice[] }) => {
-  if (devices.length === 0) {
-    return <EmptyState icon={Usb} message="No USB devices detected" />
+// Combined USB & Thunderbolt Content
+const USBThunderboltContent = ({ 
+  usbDevices, 
+  thunderboltDevices 
+}: { 
+  usbDevices: USBDevice[]
+  thunderboltDevices: ThunderboltDevice[] 
+}) => {
+  const total = usbDevices.length + thunderboltDevices.length
+  
+  if (total === 0) {
+    return <EmptyState icon={Usb} message="No USB or Thunderbolt devices detected" />
   }
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
         <Usb className="w-5 h-5 text-blue-500" />
-        USB Devices ({devices.length})
+        USB & Thunderbolt ({total})
       </h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {devices.map((device, idx) => (
-          <DeviceCard key={idx} title={device.name || 'Unknown USB Device'} icon={Usb} badge={device.deviceType}>
-            <div className="space-y-2 text-sm">
-              {device.vendor && <InfoRow label="Vendor" value={device.vendor} />}
-              {device.vendorId && <InfoRow label="Vendor ID" value={device.vendorId} />}
-              {device.productId && <InfoRow label="Product ID" value={device.productId} />}
-              {device.serialNumber && <InfoRow label="Serial" value={device.serialNumber} />}
-              {device.speed && <InfoRow label="Speed" value={device.speed} />}
-              {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
-            </div>
-          </DeviceCard>
-        ))}
-      </div>
+      
+      {thunderboltDevices.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <Zap className="w-4 h-4 text-yellow-500" /> Thunderbolt ({thunderboltDevices.length})
+          </h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {thunderboltDevices.map((device, idx) => (
+              <DeviceCard key={idx} title={device.name || 'Thunderbolt Device'} icon={Zap} badge={device.deviceType}>
+                <div className="space-y-2 text-sm">
+                  {device.vendor && <InfoRow label="Vendor" value={device.vendor} />}
+                  {device.deviceId && <InfoRow label="Device ID" value={device.deviceId} />}
+                  {device.uid && <InfoRow label="UID" value={device.uid} />}
+                </div>
+              </DeviceCard>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {usbDevices.length > 0 && (
+        <div className="space-y-3">
+          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+            <Usb className="w-4 h-4 text-blue-500" /> USB Devices ({usbDevices.length})
+          </h4>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {usbDevices.map((device, idx) => (
+              <DeviceCard key={idx} title={device.name || 'Unknown USB Device'} icon={Usb} badge={device.deviceType}>
+                <div className="space-y-2 text-sm">
+                  {device.vendor && <InfoRow label="Vendor" value={device.vendor} />}
+                  {device.vendorId && <InfoRow label="Vendor ID" value={device.vendorId} />}
+                  {device.productId && <InfoRow label="Product ID" value={device.productId} />}
+                  {device.serialNumber && <InfoRow label="Serial" value={device.serialNumber} />}
+                  {device.speed && <InfoRow label="Speed" value={device.speed} />}
+                  {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+                </div>
+              </DeviceCard>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -525,55 +571,56 @@ const InputDevicesContent = ({ devices }: { devices: InputDevices }) => {
   )
 }
 
-// Audio Devices Content
+// Audio Devices Content (Output only)
 const AudioDevicesContent = ({ devices }: { devices: AudioDevice[] }) => {
   if (devices.length === 0) {
-    return <EmptyState icon={Volume2} message="No audio devices detected" />
+    return <EmptyState icon={Volume2} message="No audio output devices detected" />
   }
   
-  const outputs = devices.filter(d => d.isOutput || d.type === 'Output')
-  const inputs = devices.filter(d => d.isInput || d.type === 'Input')
-  
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
         <Volume2 className="w-5 h-5 text-green-500" />
-        Audio Devices ({devices.length})
+        Audio Output ({devices.length})
       </h3>
-      
-      {outputs.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            <Speaker className="w-4 h-4" /> Output Devices ({outputs.length})
-          </h4>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {outputs.map((device, idx) => (
-              <DeviceCard key={idx} title={device.name || 'Audio Output'} icon={Speaker} badge={device.isDefault ? 'Default' : undefined}>
-                <div className="space-y-2 text-sm">
-                  {device.manufacturer && <InfoRow label="Manufacturer" value={device.manufacturer} />}
-                  {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
-                </div>
-              </DeviceCard>
-            ))}
-          </div>
-        </div>
-      )}
-      
-      {inputs.length > 0 && (
-        <div className="space-y-3">
-          <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Input Devices ({inputs.length})</h4>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {inputs.map((device, idx) => (
-              <DeviceCard key={idx} title={device.name || 'Audio Input'} badge={device.isDefault ? 'Default' : undefined}>
-                <div className="space-y-2 text-sm">
-                  {device.manufacturer && <InfoRow label="Manufacturer" value={device.manufacturer} />}
-                  {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
-                </div>
-              </DeviceCard>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {devices.map((device, idx) => (
+          <DeviceCard key={idx} title={device.name || 'Audio Output'} icon={Speaker} badge={device.isDefault ? 'Default' : undefined}>
+            <div className="space-y-2 text-sm">
+              {device.manufacturer && <InfoRow label="Manufacturer" value={device.manufacturer} />}
+              {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+              {device.isBuiltIn !== undefined && <InfoRow label="Type" value={device.isBuiltIn ? 'Built-in' : 'External'} />}
+            </div>
+          </DeviceCard>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Microphones Content (NEW - Input audio devices)
+const MicrophonesContent = ({ devices }: { devices: AudioDevice[] }) => {
+  if (devices.length === 0) {
+    return <EmptyState icon={Mic} message="No microphones detected" />
+  }
+  
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+        <Mic className="w-5 h-5 text-rose-500" />
+        Microphones ({devices.length})
+      </h3>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {devices.map((device, idx) => (
+          <DeviceCard key={idx} title={device.name || 'Microphone'} icon={Mic} badge={device.isDefault ? 'Default' : undefined}>
+            <div className="space-y-2 text-sm">
+              {device.manufacturer && <InfoRow label="Manufacturer" value={device.manufacturer} />}
+              {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+              {device.isBuiltIn !== undefined && <InfoRow label="Type" value={device.isBuiltIn ? 'Built-in' : 'External'} />}
+            </div>
+          </DeviceCard>
+        ))}
+      </div>
     </div>
   )
 }
@@ -581,7 +628,7 @@ const AudioDevicesContent = ({ devices }: { devices: AudioDevice[] }) => {
 // Bluetooth Devices Content
 const BluetoothDevicesContent = ({ devices }: { devices: BluetoothDevice[] }) => {
   if (devices.length === 0) {
-    return <EmptyState icon={Bluetooth} message="No Bluetooth devices detected" />
+    return <EmptyState icon={Bluetooth} message="No Bluetooth peripherals detected" />
   }
   
   const connected = devices.filter(d => d.isConnected)
@@ -591,7 +638,7 @@ const BluetoothDevicesContent = ({ devices }: { devices: BluetoothDevice[] }) =>
     <div className="space-y-6">
       <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
         <Bluetooth className="w-5 h-5 text-cyan-500" />
-        Bluetooth Devices ({devices.length})
+        Bluetooth Peripherals ({devices.length})
       </h3>
       
       {connected.length > 0 && (
@@ -632,64 +679,18 @@ const BluetoothDevicesContent = ({ devices }: { devices: BluetoothDevice[] }) =>
   )
 }
 
-// Cameras Content
-const CamerasContent = ({ devices }: { devices: CameraDevice[] }) => {
-  if (devices.length === 0) {
-    return <EmptyState icon={Camera} message="No cameras detected" />
-  }
-  
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-        <Camera className="w-5 h-5 text-pink-500" />
-        Cameras ({devices.length})
-      </h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {devices.map((device, idx) => (
-          <DeviceCard key={idx} title={device.name || 'Camera'} icon={Camera} badge={device.isBuiltIn ? 'Built-in' : 'External'}>
-            <div className="space-y-2 text-sm">
-              {device.modelId && <InfoRow label="Model ID" value={device.modelId} />}
-              {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
-            </div>
-          </DeviceCard>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Thunderbolt Content
-const ThunderboltContent = ({ devices }: { devices: ThunderboltDevice[] }) => {
-  if (devices.length === 0) {
-    return <EmptyState icon={Zap} message="No Thunderbolt devices detected" />
-  }
-  
-  return (
-    <div className="space-y-4">
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 flex items-center gap-2">
-        <Zap className="w-5 h-5 text-yellow-500" />
-        Thunderbolt Devices ({devices.length})
-      </h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {devices.map((device, idx) => (
-          <DeviceCard key={idx} title={device.name || 'Thunderbolt Device'} icon={Zap} badge={device.deviceType}>
-            <div className="space-y-2 text-sm">
-              {device.vendor && <InfoRow label="Vendor" value={device.vendor} />}
-              {device.deviceId && <InfoRow label="Device ID" value={device.deviceId} />}
-              {device.uid && <InfoRow label="UID" value={device.uid} />}
-            </div>
-          </DeviceCard>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-// Printers Content - HIGH PRIORITY
+// Printers Content - HIGH PRIORITY - Full width cards, default printer first
 const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
   if (devices.length === 0) {
     return <EmptyState icon={Printer} message="No printers detected" />
   }
+  
+  // Sort to put default printer first
+  const sortedPrinters = [...devices].sort((a, b) => {
+    if (a.isDefault && !b.isDefault) return -1
+    if (!a.isDefault && b.isDefault) return 1
+    return 0
+  })
   
   return (
     <div className="space-y-4">
@@ -697,8 +698,8 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
         <Printer className="w-5 h-5 text-orange-500" />
         Printers ({devices.length})
       </h3>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {devices.map((device, idx) => (
+      <div className="space-y-4">
+        {sortedPrinters.map((device, idx) => (
           <DeviceCard 
             key={idx} 
             title={device.name || 'Printer'} 
@@ -708,14 +709,19 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                 Default
               </span>
             ) : undefined}
+            fullWidth={true}
           >
-            <div className="space-y-2 text-sm">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
               {device.printerType && <InfoRow label="Type" value={device.printerType} />}
               {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
               {device.status && <InfoRow label="Status" value={device.status} />}
-              {device.uri && <InfoRow label="URI" value={device.uri} />}
               {device.pendingJobs !== undefined && <InfoRow label="Pending Jobs" value={String(device.pendingJobs)} />}
             </div>
+            {device.uri && (
+              <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                <InfoRow label="URI" value={device.uri} fullWidth />
+              </div>
+            )}
           </DeviceCard>
         ))}
       </div>
@@ -779,14 +785,14 @@ const ExternalStorageContent = ({ devices }: { devices: ExternalStorageDevice[] 
 }
 
 // Helper Components
-const InfoRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex justify-between items-center">
-    <span className="text-gray-500 dark:text-gray-400">{label}</span>
-    <span className="text-gray-900 dark:text-gray-100 font-medium truncate max-w-[60%]" title={value}>{value}</span>
+const InfoRow = ({ label, value, fullWidth = false }: { label: string; value: string; fullWidth?: boolean }) => (
+  <div className={`flex ${fullWidth ? 'flex-col gap-1' : 'items-center gap-4'}`}>
+    <span className={`text-gray-500 dark:text-gray-400 ${fullWidth ? '' : 'w-28 flex-shrink-0'}`}>{label}</span>
+    <span className={`text-gray-900 dark:text-gray-100 font-medium ${fullWidth ? 'break-all font-mono text-xs' : 'truncate'}`} title={value}>{value}</span>
   </div>
 )
 
-const EmptyState = ({ icon: Icon, message }: { icon: React.ElementType; message: string }) => (
+const EmptyState = ({ icon: Icon, message }: { icon: LucideIcon; message: string }) => (
   <div className="text-center py-12">
     <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800 mb-4">
       <Icon className="h-6 w-6 text-gray-400 dark:text-gray-600" />
