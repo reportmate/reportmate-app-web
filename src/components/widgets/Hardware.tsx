@@ -123,8 +123,9 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   const isUnifiedMemory = (cpuCores > 0 && gpuCores > 0 && cpuCores + gpuCores > 0) && 
                           (chipName.includes('M1') || chipName.includes('M2') || chipName.includes('M3') || chipName.includes('M4'))
   
-  // NPU cores for Mac Apple Silicon
+  // NPU cores and performance for Mac Apple Silicon
   const npuCores = safeNumber(hardwareData.processor?.npu_cores) || safeNumber(hardwareData.npu?.cores)
+  const npuTops = safeString(hardwareData.npu?.performance_tops || hardwareData.npu?.performanceTops)
   
   // Memory - support physicalMemory (normalized from physical_memory on Mac) and totalPhysical (Windows)
   const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || 
@@ -179,8 +180,8 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
       iconColor={WidgetColors.orange}
     >
       {isMac ? (
-        /* Mac-specific layout: Model/Model Identifier in 2-column, Chip, 2-column grid, Storage at bottom */
         <div className="space-y-3">
+          {/* Mac-specific layout: Model/Model Identifier in 2-column, Chip, 2-column grid, Storage at bottom */}
           {/* Model and Model Identifier side-by-side in 2-column grid */}
           <div className="grid grid-cols-2 gap-3">
             {model !== 'Unknown' && (
@@ -200,48 +201,46 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           </div>
           
           {isUnifiedMemory ? (
-            /* Unified Memory Architecture: Dashed border box around CPU/GPU/Memory/NPU */
             <>
+              {/* Unified Memory Architecture: No border, just clean grid */}
               {/* Chip name */}
               <Stat 
                 label="Chip" 
                 value={chipName !== 'Unknown' ? chipName : 'Unknown'} 
               />
               
-              {/* Dashed border container - left padding for box, reduced top margin to attach to title */}
-              <div className="rounded-lg border border-gray-300 dark:border-gray-600 border-dashed mt-1 mb-3 ml-[-12px] py-2 pl-3 pr-2">
-                <div className="grid grid-cols-2 gap-2">
-                  {/* LEFT COLUMN */}
-                  <div className="space-y-2">
+              {/* Two-column grid: CPU/GPU left, RAM/NPU right */}
+              <div className="grid grid-cols-2 gap-2">
+                {/* LEFT COLUMN */}
+                <div className="space-y-2">
+                  <Stat 
+                    label="CPU" 
+                    value={cpuCores > 0 ? `${cpuCores} cores` : 'Unknown'}
+                  />
+                  <Stat 
+                    label="GPU" 
+                    value={gpuCores > 0 ? `${gpuCores} cores` : graphicsName}
+                  />
+                </div>
+                
+                {/* RIGHT COLUMN */}
+                <div className="space-y-2">
+                  <Stat 
+                    label="RAM" 
+                    value={memoryFormatted}
+                  />
+                  {npuCores > 0 && (
                     <Stat 
-                      label="CPU" 
-                      value={cpuCores > 0 ? `${cpuCores} cores` : 'Unknown'}
+                      label="NPU" 
+                      value={npuTops !== 'Unknown' ? `${npuTops} TOPS` : `${npuCores} cores`}
                     />
-                    <Stat 
-                      label="GPU" 
-                      value={gpuCores > 0 ? `${gpuCores} cores` : graphicsName}
-                    />
-                  </div>
-                  
-                  {/* RIGHT COLUMN */}
-                  <div className="space-y-2">
-                    <Stat 
-                      label="Memory" 
-                      value={memoryFormatted}
-                    />
-                    {npuCores > 0 && (
-                      <Stat 
-                        label="NPU" 
-                        value={`${npuCores} cores`}
-                      />
-                    )}
-                  </div>
+                  )}
                 </div>
               </div>
             </>
           ) : (
-            /* Non-unified memory: Standard layout with Chip label */
             <>
+              {/* Non-unified memory: Standard layout with Chip label */}
               {/* Chip name (e.g., M4 Pro) */}
               <Stat 
                 label="Chip" 
@@ -265,13 +264,13 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
                 {/* RIGHT COLUMN */}
                 <div className="space-y-2">
                   <Stat 
-                    label="Memory" 
+                    label="RAM" 
                     value={memoryFormatted}
                   />
                   {npuCores > 0 && (
                     <Stat 
                       label="NPU" 
-                      value={`${npuCores} cores`}
+                      value={npuTops !== 'Unknown' ? `${npuTops} TOPS` : `${npuCores} cores`}
                     />
                   )}
                 </div>
@@ -282,11 +281,10 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           {/* Storage at bottom with total capacity and free */}
           <Stat 
             label="Storage" 
-            value={totalStorage > 0 ? `${formatBytes(totalStorage)} (${formatBytes(freeStorage)} free)` : 'Unknown'}
+            value={totalStorage > 0 ? `${formatBytes(totalStorage)} • ${formatBytes(freeStorage)} free` : 'Unknown'}
           />
         </div>
       ) : (
-        /* Windows/Linux layout: Standard vertical list */
         <div className="space-y-3">
           {manufacturer !== 'Unknown' && (
             <Stat 
@@ -311,7 +309,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           />
           
           <Stat 
-            label="Memory" 
+            label="RAM" 
             value={memoryFormatted}
           />
           
