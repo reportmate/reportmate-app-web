@@ -247,8 +247,8 @@ export function GraphicsDistributionChart({
       if (!Array.isArray(storage)) return 'Unknown'
       
       const totalBytes = storage.reduce((sum, drive) => {
-        const size = drive.size || drive.capacity || drive.totalSize || 0
-        return sum + (typeof size === 'number' ? size : 0)
+        const capacity = drive.capacity || drive.totalSize || 0
+        return sum + (typeof capacity === 'number' ? capacity : 0)
       }, 0)
       
       const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))

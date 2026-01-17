@@ -300,30 +300,31 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   }
 
   // Data Extraction - Support both snake_case (Mac osquery) and camelCase (Windows)
+  // Note: After normalizeKeys(), all snake_case keys are converted to camelCase
+  // Mac now sends capacity (not size) - source was fixed
   const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
   const storageDevices = allStorageDevices.filter((drive: any) => {
-    // Support both size (Mac) and capacity (Windows)
-    const capacity = drive.size ?? drive.capacity
-    // Support both free_space (Mac) and freeSpace (Windows)
-    const freeSpace = drive.free_space ?? drive.freeSpace
+    const capacity = drive.capacity
+    // After normalizeKeys: freeSpace (normalized from free_space or already camelCase)
+    const freeSpace = drive.freeSpace ?? drive.free_space
     return (capacity && capacity > 0) && (freeSpace && freeSpace > 0)
   })
-  // Only count INTERNAL drives - support both is_internal (Mac) and isInternal (Windows)
+  // Only count INTERNAL drives - After normalizeKeys: isInternal (normalized from is_internal)
   const internalDrives = storageDevices.filter((drive: any) => {
-    const isInternal = drive.is_internal ?? drive.isInternal
+    const isInternal = drive.isInternal ?? drive.is_internal
     return isInternal === 1 || isInternal === true
   })
   const totalStorage = internalDrives.reduce((total: number, drive: any) => {
-    const capacity = drive.size ?? drive.capacity ?? 0
+    const capacity = drive.capacity ?? 0
     return total + capacity
   }, 0) || 0
   const freeStorage = internalDrives.reduce((total: number, drive: any) => {
-    const freeSpace = drive.free_space ?? drive.freeSpace ?? 0
+    const freeSpace = drive.freeSpace ?? drive.free_space ?? 0
     return total + freeSpace
   }, 0) || 0
   
-  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
-  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - support both physicalMemory (normalized from physical_memory on Mac) and totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
@@ -770,8 +771,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {/* Storage Devices Section - Show when multiple drives with capacity > 0 */}
       {(() => {
         const validDrives = storageDevices.filter((drive: any) => {
-          // Support both size (Mac) and capacity (Windows)
-          const driveCapacity = drive.size ?? drive.capacity
+          const driveCapacity = drive.capacity
           return driveCapacity && safeNumber(driveCapacity) > 0
         });
         return validDrives.length > 1 ? (
@@ -797,11 +797,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {validDrives.map((drive: any, index: number) => {
-                      // Support both snake_case (Mac osquery) and camelCase (Windows)
-                      const capacity = safeNumber(drive.size ?? drive.capacity);
-                      const freeSpace = safeNumber(drive.free_space ?? drive.freeSpace);
-                      const fileSystem = safeString(drive.file_system ?? drive.fileSystem);
-                      const deviceName = safeString(drive.device_name ?? drive.deviceName);
+                      const capacity = safeNumber(drive.capacity);
+                      const freeSpace = safeNumber(drive.freeSpace ?? drive.free_space);
+                      const fileSystem = safeString(drive.fileSystem ?? drive.file_system);
+                      const deviceName = safeString(drive.deviceName ?? drive.device_name);
                       const usedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
                       const health = safeString(drive.health);
                       
