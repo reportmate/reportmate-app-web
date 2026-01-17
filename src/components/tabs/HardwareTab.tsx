@@ -301,6 +301,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
   // Data Extraction - Support both snake_case (Mac osquery) and camelCase (Windows)
   // Note: After normalizeKeys(), all snake_case keys are converted to camelCase
+  
+  // System Identity fields
+  const manufacturer = safeString(hardwareData.manufacturer)
+  const model = safeString(hardwareData.model)
+  const modelIdentifier = safeString(hardwareData.modelIdentifier || hardwareData.model_identifier)
+  
   // Mac now sends capacity (not size) - source was fixed
   const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
   const storageDevices = allStorageDevices.filter((drive: any) => {
@@ -424,7 +430,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Manufacturer</div>
               <div className="text-xl font-bold text-gray-900 dark:text-white">
-                {safeString(hardwareData.manufacturer) || 'Unknown'}
+                {manufacturer}
               </div>
             </div>
             
@@ -432,16 +438,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model</div>
               <div className="text-xl font-bold text-gray-900 dark:text-white">
-                {safeString(hardwareData.model) || 'Unknown'}
+                {model}
               </div>
             </div>
             
-            {/* Identifier */}
-            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+            {/* Model Identifier */}
+            {modelIdentifier !== 'Unknown' && (
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model Identifier</div>
                 <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                  {safeString(hardwareData.model_identifier)}
+                  {modelIdentifier}
                 </div>
               </div>
             )}
