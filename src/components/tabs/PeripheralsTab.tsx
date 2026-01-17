@@ -21,7 +21,8 @@ import React, { useState, useMemo } from 'react'
 import { 
   Usb, Keyboard, Volume2, Bluetooth, Zap, Printer, 
   ScanLine, HardDrive, ChevronRight, Wifi, WifiOff,
-  Mouse, Tablet, Speaker, Mic, Hand, Monitor, LucideIcon
+  Mouse, Tablet, Speaker, Mic, Hand, Monitor, LucideIcon,
+  Copy, Check
 } from 'lucide-react'
 
 // Type definitions
@@ -92,6 +93,13 @@ interface ThunderboltDevice {
   connectionType?: string
 }
 
+interface CupsFilter {
+  name: string
+  path: string
+  version?: string
+  permissions?: string
+}
+
 interface PrinterDevice {
   name: string
   uri?: string
@@ -106,19 +114,24 @@ interface PrinterDevice {
   pendingJobs?: number
   printerType?: string
   deviceType?: string
-  make?: string
+  manufacturer?: string
   model?: string
+  identifier?: string
+  make?: string
   makeAndModel?: string
   driverName?: string
+  driverVersion?: string
+  postScriptVersion?: string
   ppd?: string
   ppdVersion?: string
+  ppdFileVersion?: string
   cupsVersion?: string
   authInfoRequired?: string
-  printerCommands?: string[]
+  printerCommands?: string | string[]
   printerUriSupported?: string
   scanningSupport?: string
   dateAdded?: string
-  cupsFilters?: string
+  cupsFilters?: CupsFilter[]
   faxSupport?: string
   pdes?: string
   colorCapable?: boolean
@@ -199,21 +212,23 @@ const DeviceCard = ({
   fullWidth = false
 }: { 
   children: React.ReactNode
-  title: string
+  title?: string
   icon?: LucideIcon
   badge?: string | React.ReactNode
   fullWidth?: boolean
 }) => (
   <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden ${fullWidth ? 'col-span-full' : ''}`}>
-    <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        {Icon && <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
-        <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h4>
+    {title && (
+      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="w-4 h-4 text-gray-500 dark:text-gray-400" />}
+          <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100">{title}</h4>
+        </div>
+        {badge && (
+          <span className="text-xs text-gray-500 dark:text-gray-400">{badge}</span>
+        )}
       </div>
-      {badge && (
-        <span className="text-xs text-gray-500 dark:text-gray-400">{badge}</span>
-      )}
-    </div>
+    )}
     <div className="p-4">
       {children}
     </div>
@@ -743,6 +758,17 @@ const BluetoothDevicesContent = ({ devices }: { devices: BluetoothDevice[] }) =>
 
 // Printers Content - HIGH PRIORITY - Full width cards, default printer first
 const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
+  const [copiedUri, setCopiedUri] = useState<string | null>(null)
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedUri(text)
+      setTimeout(() => setCopiedUri(null), 2000)
+    } catch (err) {
+      console.error('Failed to copy:', err)
+    }
+  }
 
   // Sort to put default printer first
   const sortedPrinters = [...devices].sort((a, b) => {
@@ -750,6 +776,14 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
     if (!a.isDefault && b.isDefault) return 1
     return 0
   })
+
+  // Helper to get printer commands as string
+  const getCommandsString = (commands: string | string[] | undefined): string => {
+    if (!commands) return ''
+    if (typeof commands === 'string') return commands.trim()
+    if (Array.isArray(commands)) return commands.filter(c => c).join(', ')
+    return ''
+  }
   
   return (
     <div className="space-y-4">
@@ -760,9 +794,7 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
       <div className="space-y-4">
         {sortedPrinters.map((device, idx) => (
           <DeviceCard 
-            key={idx} 
-            title={device.name || 'Printer'} 
-            icon={Printer} 
+            key={idx}
             badge={device.isDefault ? (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
                 Default
@@ -772,55 +804,113 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
           >
             {/* Unified Printer Info */}
             <div className="space-y-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                {/* Left Column */}
-                {device.makeAndModel && <InfoRow label="Make & Model" value={device.makeAndModel} />}
-                {device.printerType && <InfoRow label="Type" value={device.printerType} />}
-                {device.driverName && <InfoRow label="Driver" value={device.driverName} />}
-                {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+              {/* Printer Name - First field at top */}
+              {device.name && (
+                <div className="text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">Name</span>
+                  <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">{device.name}</span>
+                </div>
+              )}
+
+              {/* Queue (Device URI) - code block with copy button */}
+              {device.uri && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm block mb-1">Queue</span>
+                  <div className="inline-flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded px-2 py-1">
+                    <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">{device.uri}</span>
+                    <button
+                      onClick={() => copyToClipboard(device.uri!)}
+                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      title="Copy Queue"
+                    >
+                      {copiedUri === device.uri ? (
+                        <Check className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* PostScript Printer Description - code block with copy button */}
+              {device.ppd && (
+                <div>
+                  <span className="text-gray-500 dark:text-gray-400 text-sm block mb-1">PostScript Printer Description</span>
+                  <div className="inline-flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded px-2 py-1">
+                    <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">{device.ppd}</span>
+                    <button
+                      onClick={() => copyToClipboard(device.ppd!)}
+                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      title="Copy PPD"
+                    >
+                      {copiedUri === device.ppd ? (
+                        <Check className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* CUPS Filters - code blocks with copy buttons */}
+              {device.cupsFilters && Array.isArray(device.cupsFilters) && device.cupsFilters.length > 0 && device.cupsFilters.some(f => f.name) && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">CUPS Filters</h4>
+                  <div className="space-y-2">
+                    {device.cupsFilters.filter(f => f.name).map((filter, i) => (
+                      <div key={i}>
+                        <div className="inline-flex items-center gap-2 bg-gray-50 dark:bg-gray-800/50 rounded px-2 py-1">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium text-gray-900 dark:text-gray-100 text-xs">{filter.name}</span>
+                              {filter.version && <span className="text-gray-500 dark:text-gray-400 text-xs">v{filter.version}</span>}
+                            </div>
+                            {filter.path && (
+                              <div className="text-gray-500 dark:text-gray-500 font-mono text-[10px] truncate max-w-xl" title={filter.path}>
+                                {filter.path}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => copyToClipboard(filter.path || filter.name)}
+                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            title="Copy Filter Path"
+                          >
+                            {copiedUri === (filter.path || filter.name) ? (
+                              <Check className="w-3 h-3 text-green-500" />
+                            ) : (
+                              <Copy className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" />
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Two column grid - Manufacturer first */}
+              <div className="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                {/* Column A - Left */}
+                <div className="space-y-2">
+                  {(device.manufacturer || device.make) && (
+                    <InfoRow label="Manufacturer" value={device.manufacturer || device.make || ''} />
+                  )}
+                  {device.model && <InfoRow label="Model" value={device.model} />}
+                  {device.identifier && <InfoRow label="Identifier" value={device.identifier} />}
+                  {device.connectionType && <InfoRow label="Connection" value={device.connectionType} />}
+                  {device.cupsVersion && <InfoRow label="CUPS Version" value={device.cupsVersion} />}
+                </div>
                 
-                {/* Right Column */}
-                {device.state && <InfoRow label="State" value={device.state} />}
-                {device.status && <InfoRow label="Status" value={device.status} />}
-                {device.ppdVersion && <InfoRow label="PPD Version" value={device.ppdVersion} />}
-                {device.cupsVersion && <InfoRow label="CUPS Version" value={device.cupsVersion} />}
-                
-                {/* Full width items */}
-                {device.ppd && <InfoRow label="PPD" value={device.ppd} fullWidth />}
-                {device.printerUriSupported && device.printerUriSupported !== device.uri && (
-                  <InfoRow label="Supported URI" value={device.printerUriSupported} fullWidth />
-                )}
+                {/* Column B - Right */}
+                <div className="space-y-2">
+                  {device.status && <InfoRow label="Status" value={device.status} />}
+                  {device.scanningSupport && <InfoRow label="Scanning" value={device.scanningSupport} />}
+                  {device.faxSupport && <InfoRow label="Fax" value={device.faxSupport} />}
+                </div>
               </div>
-
-              {/* Capabilities */}
-              {(device.colorCapable !== undefined || device.duplexCapable !== undefined || device.scanningSupport || device.faxSupport) && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Capabilities</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                    {device.colorCapable !== undefined && <InfoRow label="Color" value={device.colorCapable ? 'Yes' : 'No'} />}
-                    {device.duplexCapable !== undefined && <InfoRow label="Duplex" value={device.duplexCapable ? 'Yes' : 'No'} />}
-                    {device.scanningSupport && <InfoRow label="Scanning" value={device.scanningSupport} />}
-                    {device.faxSupport && <InfoRow label="Fax" value={device.faxSupport} />}
-                  </div>
-                </div>
-              )}
-
-              {/* Additional Details */}
-              {(device.dateAdded || device.authInfoRequired || (Array.isArray(device.printerCommands) && device.printerCommands.length > 0)) && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide mb-2">Additional Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 text-sm">
-                    {device.dateAdded && <InfoRow label="Added" value={device.dateAdded} />}
-                    {device.authInfoRequired && device.authInfoRequired !== 'none' && (
-                      <InfoRow label="Authentication" value={device.authInfoRequired} />
-                    )}
-                    {Array.isArray(device.printerCommands) && device.printerCommands.length > 0 && device.printerCommands.filter(c => c).length > 0 && (
-                      <InfoRow label="Commands" value={device.printerCommands.filter(c => c).join(', ')} fullWidth />
-                    )}
-                    {device.cupsFilters && <InfoRow label="CUPS Filters" value={device.cupsFilters} fullWidth />}
-                  </div>
-                </div>
-              )}
 
               {/* State Reasons (if any issues) */}
               {Array.isArray(device.stateReasons) && device.stateReasons.length > 0 && !device.stateReasons.includes('none') && device.stateReasons.filter(r => r && r !== 'none').length > 0 && (
@@ -833,13 +923,6 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                       </span>
                     ))}
                   </div>
-                </div>
-              )}
-
-              {/* Device URI - Full width at bottom */}
-              {device.uri && (
-                <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-                  <InfoRow label="Device URI" value={device.uri} fullWidth />
                 </div>
               )}
             </div>
