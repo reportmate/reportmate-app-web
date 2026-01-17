@@ -350,14 +350,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const graphicsManufacturer = safeString(hardwareData.graphics?.manufacturer)
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  // Support both metal_support (Mac) and metalSupport (Windows)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
+  // Support both metalSupport (normalized) and metal_support (legacy)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport) || safeString(hardwareData.graphics?.metal_support)
   
   const npuName = safeString(hardwareData.npu?.name)
   const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits) || safeNumber(hardwareData.npu?.compute_units)
   const npuCores = safeNumber(hardwareData.npu?.cores)
-  const npuTops = safeString(hardwareData.npu?.performance_tops)
+  const npuTops = safeString(hardwareData.npu?.performanceTops || hardwareData.npu?.performance_tops)
   const hasNpu = Boolean(hardwareData.npu)
   
   const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
@@ -463,10 +463,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <span className="text-xs text-gray-500 dark:text-gray-400">Unified Memory Architecture</span>
             </div>
             
-            {/* Unified Layout: 4x2 grid with dashed border around CPU/Memory/GPU/NPU */}
+            {/* Unified Layout: 4x2 grid - clean layout without border */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
-              {/* SINGLE Dashed Border Container around CPU/Memory/GPU/NPU - spans 2 columns */}
-              <div className="col-span-2 bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border-2 border-gray-200 dark:border-gray-700 border-dashed">
+              {/* Left side: CPU/RAM/GPU/NPU - spans 2 columns */}
+              <div className="col-span-2 p-4">
                 <div className="grid grid-cols-2 gap-4">
                   {/* CPU */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
@@ -480,11 +480,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     )}
                   </div>
 
-                  {/* Memory */}
+                  {/* RAM */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <MemoryStick className="w-5 h-5 text-yellow-500" />
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Memory</h4>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
                     </div>
                     <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
                     <div className="text-sm text-gray-900 dark:text-white">{memoryType} {memoryManufacturer}</div>
@@ -585,11 +585,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               )}
             </div>
 
-            {/* Memory */}
+            {/* RAM */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 mb-2">
                 <MemoryStick className="w-5 h-5 text-yellow-500" />
-                <h4 className="font-semibold text-gray-900 dark:text-white">Memory</h4>
+                <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
               </div>
               <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
               <div className="text-sm text-gray-900 dark:text-white mb-1">{memoryType} {memoryManufacturer}</div>
@@ -636,7 +636,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <div className="text-2xl font-bold text-green-500 mb-1">{graphicsCores > 0 ? `${graphicsCores} Cores` : graphicsName}</div>
               <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsName}</div>
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {graphicsMemorySize ? `${graphicsMemorySize} GB VRAM` : 'Discrete GPU'}
+                {graphicsMetalSupport !== 'Unknown' ? graphicsMetalSupport : (graphicsMemorySize ? `${graphicsMemorySize} GB VRAM` : 'Discrete GPU')}
               </div>
             </div>
 

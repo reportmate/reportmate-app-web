@@ -48,7 +48,10 @@ const formatBytes = (bytes: number): string => {
 }
 
 // Helper function to format percentage
-const formatPercentage = (percentage: number): string => {
+const formatPercentage = (percentage: number | undefined | null): string => {
+  if (percentage === undefined || percentage === null || isNaN(percentage)) {
+    return '0.0%'
+  }
   return `${percentage.toFixed(1)}%`
 }
 
