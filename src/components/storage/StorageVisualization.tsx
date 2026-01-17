@@ -31,7 +31,7 @@ interface StorageDevice {
   interface: string
   lastAnalyzed: string
   rootDirectories: StorageDirectory[]
-  storageAnalysisEnabled: boolean
+  storageAnalysisEnabled: boolean | number
 }
 
 interface StorageVisualizationProps {

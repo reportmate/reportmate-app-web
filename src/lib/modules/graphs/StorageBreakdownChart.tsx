@@ -78,8 +78,8 @@ export function StorageBreakdownChart({
       // Try the modules.hardware.storage structure first
       if (device.modules?.hardware?.storage && Array.isArray(device.modules.hardware.storage)) {
         const totalBytes = device.modules.hardware.storage.reduce((sum, drive) => {
-          const size = drive.size || drive.capacity || drive.totalSize || 0
-          return sum + (typeof size === 'number' ? size : 0)
+          const capacity = drive.capacity || drive.totalSize || 0
+          return sum + (typeof capacity === 'number' ? capacity : 0)
         }, 0)
         return Math.round(totalBytes / (1024 * 1024 * 1024))
       }
@@ -88,8 +88,8 @@ export function StorageBreakdownChart({
       const storageField = device.storage || (device as any).storage
       if (Array.isArray(storageField)) {
         const totalBytes = storageField.reduce((sum, drive) => {
-          const size = drive.size || drive.capacity || drive.totalSize || 0
-          return sum + (typeof size === 'number' ? size : 0)
+          const capacity = drive.capacity || drive.totalSize || 0
+          return sum + (typeof capacity === 'number' ? capacity : 0)
         }, 0)
         return Math.round(totalBytes / (1024 * 1024 * 1024))
       }
