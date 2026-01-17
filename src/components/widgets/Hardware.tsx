@@ -93,14 +93,17 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   
   // === Data Extraction - EXACTLY matching HardwareTab.tsx patterns ===
   
+  // Manufacturer - from hardwareData.manufacturer
+  const manufacturer = safeString(hardwareData.manufacturer)
+  
   // Model - from hardwareData.model (HardwareTab shows this in System Identity section)
   const model = safeString(hardwareData.model)
   
+  // Model Identifier - Mac specific identifier (e.g., "Mac16,11")
+  const modelIdentifier = safeString(hardwareData.modelIdentifier || hardwareData.model_identifier)
+  
   // Chip name for Mac (e.g., "M4 Pro", "M3 Max")
   const chipName = safeString(hardwareData.processor?.chip || hardwareData.processor?.name || hardwareData.processor)
-  
-  // Identifier (hardware serial number)
-  const identifier = safeString(hardwareData.identifier || hardwareData.serialNumber || hardwareData.serial_number)
   
   // Processor - HardwareTab uses safeProcessorName(hardwareData.processor)
   const processorName = safeProcessorName(hardwareData.processor)
@@ -176,23 +179,25 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
       iconColor={WidgetColors.orange}
     >
       {isMac ? (
-        /* Mac-specific layout: Model/Identifier at top, Chip, 2-column grid, Storage at bottom */
+        /* Mac-specific layout: Model/Model Identifier in 2-column, Chip, 2-column grid, Storage at bottom */
         <div className="space-y-3">
-          {/* Model and Identifier at very top */}
-          {model !== 'Unknown' && (
-            <Stat 
-              label="Model" 
-              value={model} 
-            />
-          )}
-          {identifier !== 'Unknown' && (
-            <Stat 
-              label="Identifier" 
-              value={identifier}
-              isMono
-              showCopyButton
-            />
-          )}
+          {/* Model and Model Identifier side-by-side in 2-column grid */}
+          <div className="grid grid-cols-2 gap-3">
+            {model !== 'Unknown' && (
+              <Stat 
+                label="Model" 
+                value={model} 
+              />
+            )}
+            {modelIdentifier !== 'Unknown' && (
+              <Stat 
+                label="Identifier" 
+                value={modelIdentifier}
+                isMono
+                showCopyButton
+              />
+            )}
+          </div>
           
           {isUnifiedMemory ? (
             /* Unified Memory Architecture: Dashed border box around CPU/GPU/Memory/NPU */
@@ -283,6 +288,13 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
       ) : (
         /* Windows/Linux layout: Standard vertical list */
         <div className="space-y-3">
+          {manufacturer !== 'Unknown' && (
+            <Stat 
+              label="Manufacturer" 
+              value={manufacturer} 
+            />
+          )}
+          
           <Stat 
             label="Model" 
             value={model} 
