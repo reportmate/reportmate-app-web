@@ -295,6 +295,11 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Mac-specific data - ADE configuration and device identifiers
   // NOTE: Compliance moved to Security tab, Remote Management may move to Security/Remote Access
   
+  // Windows-specific data - Autopilot configuration, Primary User, Management Name
+  const autopilotConfig = management.autopilot_config || management.autopilotConfig
+  const primaryUser = deviceDetails.primary_user || deviceDetails.primaryUser
+  const managementName = deviceDetails.management_name || deviceDetails.managementName
+  
   // Get compliance policies and managed apps for summary
   const compliancePolicies = management.compliance_policies || management.compliancePolicies || []
   const managedApps = management.managed_apps || management.managedApps || []
@@ -551,6 +556,33 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Details</h3>
               <div className="space-y-4">
 
+                {/* Management Name (device name in Intune portal) */}
+                {managementName && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Management Name</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-3">{managementName}</span>
+                  </div>
+                )}
+
+                {/* Primary User - who has self-service device action access */}
+                {primaryUser && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Primary User</span>
+                    <div className="flex items-center gap-2 ml-3">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">{primaryUser}</span>
+                      <CopyButton value={primaryUser} />
+                    </div>
+                  </div>
+                )}
+
+                {/* User Principal Name - who enrolled the device */}
+                {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
+                  <div className="flex items-start">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Enrolled By</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
+                  </div>
+                )}
+
                 {/* Intune Device ID with copy button - support both snake_case and camelCase */}
                 {(deviceDetails?.intune_device_id || deviceDetails?.intuneDeviceId) && (
                   <div className="flex items-center">
@@ -748,6 +780,93 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                         </span>
                       </div>
                     )}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Windows: Autopilot Configuration (equivalent to Mac ADE) */}
+          {isEnrolled && !isMac && autopilotConfig && (autopilotConfig.assigned || autopilotConfig.activated) && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
+              <div className="space-y-3">
+                {/* Autopilot Assigned/Activated */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.assigned
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.assigned ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activated</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.activated
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.activated ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Deployment Mode */}
+                {autopilotConfig.deployment_mode && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Mode</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.deployment_mode}
+                    </span>
+                  </div>
+                )}
+
+                {/* Profile Name */}
+                {autopilotConfig.profile_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Profile</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.profile_name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Group Tag */}
+                {autopilotConfig.group_tag && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Group Tag</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                      {autopilotConfig.group_tag}
+                    </span>
+                  </div>
+                )}
+
+                {/* Enrollment Status Page */}
+                {autopilotConfig.enrollment_status_page_enabled !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment Status Page</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.enrollment_status_page_enabled
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.enrollment_status_page_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Deployment Phase */}
+                {autopilotConfig.deployment_phase && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Phase</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.deployment_phase}
+                    </span>
                   </div>
                 )}
               </div>
