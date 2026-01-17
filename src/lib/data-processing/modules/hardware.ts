@@ -63,13 +63,13 @@ export function extractHardware(deviceModules: any): HardwareInfo {
 
   // Memory processing - supports both snake_case (osquery/new) and camelCase (legacy)
   if (hardware.memory) {
-    // Support: total_physical (snake_case), totalPhysical (camelCase), physical_memory (Mac)
-    const totalMem = hardware.memory.total_physical ?? hardware.memory.totalPhysical ?? hardware.memory.physical_memory
+    // Support: physicalMemory (normalized from physical_memory), total_physical (snake_case), totalPhysical (camelCase), physical_memory (Mac raw)
+    const totalMem = hardware.memory.physicalMemory ?? hardware.memory.physical_memory ?? hardware.memory.total_physical ?? hardware.memory.totalPhysical
     if (totalMem) {
       hardwareInfo.memory = `${Math.round(totalMem / (1024*1024*1024))} GB`
     }
     // Support: available_physical (snake_case), availablePhysical (camelCase)
-    const availMem = hardware.memory.available_physical ?? hardware.memory.availablePhysical
+    const availMem = hardware.memory.availablePhysical ?? hardware.memory.available_physical
     if (availMem) {
       hardwareInfo.availableRAM = `${Math.round(availMem / (1024*1024*1024))} GB`
     }
@@ -80,8 +80,8 @@ export function extractHardware(deviceModules: any): HardwareInfo {
     const mainDrive = hardware.storage[0]
     // Mac sends size, Windows sends capacity
     const capacity = mainDrive.size ?? mainDrive.capacity
-    // Mac sends free_space, Windows sends freeSpace
-    const freeSpace = mainDrive.free_space ?? mainDrive.freeSpace
+    // After normalization: freeSpace (from free_space)
+    const freeSpace = mainDrive.freeSpace ?? mainDrive.free_space
     const totalGB = Math.round(capacity / (1024*1024*1024))
     const freeGB = Math.round((freeSpace || 0) / (1024*1024*1024))
     hardwareInfo.storage = freeGB > 0 

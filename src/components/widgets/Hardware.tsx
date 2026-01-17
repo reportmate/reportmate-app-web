@@ -123,17 +123,17 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   // NPU cores for Mac Apple Silicon
   const npuCores = safeNumber(hardwareData.processor?.npu_cores) || safeNumber(hardwareData.npu?.cores)
   
-  // Memory - support both physical_memory (Mac osquery) and totalPhysical (Windows)
-  // HardwareTab: safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical)
-  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || 
+  // Memory - support physicalMemory (normalized from physical_memory on Mac) and totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || 
+                      safeNumber(hardwareData.memory?.physical_memory) ||
                       safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryFormatted = totalMemory > 0 ? formatBytes(totalMemory) : 'Unknown'
   
-  // Storage - get internal drives only - matches HardwareTab.tsx exactly
+  // Storage - get internal drives only - use capacity (Mac now sends capacity, not size)
   const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
   const storageDevices = allStorageDevices.filter((drive: any) => {
-    const capacity = drive.size ?? drive.capacity
-    const freeSpace = drive.free_space ?? drive.freeSpace
+    const capacity = drive.capacity
+    const freeSpace = drive.freeSpace ?? drive.free_space
     return (capacity && capacity > 0) && (freeSpace && freeSpace > 0)
   })
   // Only count INTERNAL drives
@@ -143,12 +143,12 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   })
   
   const totalStorage = internalDrives.reduce((total: number, drive: any) => {
-    const capacity = drive.size ?? drive.capacity ?? 0
+    const capacity = drive.capacity ?? 0
     return total + capacity
   }, 0) || 0
   
   const freeStorage = internalDrives.reduce((total: number, drive: any) => {
-    const freeSpace = drive.free_space ?? drive.freeSpace ?? 0
+    const freeSpace = drive.freeSpace ?? drive.free_space ?? 0
     return total + freeSpace
   }, 0) || 0
 
@@ -197,12 +197,15 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           {isUnifiedMemory ? (
             /* Unified Memory Architecture: Dashed border box around CPU/GPU/Memory/NPU */
             <>
-              {/* Chip title - shifted right with more margin (twice as much) */}
-              <div className="text-sm font-medium text-gray-900 dark:text-white ml-4 mr-16">{chipName !== 'Unknown' ? chipName : 'Unknown'} Chip</div>
+              {/* Chip name */}
+              <Stat 
+                label="Chip" 
+                value={chipName !== 'Unknown' ? chipName : 'Unknown'} 
+              />
               
               {/* Dashed border container - left padding for box, reduced top margin to attach to title */}
-              <div className="rounded-lg border border-gray-300 dark:border-gray-600 border-dashed mt-1 mb-3 ml-[-12px] mr-[-4px] py-2 pl-3">
-                <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-lg border border-gray-300 dark:border-gray-600 border-dashed mt-1 mb-3 ml-[-12px] py-2 pl-3 pr-2">
+                <div className="grid grid-cols-2 gap-2">
                   {/* LEFT COLUMN */}
                   <div className="space-y-2">
                     <Stat 
