@@ -13,58 +13,104 @@ import { CopyButton } from "../../src/components/ui/CopyButton"
 
 const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
-// Helper function to get circular status icons (from RecentEventsWidget)
+// Helper function to get status icons matching the filter button style (no circles)
 const getStatusIcon = (kind: string) => {
   switch (kind.toLowerCase()) {
     case 'success':
       return (
-        <div className="w-6 h-6 bg-green-400 rounded-full flex items-center justify-center" title="Success">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+        <div className="w-5 h-5 text-green-500" title="Success">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
         </div>
       )
     case 'warning':
       return (
-        <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center" title="Warning">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM11 14a1 1 0 11-2 0 1 1 0 012 0zm-1-4a1 1 0 011 1v2a1 1 0 11-2 0v-2a1 1 0 011-1z" clipRule="evenodd" />
+        <div className="w-5 h-5 text-yellow-500" title="Warning">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
         </div>
       )
     case 'error':
       return (
-        <div className="w-6 h-6 bg-red-400 rounded-full flex items-center justify-center" title="Error">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+        <div className="w-5 h-5 text-red-500" title="Error">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>
         </div>
       )
     case 'info':
       return (
-        <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center" title="Info">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+        <div className="w-5 h-5 text-blue-500" title="Info">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
         </div>
       )
     case 'system':
       return (
-        <div className="w-6 h-6 bg-purple-400 rounded-full flex items-center justify-center" title="System">
-          <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+        <div className="w-5 h-5 text-purple-500" title="System">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
           </svg>
         </div>
       )
     default:
       return (
-        <div className="w-6 h-6 bg-gray-400 rounded-full flex items-center justify-center" title="Unknown">
-          <svg className="w-3.5 h-3.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-8-3a1 1 0 00-.867.5 1 1 0 11-1.731-1A3 3 0 0113 8a3.001 3.001 0 01-2 2.83V11a1 1 0 11-2 0v-1a1 1 0 011-1 1 1 0 100-2zm0 8a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+        <div className="w-5 h-5 text-gray-400" title="Unknown">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
         </div>
       )
   }
+}
+
+// Helper to format event ID for display (handles bundle IDs cleanly)
+const formatEventId = (id: string | number): string => {
+  const idStr = String(id)
+  if (idStr.startsWith('bundle-')) {
+    // Extract device serial from bundle ID: bundle-SERIAL-timestamp-eventIds
+    const parts = idStr.split('-')
+    if (parts.length >= 2) {
+      return `${parts[1]}...` // Show device serial with ellipsis
+    }
+    return 'Bundle'
+  }
+  return `#${idStr}`
+}
+
+// Helper to check if ID is a bundle ID
+const isBundleId = (id: string | number): boolean => {
+  return String(id).startsWith('bundle-')
+}
+
+// Get styling for filter buttons (matching EventsTab.tsx design)
+function getFilterStyles(key: string, isActive: boolean) {
+  const baseColors: Record<string, { active: string; inactive: string }> = {
+    success: {
+      active: 'bg-green-700 text-white border-green-800 shadow-md dark:bg-green-600 dark:border-green-700',
+      inactive: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200 hover:border-green-300 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/60'
+    },
+    warning: {
+      active: 'bg-yellow-600 text-white border-yellow-700 shadow-md dark:bg-yellow-500 dark:border-yellow-600',
+      inactive: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800 dark:hover:bg-yellow-900/60'
+    },
+    error: {
+      active: 'bg-red-700 text-white border-red-800 shadow-md dark:bg-red-600 dark:border-red-700',
+      inactive: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200 hover:border-red-300 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/60'
+    },
+    info: {
+      active: 'bg-blue-700 text-white border-blue-800 shadow-md dark:bg-blue-600 dark:border-blue-700',
+      inactive: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 hover:border-blue-300 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/60'
+    },
+    system: {
+      active: 'bg-purple-700 text-white border-purple-800 shadow-md dark:bg-purple-600 dark:border-purple-700',
+      inactive: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200 hover:border-purple-300 dark:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/60'
+    },
+  }
+  return baseColors[key]?.[isActive ? 'active' : 'inactive'] || baseColors.info.inactive
 }
 
 // Force dynamic rendering for this page to avoid SSG issues with useSearchParams
@@ -665,19 +711,19 @@ function EventsPageContent() {
               <div className="overflow-auto max-h-[calc(100vh-16rem)]">
                 <table className="w-full table-fixed relative border-collapse">
                   <colgroup>
-                    <col style={{width: '12%'}} />
-                    <col style={{width: '8.5%'}} />
-                    <col style={{width: '20%'}} />
-                    <col style={{width: '35%'}} />
-                    <col style={{width: '12.75%'}} />
-                    <col style={{width: '11.75%'}} />
+                    <col style={{width: '6%'}} />
+                    <col style={{width: '9%'}} />
+                    <col style={{width: '18%'}} />
+                    <col style={{width: '40%'}} />
+                    <col style={{width: '14%'}} />
+                    <col style={{width: '13%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
                       <td colSpan={6} className="px-6 py-2 h-14">
-                        {/* Desktop filter tabs */}
-                        <nav className="hidden sm:flex flex-wrap gap-2">
+                        {/* Desktop filter tabs - full width */}
+                        <nav className="hidden sm:grid grid-cols-5 gap-2 w-full">
                           {[
                             { key: 'success', label: 'Success' },
                             { key: 'warning', label: 'Warnings' },
@@ -686,25 +732,15 @@ function EventsPageContent() {
                             { key: 'system', label: 'System' },
                           ].map((filter) => {
                             const isActive = filterType === filter.key
-                            const statusConfig = getStatusConfig(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
                                 onClick={() => setFilterType(isActive ? 'all' : filter.key)}
-                                className={`${
-                                  isActive
-                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
-                                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                                } w-32 justify-center px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
+                                className={`flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
-                                {statusConfig && (
-                                  <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
-                                    {statusConfig.icon}
-                                  </div>
-                                )}
-                                <span className="hidden md:inline">{filter.label}</span>
-                                <span className="md:hidden">{filter.label.split(' ')[0]}</span>
+                                {getStatusIcon(filter.key)}
+                                <span>{filter.label}</span>
                               </button>
                             )
                           })}
@@ -788,10 +824,10 @@ function EventsPageContent() {
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <span 
-                                className="text-sm text-gray-900 dark:text-gray-100 font-mono truncate block max-w-20" 
-                                title={`#${event.id}`}
+                                className="text-sm text-gray-900 dark:text-gray-100 font-mono" 
+                                title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                               >
-                                #{event.id}
+                                {formatEventId(event.id)}
                               </span>
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
@@ -988,12 +1024,12 @@ function EventsPageContent() {
               <div className="overflow-x-auto">
                 <table className="w-full table-fixed border-collapse">
                   <colgroup>
-                    <col style={{width: '12%'}} />
-                    <col style={{width: '8.5%'}} />
-                    <col style={{width: '20%'}} />
-                    <col style={{width: '35%'}} />
-                    <col style={{width: '12.75%'}} />
-                    <col style={{width: '11.75%'}} />
+                    <col style={{width: '6%'}} />
+                    <col style={{width: '9%'}} />
+                    <col style={{width: '18%'}} />
+                    <col style={{width: '40%'}} />
+                    <col style={{width: '14%'}} />
+                    <col style={{width: '13%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
@@ -1131,10 +1167,10 @@ function EventsPageContent() {
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <span 
-                                className="text-sm text-gray-900 dark:text-gray-100 font-mono max-w-20 block truncate"
-                                title={`#${event.id}`}
+                                className="text-sm text-gray-900 dark:text-gray-100 font-mono"
+                                title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                               >
-                                #{event.id}
+                                {formatEventId(event.id)}
                               </span>
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
@@ -1326,10 +1362,10 @@ function EventsPageContent() {
                       <div className="flex items-center gap-2 flex-wrap">
                         {getStatusIcon(event.kind)}
                         <span 
-                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono max-w-24 truncate"
-                          title={`#${event.id}`}
+                          className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono"
+                          title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                         >
-                          #{event.id}
+                          {formatEventId(event.id)}
                         </span>
                       </div>
                     </div>
@@ -1402,10 +1438,10 @@ function EventsPageContent() {
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <span 
-                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono max-w-24 truncate"
-                              title={`#${event.id}`}
+                              className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono"
+                              title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                             >
-                              #{event.id}
+                              {formatEventId(event.id)}
                             </span>
                             <div className="text-xs text-gray-600 dark:text-gray-400">
                               <div className="font-medium">Full Timestamp:</div>
