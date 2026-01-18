@@ -246,6 +246,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
         {activeTab === 'management' && <ManagementTabSkeleton />}
         {activeTab === 'system' && <SystemTabSkeleton />}
         {activeTab === 'hardware' && <HardwareTabSkeleton isMac={isMac} />}
+        {activeTab === 'peripherals' && <PeripheralsTabSkeleton />}
         {activeTab === 'network' && <NetworkTabSkeleton />}
         {activeTab === 'security' && <SecurityTabSkeleton />}
         {activeTab === 'events' && <EventsTabSkeleton />}
@@ -254,9 +255,9 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
   )
 }
 
-// Individual tab skeletons that show the structure of each tab
+// Individual tab skeletons - exported for use in ModuleLoadingState
 
-function InfoTabSkeleton() {
+export function InfoTabSkeleton() {
   const fieldWidths = ['w-20', 'w-24', 'w-28', 'w-32', 'w-36', 'w-40']
   const valueWidths = ['w-24', 'w-28', 'w-32', 'w-36', 'w-40', 'w-44']
   
@@ -385,7 +386,7 @@ function InfoTabSkeleton() {
   )
 }
 
-function HardwareTabSkeleton({ isMac }: { isMac?: boolean }) {
+export function HardwareTabSkeleton({ isMac }: { isMac?: boolean }) {
   // If isMac is undefined, show unified layout (default to Mac-like for modern hardware)
   const showUnified = isMac !== false
   
@@ -631,7 +632,7 @@ function HardwareTabSkeleton({ isMac }: { isMac?: boolean }) {
   )
 }
 
-function SystemTabSkeleton() {
+export function SystemTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* System info grid */}
@@ -656,7 +657,7 @@ function SystemTabSkeleton() {
   )
 }
 
-function ManagementTabSkeleton() {
+export function ManagementTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header with Icon and Provider - matches actual layout */}
@@ -810,7 +811,7 @@ function ManagementTabSkeleton() {
   )
 }
 
-function InstallsTabSkeleton() {
+export function InstallsTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header with Icon */}
@@ -935,7 +936,7 @@ function InstallsTabSkeleton() {
   )
 }
 
-function ProfilesTabSkeleton() {
+export function ProfilesTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* Profile stats */}
@@ -972,44 +973,107 @@ function ProfilesTabSkeleton() {
   )
 }
 
-function ApplicationsTabSkeleton() {
+export function ApplicationsTabSkeleton() {
   return (
     <div className="space-y-6">
-      {/* App stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {['Total Apps', 'Recently Updated', 'System Apps'].map((stat) => (
-          <div key={stat} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 text-center">
-            <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto mb-2"></div>
-            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mx-auto"></div>
+      {/* Header with icon and total count */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg animate-pulse"></div>
+          <div>
+            <div className="h-7 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+          <div className="h-8 w-16 bg-blue-200 dark:bg-blue-900 rounded animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Usage Summary Cards - 4 columns */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
+              <div className="flex-1">
+                <div className="h-7 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1" style={{ animationDelay: `${i * 0.1 + 0.05}s` }}></div>
+                <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+              </div>
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Applications list */}
+      {/* Top Apps by Usage */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="p-4 space-y-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="flex items-center gap-4">
+              <div className="w-8 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="flex-1">
+                <div className="flex justify-between mb-1">
+                  <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+                <div className="h-2 w-full bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                <div className="flex gap-4 mt-1">
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-3 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Applications Table */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
         <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="h-6 w-44 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
         </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="p-6 flex justify-between items-center">
-              <div className="flex items-center gap-4 flex-1">
-                <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                <div className="flex-1">
-                  <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-                  <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-              </div>
-              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-            </div>
-          ))}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                {['Name', 'Version', 'Publisher', 'Usage'].map((header, i) => (
+                  <th key={header} className="px-6 py-3 text-left">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05}s` }}></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <tr key={i}>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.05}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.15}s` }}></div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   )
 }
 
-function SecurityTabSkeleton() {
+export function SecurityTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header skeleton */}
@@ -1054,32 +1118,125 @@ function SecurityTabSkeleton() {
   )
 }
 
-function NetworkTabSkeleton() {
+export function NetworkTabSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Network interfaces */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {['Wi-Fi', 'Ethernet'].map((interface_type) => (
-          <div key={interface_type} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="h-6 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-teal-100 dark:bg-teal-900 rounded-lg animate-pulse"></div>
+          <div>
+            <div className="h-7 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+        <div className="text-right mr-8">
+          <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+          <div className="h-8 w-24 bg-teal-200 dark:bg-teal-900 rounded animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Hostname Bar */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+            <div className="h-5 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+          <div className="text-right">
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+            <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+
+      {/* 70/30 Split Layout */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column - 70% - Active Connections */}
+        <div className="lg:w-[70%] space-y-4">
+          {[1, 2].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+              {/* Connection Header */}
+              <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                  <div>
+                    <div className="h-5 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                </div>
+                <div className="h-7 w-24 bg-green-100 dark:bg-green-900/30 rounded-full animate-pulse"></div>
+              </div>
+              {/* Connection Body */}
+              <div className="p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3">
+                  {[1, 2, 3, 4, 5, 6].map((j) => (
+                    <div key={j} className="flex justify-between py-1.5 border-b border-gray-100 dark:border-gray-700/50">
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="p-6 space-y-4">
+          ))}
+        </div>
+
+        {/* Right Column - 30% - Secondary Info */}
+        <div className="lg:w-[30%] space-y-4">
+          {/* VPN Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg animate-pulse"></div>
+              <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <div className="space-y-2">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-9 bg-gray-50 dark:bg-gray-700/50 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+
+          {/* Network Quality Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg animate-pulse"></div>
+              <div className="h-5 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex justify-between items-center">
-                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div key={i} className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+                  <div className="h-5 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Saved WiFi Card */}
+          <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+            <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-3 w-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              <div className="h-8 bg-gray-50 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+            </div>
+            <div className="p-2">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="h-8 px-4 flex items-center border-b border-gray-100 dark:border-gray-700">
                   <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                 </div>
               ))}
             </div>
           </div>
-        ))}
+        </div>
       </div>
     </div>
   )
 }
 
-function EventsTabSkeleton() {
+export function EventsTabSkeleton() {
   return (
     <div className="space-y-6">
       {/* Event stats */}
@@ -1108,6 +1265,61 @@ function EventsTabSkeleton() {
                 </div>
                 <div className="h-3 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
                 <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function PeripheralsTabSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Horizontal Category Filters */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+        <div className="grid grid-cols-4 gap-2">
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+            <div key={i} className="flex items-center justify-between px-3 py-2.5 rounded-md bg-gray-50 dark:bg-gray-700/50">
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05}s` }}></div>
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.025}s` }}></div>
+              </div>
+              <div className="h-5 w-6 bg-gray-200 dark:bg-gray-600 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.05}s` }}></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Content Area */}
+      <div className="space-y-8">
+        {/* Section Header */}
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 bg-blue-200 dark:bg-blue-900 rounded animate-pulse"></div>
+          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+
+        {/* Device Cards Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+              {/* Card Header */}
+              <div className="px-4 py-3 bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              </div>
+              {/* Card Body */}
+              <div className="p-4 space-y-3">
+                {[1, 2, 3].map((j) => (
+                  <div key={j} className="flex justify-between items-center">
+                    <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    <div className="h-3 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
