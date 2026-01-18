@@ -263,6 +263,7 @@ export interface InstallPackage {
   itemSize?: string // Item size in bytes
   errors?: ErrorMessage[]
   warnings?: WarningMessage[]
+  pendingReason?: string // Why the package is pending (e.g., "Update available: 1.0 → 2.0")
   failureCount?: number
   lastAttemptStatus?: string
   recentAttempts?: any[]
@@ -661,6 +662,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         type: item.type || 'Package',
         lastUpdate: getLatestAttemptTimestamp(item),
         itemSize: item.itemSize,
+        pendingReason: item.pending_reason || item.pendingReason || '', // Why pending (e.g., "Update available: 1.0 → 2.0")
         failureCount: item.failureCount || 0,
         lastAttemptStatus: item.lastAttemptStatus,
         recentAttempts: item.recentAttempts || [],
