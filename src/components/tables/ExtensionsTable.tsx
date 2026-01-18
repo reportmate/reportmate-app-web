@@ -4,7 +4,7 @@
  * Similar to macOS System Settings Extensions pane
  */
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 
 export interface Extension {
   identifier: string
@@ -397,6 +397,40 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
     setExpandedItems(newSet)
   }
 
+  // Auto-expand all items when filtering to "Waiting for User Action"
+  useEffect(() => {
+    if (statusFilter === 'waiting') {
+      const allKeys = new Set<string>()
+      if (viewMode === 'byCategory') {
+        filteredByCategory.forEach(([category]) => {
+          allKeys.add(`cat-${category}`)
+        })
+      } else {
+        filteredByApp.forEach(([appName]) => {
+          allKeys.add(`app-${appName}`)
+        })
+      }
+      setExpandedItems(allKeys)
+    }
+  }, [statusFilter, viewMode, filteredByCategory, filteredByApp])
+
+  // Auto-expand all items when searching
+  useEffect(() => {
+    if (search.trim()) {
+      const allKeys = new Set<string>()
+      if (viewMode === 'byCategory') {
+        filteredByCategory.forEach(([category]) => {
+          allKeys.add(`cat-${category}`)
+        })
+      } else {
+        filteredByApp.forEach(([appName]) => {
+          allKeys.add(`app-${appName}`)
+        })
+      }
+      setExpandedItems(allKeys)
+    }
+  }, [search, viewMode, filteredByCategory, filteredByApp])
+
   if (!extensions.length) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-8">
@@ -493,11 +527,8 @@ export const ExtensionsTable: React.FC<ExtensionsTableProps> = ({
               )}
             </div>
 
-            {/* Spacer to push search to right */}
-            <div className="flex-1" />
-
-            {/* Search */}
-            <div className="relative w-full sm:w-56">
+            {/* Search - right next to filters */}
+            <div className="relative w-full sm:w-48">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
