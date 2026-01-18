@@ -27,7 +27,7 @@ interface ManagedInstallsTableProps {
 }
 
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
-  const [statusFilter, setStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warning' | 'error' | 'removed'>('all');
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
 
@@ -39,6 +39,20 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       newExpandedIds.add(packageId);
     }
     setExpandedPackageIds(newExpandedIds);
+  };
+
+  const toggleFilter = (filter: string) => {
+    const newFilters = new Set(statusFilter);
+    if (newFilters.has(filter)) {
+      newFilters.delete(filter);
+    } else {
+      newFilters.add(filter);
+    }
+    setStatusFilter(newFilters);
+  };
+
+  const clearFilters = () => {
+    setStatusFilter(new Set());
   };
 
   // Early return for completely missing data
@@ -113,18 +127,11 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     
     let filtered = data.packages;
 
-    // Apply status filter
-    if (statusFilter !== 'all') {
+    // Apply status filter (multi-select)
+    if (statusFilter.size > 0) {
       filtered = filtered.filter((pkg: any) => {
         const status = pkg.status?.toLowerCase() || '';
-        switch (statusFilter) {
-          case 'installed': return status === 'installed';
-          case 'pending': return status === 'pending';
-          case 'warning': return status === 'warning'; 
-          case 'error': return status === 'error';
-          case 'removed': return status === 'removed';
-          default: return true;
-        }
+        return statusFilter.has(status);
       });
     }
 
@@ -157,7 +164,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   <div>
                     <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
                       Managed Items:
@@ -172,68 +179,67 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                       )}
                     </h3>
                   </div>
+                  {/* Clear Filters Button */}
+                  {statusFilter.size > 0 && (
+                    <button
+                      onClick={clearFilters}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full transition-colors bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
                 </div>
                 
                 {/* Search and Filters */}
                 <div className="flex items-center gap-4">
                   {/* Status Filters */}
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setStatusFilter('all')}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                        statusFilter === 'all'
-                          ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      All
-                    </button>
                   <button
-                    onClick={() => setStatusFilter('installed')}
+                    onClick={() => toggleFilter('installed')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'installed'
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      statusFilter.has('installed')
+                        ? 'bg-green-600 text-white dark:bg-green-400 dark:text-gray-900'
+                        : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50'
                     }`}
                   >
                     Installed - {installedCount}
                   </button>
                   <button
-                    onClick={() => setStatusFilter('pending')}
+                    onClick={() => toggleFilter('pending')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'pending'
-                        ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      statusFilter.has('pending')
+                        ? 'bg-cyan-600 text-white dark:bg-cyan-400 dark:text-gray-900'
+                        : 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 hover:bg-cyan-200 dark:hover:bg-cyan-900/50'
                     }`}
                   >
                     Pending - {pendingCount}
                   </button>
                   <button
-                    onClick={() => setStatusFilter('warning')}
+                    onClick={() => toggleFilter('warning')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'warning'
-                        ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      statusFilter.has('warning')
+                        ? 'bg-yellow-600 text-white dark:bg-yellow-400 dark:text-gray-900'
+                        : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
                     }`}
                   >
                     Warning - {warningCount}
                   </button>
                   <button
-                    onClick={() => setStatusFilter('error')}
+                    onClick={() => toggleFilter('error')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'error'
-                        ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      statusFilter.has('error')
+                        ? 'bg-red-600 text-white dark:bg-red-400 dark:text-gray-900'
+                        : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50'
                     }`}
                   >
                     Error - {errorCount}
                   </button>
                   <button
-                    onClick={() => setStatusFilter('removed')}
+                    onClick={() => toggleFilter('removed')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
-                      statusFilter === 'removed'
-                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200'
-                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      statusFilter.has('removed')
+                        ? 'bg-purple-600 text-white dark:bg-purple-400 dark:text-gray-900'
+                        : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/50'
                     }`}
                   >
                     Removed - {removedCount}
@@ -259,12 +265,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
             </div>
           </div>
           <div className="overflow-x-auto overlay-scrollbar">
-              {statusFilter !== 'all' && (
+              {statusFilter.size > 0 && (
                 <div className="px-6 py-2 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
                   <div className="text-xs text-gray-600 dark:text-gray-400">
                     Showing {filteredPackages.length} of {packages.length} packages
                     <span className="ml-2">
-                      filtered by: <span className="font-medium capitalize">{statusFilter}</span>
+                      filtered by: <span className="font-medium capitalize">{Array.from(statusFilter).join(', ')}</span>
                     </span>
                   </div>
                 </div>
@@ -272,9 +278,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-900">
                   <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item Size</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Date Processed</th>
                   </tr>
@@ -304,6 +310,31 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                         </div>
                       </td>
                     </tr>
+                  ) : filteredPackages.length === 0 && statusFilter.size > 0 ? (
+                    // Empty state when filters are active but no matching packages
+                    <tr>
+                      <td colSpan={5} className="px-6 py-16">
+                        <div className="text-center">
+                          <div className="w-12 h-12 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                            </svg>
+                          </div>
+                          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
+                            No items with {Array.from(statusFilter).map(f => f.toLowerCase()).join(' or ')}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            No packages match the selected filter{statusFilter.size > 1 ? 's' : ''}.
+                          </p>
+                          <button
+                            onClick={clearFilters}
+                            className="mt-4 px-4 py-2 text-sm font-medium rounded-lg transition-colors bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+                          >
+                            Clear Filters
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
                   ) : (
                     // Show packages when available
                     <>
@@ -311,15 +342,22 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                         (a.displayName || a.name).localeCompare(b.displayName || b.name)
                       ).map((pkg) => {
                         const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
+                        const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
+                        const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
                         const isExpanded = expandedPackageIds.has(pkg.id);
                         
                         return (
                           <React.Fragment key={pkg.id}>
                             {/* Main Package Row */}
                             <tr 
-                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasErrorsOrWarnings ? 'cursor-pointer' : ''}`}
-                              onClick={() => hasErrorsOrWarnings && togglePackageExpansion(pkg.id)}
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasExpandableContent ? 'cursor-pointer' : ''}`}
+                              onClick={() => hasExpandableContent && togglePackageExpansion(pkg.id)}
                             >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
+                                  {getStatusDisplay(pkg.status || 'Unknown')}
+                                </span>
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="text-sm font-medium text-gray-900 dark:text-white">
                                   {pkg.displayName || pkg.name || 'Unknown Package'}
@@ -335,18 +373,13 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                   )}
                                 </div>
                               </td>
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
-                                  {getStatusDisplay(pkg.status || 'Unknown')}
-                                </span>
-                              </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 {formatItemSize(pkg.itemSize) || ''}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 <div className="flex items-center justify-between">
                                   <span>{pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}</span>
-                                  {hasErrorsOrWarnings && (
+                                  {hasExpandableContent && (
                                     <svg 
                                       className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200 ml-2 ${isExpanded ? 'rotate-90' : ''}`}
                                       fill="none" 
@@ -360,8 +393,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                               </td>
                             </tr>
 
-                            {/* Expandable Error/Warning Details Row */}
-                            {isExpanded && hasErrorsOrWarnings && (
+                            {/* Expandable Error/Warning/Pending Details Row */}
+                            {isExpanded && hasExpandableContent && (
                               <tr className="bg-gray-50 dark:bg-gray-900">
                                 <td colSpan={5} className="px-6 py-4">
                                   <div className="space-y-3">
@@ -422,6 +455,27 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                             )}
                                           </div>
                                         ))}
+                                      </div>
+                                    )}
+
+                                    {/* Pending Reason Section */}
+                                    {hasPendingReason && (
+                                      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
+                                        <div className="flex items-start gap-3">
+                                          <div className="flex-shrink-0">
+                                            <svg className="w-5 h-5 text-cyan-500 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                          </div>
+                                          <div>
+                                            <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
+                                              PENDING
+                                            </span>
+                                            <p className="text-sm text-cyan-700 dark:text-cyan-300 mt-2">
+                                              {pkg.pendingReason}
+                                            </p>
+                                          </div>
+                                        </div>
                                       </div>
                                     )}
                                   </div>
