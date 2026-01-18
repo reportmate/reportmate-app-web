@@ -34,10 +34,14 @@ export async function GET(
         
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
+    
+    // Get query parameters for pagination
+    const url = new URL(request.url)
+    const limit = url.searchParams.get('limit') || '100'
         
     // Special handling for events module (events are stored separately)
     if (moduleName === 'events') {
-      const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events`
+      const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events?limit=${limit}`
             
       const eventsResponse = await fetch(eventsUrl, {
         cache: 'no-store',
