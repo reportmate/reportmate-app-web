@@ -287,7 +287,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           </div>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">System Information</h1>
-            <p className="text-base text-gray-600 dark:text-gray-400">Operating system and hardware details</p>
+            <p className="text-base text-gray-600 dark:text-gray-400">Operating system and apps access</p>
           </div>
         </div>
         {/* Update Status Badge - Top Right */}
@@ -328,7 +328,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           {/* Windows: 4 columns - OS + Display Version | Build Number (extracted) | Feature Update | Edition + Activation */}
           <div className={`grid grid-cols-1 md:grid-cols-2 ${isMac ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-6 mb-6`}>
             {isMac ? (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{osLabel}</label>
@@ -337,7 +337,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                 </div>
               </div>
             ) : (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wide">{osLabel}</label>
@@ -348,7 +348,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             )}
             
             {isMac ? (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Version</label>
@@ -357,7 +357,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                 </div>
               </div>
             ) : (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Version</label>
@@ -368,7 +368,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             )}
             
             {isMac ? (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Build</label>
@@ -377,7 +377,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                 </div>
               </div>
             ) : (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-indigo-600 dark:text-indigo-400 uppercase tracking-wide">Feature</label>
@@ -389,7 +389,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             
             {/* Edition card - Windows only, now in top row as 4th card */}
             {!isMac && (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-violet-600 dark:text-violet-400 uppercase tracking-wide">Edition</label>
@@ -415,7 +415,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           {/* Row 2: Remaining data points - spread across full width */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
             {/* Uptime */}
-            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <label className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">System Uptime</label>
@@ -426,7 +426,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             
             {/* Last Boot */}
             {systemTabData.bootTime && systemTabData.bootTime !== 'Unknown' ? (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide">Last Boot</label>
@@ -435,7 +435,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                 </div>
               </div>
             ) : (
-              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+              <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <label className="text-xs font-semibold text-cyan-600 dark:text-cyan-400 uppercase tracking-wide">Last Boot</label>
@@ -446,7 +446,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             )}
             
             {/* Locale */}
-            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <label className="text-xs font-semibold text-orange-600 dark:text-orange-400 uppercase tracking-wide">System Locale</label>
@@ -456,7 +456,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             </div>
             
             {/* Keyboard Layout */}
-            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <label className="text-xs font-semibold text-pink-600 dark:text-pink-400 uppercase tracking-wide">Keyboard Layout</label>
@@ -466,7 +466,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
             </div>
             
             {/* Time Zone */}
-            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-purple-200/50 dark:border-purple-700/30 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
+            <div className="group bg-white/60 dark:bg-gray-900/40 backdrop-blur-sm rounded-xl p-4 border border-gray-200 dark:border-gray-700 hover:shadow-md hover:scale-[1.02] transition-all duration-200">
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <label className="text-xs font-semibold text-teal-600 dark:text-teal-400 uppercase tracking-wide">Time Zone</label>
@@ -658,6 +658,51 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           })()}
         </div>
       )}
+
+      {/* Mac: Install History */}
+      {isMac && installHistory.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Install History</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              Packages installed in the last 90 days ({installHistory.length} packages)
+            </p>
+          </div>
+          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {[...installHistory]
+                  .sort((a, b) => parseInstallTime(b.installTime) - parseInstallTime(a.installTime))
+                  .map((item, index) => (
+                  <tr key={item.packageId || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {item.installTime ? formatExactTime(item.installTime) : 'Unknown'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{item.packageId}</div>
+                        {item.packageFilename && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">{item.packageFilename}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {item.version || 'Unknown'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
       
       {/* System Statistics */}
       <div className={`grid grid-cols-1 ${isMac ? 'md:grid-cols-4' : 'md:grid-cols-5'} gap-4`}>
@@ -794,9 +839,53 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
         </div>
       )}
 
-      {/* Mac: Extensions (By App / By Category) */}
-      {isMac && systemExtensions.length > 0 && (
-        <ExtensionsTable extensions={systemExtensions} title="Extensions" />
+      {/* Mac: Extensions (60%) and Open at Login (40%) side-by-side */}
+      {isMac && (systemExtensions.length > 0 || loginItems.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-6">
+          {/* Extensions Table - 60% */}
+          {systemExtensions.length > 0 && (
+            <ExtensionsTable extensions={systemExtensions} title="Extensions" />
+          )}
+
+          {/* Open at Login Table - 40% */}
+          {loginItems.length > 0 && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Open at Login</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">Applications that open automatically when you log in ({loginItems.length} items)</p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kind</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {loginItems.map((item, index) => (
+                      <tr key={item.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-3">
+                          <div className="flex items-center">
+                            <div className="w-6 h-6 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
+                              <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                          {item.type || 'Application'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Mac: Kernel Extensions */}
@@ -933,90 +1022,6 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
                       {helper.bundleIdentifier || 'Unknown'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Mac: Open at Login - after Privileged Helper Tools */}
-      {isMac && loginItems.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Open at Login</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">Applications that open automatically when you log in ({loginItems.length} items)</p>
-          </div>
-          <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Item</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Kind</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {loginItems.map((item, index) => (
-                  <tr key={item.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-3">
-                      <div className="flex items-center">
-                        <div className="w-6 h-6 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mr-3">
-                          <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
-                      {item.type || 'Application'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Mac: Install History */}
-      {isMac && installHistory.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Install History</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Packages installed in the last 90 days ({installHistory.length} packages)
-            </p>
-          </div>
-          <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Package</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                {[...installHistory]
-                  .sort((a, b) => parseInstallTime(b.installTime) - parseInstallTime(a.installTime))
-                  .map((item, index) => (
-                  <tr key={item.packageId || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {item.installTime ? formatExactTime(item.installTime) : 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{item.packageId}</div>
-                        {item.packageFilename && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">{item.packageFilename}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {item.version || 'Unknown'}
                     </td>
                   </tr>
                 ))}
