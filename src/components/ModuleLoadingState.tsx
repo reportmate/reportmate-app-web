@@ -1,9 +1,23 @@
 /**
  * Module Loading State Component
  * Shows loading, error, or empty states for device modules
+ * Uses the same tab-specific skeletons as DeviceDetailSkeleton for consistent UX
  */
 
 import React from 'react'
+import {
+  InfoTabSkeleton,
+  InstallsTabSkeleton,
+  ApplicationsTabSkeleton,
+  ProfilesTabSkeleton,
+  ManagementTabSkeleton,
+  HardwareTabSkeleton,
+  PeripheralsTabSkeleton,
+  SystemTabSkeleton,
+  SecurityTabSkeleton,
+  NetworkTabSkeleton,
+  EventsTabSkeleton
+} from './skeleton/DeviceDetailSkeleton'
 
 interface ModuleLoadingStateProps {
   moduleName: string
@@ -12,6 +26,7 @@ interface ModuleLoadingStateProps {
   icon?: string
   accentColor?: string
   onRetry?: () => void
+  isMac?: boolean
 }
 
 const getAccentColorClasses = (color: string = 'blue') => {
@@ -30,20 +45,45 @@ const getAccentColorClasses = (color: string = 'blue') => {
   return colorMap[color] || colorMap.blue
 }
 
+// Map module names to their corresponding skeleton components
+const getModuleSkeleton = (moduleName: string, isMac?: boolean): React.ReactNode => {
+  const skeletonMap: Record<string, React.ReactNode> = {
+    info: <InfoTabSkeleton />,
+    installs: <InstallsTabSkeleton />,
+    applications: <ApplicationsTabSkeleton />,
+    profiles: <ProfilesTabSkeleton />,
+    management: <ManagementTabSkeleton />,
+    hardware: <HardwareTabSkeleton isMac={isMac} />,
+    peripherals: <PeripheralsTabSkeleton />,
+    system: <SystemTabSkeleton />,
+    security: <SecurityTabSkeleton />,
+    network: <NetworkTabSkeleton />,
+    events: <EventsTabSkeleton />
+  }
+  return skeletonMap[moduleName.toLowerCase()] || null
+}
+
 export const ModuleLoadingState: React.FC<ModuleLoadingStateProps> = ({
   moduleName,
   state,
   error,
   icon,
   accentColor = 'blue',
-  onRetry
+  onRetry,
+  isMac
 }) => {
   const colors = getAccentColorClasses(accentColor)
   
   if (state === 'loading') {
+    // Use the specific tab skeleton if available, matching DeviceDetailSkeleton
+    const skeleton = getModuleSkeleton(moduleName, isMac)
+    if (skeleton) {
+      return <>{skeleton}</>
+    }
+    
+    // Fallback for unknown modules (should rarely happen)
     return (
       <div className="space-y-6 animate-pulse">
-        {/* Header Skeleton */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className={`w-12 h-12 ${colors.bg} rounded-lg`}></div>
@@ -52,36 +92,11 @@ export const ModuleLoadingState: React.FC<ModuleLoadingStateProps> = ({
               <div className="h-4 w-56 bg-gray-200 dark:bg-gray-700 rounded"></div>
             </div>
           </div>
-          <div className="text-right space-y-2">
-            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
-            <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
-          </div>
         </div>
-        
-        {/* Stats Cards Skeleton */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-              <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            </div>
-          ))}
-        </div>
-
-        {/* Table Skeleton */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
-            <div className="h-6 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
-            <div className="h-8 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-          </div>
-          <div className="p-6 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+          <div className="space-y-4">
             {[1, 2, 3, 4, 5].map(i => (
-              <div key={i} className="flex items-center gap-4">
-                <div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded ml-auto"></div>
-              </div>
+              <div key={i} className="h-4 bg-gray-200 dark:bg-gray-700 rounded" style={{ width: `${60 + i * 5}%` }}></div>
             ))}
           </div>
         </div>
