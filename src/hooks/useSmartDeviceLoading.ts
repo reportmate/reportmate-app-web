@@ -2,15 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { mapDeviceData } from '../lib/data-processing/device-mapper-modular'
 
 /**
- * Smart Device Loading Hook - V2
+ * Smart Device Loading Hook - V3
  * 
  * Strategy:
  * 1. Load InfoTab modules FIRST (inventory, system, hardware, management, security, network)
- * 2. Load remaining modules in PARALLEL in background
- * 3. No artificial delays - let the network be the bottleneck
- * 4. Properly process all data through mapDeviceData()
+ * 2. Check URL hash - if user landed on a specific tab, load that NEXT
+ * 3. Load remaining modules in PARALLEL in background
+ * 4. Events are loaded with limit=5 initially for speed
+ * 5. No artificial delays - let the network be the bottleneck
  * 
- * This gives instant InfoTab while loading the rest efficiently.
+ * This gives instant InfoTab + active tab priority.
  */
 
 export type ModuleLoadState = 'unloaded' | 'loading' | 'loaded' | 'error'
@@ -23,6 +24,16 @@ export interface ModuleStatus {
 }
 
 const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers', 'peripherals']
+
+// Get initial active tab from URL hash
+const getInitialActiveTab = (): string | null => {
+  if (typeof window === 'undefined') return null
+  const hash = window.location.hash.replace('#', '')
+  if (hash && BACKGROUND_MODULES.includes(hash)) {
+    return hash
+  }
+  return null
+}
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (processed and ready for InfoTab)
@@ -110,91 +121,107 @@ export function useSmartDeviceLoading(deviceId: string) {
   }, [deviceId])
   
   /**
-   * Load remaining modules in PARALLEL once InfoTab is ready
+   * Load remaining modules - PRIORITIZE ACTIVE TAB, then parallel for rest
    */
   useEffect(() => {
     if (!deviceInfo || infoLoading || allModulesLoaded) return
     
     let cancelled = false
     
-    const loadBackgroundModules = async () => {
-      // Load ALL remaining modules at once (browser will handle parallelization)
-      const promises = BACKGROUND_MODULES.map(async (moduleName) => {
-        // Skip if already loaded
-        if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
-          return
-        }
+    const loadSingleModule = async (moduleName: string): Promise<void> => {
+      // Skip if already loaded
+      if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
+        return
+      }
+      
+      // Mark as loading
+      setModuleStates(prev => ({
+        ...prev,
+        [moduleName]: { state: 'loading', data: null, error: null }
+      }))
+      
+      try {
+        // Events module: limit to 5 for initial fast load
+        const url = moduleName === 'events' 
+          ? `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}?limit=5`
+          : `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`
         
-        // Mark as loading
-        setModuleStates(prev => ({
-          ...prev,
-          [moduleName]: { state: 'loading', data: null, error: null }
-        }))
+        const response = await fetch(url)
         
-        try {
-          const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`)
-          
-          if (cancelled) return
-          
-          if (!response.ok) {
-            if (response.status === 404) {
-              // Module doesn't exist for this device - that's OK
-              setModuleStates(prev => ({
-                ...prev,
-                [moduleName]: { state: 'loaded', data: null, error: null, loadedAt: new Date() }
-              }))
-              return
-            }
-            throw new Error(`HTTP ${response.status}`)
-          }
-          
-          const result = await response.json()
-          
-          if (cancelled) return
-          
-          if (result.success) {
+        if (cancelled) return
+        
+        if (!response.ok) {
+          if (response.status === 404) {
+            // Module doesn't exist for this device - that's OK
             setModuleStates(prev => ({
               ...prev,
-              [moduleName]: {
-                state: 'loaded',
-                data: result.data,
-                error: null,
-                loadedAt: new Date()
-              }
+              [moduleName]: { state: 'loaded', data: null, error: null, loadedAt: new Date() }
             }))
-            
-            // Update deviceInfo with new module data
-            setDeviceInfo((prev: any) => {
-              if (!prev) return prev
-              return {
-                ...prev,
-                modules: {
-                  ...prev.modules,
-                  [moduleName]: result.data
-                }
-              }
-            })
-          } else {
-            throw new Error(result.error || 'Failed to load module')
+            return
           }
-          
-        } catch (error) {
-          if (cancelled) return
-          console.error(`[SMART LOAD] Error loading ${moduleName}:`, error)
-          
+          throw new Error(`HTTP ${response.status}`)
+        }
+        
+        const result = await response.json()
+        
+        if (cancelled) return
+        
+        if (result.success) {
           setModuleStates(prev => ({
             ...prev,
             [moduleName]: {
-              state: 'error',
-              data: null,
-              error: error instanceof Error ? error.message : String(error)
+              state: 'loaded',
+              data: result.data,
+              error: null,
+              loadedAt: new Date()
             }
           }))
+          
+          // Update deviceInfo with new module data
+          setDeviceInfo((prev: any) => {
+            if (!prev) return prev
+            return {
+              ...prev,
+              modules: {
+                ...prev.modules,
+                [moduleName]: result.data
+              }
+            }
+          })
+        } else {
+          throw new Error(result.error || 'Failed to load module')
         }
-      })
+        
+      } catch (error) {
+        if (cancelled) return
+        console.error(`[SMART LOAD] Error loading ${moduleName}:`, error)
+        
+        setModuleStates(prev => ({
+          ...prev,
+          [moduleName]: {
+            state: 'error',
+            data: null,
+            error: error instanceof Error ? error.message : String(error)
+          }
+        }))
+      }
+    }
+    
+    const loadBackgroundModules = async () => {
+      // Check if user landed on a specific tab (from URL hash)
+      const activeTab = getInitialActiveTab()
       
-      // Wait for all to complete
-      await Promise.allSettled(promises)
+      // Prioritize active tab first if it's a background module
+      if (activeTab && !moduleStatesRef.current[activeTab]?.state) {
+        await loadSingleModule(activeTab)
+      }
+      
+      // Then load remaining modules in parallel
+      const remainingModules = BACKGROUND_MODULES.filter(m => 
+        m !== activeTab && !moduleStatesRef.current[m]?.state
+      )
+      
+      await Promise.allSettled(remainingModules.map(loadSingleModule))
       
       if (!cancelled) {
         setAllModulesLoaded(true)
