@@ -19,7 +19,7 @@ export interface ModuleStatus {
   loadedAt?: Date
 }
 
-const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers', 'peripherals']
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'system', 'network', 'security']
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (core identity + info tab modules)
@@ -125,6 +125,8 @@ export function useSmartDeviceLoading(deviceId: string) {
     let cancelled = false
     
     const loadAllModules = async () => {
+      console.log('[SMART LOAD] Starting background module loading for:', BACKGROUND_MODULES)
+      
       // Mark all as loading first
       const loadingStates: Record<string, ModuleStatus> = {}
       BACKGROUND_MODULES.forEach(mod => {
@@ -165,6 +167,8 @@ export function useSmartDeviceLoading(deviceId: string) {
       })
       
       if (cancelled) return
+      
+      console.log('[SMART LOAD] All modules loaded, final states:', Object.keys(finalStates).map(k => `${k}: ${finalStates[k].state}`))
       
       // Single state update with all results
       setModuleStates(finalStates)
@@ -239,7 +243,11 @@ export function useSmartDeviceLoading(deviceId: string) {
   }, [moduleStates, fetchModuleData])
   
   // Memoized helper functions to avoid creating new functions on every render
-  const isModuleLoaded = useCallback((mod: string) => moduleStates[mod]?.state === 'loaded', [moduleStates])
+  const isModuleLoaded = useCallback((mod: string) => {
+    const loaded = moduleStates[mod]?.state === 'loaded'
+    console.log(`[SMART LOAD] isModuleLoaded('${mod}') = ${loaded}, state = ${moduleStates[mod]?.state}`)
+    return loaded
+  }, [moduleStates])
   const isModuleLoading = useCallback((mod: string) => moduleStates[mod]?.state === 'loading', [moduleStates])
   const isModuleError = useCallback((mod: string) => moduleStates[mod]?.state === 'error', [moduleStates])
   const getModuleData = useCallback((mod: string) => moduleStates[mod]?.data || null, [moduleStates])

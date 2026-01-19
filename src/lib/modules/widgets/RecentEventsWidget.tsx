@@ -43,7 +43,7 @@ const getEventModuleId = (event: BundledEvent): string | null => {
     return 'network'
   }
   if (message.includes('profile') || message.includes('policy') || message.includes('configuration')) {
-    return 'profiles'
+    return 'management'  // Profiles merged into Management
   }
   if (message.includes('security') || message.includes('antivirus') || message.includes('firewall') || message.includes('tpm')) {
     return 'security'
