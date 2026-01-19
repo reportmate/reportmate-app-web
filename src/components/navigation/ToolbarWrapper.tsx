@@ -5,7 +5,16 @@ import { AppToolbar } from './AppToolbar'
 import { ReactNode } from 'react'
 
 interface ToolbarWrapperProps {
-  preloadedDevices?: Array<{ serialNumber?: string; serial_number?: string; deviceName?: string; device_name?: string }>
+  preloadedDevices?: Array<{
+    serialNumber?: string
+    serial_number?: string
+    deviceName?: string
+    device_name?: string
+    assetTag?: string
+    asset_tag?: string
+    hostname?: string
+    network?: { hostname?: string }
+  }>
   children?: ReactNode
 }
 

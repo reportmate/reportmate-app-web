@@ -8,6 +8,7 @@ interface Device {
   serialNumber: string
   name: string
   assetTag?: string
+  hostname?: string
   status: string
 }
 
@@ -19,7 +20,7 @@ interface DeviceSearchFieldProps {
 
 export function DeviceSearchField({ 
   className = "", 
-  placeholder = "Find device by name, serial, or asset tag",
+  placeholder = "Find device by name, serial, asset tag, or hostname",
   preloadedDevices = []
 }: DeviceSearchFieldProps) {
   const router = useRouter()
@@ -45,6 +46,93 @@ export function DeviceSearchField({
     document.addEventListener('keydown', handleGlobalKeydown)
     return () => document.removeEventListener('keydown', handleGlobalKeydown)
   }, [])
+
+  const normalizeValue = (value?: string) =>
+    (value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim()
+
+  const getDeviceHostname = (device: Device) =>
+    device.hostname || (device as any)?.modules?.network?.hostname || (device as any)?.network?.hostname
+
+  const editDistance = (a: string, b: string) => {
+    if (a === b) return 0
+    if (!a) return b.length
+    if (!b) return a.length
+
+    const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
+    for (let i = 0; i <= a.length; i++) matrix[i][0] = i
+    for (let j = 0; j <= b.length; j++) matrix[0][j] = j
+
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        )
+      }
+    }
+    return matrix[a.length][b.length]
+  }
+
+  const scoreTokenAgainstTarget = (token: string, target: string) => {
+    if (!token || !target) return 0
+    const targetTokens = target.split(' ').filter(Boolean)
+    let bestScore = 0
+
+    for (const word of targetTokens) {
+      if (word.includes(token)) {
+        return 4
+      }
+      const distance = editDistance(token, word)
+      if (distance <= 1) {
+        bestScore = Math.max(bestScore, 3)
+        continue
+      }
+      if (token.length >= 6 && distance <= 2) {
+        bestScore = Math.max(bestScore, 2)
+      }
+    }
+
+    if (bestScore > 0) return bestScore
+
+    let index = 0
+    for (const char of target) {
+      if (char === token[index]) index += 1
+      if (index === token.length) return 1
+    }
+
+    return 0
+  }
+
+  const getDeviceMatchScore = (device: Device, query: string) => {
+    const normalizedQuery = normalizeValue(query)
+    if (!normalizedQuery) return 0
+    const tokens = normalizedQuery.split(' ').filter(Boolean)
+    if (tokens.length === 0) return 0
+
+    const targets = [
+      normalizeValue(device.name),
+      normalizeValue(device.serialNumber),
+      normalizeValue(device.assetTag),
+      normalizeValue(getDeviceHostname(device))
+    ].filter(Boolean)
+
+    let totalScore = 0
+    for (const token of tokens) {
+      let bestTokenScore = 0
+      for (const target of targets) {
+        bestTokenScore = Math.max(bestTokenScore, scoreTokenAgainstTarget(token, target))
+      }
+      if (bestTokenScore === 0) return 0
+      totalScore += bestTokenScore
+    }
+
+    return totalScore
+  }
 
   const searchDevices = useCallback(async (query: string) => {
     setIsLoading(true)
@@ -72,15 +160,16 @@ export function DeviceSearchField({
       }
       
       if (devices.length > 0) {
-        // Filter devices based on search query
-        const filteredDevices = devices.filter((device: Device) => {
-          const queryLower = query.toLowerCase()
-          const serialMatch = device.serialNumber?.toLowerCase().includes(queryLower)
-          const assetTagMatch = device.assetTag?.toLowerCase().includes(queryLower)
-          const nameMatch = device.name?.toLowerCase().includes(queryLower)
-          
-          return serialMatch || assetTagMatch || nameMatch
-        }).slice(0, 8) // Limit to 8 results
+        // Filter devices based on fuzzy search query
+        const filteredDevices = devices
+          .map((device: Device) => ({
+            device,
+            score: getDeviceMatchScore(device, query)
+          }))
+          .filter(({ score }) => score > 0)
+          .sort((a, b) => b.score - a.score)
+          .map(({ device }) => device)
+          .slice(0, 8) // Limit to 8 results
 
         setSuggestions(filteredDevices)
         setShowSuggestions(filteredDevices.length > 0)
@@ -204,12 +293,18 @@ export function DeviceSearchField({
     }
   }
 
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
   const getHighlightedText = (text: string, query: string) => {
     if (!query) return text
-    
-    const parts = text.split(new RegExp(`(${query})`, 'gi'))
+
+    const tokens = normalizeValue(query).split(' ').filter(Boolean)
+    if (tokens.length === 0) return text
+
+    const pattern = tokens.map(escapeRegExp).join('|')
+    const parts = text.split(new RegExp(`(${pattern})`, 'gi'))
     return parts.map((part, index) => (
-      part.toLowerCase() === query.toLowerCase() ? (
+      tokens.includes(part.toLowerCase()) ? (
         <mark key={index} className="bg-yellow-200 dark:bg-yellow-800 rounded px-0.5">
           {part}
         </mark>
@@ -327,6 +422,14 @@ export function DeviceSearchField({
                         <span></span>
                         <span className="font-medium">
                           {getHighlightedText(device.assetTag, searchQuery)}
+                        </span>
+                      </>
+                    )}
+                    {getDeviceHostname(device) && (
+                      <>
+                        <span></span>
+                        <span>
+                          {getHighlightedText(getDeviceHostname(device) as string, searchQuery)}
                         </span>
                       </>
                     )}
