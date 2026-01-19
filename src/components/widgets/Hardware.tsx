@@ -286,17 +286,19 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {manufacturer !== 'Unknown' && (
+          {/* Windows: Two-column grid for Manufacturer/Model */}
+          <div className="grid grid-cols-2 gap-3">
+            {manufacturer !== 'Unknown' && (
+              <Stat 
+                label="Manufacturer" 
+                value={manufacturer} 
+              />
+            )}
             <Stat 
-              label="Manufacturer" 
-              value={manufacturer} 
+              label="Model" 
+              value={model} 
             />
-          )}
-          
-          <Stat 
-            label="Model" 
-            value={model} 
-          />
+          </div>
           
           <Stat 
             label="Processor" 
@@ -309,7 +311,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           />
           
           <Stat 
-            label="RAM" 
+            label="Memory" 
             value={memoryFormatted}
           />
           

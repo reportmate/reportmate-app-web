@@ -284,28 +284,20 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
         )}
       </div>
 
-      {/* Hostname - Prominent display */}
-      {(networkData.hostname || rawNetworkModule?.hostname) && (
+      {/* Local Hostname - Prominent display for Mac */}
+      {(networkData.localHostname || rawNetworkModule?.localHostname) && (
         <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center">
             <div>
-              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Hostname</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Local Hostname</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 <CopyableValue 
-                  value={networkData.hostname || rawNetworkModule?.hostname} 
+                  value={networkData.localHostname || rawNetworkModule?.localHostname} 
                   className="text-lg"
                   mono={true}
                 />
               </div>
             </div>
-            {(networkData.localHostname || rawNetworkModule?.localHostname) && (
-              <div className="text-right">
-                <div className="text-xs text-gray-500 dark:text-gray-400">Local Hostname</div>
-                <div className="text-sm font-mono text-gray-700 dark:text-gray-300">
-                  {networkData.localHostname || rawNetworkModule?.localHostname}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}
