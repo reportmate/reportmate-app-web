@@ -16,7 +16,10 @@ export const revalidate = 0
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "ReportMate Endpoint Monitoring",
+  title: {
+    template: "%s | ReportMate",
+    default: "ReportMate Endpoint Monitoring",
+  },
   description: "Real-time fleet monitoring and event tracking",
   manifest: "/manifest.json",
   icons: {
@@ -50,20 +53,31 @@ export const viewport: Viewport = {
 async function getDevices() {
   try {
     const apiUrl = process.env.API_BASE_URL || 'http://localhost:3000'
+    
+    // Add timeout to prevent blocking the entire layout
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+    
     const response = await fetch(`${apiUrl}/api/devices`, {
       cache: 'no-store',
+      signal: controller.signal,
       headers: {
         'Cache-Control': 'no-cache',
         'Pragma': 'no-cache'
       }
     })
+    
+    clearTimeout(timeout)
 
     if (response.ok) {
       const data = await response.json()
       return Array.isArray(data) ? data : (data.devices || [])
     }
   } catch (error) {
-    console.error('[Layout] Failed to fetch devices:', error)
+    // Don't log abort errors - they're expected on timeout
+    if (error instanceof Error && error.name !== 'AbortError') {
+      console.error('[Layout] Failed to fetch devices:', error)
+    }
   }
   return []
 }
