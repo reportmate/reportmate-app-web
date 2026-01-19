@@ -13,6 +13,7 @@ interface Device {
   serialNumber: string
   name: string
   assetTag?: string
+  hostname?: string
   status: string
 }
 
@@ -75,7 +76,7 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
               <div className="flex-1 mr-4">
                 <DeviceSearchField 
                   className="w-full" 
-                  placeholder="Find device by name, serial, or asset tag" 
+                  placeholder="Find device by name, serial, asset tag, or hostname" 
                   preloadedDevices={preloadedDevices} 
                 />
               </div>
