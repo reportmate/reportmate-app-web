@@ -416,6 +416,15 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
         />
       )}
 
+      {/* Windows: Autopilot Activated */}
+      {!isMac && (management.autopilot_config || management.autopilotConfig) && (
+        <StatusBadge
+          label="Autopilot Activated"
+          status={parseBool((management.autopilot_config || management.autopilotConfig).activated) ? 'Yes' : 'No'}
+          type={parseBool((management.autopilot_config || management.autopilotConfig).activated) ? 'success' : 'info'}
+        />
+      )}
+
       {isEnrolled && (
         <>
           {/* Server URL - moved above certificate */}
@@ -438,8 +447,8 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
           {/* Device IDs section - all under horizontal line with consistent formatting */}
           {(hardwareUuid || (!isMac && (intuneDeviceId || entraObjectId))) && (
             <div className="mt-3 pt-2 border-t border-transparent space-y-2">
-              {/* Hardware UUID */}
-              {hardwareUuid && (
+              {/* Hardware UUID - hide for Intune provider */}
+              {hardwareUuid && !provider?.toLowerCase().includes('intune') && (
                 <div>
                   <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Hardware UUID</dt>
                   <dd className="mt-1 flex items-center gap-2 min-w-0">
@@ -457,10 +466,10 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
                 </div>
               )}
               
-              {/* Windows: Intune Device ID */}
-              {!isMac && intuneDeviceId && (
+              {/* Windows: Intune Device ID - only show if provider is Intune */}
+              {!isMac && provider?.toLowerCase().includes('intune') && intuneDeviceId && (
                 <div>
-                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Intune ID</dt>
+                  <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Intune UUID</dt>
                   <dd className="mt-1 flex items-center gap-2 min-w-0">
                     <span className="font-mono text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '11px' }} title={intuneDeviceId}>{intuneDeviceId}</span>
                     <button
@@ -476,8 +485,8 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
                 </div>
               )}
               
-              {/* Windows: Entra Object ID */}
-              {!isMac && entraObjectId && (
+              {/* Windows: Entra Object ID - only show if provider is NOT Intune */}
+              {!isMac && !provider?.toLowerCase().includes('intune') && entraObjectId && (
                 <div>
                   <dt className="text-xs font-medium text-gray-500 dark:text-gray-400">Object ID</dt>
                   <dd className="mt-1 flex items-center gap-2 min-w-0">

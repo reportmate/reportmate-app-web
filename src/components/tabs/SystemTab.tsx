@@ -1049,12 +1049,19 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {/* Sort PATH to top */}
                 {[...environment].sort((a, b) => {
-                  if (a.name === 'PATH' || a.name === 'path') return -1
-                  if (b.name === 'PATH' || b.name === 'path') return 1
+                  const aName = (a.name || '').toLowerCase()
+                  const bName = (b.name || '').toLowerCase()
+                  if (aName === 'path') return -1
+                  if (bName === 'path') return 1
+                  if (aName === 'hosts_file') return -1
+                  if (bName === 'hosts_file') return 1
                   return (a.name || '').localeCompare(b.name || '')
                 }).map((env: any, index: number) => {
-                  const isPath = env.name === 'PATH' || env.name === 'path'
+                  const nameLower = (env.name || '').toLowerCase()
+                  const isPath = nameLower === 'path'
+                  const isHostsFile = nameLower === 'hosts_file'
                   const pathParts = isPath ? (env.value || '').split(':').filter(Boolean) : []
+                  const hostsLines = isHostsFile ? (env.value || '').split('\n') : []
                   
                   return (
                     <tr key={env.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -1074,6 +1081,18 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                             </summary>
                             <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto whitespace-pre-wrap break-all">
                               {pathParts.join('\n')}
+                            </pre>
+                          </details>
+                        ) : isHostsFile ? (
+                          <details className="group" open>
+                            <summary className="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1">
+                              <span>hosts file</span>
+                              <svg className="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </summary>
+                            <pre className="mt-2 p-3 bg-gray-100 dark:bg-gray-900 rounded-lg text-xs font-mono text-gray-800 dark:text-gray-200 overflow-x-auto whitespace-pre-wrap break-all">
+                              {hostsLines.join('\n')}
                             </pre>
                           </details>
                         ) : (

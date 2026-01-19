@@ -420,21 +420,136 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 </span>
               </div>
             )}
+
+            {/* User Principal Name - who enrolled the device */}
+            {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
+              <div className="flex items-start">
+                <span className="text-base font-medium text-gray-900 dark:text-white">Enrolled By</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
+              </div>
+            )}
           </div>
+
+          {/* Windows: Autopilot Configuration */}
+          {isEnrolled && !isMac && (management.autopilot_config || management.autopilotConfig) && (() => {
+            const autopilot = management.autopilot_config || management.autopilotConfig
+            return (
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
+                <div className="space-y-3">
+                  {/* Status Pills - Two columns */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Assigned Status */}
+                    {autopilot.assigned !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.assigned)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.assigned) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Enrollment Status Page */}
+                    {autopilot.enrollment_status_page_enabled !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment Status Page</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.enrollment_status_page_enabled)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.enrollment_status_page_enabled) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Activated Status */}
+                    {autopilot.activated !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activated</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.activated)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.activated) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Deployment Phase */}
+                    {autopilot.deployment_phase && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Phase</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          autopilot.deployment_phase === 'Completed'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                        }`}>
+                          {autopilot.deployment_phase}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Additional Details */}
+                  {(autopilot.profile_name || autopilot.group_tag || autopilot.tenant_domain || autopilot.tenant_id || autopilot.deployment_mode || autopilot.join_method) && (
+                    <div className="pt-3 space-y-2">
+                      {autopilot.profile_name && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Profile</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.profile_name}</span>
+                        </div>
+                      )}
+                      {autopilot.group_tag && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Group Tag</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.group_tag}</span>
+                        </div>
+                      )}
+                      {autopilot.tenant_domain && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Tenant</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.tenant_domain}</span>
+                        </div>
+                      )}
+                      {autopilot.tenant_id && (
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Tenant ID</span>
+                          <div className="flex items-center gap-2 ml-3">
+                            <span className="text-sm font-mono text-gray-900 dark:text-white">{autopilot.tenant_id}</span>
+                            <CopyButton value={autopilot.tenant_id} />
+                          </div>
+                        </div>
+                      )}
+                      {autopilot.deployment_mode && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Mode</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.deployment_mode}</span>
+                        </div>
+                      )}
+                      {autopilot.join_method && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Join Method</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.join_method}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
 
           {/* Organization */}
           {isEnrolled && tenantName && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Details</h3>
               <div className="space-y-4">
-
-                {/* User Principal Name - who enrolled the device */}
-                {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
-                  <div className="flex items-start">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Enrolled By</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
-                  </div>
-                )}
 
                 {/* Intune Device ID with copy button - support both snake_case and camelCase */}
                 {(deviceDetails?.intune_device_id || deviceDetails?.intuneDeviceId) && (

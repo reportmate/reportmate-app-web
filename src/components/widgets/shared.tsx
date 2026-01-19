@@ -95,12 +95,25 @@ export interface StatusBadgeProps {
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ label, status, type = 'info' }) => {
   const getStatusColor = () => {
-    if (type === 'success' || status === true || status === 'Enabled' || status === 'Up to date') {
+    // If type is explicitly set to info, always return gray (neutral)
+    if (type === 'info') {
+      return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+    }
+    // If type is explicitly set to success, warning, or error, use that
+    if (type === 'success') {
       return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-    } else if (type === 'error' || status === false || status === 'Disabled') {
-      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-    } else if (type === 'warning') {
+    }
+    if (type === 'warning') {
       return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+    }
+    if (type === 'error') {
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+    }
+    // Fallback to status-based coloring (shouldn't reach here with current usage)
+    if (status === true || status === 'Enabled' || status === 'Up to date') {
+      return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+    } else if (status === false || status === 'Disabled') {
+      return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
     } else {
       return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
     }
