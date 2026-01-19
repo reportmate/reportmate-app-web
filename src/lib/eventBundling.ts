@@ -19,6 +19,12 @@ export interface BundledEvent extends FleetEvent {
   count: number
   eventIds: string[]
   bundledKinds: string[]
+  // Error/warning details for expandable rows (lazy-loaded)
+  errorMessages?: string[]
+  warningMessages?: string[]
+  failedItems?: Array<{ name: string; displayName: string; error: string }>
+  warningItems?: Array<{ name: string; displayName: string; warning: string }>
+  hasExpandableDetails?: boolean  // True if event has error/warning details to show
 }
 
 /**
@@ -73,6 +79,9 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       const sortedEventIds = relatedEvents.map(e => e.id).sort().join('-')
       const bundleId = `bundle-${event.device}-${eventTime}-${sortedEventIds.substring(0, 20)}`
 
+      // Extract error/warning details from bundled events
+      const bundledDetails = extractErrorWarningDetails(relatedEvents)
+
       bundled.push({
         id: bundleId,
         device: event.device,
@@ -82,26 +91,95 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
         count: relatedEvents.length,
         eventIds: relatedEvents.map(e => e.id),
         isBundle: true,
-        bundledKinds: bundleKinds
+        bundledKinds: bundleKinds,
+        ...bundledDetails
       })
     } else {
-      // Single event, add as-is
+      // Single event, add as-is with error/warning details extracted
       processed.add(event.id)
+      const singleEventDetails = extractErrorWarningDetails([event])
+      
       bundled.push({
         id: event.id,
         device: event.device,
         kind: event.kind,
         ts: event.ts,
         message: event.message || formatPayloadPreview(event.payload),
+        payload: event.payload,
         count: 1,
         eventIds: [event.id],
         isBundle: false,
-        bundledKinds: [event.kind]
+        bundledKinds: [event.kind],
+        ...singleEventDetails
       })
     }
   }
 
   return bundled.slice(0, 50) // Limit to 50 items
+}
+
+/**
+ * Extract error/warning messages and items from event payloads
+ * Used for both single events and bundled events
+ */
+function extractErrorWarningDetails(events: FleetEvent[]): Partial<BundledEvent> {
+  const errorMessages: string[] = []
+  const warningMessages: string[] = []
+  const failedItems: Array<{ name: string; displayName: string; error: string }> = []
+  const warningItems: Array<{ name: string; displayName: string; warning: string }> = []
+  
+  for (const event of events) {
+    if (!event.payload || typeof event.payload !== 'object') continue
+    
+    const payload = event.payload as Record<string, unknown>
+    
+    // Extract error messages array
+    if (Array.isArray(payload.error_messages)) {
+      errorMessages.push(...(payload.error_messages as string[]))
+    }
+    
+    // Extract warning messages array
+    if (Array.isArray(payload.warning_messages)) {
+      warningMessages.push(...(payload.warning_messages as string[]))
+    }
+    
+    // Extract failed items array
+    if (Array.isArray(payload.failed_items)) {
+      for (const item of payload.failed_items as Array<Record<string, string>>) {
+        failedItems.push({
+          name: item.name || 'Unknown',
+          displayName: item.displayName || item.name || 'Unknown',
+          error: item.error || ''
+        })
+      }
+    }
+    
+    // Extract warning items array
+    if (Array.isArray(payload.warning_items)) {
+      for (const item of payload.warning_items as Array<Record<string, string>>) {
+        warningItems.push({
+          name: item.name || 'Unknown',
+          displayName: item.displayName || item.name || 'Unknown',
+          warning: item.warning || ''
+        })
+      }
+    }
+  }
+  
+  // Determine if event has expandable details
+  const hasExpandableDetails = 
+    errorMessages.length > 0 || 
+    warningMessages.length > 0 || 
+    failedItems.length > 0 || 
+    warningItems.length > 0
+
+  return {
+    errorMessages: errorMessages.length > 0 ? errorMessages : undefined,
+    warningMessages: warningMessages.length > 0 ? warningMessages : undefined,
+    failedItems: failedItems.length > 0 ? failedItems : undefined,
+    warningItems: warningItems.length > 0 ? warningItems : undefined,
+    hasExpandableDetails
+  }
 }
 
 // Determine if two events should be bundled together
