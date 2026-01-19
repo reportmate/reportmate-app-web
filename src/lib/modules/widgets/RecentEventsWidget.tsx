@@ -181,10 +181,24 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   // Bundle related events intelligently
   const bundledEvents = useMemo(() => bundleEvents(events), [events])
+  
+  // Toggle expand/collapse for an event row
+  const toggleExpanded = (eventId: string) => {
+    setExpandedEvents(prev => {
+      const next = new Set(prev)
+      if (next.has(eventId)) {
+        next.delete(eventId)
+      } else {
+        next.add(eventId)
+      }
+      return next
+    })
+  }
 
   const handleMouseEnter = () => {
     setIsHovered(true)
@@ -463,45 +477,169 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {bundledEvents.map((bundledEvent: BundledEvent) => {
+                      const isExpanded = expandedEvents.has(bundledEvent.id)
+                      const hasDetails = bundledEvent.hasExpandableDetails
+                      
                       return (
-                        <tr 
-                          key={bundledEvent.id} 
-                          className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                        >
-                          <td className="w-20 px-3 py-2.5">
-                            <div className="flex items-center justify-center">
-                              {getStatusIcon(bundledEvent.kind)}
-                            </div>
-                          </td>
-                          <td className="w-56 px-3 py-2.5">
-                            <Link
-                              href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
-                                const moduleId = getEventModuleId(bundledEvent)
-                                return moduleId ? `#${moduleId}` : ''
-                              })()}`}
-                              className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
-                            >
-                              {getDeviceName(bundledEvent, deviceNameMap)}
-                            </Link>
-                          </td>
-                          <td className="px-3 py-2.5 hidden md:table-cell">
-                            <div className="text-sm text-gray-900 dark:text-white truncate">
-                              {bundledEvent.message}
-                              {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                  ({bundledEvent.bundledKinds.join(', ')})
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="w-44 px-3 py-2.5">
-                            <div className="text-sm text-gray-600 dark:text-gray-400">
-                              <div className="font-medium truncate">
-                                {formatRelativeTime(bundledEvent.ts)}
+                        <React.Fragment key={bundledEvent.id}>
+                          <tr 
+                            className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${hasDetails ? 'cursor-pointer' : ''}`}
+                            onClick={hasDetails ? () => toggleExpanded(bundledEvent.id) : undefined}
+                          >
+                            <td className="w-20 px-3 py-2.5">
+                              <div className="flex items-center justify-center">
+                                {hasDetails ? (
+                                  <div className="flex items-center gap-1">
+                                    <svg 
+                                      className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} 
+                                      fill="none" 
+                                      stroke="currentColor" 
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                    {getStatusIcon(bundledEvent.kind)}
+                                  </div>
+                                ) : (
+                                  getStatusIcon(bundledEvent.kind)
+                                )}
                               </div>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="w-56 px-3 py-2.5">
+                              <Link
+                                href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
+                                  const moduleId = getEventModuleId(bundledEvent)
+                                  return moduleId ? `#${moduleId}` : ''
+                                })()}`}
+                                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {getDeviceName(bundledEvent, deviceNameMap)}
+                              </Link>
+                            </td>
+                            <td className="px-3 py-2.5 hidden md:table-cell">
+                              <div className="text-sm text-gray-900 dark:text-white truncate">
+                                {bundledEvent.message}
+                                {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                    ({bundledEvent.bundledKinds.join(', ')})
+                                  </span>
+                                )}
+                                {hasDetails && !isExpanded && (
+                                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
+                                    (click to expand)
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="w-44 px-3 py-2.5">
+                              <div className="text-sm text-gray-600 dark:text-gray-400">
+                                <div className="font-medium truncate">
+                                  {formatRelativeTime(bundledEvent.ts)}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                          
+                          {/* Expanded detail row */}
+                          {isExpanded && hasDetails && (
+                            <tr className="bg-gray-50 dark:bg-gray-750">
+                              <td colSpan={4} className="px-6 py-4">
+                                <div className="space-y-3">
+                                  {/* Error Messages */}
+                                  {bundledEvent.errorMessages && bundledEvent.errorMessages.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
+                                        Errors ({bundledEvent.errorMessages.length})
+                                      </h4>
+                                      <ul className="space-y-1">
+                                        {bundledEvent.errorMessages.map((msg, idx) => (
+                                          <li 
+                                            key={idx} 
+                                            className="text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded font-mono"
+                                          >
+                                            {msg}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Warning Messages */}
+                                  {bundledEvent.warningMessages && bundledEvent.warningMessages.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-2">
+                                        Warnings ({bundledEvent.warningMessages.length})
+                                      </h4>
+                                      <ul className="space-y-1">
+                                        {bundledEvent.warningMessages.map((msg, idx) => (
+                                          <li 
+                                            key={idx} 
+                                            className="text-sm text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1.5 rounded font-mono"
+                                          >
+                                            {msg}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Failed Items */}
+                                  {bundledEvent.failedItems && bundledEvent.failedItems.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
+                                        Failed Items ({bundledEvent.failedItems.length})
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {bundledEvent.failedItems.map((item, idx) => (
+                                          <div 
+                                            key={idx} 
+                                            className="bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded border-l-2 border-red-400"
+                                          >
+                                            <div className="text-sm font-medium text-red-800 dark:text-red-200">
+                                              {item.displayName}
+                                            </div>
+                                            {item.error && (
+                                              <div className="text-xs text-red-600 dark:text-red-400 font-mono mt-1">
+                                                {item.error}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Warning Items */}
+                                  {bundledEvent.warningItems && bundledEvent.warningItems.length > 0 && (
+                                    <div>
+                                      <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-2">
+                                        Items with Warnings ({bundledEvent.warningItems.length})
+                                      </h4>
+                                      <div className="space-y-2">
+                                        {bundledEvent.warningItems.map((item, idx) => (
+                                          <div 
+                                            key={idx} 
+                                            className="bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded border-l-2 border-yellow-400"
+                                          >
+                                            <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                                              {item.displayName}
+                                            </div>
+                                            {item.warning && (
+                                              <div className="text-xs text-yellow-600 dark:text-yellow-400 font-mono mt-1">
+                                                {item.warning}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
                       )
                     })}
                   </tbody>
