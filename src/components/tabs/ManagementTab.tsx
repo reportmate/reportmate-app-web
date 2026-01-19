@@ -6,7 +6,7 @@
  * - Windows: Legacy camelCase fields with native booleans
  */
 
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
@@ -143,6 +143,15 @@ interface ManagementTabProps {
 }
 
 export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
+  // State for profile accordion expansion
+  const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set())
+  // State for managed policies accordion expansion
+  const [expandedPolicies, setExpandedPolicies] = useState<Set<string>>(new Set())
+  // State for profiles search
+  const [profileSearch, setProfileSearch] = useState('')
+  // State for policies search
+  const [policySearch, setPolicySearch] = useState('')
+  
   // Access management data from modular structure or fallback to device level
   const rawManagement = (device as any).modules?.management || (device as any).management
 
@@ -187,8 +196,63 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const remoteManagement = management.remote_management || management.remoteManagement || {}
   const installedProfiles = management.installed_profiles || management.installedProfiles || []
   const profiles = management.profiles || []
+  const managedPolicies = management.managed_policies || management.managedPolicies || []
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
   const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
+  
+  // Toggle profile expansion
+  const toggleProfile = (identifier: string) => {
+    setExpandedProfiles(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(identifier)) {
+        newSet.delete(identifier)
+      } else {
+        newSet.add(identifier)
+      }
+      return newSet
+    })
+  }
+  
+  // Toggle policy domain expansion
+  const togglePolicy = (domain: string) => {
+    setExpandedPolicies(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(domain)) {
+        newSet.delete(domain)
+      } else {
+        newSet.add(domain)
+      }
+      return newSet
+    })
+  }
+  
+  // Filter profiles by search
+  const filteredProfiles = useMemo(() => {
+    if (!profileSearch.trim()) return installedProfiles
+    const search = profileSearch.toLowerCase()
+    return installedProfiles.filter((profile: any) => {
+      const name = (profile.name || profile.identifier || '').toLowerCase()
+      const identifier = (profile.identifier || '').toLowerCase()
+      const org = (profile.organization || '').toLowerCase()
+      return name.includes(search) || identifier.includes(search) || org.includes(search)
+    })
+  }, [installedProfiles, profileSearch])
+  
+  // Filter managed policies by search
+  const filteredPolicies = useMemo(() => {
+    if (!policySearch.trim()) return managedPolicies
+    const search = policySearch.toLowerCase()
+    return managedPolicies.filter((policy: any) => {
+      const domain = (policy.domain || '').toLowerCase()
+      // Also check individual settings for search term
+      const settings = policy.settings || []
+      const settingsMatch = settings.some((s: any) => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.value || '').toLowerCase().includes(search)
+      )
+      return domain.includes(search) || settingsMatch
+    })
+  }, [managedPolicies, policySearch])
   
   // Parse the MDM certificate (handles nested JSON in 'output' field)
   const mdmCertificate = parseMdmCertificate(mdmCertificateRaw)
@@ -982,6 +1046,343 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           </div>
         )}
       </div>
+
+      {/* Configuration Profiles Section (Mac) - Accordion style like SystemTab Background Activity */}
+      {isMac && filteredProfiles.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Configuration Profiles</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Management profiles installed on this device ({filteredProfiles.length} of {installedProfiles.length} profiles)
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full sm:w-64 pl-9 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                  placeholder="Search profiles..."
+                  value={profileSearch}
+                  onChange={(e) => setProfileSearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Profiles Accordion List */}
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredProfiles.map((profile: any, index: number) => {
+              const identifier = profile.identifier || `profile-${index}`
+              const isExpanded = expandedProfiles.has(identifier)
+              const payloads = profile.payloads || []
+              const payloadCount = payloads.length || profile.payload_count || 0
+              const isVerified = profile.verification_state === 'verified'
+              const isRemovalDisallowed = profile.removal_disallowed === true || profile.removal_disallowed === 'true'
+              
+              return (
+                <div key={identifier} className="group">
+                  {/* Profile Header Row - Clickable */}
+                  <button
+                    onClick={() => toggleProfile(identifier)}
+                    className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {/* Expand/Collapse Icon */}
+                      <svg 
+                        className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      
+                      {/* Profile Icon */}
+                      <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                      
+                      {/* Profile Name and Details */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            {profile.name || identifier}
+                          </span>
+                          {/* Locked Badge */}
+                          {isRemovalDisallowed && (
+                            <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                          {profile.organization || 'Unknown Organization'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Right Side Badges */}
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      {payloadCount > 0 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {payloadCount} payload{payloadCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {/* User scope badge (e.g., "System Level") */}
+                      {profile.user && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {profile.user}
+                        </span>
+                      )}
+                      {/* Method badge: Only show for legacy MCX profiles */}
+                      {profile.method === 'Emulated' && (
+                        <span 
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                          title="Emulated via MCX (Managed Client for X) - legacy method"
+                        >
+                          Legacy MCX
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  
+                  {/* Expanded Profile Details */}
+                  {isExpanded && (
+                    <div className="px-6 pb-4 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-200 dark:border-gray-700">
+                      {/* Profile Metadata */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 py-4">
+                        <div>
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Identifier</div>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-900 dark:text-white font-mono break-all">
+                              {identifier}
+                            </span>
+                            <CopyButton value={identifier} />
+                          </div>
+                        </div>
+                        {profile.uuid && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">UUID</div>
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-gray-900 dark:text-white font-mono break-all">
+                                {profile.uuid}
+                              </span>
+                              <CopyButton value={profile.uuid} />
+                            </div>
+                          </div>
+                        )}
+                        {profile.install_date && (
+                          <div>
+                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Installed</div>
+                            <div className="text-xs text-gray-900 dark:text-white font-mono">
+                              {typeof profile.install_date === 'string' && profile.install_date.includes('at')
+                                ? profile.install_date.split(' at ')[0].split(', ').slice(0, 2).join(', ')
+                                : profile.install_date}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Profile Description */}
+                      {profile.description && (
+                        <div className="mt-2 p-3 bg-gray-100 dark:bg-gray-900/50 rounded-lg">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Description</div>
+                          <div className="text-sm text-gray-700 dark:text-gray-300">{profile.description}</div>
+                        </div>
+                      )}
+                      
+                      {/* Payloads Section */}
+                      {payloads.length > 0 && (
+                        <div className="mt-2">
+                          <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-2">Payloads</div>
+                          <div className="space-y-2">
+                            {payloads.map((payload: any, pIndex: number) => (
+                              <div key={pIndex} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div className="px-4 py-3">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                      {payload.display_name || payload.type || 'Unknown Payload'}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                                      {payload.type}
+                                    </span>
+                                  </div>
+                                  
+                                  {/* Payload Settings */}
+                                  {payload.settings && Object.keys(payload.settings).length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                      <table className="w-full text-xs">
+                                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+                                          {Object.entries(payload.settings).map(([key, value], sIndex) => (
+                                            <tr key={sIndex}>
+                                              <td className="py-1.5 pr-4 font-medium text-gray-600 dark:text-gray-400 whitespace-nowrap align-top">
+                                                {key}
+                                              </td>
+                                              <td className="py-1.5 text-gray-900 dark:text-white break-all">
+                                                {typeof value === 'boolean' ? (
+                                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                                                    value ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                                  }`}>
+                                                    {value ? 'Yes' : 'No'}
+                                                  </span>
+                                                ) : typeof value === 'object' ? (
+                                                  <pre className="text-xs font-mono whitespace-pre-wrap">{JSON.stringify(value, null, 2)}</pre>
+                                                ) : (
+                                                  String(value)
+                                                )}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  )}
+                                  
+                                  {/* Raw Data Fallback */}
+                                  {payload.raw_data && !payload.settings && (
+                                    <details className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700">
+                                      <summary className="text-xs text-blue-600 dark:text-blue-400 cursor-pointer hover:underline">
+                                        View Raw Data
+                                      </summary>
+                                      <pre className="mt-2 p-2 bg-gray-100 dark:bg-gray-900 rounded text-xs font-mono whitespace-pre-wrap overflow-x-auto">
+                                        {payload.raw_data}
+                                      </pre>
+                                    </details>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Managed Policies Section (Mac) - Grouped by domain */}
+      {isMac && filteredPolicies.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Managed Preferences</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  Managed settings from /Library/Managed Preferences/ ({filteredPolicies.length} of {managedPolicies.length} domains)
+                </p>
+              </div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full sm:w-64 pl-9 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+                  placeholder="Search preferences..."
+                  value={policySearch}
+                  onChange={(e) => setPolicySearch(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* Managed Policies Accordion List */}
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredPolicies.map((policy: any, index: number) => {
+              const domain = policy.domain || `domain-${index}`
+              const isExpanded = expandedPolicies.has(domain)
+              const settings = policy.settings || []
+              const settingCount = settings.length || policy.setting_count || 0
+              
+              return (
+                <div key={domain} className="group">
+                  {/* Policy Domain Header - Clickable */}
+                  <button
+                    onClick={() => togglePolicy(domain)}
+                    className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {/* Expand/Collapse Icon */}
+                      <svg 
+                        className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
+                        fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      
+                      {/* Gear Icon */}
+                      <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </div>
+                      
+                      {/* Domain Name */}
+                      <span className="text-sm font-medium text-gray-900 dark:text-white font-mono truncate">
+                        {domain}
+                      </span>
+                    </div>
+                    
+                    {/* Settings Count */}
+                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                      {settingCount} setting{settingCount !== 1 ? 's' : ''}
+                    </span>
+                  </button>
+                  
+                  {/* Expanded Settings Table */}
+                  {isExpanded && settings.length > 0 && (
+                    <div className="px-6 pb-4 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-200 dark:border-gray-700">
+                      <table className="w-full text-sm mt-3">
+                        <thead>
+                          <tr className="text-left">
+                            <th className="pb-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Key</th>
+                            <th className="pb-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Value</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                          {settings.map((setting: any, sIndex: number) => (
+                            <tr key={sIndex}>
+                              <td className="py-2 pr-4 text-gray-600 dark:text-gray-400 font-mono text-xs whitespace-nowrap align-top">
+                                {setting.name}
+                              </td>
+                              <td className="py-2 text-gray-900 dark:text-white break-all text-xs">
+                                {setting.value === '1' || setting.value === 'true' ? (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    Yes
+                                  </span>
+                                ) : setting.value === '0' || setting.value === 'false' ? (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                    No
+                                  </span>
+                                ) : (
+                                  <span className="font-mono">{setting.value}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Debug Accordion for API Data */}
       <div className="mt-6">
