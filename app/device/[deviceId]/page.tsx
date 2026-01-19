@@ -367,19 +367,29 @@ export default function DeviceDetailPage() {
         const hash = window.location.hash.replace('#', '') as TabType
         if (hash && tabs.some(tab => tab.id === hash)) {
           setActiveTab(hash)
+          
+          // Request module if not already loaded (fixes back/forward button data loading)
+          if (hash !== 'info' && !isModuleLoaded(hash)) {
+            // No await needed here, just trigger request
+            requestModule(hash).catch(() => {})
+          }
         }
       }
     }
-    
-    // Set initial tab from URL hash
-    handleHashChange()
     
     // Listen for hash changes
     if (typeof window !== 'undefined') {
       window.addEventListener('hashchange', handleHashChange)
       return () => window.removeEventListener('hashchange', handleHashChange)
     }
-  }, [activeTab])
+  }, [isModuleLoaded, requestModule])
+
+  // Prefetch module data on hover
+  const handleTabHover = (tabId: TabType) => {
+    if (tabId !== 'info' && !isModuleLoaded(tabId)) {
+      requestModule(tabId).catch(() => {})
+    }
+  }
 
   // Dynamic overflow detection based on container width
   useEffect(() => {
@@ -956,6 +966,7 @@ export default function DeviceDetailPage() {
                   <div key={tab.id} className="relative group">
                     <button
                       onClick={() => handleTabChange(tab.id)}
+                      onMouseEnter={() => handleTabHover(tab.id)}
                       className={`tab-button flex items-center justify-center p-3.5 border-b-2 font-medium text-sm transition-all duration-200 ease-in-out flex-shrink-0 rounded-t-lg ${
                         isActive 
                           ? getTabAccentColors(tab.accentColor, true)
@@ -1024,12 +1035,13 @@ export default function DeviceDetailPage() {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Info Tab - Always loaded fast */}
-        <div className={activeTab === 'info' ? 'block' : 'hidden'}>
+        {activeTab === 'info' && (
           <InfoTab device={deviceInfo} />
-        </div>
+        )}
 
         {/* Installs Tab - Progressive loading */}
-        <div className={activeTab === 'installs' ? 'block' : 'hidden'}>
+        {activeTab === 'installs' && (
+          <div>
           {isModuleError('installs') ? (
             <ModuleLoadingState 
               moduleName="installs" 
@@ -1050,10 +1062,12 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Profiles Tab - Progressive loading */}
-        <div className={activeTab === 'profiles' ? 'block' : 'hidden'}>
+        {activeTab === 'profiles' && (
+          <div>
           {isModuleError('profiles') ? (
             <ModuleLoadingState 
               moduleName="profiles" 
@@ -1074,10 +1088,12 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Applications Tab - Progressive loading */}
-        <div className={activeTab === 'applications' ? 'block' : 'hidden'}>
+        {activeTab === 'applications' && (
+          <div>
           {isModuleError('applications') ? (
             <ModuleLoadingState 
               moduleName="applications" 
@@ -1098,15 +1114,17 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Management Tab - Already in info, just display */}
-        <div className={activeTab === 'management' ? 'block' : 'hidden'}>
+        {activeTab === 'management' && (
           <ManagementTab device={deviceInfo as unknown as Record<string, unknown>} />
-        </div>
+        )}
 
         {/* System Tab - Progressive loading */}
-        <div className={activeTab === 'system' ? 'block' : 'hidden'}>
+        {activeTab === 'system' && (
+          <div>
           {isModuleError('system') ? (
             <ModuleLoadingState 
               moduleName="system" 
@@ -1127,15 +1145,17 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Hardware Tab - Already in info, just display */}
-        <div className={activeTab === 'hardware' ? 'block' : 'hidden'}>
+        {activeTab === 'hardware' && (
           <HardwareTab device={deviceInfo as any} />
-        </div>
+        )}
 
         {/* Network Tab - Progressive loading */}
-        <div className={activeTab === 'network' ? 'block' : 'hidden'}>
+        {activeTab === 'network' && (
+          <div>
           {isModuleError('network') ? (
             <ModuleLoadingState 
               moduleName="network" 
@@ -1156,10 +1176,12 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Security Tab - Progressive loading */}
-        <div className={activeTab === 'security' ? 'block' : 'hidden'}>
+        {activeTab === 'security' && (
+          <div>
           {isModuleError('security') ? (
             <ModuleLoadingState 
               moduleName="security" 
@@ -1180,10 +1202,12 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Peripherals Tab - Progressive loading */}
-        <div className={activeTab === 'peripherals' ? 'block' : 'hidden'}>
+        {activeTab === 'peripherals' && (
+          <div>
           {isModuleError('peripherals') ? (
             <ModuleLoadingState 
               moduleName="peripherals" 
@@ -1194,7 +1218,10 @@ export default function DeviceDetailPage() {
               onRetry={() => requestModule('peripherals')}
             />
           ) : isModuleLoaded('peripherals') ? (
-            <PeripheralsTab device={{ ...deviceInfo, id: deviceInfo.deviceId }} />
+            <PeripheralsTab 
+              device={{ ...deviceInfo, id: deviceInfo.deviceId }} 
+              data={getModuleData('peripherals')}
+            />
           ) : (
             <ModuleLoadingState 
               moduleName="peripherals" 
@@ -1204,10 +1231,12 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
 
         {/* Events Tab - Progressive loading */}
-        <div className={activeTab === 'events' ? 'block' : 'hidden'}>
+        {activeTab === 'events' && (
+          <div>
           {isModuleError('events') ? (
             <ModuleLoadingState 
               moduleName="events" 
@@ -1228,7 +1257,8 @@ export default function DeviceDetailPage() {
               isMac={isMac}
             />
           )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   )

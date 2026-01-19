@@ -125,11 +125,12 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   const [activeFilter, setActiveFilter] = useState<'all' | 'unused' | 'singleUser' | 'withUsage'>('all')
   
   // Normalize snake_case to camelCase for applications module
-  const rawApplicationsModule = device?.modules?.applications
+  // Prefer direct data prop if available
+  const rawApplicationsModule = data || device?.modules?.applications
   const normalizedApplicationsModule = rawApplicationsModule ? normalizeKeys(rawApplicationsModule) as any : null
   
-  // Process applications data from the modular device structure
-  const applicationsModuleData = extractApplications(device?.modules || {})
+  // Process applications data from the modular device structure (or constructed from data)
+  const applicationsModuleData = extractApplications(normalizedApplicationsModule ? { applications: normalizedApplicationsModule } : device?.modules || {})
   
   // Extract usage data - check both raw and normalized module
   // macOS sends applicationUsage at the module level with activeSessions array
