@@ -227,7 +227,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               <StatusBadge
                 label="Gatekeeper"
                 status={security.gatekeeper.enabled ? 'Enabled' : 'Disabled'}
-                type={getStatusType(security.gatekeeper.enabled)}
+                type={security.gatekeeper.enabled ? 'success' : 'error'}
               />
             )}
 
@@ -236,7 +236,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               <StatusBadge
                 label="System Integrity Protection"
                 status={security.systemIntegrityProtection.enabled ? 'Enabled' : 'Disabled'}
-                type={getStatusType(security.systemIntegrityProtection.enabled)}
+                type={security.systemIntegrityProtection.enabled ? 'success' : 'error'}
               />
             )}
             
@@ -253,7 +253,7 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
             <StatusBadge
               label="Firewall"
               status={firewallInfo.status}
-              type={getStatusType(security?.firewall?.enabled || security?.firewall?.isEnabled, firewallInfo.status)}
+              type="info"
             />
             
             {/* Screen Sharing (Remote Management) */}
@@ -296,13 +296,6 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
               )}
             </div>
 
-            {/* Firewall Protection */}
-            <StatusBadge
-              label="Firewall"
-              status={security?.firewall?.statusDisplay || firewallInfo.status}
-              type={getStatusType(security?.firewall?.isEnabled, firewallInfo.status)}
-            />
-
             {/* Disk Encryption */}
             <StatusBadge
               label={isWindows ? "BitLocker" : "Encryption"}
@@ -343,6 +336,13 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
                 </div>
               </div>
             )}
+
+            {/* Firewall Protection */}
+            <StatusBadge
+              label="Firewall"
+              status={security?.firewall?.statusDisplay || firewallInfo.status}
+              type="info"
+            />
           </>
         )}
       </div>
