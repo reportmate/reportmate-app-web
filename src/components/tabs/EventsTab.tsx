@@ -184,6 +184,14 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
         
         {/* Filter Buttons - Desktop */}
         <div className="hidden sm:flex items-center gap-2">
+          {filterType !== 'all' && (
+            <button
+              onClick={() => setFilterType('all')}
+              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
+            >
+              Clear
+            </button>
+          )}
           {EVENT_FILTERS.map((filter) => {
             const isActive = filterType === filter.key
             const count = eventCounts[filter.key] || 0
@@ -204,14 +212,6 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
               </button>
             )
           })}
-          {filterType !== 'all' && (
-            <button
-              onClick={() => setFilterType('all')}
-              className="px-3 py-1.5 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            >
-              Clear
-            </button>
-          )}
         </div>
         
         {/* Filter Dropdown - Mobile */}
