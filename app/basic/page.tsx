@@ -1,3 +1,10 @@
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Basic Test',
+  description: 'Basic HTML/CSS rendering test',
+};
+
 export default function BasicTest() {
   return (
     <div style={{ backgroundColor: 'red', color: 'white', fontFamily: 'Arial, sans-serif', padding: '20px', minHeight: '100vh' }}>
