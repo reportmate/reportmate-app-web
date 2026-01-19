@@ -192,6 +192,7 @@ interface Device {
 
 interface PeripheralsTabProps {
   device: Device
+  data?: PeripheralsData | any
 }
 
 // Sidebar category definition
@@ -255,7 +256,7 @@ const StatusBadge = ({ connected, label }: { connected?: boolean; label?: string
   )
 }
 
-export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
+export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) => {
   // null = show all, string = show only that category
   const [activeFilter, setActiveFilter] = useState<string | null>(null)
   
@@ -275,8 +276,8 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device }) => {
   
   // Extract peripherals data from device
   const peripherals: PeripheralsData = useMemo(() => {
-    return device.peripherals || device.modules?.peripherals || {}
-  }, [device])
+    return data || device.peripherals || device.modules?.peripherals || {}
+  }, [device, data])
   
   // Split audio devices into outputs and microphones
   const audioOutputs = useMemo(() => 

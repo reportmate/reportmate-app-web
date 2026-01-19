@@ -67,15 +67,35 @@ interface EventsTabProps {
   data?: Record<string, unknown>
 }
 
-export const EventsTab: React.FC<EventsTabProps> = ({ events }) => {
+export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
   // Filter state - 'all' shows everything, otherwise filter by kind
   const [filterType, setFilterType] = useState<string>('all')
   
   // Filter events to only include valid categories
   const validEvents = useMemo(() => {
-    if (!events) return []
-    return events.filter(event => event.kind && VALID_EVENT_KINDS.includes(event.kind.toLowerCase()))
-  }, [events])
+    // Check various sources for events (prop, data prop, wrapper objects)
+    let rawEvents = events || (data as any)?.events || data || []
+    
+    // Handle case where rawEvents might be an object wrapping the array
+    if (!Array.isArray(rawEvents) && rawEvents && typeof rawEvents === 'object') {
+       if (Array.isArray((rawEvents as any).events)) {
+         rawEvents = (rawEvents as any).events
+       } else if (Array.isArray((rawEvents as any).items)) {
+         rawEvents = (rawEvents as any).items
+       } else {
+         // Fallback: convert object values to array if it looks like a map, or just empty
+         rawEvents = []
+       }
+    }
+
+    if (!Array.isArray(rawEvents)) return []
+
+    return rawEvents.filter((event: any) => 
+      event && 
+      (event.kind || event.type) && 
+      VALID_EVENT_KINDS.includes((event.kind || event.type).toLowerCase())
+    )
+  }, [events, data])
   
   // Apply intelligent event bundling
   const bundledEvents = useMemo(() => {

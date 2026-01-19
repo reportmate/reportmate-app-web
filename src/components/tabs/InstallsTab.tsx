@@ -180,63 +180,26 @@ const InstallsTabSkeleton = () => (
   </div>
 )
 
-export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data }) => {
+export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
   const params = useParams()
   const deviceId = params?.deviceId as string
-  const [selfFetchedDevice, setSelfFetchedDevice] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(!device && !!deviceId)
   const [isLogExpanded, setIsLogExpanded] = useState(false)
   const [logContent, setLogContent] = useState<string | null>(null)
   const [isLogLoading, setIsLogLoading] = useState(false)
   const [isLogCopied, setIsLogCopied] = useState(false)
   const [logSearchTerm, setLogSearchTerm] = useState('')
 
-  // EMERGENCY WORKAROUND: Try synchronous data processing first
-  // If device prop is null/empty, we'll show a fallback message
-  const effectiveDevice = device || selfFetchedDevice
-  
   // Normalize snake_case to camelCase for installs module
-  const rawInstallsModule = effectiveDevice?.modules?.installs
+  // Prefer direct data prop if available (freshest from smart loader)
+  const rawInstallsModule = data || device?.modules?.installs
   const normalizedInstallsModule = rawInstallsModule ? normalizeKeys(rawInstallsModule) as any : null
-  const normalizedModules = effectiveDevice?.modules ? {
-    ...effectiveDevice.modules,
+  const normalizedModules = {
+    ...(device?.modules || {}),
     installs: normalizedInstallsModule
-  } : null
+  }
   
-  // CRITICAL FIX: Always process raw device data directly to ensure we get the rich Cimian data
-  // The data prop might be empty or not processed correctly, so we handle it ourselves
-  const installsData = normalizedModules ? extractInstalls(normalizedModules) : null
-  
-  // Self-contained device data fetching as workaround for broken device page useEffect
-  // BUT ONLY if we don't have device data already
-  useEffect(() => {
-    // If we have no device prop or an empty device, fetch it ourselves
-    if (!device && deviceId) {
-      setIsLoading(true)
-      
-      fetch(`/api/device/${deviceId}`)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`)
-          }
-          return response.json()
-        })
-        .then(deviceData => {
-          // CRITICAL FIX: Use deviceData.device (not deviceData) since API returns {success: true, device: {...}}
-          if (deviceData?.success && deviceData?.device) {
-            setSelfFetchedDevice(deviceData.device)  // Use .device property!
-          } else {
-            setSelfFetchedDevice(deviceData)  // Fallback to full response
-          }
-        })
-        .catch(error => {
-          console.error('[INSTALLS TAB] Error fetching device:', error)
-        })
-        .finally(() => {
-          setIsLoading(false)
-        })
-    }
-  }, [device, deviceId])
+  // Process raw device data directly to ensure we get the rich Cimian data
+  const installsData = extractInstalls(normalizedModules)
   
   // Process raw Cimian data to ensure proper version and duration fields
   const processedInstallsData = useMemo(() => {
@@ -249,7 +212,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
     return installsData
     
     // If we have raw device data but no processed packages, create them
-    const cimianData = effectiveDevice?.modules?.installs?.cimian
+    const cimianData = device?.modules?.installs?.cimian
     if (!cimianData) return installsData
     
     const packages: any[] = []
@@ -352,7 +315,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
     }
     
     return processedData
-  }, [installsData, effectiveDevice])
+  }, [installsData, device])
 
   const toggleLog = async () => {
     if (isLogExpanded) {
@@ -362,10 +325,10 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
 
     setIsLogExpanded(true)
     
-    if (!logContent && effectiveDevice?.serialNumber) {
+    if (!logContent && device?.serialNumber) {
       setIsLogLoading(true)
       try {
-        const response = await fetch(`/api/device/${effectiveDevice.serialNumber}/installs/log`)
+        const response = await fetch(`/api/device/${device.serialNumber}/installs/log`)
         if (response.ok) {
           const data = await response.json()
           setLogContent(data.runLog || 'No log data available')
@@ -381,9 +344,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
     }
   }
 
-  if (isLoading) {
-    return <InstallsTabSkeleton />
-  }
+
 
   return (
     <div className="space-y-6">
@@ -401,11 +362,11 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
           </div>
         </div>
         {/* Last Run - Top Right */}
-        {(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.munki?.endTime || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time) && (
+        {(processedInstallsData?.config?.lastRun || device?.modules?.installs?.munki?.endTime || device?.modules?.installs?.cimian?.sessions?.[0]?.start_time) && (
           <div className="text-right mr-8">
             <div className="text-sm text-gray-500 dark:text-gray-400">Last Run</div>
             <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              {formatCompactRelativeTime(processedInstallsData?.config?.lastRun || effectiveDevice?.modules?.installs?.munki?.endTime || effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time || '')}
+              {formatCompactRelativeTime(processedInstallsData?.config?.lastRun || device?.modules?.installs?.munki?.endTime || device?.modules?.installs?.cimian?.sessions?.[0]?.start_time || '')}
             </div>
           </div>
         )}
@@ -420,10 +381,10 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
                 {processedInstallsData?.config?.manifest || 
-                 effectiveDevice?.modules?.installs?.munki?.manifestName ||
-                 effectiveDevice?.modules?.installs?.munki?.clientIdentifier ||
-                 effectiveDevice?.modules?.installs?.cimian?.config?.ClientIdentifier || 
-                 effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
+                 device?.modules?.installs?.munki?.manifestName ||
+                 device?.modules?.installs?.munki?.clientIdentifier ||
+                 device?.modules?.installs?.cimian?.config?.ClientIdentifier || 
+                 device?.modules?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
                  'No manifest configured'}
               </div>
             </div>
@@ -431,9 +392,9 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
                 {processedInstallsData?.config?.softwareRepoURL || 
-                 effectiveDevice?.modules?.installs?.munki?.softwareRepoURL ||
-                 effectiveDevice?.modules?.installs?.cimian?.config?.SoftwareRepoURL || 
-                 effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
+                 device?.modules?.installs?.munki?.softwareRepoURL ||
+                 device?.modules?.installs?.cimian?.config?.SoftwareRepoURL || 
+                 device?.modules?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
                  'No repo configured'}
               </div>
             </div>
@@ -446,7 +407,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="flex justify-center">
                 <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
                   {processedInstallsData?.config?.runType || 
-                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
+                   device?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
                    'Auto'}
                 </span>
               </div>
@@ -454,12 +415,12 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
             <div>
               <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
                 {processedInstallsData?.systemName ? `${processedInstallsData.systemName} Version` : 
-                 effectiveDevice?.modules?.installs?.munki ? 'Munki Version' : 'Cimian Version'}
+                 device?.modules?.installs?.munki ? 'Munki Version' : 'Cimian Version'}
               </div>
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border mx-auto inline-block">
                 {processedInstallsData?.config?.version || 
-                 effectiveDevice?.modules?.installs?.munki?.version ||
-                 effectiveDevice?.modules?.installs?.cimian?.version || 
+                 device?.modules?.installs?.munki?.version ||
+                 device?.modules?.installs?.cimian?.version || 
                  'Unknown'}
               </div>
             </div>
@@ -478,9 +439,9 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
               <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
                 {(() => {
                   const timestamp = processedInstallsData?.config?.lastRun || 
-                                   effectiveDevice?.modules?.installs?.munki?.endTime ||
-                                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
-                                   effectiveDevice?.modules?.installs?.cimian?.sessions?.[0]?.endTime
+                                   device?.modules?.installs?.munki?.endTime ||
+                                   device?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
+                                   device?.modules?.installs?.cimian?.sessions?.[0]?.endTime
                   if (!timestamp) return 'Never'
                   
                   try {
@@ -587,7 +548,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
                          const url = window.URL.createObjectURL(blob);
                          const a = document.createElement('a');
                          a.href = url;
-                         a.download = `run-${effectiveDevice?.serialNumber || 'log'}.log`;
+                         a.download = `run-${device?.serialNumber || 'log'}.log`;
                          document.body.appendChild(a);
                          a.click();
                          window.URL.revokeObjectURL(url);
@@ -642,7 +603,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
                   <div className="flex justify-end gap-2 mb-2">
                     <button
                       onClick={() => {
-                        const jsonString = JSON.stringify(effectiveDevice?.modules?.installs, null, 2)
+                        const jsonString = JSON.stringify(device?.modules?.installs, null, 2)
                         navigator.clipboard.writeText(jsonString)
                       }}
                       className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
@@ -651,7 +612,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data: _data })
                     </button>
                   </div>
                   <pre className="p-4 bg-gray-900 dark:bg-black text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto rounded border border-gray-700">
-                    {JSON.stringify(effectiveDevice?.modules?.installs, null, 2)}
+                    {JSON.stringify(device?.modules?.installs, null, 2)}
                   </pre>
                 </div>
               </div>

@@ -2,16 +2,12 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { mapDeviceData } from '../lib/data-processing/device-mapper-modular'
 
 /**
- * Smart Device Loading Hook - V3
+ * Smart Device Loading Hook - V4 (Simplified & Robust)
  * 
  * Strategy:
- * 1. Load InfoTab modules FIRST (inventory, system, hardware, management, security, network)
- * 2. Check URL hash - if user landed on a specific tab, load that NEXT
- * 3. Load remaining modules in PARALLEL in background
- * 4. Events are loaded with limit=5 initially for speed
- * 5. No artificial delays - let the network be the bottleneck
- * 
- * This gives instant InfoTab + active tab priority.
+ * 1. Load InfoTab (Basic device info) - FAST
+ * 2. Background Load - All other modules in parallel
+ * 3. Simple state management - no complex ref syncing
  */
 
 export type ModuleLoadState = 'unloaded' | 'loading' | 'loaded' | 'error'
@@ -25,43 +21,56 @@ export interface ModuleStatus {
 
 const BACKGROUND_MODULES: string[] = ['events', 'installs', 'profiles', 'applications', 'displays', 'printers', 'peripherals']
 
-// Get initial active tab from URL hash
-const getInitialActiveTab = (): string | null => {
-  if (typeof window === 'undefined') return null
-  const hash = window.location.hash.replace('#', '')
-  if (hash && BACKGROUND_MODULES.includes(hash)) {
-    return hash
-  }
-  return null
-}
-
 export function useSmartDeviceLoading(deviceId: string) {
-  // Device info (processed and ready for InfoTab)
+  // Device info (core identity + info tab modules)
   const [deviceInfo, setDeviceInfo] = useState<any>(null)
   const [infoLoading, setInfoLoading] = useState(true)
   const [infoError, setInfoError] = useState<string | null>(null)
   
-  // Module loading states
+  // Module loading states - simple object tracking
   const [moduleStates, setModuleStates] = useState<Record<string, ModuleStatus>>({})
   const [allModulesLoaded, setAllModulesLoaded] = useState(false)
-  const moduleStatesRef = useRef<Record<string, ModuleStatus>>({})
   
+  // Track if background loading has been triggered for this deviceId
+  const backgroundLoadingTriggered = useRef(false)
+  const currentDeviceId = useRef(deviceId)
+
+  // Reset everything when deviceId changes
   useEffect(() => {
-    moduleStatesRef.current = moduleStates
-  }, [moduleStates])
-  
+    currentDeviceId.current = deviceId
+    backgroundLoadingTriggered.current = false
+    setDeviceInfo(null)
+    setInfoLoading(true)
+    setInfoError(null)
+    setModuleStates({})
+    setAllModulesLoaded(false)
+  }, [deviceId])
+
+  // Fetch helper - simple and direct
+  const fetchModuleData = useCallback(async (moduleName: string): Promise<any> => {
+    const url = moduleName === 'events' 
+      ? `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}?limit=5`
+      : `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`
+      
+    const response = await fetch(url)
+    
+    if (!response.ok) {
+      if (response.status === 404) return null
+      throw new Error(`HTTP ${response.status}`)
+    }
+    
+    const result = await response.json()
+    if (result.success) return result.data
+    throw new Error(result.error || 'Failed to load module')
+  }, [deviceId])
+
   /**
-   * Load InfoTab data - FAST
+   * 1. Load InfoTab data
    */
   useEffect(() => {
     let cancelled = false
     
     const loadInfoData = async () => {
-      if (cancelled) return
-      
-      setInfoLoading(true)
-      setInfoError(null)
-      
       try {
         const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/info`)
         
@@ -82,25 +91,9 @@ export function useSmartDeviceLoading(deviceId: string) {
         // Process through mapDeviceData to ensure proper structure
         const processed = mapDeviceData(result.device)
         
+        if (cancelled) return
+        
         setDeviceInfo(processed)
-        
-        // Mark info modules as loaded
-        if (result.device?.modules) {
-          const loadedModules = Object.keys(result.device.modules)
-          const newStates: Record<string, ModuleStatus> = {}
-          
-          loadedModules.forEach(moduleName => {
-            newStates[moduleName] = {
-              state: 'loaded',
-              data: result.device.modules[moduleName],
-              error: null,
-              loadedAt: new Date()
-            }
-          })
-          
-          setModuleStates(newStates)
-        }
-        
         setInfoLoading(false)
         
       } catch (error) {
@@ -115,218 +108,154 @@ export function useSmartDeviceLoading(deviceId: string) {
       loadInfoData()
     }
     
-    return () => {
-      cancelled = true
-    }
+    return () => { cancelled = true }
   }, [deviceId])
-  
+
   /**
-   * Load remaining modules - PRIORITIZE ACTIVE TAB, then parallel for rest
+   * 2. Load background modules - ONLY ONCE per deviceId
    */
   useEffect(() => {
-    if (!deviceInfo || infoLoading || allModulesLoaded) return
+    // Wait for info to load successfully
+    if (!deviceInfo || infoLoading || infoError) return
+    
+    // Only trigger once per deviceId
+    if (backgroundLoadingTriggered.current) return
+    backgroundLoadingTriggered.current = true
     
     let cancelled = false
     
-    const loadSingleModule = async (moduleName: string): Promise<void> => {
-      // Skip if already loaded
-      if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
-        return
-      }
+    const loadAllModules = async () => {
+      // Mark all as loading first
+      const loadingStates: Record<string, ModuleStatus> = {}
+      BACKGROUND_MODULES.forEach(mod => {
+        loadingStates[mod] = { state: 'loading', data: null, error: null }
+      })
+      setModuleStates(loadingStates)
       
-      // Mark as loading
-      setModuleStates(prev => ({
-        ...prev,
-        [moduleName]: { state: 'loading', data: null, error: null }
-      }))
-      
-      try {
-        // Events module: limit to 5 for initial fast load
-        const url = moduleName === 'events' 
-          ? `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}?limit=5`
-          : `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`
-        
-        const response = await fetch(url)
-        
-        if (cancelled) return
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            // Module doesn't exist for this device - that's OK
-            setModuleStates(prev => ({
-              ...prev,
-              [moduleName]: { state: 'loaded', data: null, error: null, loadedAt: new Date() }
-            }))
-            return
-          }
-          throw new Error(`HTTP ${response.status}`)
-        }
-        
-        const result = await response.json()
-        
-        if (cancelled) return
-        
-        if (result.success) {
-          setModuleStates(prev => ({
-            ...prev,
-            [moduleName]: {
-              state: 'loaded',
-              data: result.data,
-              error: null,
-              loadedAt: new Date()
-            }
-          }))
-          
-          // Update deviceInfo with new module data
-          setDeviceInfo((prev: any) => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              modules: {
-                ...prev.modules,
-                [moduleName]: result.data
-              }
-            }
-          })
-        } else {
-          throw new Error(result.error || 'Failed to load module')
-        }
-        
-      } catch (error) {
-        if (cancelled) return
-        console.error(`[SMART LOAD] Error loading ${moduleName}:`, error)
-        
-        setModuleStates(prev => ({
-          ...prev,
-          [moduleName]: {
-            state: 'error',
-            data: null,
-            error: error instanceof Error ? error.message : String(error)
-          }
-        }))
-      }
-    }
-    
-    const loadBackgroundModules = async () => {
-      // Check if user landed on a specific tab (from URL hash)
-      const activeTab = getInitialActiveTab()
-      
-      // Prioritize active tab first if it's a background module
-      if (activeTab && !moduleStatesRef.current[activeTab]?.state) {
-        await loadSingleModule(activeTab)
-      }
-      
-      // Then load remaining modules in parallel
-      const remainingModules = BACKGROUND_MODULES.filter(m => 
-        m !== activeTab && !moduleStatesRef.current[m]?.state
+      // Fetch all in parallel
+      const results = await Promise.allSettled(
+        BACKGROUND_MODULES.map(async (mod) => {
+          const data = await fetchModuleData(mod)
+          return { mod, data }
+        })
       )
       
-      await Promise.allSettled(remainingModules.map(loadSingleModule))
+      if (cancelled) return
       
-      if (!cancelled) {
-        setAllModulesLoaded(true)
-      }
+      // Update states based on results
+      const finalStates: Record<string, ModuleStatus> = {}
+      
+      results.forEach((result, index) => {
+        const mod = BACKGROUND_MODULES[index]
+        
+        if (result.status === 'fulfilled') {
+          finalStates[mod] = {
+            state: 'loaded',
+            data: result.value.data,
+            error: null,
+            loadedAt: new Date()
+          }
+        } else {
+          finalStates[mod] = {
+            state: 'error',
+            data: null,
+            error: result.reason?.message || 'Failed to load'
+          }
+        }
+      })
+      
+      if (cancelled) return
+      
+      // Single state update with all results
+      setModuleStates(finalStates)
+      
+      // Also sync to deviceInfo.modules for legacy components
+      setDeviceInfo((prev: any) => {
+        if (!prev) return prev
+        const modules = { ...prev.modules }
+        Object.entries(finalStates).forEach(([mod, status]) => {
+          if (status.state === 'loaded') {
+            modules[mod] = status.data
+          }
+        })
+        return { ...prev, modules }
+      })
+      
+      setAllModulesLoaded(true)
     }
     
-    loadBackgroundModules()
+    loadAllModules()
     
-    return () => {
-      cancelled = true
-    }
-  }, [deviceInfo, infoLoading, deviceId, allModulesLoaded])
-  
+    return () => { cancelled = true }
+  }, [deviceInfo, infoLoading, infoError, fetchModuleData])
+
   /**
-   * On-demand module loading (if user clicks tab before background load completes)
+   * 3. On-demand module loading (for modules not in background list)
    */
   const requestModule = useCallback(async (moduleName: string) => {
-    // If already loaded, return data from ref (always current)
-    if (moduleStatesRef.current[moduleName]?.state === 'loaded') {
-      return moduleStatesRef.current[moduleName].data
+    // Check current state
+    const currentState = moduleStates[moduleName]
+    
+    if (currentState?.state === 'loaded') {
+      return currentState.data
     }
     
-    // If currently loading, just return null - the background load will update state
-    // No polling needed - React will re-render when moduleStates changes
-    if (moduleStatesRef.current[moduleName]?.state === 'loading') {
+    if (currentState?.state === 'loading') {
       return null
     }
     
-    // Otherwise, load it now
+    // Mark as loading
     setModuleStates(prev => ({
       ...prev,
       [moduleName]: { state: 'loading', data: null, error: null }
     }))
     
     try {
-      const response = await fetch(`/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`)
-      
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`)
-      }
-      
-      const result = await response.json()
-      
-      if (result.success) {
-        setModuleStates(prev => ({
-          ...prev,
-          [moduleName]: {
-            state: 'loaded',
-            data: result.data,
-            error: null,
-            loadedAt: new Date()
-          }
-        }))
-        
-        // Update deviceInfo
-        setDeviceInfo((prev: any) => {
-          if (!prev) return prev
-          return {
-            ...prev,
-            modules: {
-              ...prev.modules,
-              [moduleName]: result.data
-            }
-          }
-        })
-        
-        return result.data
-      } else {
-        throw new Error(result.error || 'Failed to load module')
-      }
-      
-    } catch (error) {
-      console.error(`[SMART LOAD] On-demand load failed for ${moduleName}:`, error)
+      const data = await fetchModuleData(moduleName)
       
       setModuleStates(prev => ({
         ...prev,
-        [moduleName]: {
-          state: 'error',
-          data: null,
-          error: error instanceof Error ? error.message : String(error)
-        }
+        [moduleName]: { state: 'loaded', data, error: null, loadedAt: new Date() }
       }))
       
-      throw error
+      // Sync to deviceInfo.modules
+      setDeviceInfo((prev: any) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          modules: { ...prev.modules, [moduleName]: data }
+        }
+      })
+      
+      return data
+      
+    } catch (err: any) {
+      setModuleStates(prev => ({
+        ...prev,
+        [moduleName]: { state: 'error', data: null, error: err.message }
+      }))
+      throw err
     }
-  }, [deviceId, moduleStates])
+  }, [moduleStates, fetchModuleData])
+  
+  // Memoized helper functions to avoid creating new functions on every render
+  const isModuleLoaded = useCallback((mod: string) => moduleStates[mod]?.state === 'loaded', [moduleStates])
+  const isModuleLoading = useCallback((mod: string) => moduleStates[mod]?.state === 'loading', [moduleStates])
+  const isModuleError = useCallback((mod: string) => moduleStates[mod]?.state === 'error', [moduleStates])
+  const getModuleData = useCallback((mod: string) => moduleStates[mod]?.data || null, [moduleStates])
+  const getModuleError = useCallback((mod: string) => moduleStates[mod]?.error || null, [moduleStates])
   
   return {
-    // Device data (ready for InfoTab immediately)
     deviceInfo,
     infoLoading,
     infoError,
-    
-    // Module states
     moduleStates,
     allModulesLoaded,
-    
-    // Actions
     requestModule,
-    
-    // Helper functions
-    isModuleLoaded: (moduleName: string) => moduleStates[moduleName]?.state === 'loaded',
-    isModuleLoading: (moduleName: string) => moduleStates[moduleName]?.state === 'loading',
-    isModuleError: (moduleName: string) => moduleStates[moduleName]?.state === 'error',
-    getModuleData: (moduleName: string) => moduleStates[moduleName]?.data || null,
-    getModuleError: (moduleName: string) => moduleStates[moduleName]?.error || null,
+    isModuleLoaded,
+    isModuleLoading,
+    isModuleError,
+    getModuleData,
+    getModuleError,
   }
 }

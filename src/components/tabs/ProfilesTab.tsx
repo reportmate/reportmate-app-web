@@ -195,7 +195,8 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
     let settingsCount = 0
 
     // Get profiles data from device - support both paths
-    const profilesData = device?.modules?.profiles || device?.profiles || data?.profiles || data
+    // Prefer data passed directly
+    const profilesData = data?.profiles || data || device?.modules?.profiles || device?.profiles
     
     if (!profilesData) {
       return { policyGroups: [], policyTypes: [], totalSettings: 0 }
