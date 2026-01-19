@@ -258,7 +258,6 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Application</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Publisher</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Used</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Total Time</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Launches</th>
@@ -268,7 +267,7 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {visibleApps.length === 0 && searchTerm ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                     No applications found matching &quot;{searchTerm}&quot;
                   </td>
                 </tr>
@@ -298,16 +297,6 @@ export const ApplicationsTable: React.FC<ApplicationsTableProps> = ({ data }) =>
                       {app.bundle_version && app.bundle_version !== app.version && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">
                           Bundle: {app.bundle_version}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900 dark:text-white">
-                        {app.publisher || app.signed_by || 'Unknown'}
-                      </div>
-                      {app.signed_by && (
-                        <div className="text-xs text-green-600 dark:text-green-400">
-                          Signed
                         </div>
                       )}
                     </td>
