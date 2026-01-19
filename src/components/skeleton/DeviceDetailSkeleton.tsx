@@ -14,7 +14,6 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
     { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' },
     { id: 'installs', label: 'Installs', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4', accentColor: 'emerald' },
     { id: 'applications', label: 'Applications', icon: 'M19 12.2H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V10.2a2 2 0 00-2-2M5 12.2V10.2a2 2 0 012-2m0 0V6.2a2 2 0 012-2h6a2 2 0 012 2v2M7 8.2h10', accentColor: 'blue' },
-    { id: 'profiles', label: 'Profiles', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', accentColor: 'violet' },
     { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', accentColor: 'yellow' },
     { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', accentColor: 'orange' },
     { id: 'peripherals', label: 'Peripherals', icon: 'M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', accentColor: 'cyan' },
@@ -241,7 +240,6 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
 
         {activeTab === 'info' && <InfoTabSkeleton />}
         {activeTab === 'installs' && <InstallsTabSkeleton />}
-        {activeTab === 'profiles' && <ProfilesTabSkeleton />}
         {activeTab === 'applications' && <ApplicationsTabSkeleton />}
         {activeTab === 'management' && <ManagementTabSkeleton />}
         {activeTab === 'system' && <SystemTabSkeleton />}
@@ -936,42 +934,6 @@ export function InstallsTabSkeleton() {
   )
 }
 
-export function ProfilesTabSkeleton() {
-  return (
-    <div className="space-y-6">
-      {/* Profile stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {['Total Profiles', 'Configuration', 'Device Restrictions'].map((stat, i) => (
-          <div key={stat} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-            <div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3" style={{ animationDelay: `${i * 0.1}s` }}></div>
-            <div className="h-8 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.1 + 0.1}s` }}></div>
-            <div className="h-3 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.1 + 0.2}s` }}></div>
-          </div>
-        ))}
-      </div>
-
-      {/* Profile list */}
-      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-        </div>
-        <div className="divide-y divide-gray-200 dark:divide-gray-700">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="h-5 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2" style={{ animationDelay: `${i * 0.05}s` }}></div>
-                  <div className="h-3 w-60 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.025}s` }}></div>
-                </div>
-                <div className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.05 + 0.05}s` }}></div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export function ApplicationsTabSkeleton() {
   return (
