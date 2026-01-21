@@ -56,6 +56,9 @@ export function DeviceSearchField({
   const getDeviceHostname = (device: Device) =>
     device.hostname || (device as any)?.modules?.network?.hostname || (device as any)?.network?.hostname
 
+  const getDeviceLocation = (device: Device) =>
+    device.location || (device as any)?.modules?.inventory?.location
+
   const editDistance = (a: string, b: string) => {
     if (a === b) return 0
     if (!a) return b.length
@@ -118,7 +121,8 @@ export function DeviceSearchField({
       normalizeValue(device.name),
       normalizeValue(device.serialNumber),
       normalizeValue(device.assetTag),
-      normalizeValue(getDeviceHostname(device))
+      normalizeValue(getDeviceHostname(device)),
+      normalizeValue(getDeviceLocation(device))
     ].filter(Boolean)
 
     let totalScore = 0

@@ -68,9 +68,9 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
     >
       <div className="space-y-6">
         {/* Two Column Grid for Identity and Assignment */}
-        <div className={`grid ${hasAssignmentDetails ? 'grid-cols-2' : 'grid-cols-1'} gap-6`}>
-          {/* Left Column - Device Identity */}
-          <div className="space-y-4">
+        <div className={`grid ${hasAssignmentDetails ? 'grid-cols-5' : 'grid-cols-1'} gap-6`}>
+          {/* Left Column - Device Identity (60% width) */}
+          <div className={`space-y-4 ${hasAssignmentDetails ? 'col-span-3' : ''}`}>
             {/* Device Name */}
             <Stat 
               label="Device Name" 
@@ -104,9 +104,9 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             )}
           </div>
           
-          {/* Right Column - Assignment Details (only visible if data exists) */}
+          {/* Right Column - Assignment Details (40% width) */}
           {hasAssignmentDetails && (
-            <div className="space-y-4">
+            <div className="space-y-4 col-span-2">
               {/* Usage */}
               {inventory.usage && (
                 <Stat label="Usage" value={inventory.usage} />
