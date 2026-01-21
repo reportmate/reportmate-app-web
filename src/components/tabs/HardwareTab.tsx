@@ -463,10 +463,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <span className="text-xs text-gray-500 dark:text-gray-400">Unified Memory Architecture</span>
             </div>
             
-            {/* Unified Layout: 4x2 grid - clean layout without border */}
+            {/* Unified Layout: 4x2 grid with dashed border around CPU/Memory/GPU/NPU */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
-              {/* Left side: CPU/RAM/GPU/NPU - spans 2 columns */}
-              <div className="col-span-2 p-4">
+              {/* SINGLE Dashed Border Container around CPU/Memory/GPU/NPU - spans 2 columns */}
+              <div className="col-span-2 bg-gray-100 dark:bg-gray-900/50 rounded-2xl p-4 border-2 border-gray-200 dark:border-gray-700 border-dashed">
                 <div className="grid grid-cols-2 gap-4">
                   {/* CPU */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">

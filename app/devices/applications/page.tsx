@@ -411,6 +411,10 @@ function ApplicationsPageContent() {
   const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
+  // Device table sorting state (for version distribution device list)
+  const [deviceTableSortColumn, setDeviceTableSortColumn] = useState<'deviceName' | 'serialNumber' | 'application' | 'version' | 'location' | 'catalog' | 'lastSeen'>('deviceName')
+  const [deviceTableSortDirection, setDeviceTableSortDirection] = useState<'asc' | 'desc'>('asc')
+  
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedApplications, setSelectedApplications] = useState<string[]>([])
@@ -894,6 +898,16 @@ function ApplicationsPageContent() {
       return utilizationSortDirection === 'asc' ? compareResult : -compareResult
     })
   }, [utilizationData?.applications, utilizationSortColumn, utilizationSortDirection])
+
+  // Handle device table sorting
+  const handleDeviceTableSort = (column: typeof deviceTableSortColumn) => {
+    if (deviceTableSortColumn === column) {
+      setDeviceTableSortDirection(deviceTableSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setDeviceTableSortColumn(column)
+      setDeviceTableSortDirection('asc')
+    }
+  }
 
   const handleUtilizationSort = (column: typeof utilizationSortColumn) => {
     if (utilizationSortColumn === column) {
@@ -2138,26 +2152,96 @@ function ApplicationsPageContent() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device Name
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('deviceName')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Device Name
+                          {deviceTableSortColumn === 'deviceName' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Serial Number
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('serialNumber')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Serial Number
+                          {deviceTableSortColumn === 'serialNumber' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Application
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('application')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Application
+                          {deviceTableSortColumn === 'application' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Version
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('version')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Version
+                          {deviceTableSortColumn === 'version' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Location
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('location')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Location
+                          {deviceTableSortColumn === 'location' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Catalog
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('catalog')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Catalog
+                          {deviceTableSortColumn === 'catalog' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Last Seen
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('lastSeen')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Last Seen
+                          {deviceTableSortColumn === 'lastSeen' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                     </tr>
                   </thead>
@@ -2205,7 +2289,39 @@ function ApplicationsPageContent() {
                         )
                       }
                       
-                      return devices.map((device) => (
+                      // Sort devices based on selected column and direction
+                      const sortedDevices = [...devices].sort((a, b) => {
+                        let aVal: any = a[deviceTableSortColumn]
+                        let bVal: any = b[deviceTableSortColumn]
+                        
+                        // Handle null/undefined values
+                        if (aVal === null || aVal === undefined) aVal = ''
+                        if (bVal === null || bVal === undefined) bVal = ''
+                        
+                        // Convert to string for comparison
+                        aVal = String(aVal).toLowerCase()
+                        bVal = String(bVal).toLowerCase()
+                        
+                        // For version column, use numeric comparison
+                        if (deviceTableSortColumn === 'version') {
+                          const comparison = aVal.localeCompare(bVal, undefined, { numeric: true, sensitivity: 'base' })
+                          return deviceTableSortDirection === 'asc' ? comparison : -comparison
+                        }
+                        
+                        // For lastSeen, compare as dates
+                        if (deviceTableSortColumn === 'lastSeen') {
+                          const aDate = a.lastSeen ? new Date(a.lastSeen).getTime() : 0
+                          const bDate = b.lastSeen ? new Date(b.lastSeen).getTime() : 0
+                          return deviceTableSortDirection === 'asc' ? aDate - bDate : bDate - aDate
+                        }
+                        
+                        // Standard string comparison
+                        if (aVal < bVal) return deviceTableSortDirection === 'asc' ? -1 : 1
+                        if (aVal > bVal) return deviceTableSortDirection === 'asc' ? 1 : -1
+                        return 0
+                      })
+                      
+                      return sortedDevices.map((device) => (
                         <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Link

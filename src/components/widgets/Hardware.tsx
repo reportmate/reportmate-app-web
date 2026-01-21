@@ -286,18 +286,22 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Windows: Two-column grid for Manufacturer/Model */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Windows: Custom width grid for Manufacturer (30%) / Model (70%) */}
+          <div className="grid grid-cols-10 gap-3">
             {manufacturer !== 'Unknown' && (
-              <Stat 
-                label="Manufacturer" 
-                value={manufacturer} 
-              />
+              <div className="col-span-3">
+                <Stat 
+                  label="Manufacturer" 
+                  value={manufacturer} 
+                />
+              </div>
             )}
-            <Stat 
-              label="Model" 
-              value={model} 
-            />
+            <div className="col-span-7">
+              <Stat 
+                label="Model" 
+                value={model} 
+              />
+            </div>
           </div>
           
           <Stat 
