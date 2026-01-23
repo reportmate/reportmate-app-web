@@ -85,6 +85,8 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       bundled.push({
         id: bundleId,
         device: event.device,
+        deviceName: event.deviceName,  // Preserve device name from primary event
+        assetTag: event.assetTag,      // Preserve asset tag from primary event
         kind: primaryKind,
         ts: event.ts, // Use the primary event's timestamp
         message: createBundleMessage(relatedEvents, bundleKinds),
@@ -102,6 +104,8 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
       bundled.push({
         id: event.id,
         device: event.device,
+        deviceName: event.deviceName,  // Preserve device name
+        assetTag: event.assetTag,      // Preserve asset tag
         kind: event.kind,
         ts: event.ts,
         message: event.message || formatPayloadPreview(event.payload),
