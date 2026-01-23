@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for events page
 export const dynamic = 'force-dynamic'
 
-import React, { useEffect, useState, Suspense, useMemo } from "react"
+import React, { useEffect, useState, Suspense, useMemo, useRef, useCallback } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
@@ -68,13 +68,12 @@ const getStatusIcon = (kind: string) => {
 }
 
 // Helper to format event ID for display (handles bundle IDs cleanly)
-const formatEventId = (id: string | number): string => {
+const formatEventId = (id: string | number, eventIds?: string[]): string => {
   const idStr = String(id)
   if (idStr.startsWith('bundle-')) {
-    // Extract device serial from bundle ID: bundle-SERIAL-timestamp-eventIds
-    const parts = idStr.split('-')
-    if (parts.length >= 2) {
-      return `${parts[1]}...` // Show device serial with ellipsis
+    // For bundles, show the first event ID from the bundle
+    if (eventIds && eventIds.length > 0) {
+      return `#${eventIds[0]}`
     }
     return 'Bundle'
   }
@@ -137,15 +136,20 @@ const getEventMessage = (event: BundledEvent): string => {
 function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [filterType, setFilterType] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
   const [totalEvents, setTotalEvents] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
+  
+  // Ref for infinite scroll sentinel
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   
   // Date range state (default to last 48 hours)
   const [startDate, setStartDate] = useState(() => {
@@ -162,7 +166,7 @@ function EventsPageContent() {
   
   const searchParams = useSearchParams()
   
-  const EVENTS_PER_PAGE = 100  // 100 events per page for /events page
+  const EVENTS_PER_PAGE = 100  // 100 events per batch for infinite scroll
   
   // Valid event categories - filter out everything else
   // Bundle events using the shared bundling logic
@@ -173,6 +177,8 @@ function EventsPageContent() {
     const fleetEvents: FleetEvent[] = events.map(event => ({
       id: event.id,
       device: event.device,
+      deviceName: (event as any).deviceName,
+      assetTag: (event as any).assetTag,
       kind: event.kind,
       ts: event.ts,
       message: (event as any).message,
@@ -192,77 +198,103 @@ function EventsPageContent() {
 
   // Device names fetch removed - events API now includes deviceName and assetTag directly
 
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
+  // Fetch events function for infinite scroll
+  const fetchEvents = useCallback(async (currentOffset: number, isLoadMore: boolean = false) => {
+    try {
+      if (isLoadMore) {
+        setLoadingMore(true)
+      } else {
         setLoading(true)
-        
-        // Calculate offset for API pagination
-        const offset = (currentPage - 1) * EVENTS_PER_PAGE
-        
-        // Build query parameters
-        const queryParams = new URLSearchParams()
-        queryParams.append('limit', EVENTS_PER_PAGE.toString())
-        queryParams.append('offset', offset.toString())
-        if (startDate) {
-          // Convert YYYY-MM-DD to ISO string with start of day
-          const startDateTime = new Date(startDate + 'T00:00:00.000Z').toISOString()
-          queryParams.append('startDate', startDateTime)
-        }
-        if (endDate) {
-          // Convert YYYY-MM-DD to ISO string with end of day
-          const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString()
-          queryParams.append('endDate', endDateTime)
-        }
-        
-        // Use Next.js API route with pagination and date filtering parameters
-        const apiUrl = `/api/events?${queryParams.toString()}`
-        const response = await fetch(apiUrl)
-        if (!response.ok) {
-          throw new Error('Failed to fetch events')
-        }
-        
-        const data = await response.json()
-        
-        // API returns: {success: true, events: [...]}
-        if (data.success && Array.isArray(data.events)) {
-          
-          // Filter events to only include valid categories
-          const filteredEvents = data.events.filter((event: Event) => 
-            VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
-          )
-          
-          setEvents(filteredEvents)
-          
-          // Set API filter counts (total counts for the date range, not just current page)
-          // REMOVED: No longer displaying counts in filter buttons
-          
-          // Set total events count for pagination (if provided by API)
-          if (data.totalEvents) {
-            setTotalEvents(data.totalEvents)
-          } else {
-            // If we get less than requested, we've reached the end
-            if (filteredEvents.length < EVENTS_PER_PAGE) {
-              setTotalEvents(offset + filteredEvents.length)
-            } else {
-              // Estimate total (this will be corrected when we reach the end)
-              setTotalEvents((prev) => Math.max(prev, offset + EVENTS_PER_PAGE + 1))
-            }
-          }
-        } else {
-          console.error('[EVENTS PAGE] Invalid events data received:', data)
-          setError('Invalid events data received from API')
-        }
-      } catch (error) {
-        console.error('Failed to fetch events:', error)
-        setError((error as Error).message)
-      } finally {
-        setLoading(false)
       }
+      
+      // Build query parameters
+      const queryParams = new URLSearchParams()
+      queryParams.append('limit', EVENTS_PER_PAGE.toString())
+      queryParams.append('offset', currentOffset.toString())
+      if (startDate) {
+        // Convert YYYY-MM-DD to ISO string with start of day
+        const startDateTime = new Date(startDate + 'T00:00:00.000Z').toISOString()
+        queryParams.append('startDate', startDateTime)
+      }
+      if (endDate) {
+        // Convert YYYY-MM-DD to ISO string with end of day
+        const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString()
+        queryParams.append('endDate', endDateTime)
+      }
+      
+      // Use Next.js API route with pagination and date filtering parameters
+      const apiUrl = `/api/events?${queryParams.toString()}`
+      const response = await fetch(apiUrl)
+      if (!response.ok) {
+        throw new Error('Failed to fetch events')
+      }
+      
+      const data = await response.json()
+      
+      // API returns: {success: true, events: [...]}
+      if (data.success && Array.isArray(data.events)) {
+        
+        // Filter events to only include valid categories
+        const newEvents = data.events.filter((event: Event) => 
+          VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
+        )
+        
+        if (isLoadMore) {
+          // Append to existing events
+          setEvents(prev => [...prev, ...newEvents])
+        } else {
+          // Replace events (initial load or filter change)
+          setEvents(newEvents)
+        }
+        
+        // Check if there are more events to load
+        setHasMore(newEvents.length >= EVENTS_PER_PAGE)
+        
+        // Update offset for next load
+        setOffset(currentOffset + newEvents.length)
+        
+        // Set total events count if provided by API
+        if (data.totalEvents) {
+          setTotalEvents(data.totalEvents)
+        }
+      } else {
+        console.error('[EVENTS PAGE] Invalid events data received:', data)
+        setError('Invalid events data received from API')
+      }
+    } catch (error) {
+      console.error('Failed to fetch events:', error)
+      setError((error as Error).message)
+    } finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
+  }, [startDate, endDate, EVENTS_PER_PAGE])
+
+  // Initial fetch when date range changes
+  useEffect(() => {
+    setEvents([])
+    setOffset(0)
+    setHasMore(true)
+    fetchEvents(0, false)
+  }, [startDate, endDate, fetchEvents])
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          fetchEvents(offset, true)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
     }
 
-    fetchEvents()
-  }, [currentPage, EVENTS_PER_PAGE, startDate, endDate]) // Re-fetch when page or date range changes
+    return () => observer.disconnect()
+  }, [hasMore, loading, loadingMore, offset, fetchEvents])
 
   // Filter events based on selected type and search query (client-side)
   const filteredEvents = bundledEvents.filter(event => {
@@ -287,19 +319,8 @@ function EventsPageContent() {
     return typeMatch && searchMatch
   })
 
-  // Reset to page 1 when filter or search changes, but NOT when page changes
-  useEffect(() => {
-    setCurrentPage(1)
-  }, [filterType, searchQuery])
-
-  // Calculate pagination for filtered events (client-side pagination on current page)
-  const totalPages = Math.ceil(filteredEvents.length / EVENTS_PER_PAGE)
-  const currentEvents = filteredEvents // Show all filtered events from current server page
-
-  // Calculate actual total pages based on total events and whether we're filtering
-  const actualTotalPages = searchQuery.trim() || filterType !== 'all' 
-    ? totalPages // Use client-side calculation when filtering
-    : Math.ceil(totalEvents / EVENTS_PER_PAGE) // Use server-side total when not filtering
+  // currentEvents is just filteredEvents for infinite scroll (no client-side pagination)
+  const currentEvents = filteredEvents
 
   // Helper function to format full payload for display
   const formatFullPayload = (payload: any): string => {
@@ -662,20 +683,14 @@ function EventsPageContent() {
                       <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value)
-                          setCurrentPage(1) // Reset to first page when date changes
-                        }}
+                        onChange={(e) => setStartDate(e.target.value)}
                         className="block text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                       <span className="text-gray-400">to</span>
                       <input
                         type="date"
                         value={endDate}
-                        onChange={(e) => {
-                          setEndDate(e.target.value)
-                          setCurrentPage(1) // Reset to first page when date changes
-                        }}
+                        onChange={(e) => setEndDate(e.target.value)}
                         className="block text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
@@ -816,7 +831,17 @@ function EventsPageContent() {
                       
                       return (
                         <React.Fragment key={event.id}>
-                          <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                          <tr 
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            onClick={async () => {
+                              if (isExpanded) {
+                                setExpandedEvent(null)
+                              } else {
+                                setExpandedEvent(event.id)
+                                await fetchFullPayload(event.id)
+                              }
+                            }}
+                          >
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
@@ -827,7 +852,7 @@ function EventsPageContent() {
                                 className="text-sm text-gray-900 dark:text-gray-100 font-mono" 
                                 title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                               >
-                                {formatEventId(event.id)}
+                                {formatEventId(event.id, event.eventIds)}
                               </span>
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
@@ -836,6 +861,7 @@ function EventsPageContent() {
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                   title={event.deviceName || event.device}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   {event.deviceName || event.device}
                                 </Link>
@@ -975,20 +1001,14 @@ function EventsPageContent() {
                       <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value)
-                          setCurrentPage(1)
-                        }}
+                        onChange={(e) => setStartDate(e.target.value)}
                         className="block text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                       <span className="text-gray-400 text-xs">to</span>
                       <input
                         type="date"
                         value={endDate}
-                        onChange={(e) => {
-                          setEndDate(e.target.value)
-                          setCurrentPage(1)
-                        }}
+                        onChange={(e) => setEndDate(e.target.value)}
                         className="block text-xs border border-gray-300 dark:border-gray-600 rounded px-1.5 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                       />
                     </div>
@@ -1159,7 +1179,17 @@ function EventsPageContent() {
                       
                       return (
                         <React.Fragment key={event.id}>
-                          <tr className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                          <tr 
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            onClick={async () => {
+                              if (isExpanded) {
+                                setExpandedEvent(null)
+                              } else {
+                                setExpandedEvent(event.id)
+                                await fetchFullPayload(event.id)
+                              }
+                            }}
+                          >
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
@@ -1170,7 +1200,7 @@ function EventsPageContent() {
                                 className="text-sm text-gray-900 dark:text-gray-100 font-mono"
                                 title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                               >
-                                {formatEventId(event.id)}
+                                {formatEventId(event.id, event.eventIds)}
                               </span>
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
@@ -1179,6 +1209,7 @@ function EventsPageContent() {
                                   href={`/device/${encodeURIComponent(event.device)}#events`}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                   title={event.deviceName || event.device}
+                                  onClick={(e) => e.stopPropagation()}
                                 >
                                   {event.deviceName || event.device}
                                 </Link>
@@ -1295,20 +1326,14 @@ function EventsPageContent() {
                       <input
                         type="date"
                         value={startDate}
-                        onChange={(e) => {
-                          setStartDate(e.target.value)
-                          setCurrentPage(1)
-                        }}
+                        onChange={(e) => setStartDate(e.target.value)}
                         className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                       <span className="text-gray-400 text-sm">to</span>
                       <input
                         type="date"
                         value={endDate}
-                        onChange={(e) => {
-                          setEndDate(e.target.value)
-                          setCurrentPage(1)
-                        }}
+                        onChange={(e) => setEndDate(e.target.value)}
                         className="flex-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
@@ -1356,7 +1381,18 @@ function EventsPageContent() {
                 const isExpanded = expandedEvent === event.id
                 
                 return (
-                  <div key={event.id} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4">
+                  <div 
+                    key={event.id} 
+                    className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer"
+                    onClick={async () => {
+                      if (isExpanded) {
+                        setExpandedEvent(null)
+                      } else {
+                        setExpandedEvent(event.id)
+                        await fetchFullPayload(event.id)
+                      }
+                    }}
+                  >
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -1365,7 +1401,7 @@ function EventsPageContent() {
                           className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono"
                           title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                         >
-                          {formatEventId(event.id)}
+                          {formatEventId(event.id, event.eventIds)}
                         </span>
                       </div>
                     </div>
@@ -1377,6 +1413,7 @@ function EventsPageContent() {
                         <Link
                           href={`/device/${encodeURIComponent(event.device)}#events`}
                           className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
+                          onClick={(e) => e.stopPropagation()}
                         >
                           {event.deviceName || event.device}
                         </Link>
@@ -1441,7 +1478,7 @@ function EventsPageContent() {
                               className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono"
                               title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
                             >
-                              {formatEventId(event.id)}
+                              {formatEventId(event.id, event.eventIds)}
                             </span>
                             <div className="text-xs text-gray-600 dark:text-gray-400">
                               <div className="font-medium">Full Timestamp:</div>
@@ -1476,92 +1513,26 @@ function EventsPageContent() {
               }))}
             </div>
 
-            {/* Pagination */}
-            {actualTotalPages > 1 && (
-              <div className="bg-white dark:bg-gray-800 px-4 py-3 flex items-center justify-between border-l border-r border-b border-gray-200 dark:border-gray-700 sm:px-6 rounded-b-xl shadow-sm">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                    disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Previous
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(prev => Math.min(prev + 1, actualTotalPages))}
-                    disabled={currentPage === actualTotalPages}
-                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                  </button>
+            {/* Infinite scroll sentinel and loading indicator */}
+            <div 
+              ref={loadMoreRef}
+              className="flex items-center justify-center py-6"
+            >
+              {loadingMore && (
+                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span className="text-sm">Loading more events...</span>
                 </div>
-                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
-                      Showing page <span className="font-medium">{currentPage}</span> of{' '}
-                      <span className="font-medium">{actualTotalPages}</span> 
-                      {searchQuery.trim() || filterType !== 'all' ? (
-                        <span className="ml-1 text-gray-500">({filteredEvents.length} filtered events)</span>
-                      ) : (
-                        <span className="ml-1 text-gray-500">({totalEvents.toLocaleString()} total events)</span>
-                      )}
-                    </p>
-                  </div>
-                  <div>
-                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
-                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="sr-only">Previous</span>
-                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                      
-                      {/* Page numbers */}
-                      {Array.from({ length: actualTotalPages }, (_, i) => i + 1)
-                        .filter(page => {
-                          // Show first page, last page, current page, and 2 pages before/after current
-                          return page === 1 || page === actualTotalPages || Math.abs(page - currentPage) <= 2
-                        })
-                        .map((page, index, array) => (
-                          <React.Fragment key={page}>
-                            {/* Add ellipsis if there's a gap */}
-                            {index > 0 && page - array[index - 1] > 1 && (
-                              <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-700 dark:text-gray-300">
-                                ...
-                              </span>
-                            )}
-                            <button
-                              onClick={() => setCurrentPage(page)}
-                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                page === currentPage
-                                  ? 'z-10 bg-blue-50 dark:bg-blue-900 border-blue-500 text-blue-600 dark:text-blue-400'
-                                  : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
-                              }`}
-                            >
-                              {page}
-                            </button>
-                          </React.Fragment>
-                        ))}
-                      
-                      <button
-                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, actualTotalPages))}
-                        disabled={currentPage === actualTotalPages}
-                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="sr-only">Next</span>
-                        <svg className="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </nav>
-                  </div>
-                </div>
-              </div>
-            )}
+              )}
+              {!hasMore && events.length > 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400">
+                  Showing all {events.length.toLocaleString()} events
+                </p>
+              )}
+            </div>
           </>
       </div>
     </div>
