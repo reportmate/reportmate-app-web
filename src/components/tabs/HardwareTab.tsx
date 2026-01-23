@@ -315,9 +315,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     const freeSpace = drive.freeSpace ?? drive.free_space
     return (capacity && capacity > 0) && (freeSpace && freeSpace > 0)
   })
-  // Only count INTERNAL drives - After normalizeKeys: isInternal (normalized from is_internal)
+  // Only count INTERNAL drives - support both is_internal (Mac) and isInternal (Windows)
+  // Default to true if isInternal is not set (Windows logical drives are internal)
   const internalDrives = storageDevices.filter((drive: any) => {
     const isInternal = drive.isInternal ?? drive.is_internal
+    // If isInternal is not set (undefined), assume internal unless it's clearly external
+    const isRemovable = (drive.type ?? drive.Type ?? '').toLowerCase().includes('removable') ||
+                        (drive.interface ?? drive.Interface ?? '').toLowerCase().includes('usb')
+    if (isInternal === undefined) {
+      return !isRemovable // Default to internal if not explicitly marked
+    }
     return isInternal === 1 || isInternal === true
   })
   const totalStorage = internalDrives.reduce((total: number, drive: any) => {
