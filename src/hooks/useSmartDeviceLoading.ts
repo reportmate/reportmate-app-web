@@ -19,7 +19,7 @@ export interface ModuleStatus {
   loadedAt?: Date
 }
 
-const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'system', 'network', 'security']
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'system', 'network', 'security', 'identity']
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (core identity + info tab modules)
