@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { formatRelativeTime, formatExactTime } from '../../lib/time';
-import { InstallsInfo, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
+import { InstallsInfo, InstallPackage, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
 
 // Helper function to format item size from bytes to human readable format
 const formatItemSize = (sizeBytes?: string): string => {
@@ -30,6 +30,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [groupByCategory, setGroupByCategory] = useState(true);
 
   const togglePackageExpansion = (packageId: string) => {
     const newExpandedIds = new Set(expandedPackageIds);
@@ -39,6 +41,16 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       newExpandedIds.add(packageId);
     }
     setExpandedPackageIds(newExpandedIds);
+  };
+
+  const toggleCategoryCollapse = (category: string) => {
+    const newCollapsed = new Set(collapsedCategories);
+    if (newCollapsed.has(category)) {
+      newCollapsed.delete(category);
+    } else {
+      newCollapsed.add(category);
+    }
+    setCollapsedCategories(newCollapsed);
   };
 
   const toggleFilter = (filter: string) => {
@@ -148,6 +160,54 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   const filteredPackages = getFilteredPackages();
 
+  // Group packages by category
+  const groupedPackages = useMemo(() => {
+    if (!groupByCategory) {
+      return null;
+    }
+    
+    const groups: Record<string, InstallPackage[]> = {};
+    const uncategorized: InstallPackage[] = [];
+    
+    for (const pkg of filteredPackages) {
+      const category = pkg.category?.trim() || '';
+      if (category) {
+        if (!groups[category]) {
+          groups[category] = [];
+        }
+        groups[category].push(pkg);
+      } else {
+        uncategorized.push(pkg);
+      }
+    }
+    
+    // Sort packages within each group alphabetically
+    for (const category of Object.keys(groups)) {
+      groups[category].sort((a, b) => 
+        (a.displayName || a.name).localeCompare(b.displayName || b.name)
+      );
+    }
+    uncategorized.sort((a, b) => 
+      (a.displayName || a.name).localeCompare(b.displayName || b.name)
+    );
+    
+    // Get sorted category names
+    const sortedCategories = Object.keys(groups).sort();
+    
+    // Add uncategorized at the end if there are any
+    if (uncategorized.length > 0) {
+      groups['Uncategorized'] = uncategorized;
+      sortedCategories.push('Uncategorized');
+    }
+    
+    return { groups, sortedCategories };
+  }, [filteredPackages, groupByCategory]);
+
+  // Check if any packages have categories
+  const hasCategories = useMemo(() => {
+    return filteredPackages.some(pkg => pkg.category && pkg.category.trim() !== '');
+  }, [filteredPackages]);
+
   // Calculate counts for each status (handle empty packages array)
   const packages = data?.packages && Array.isArray(data.packages) ? data.packages : [];
   const installedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
@@ -186,6 +246,22 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                       className="px-3 py-1.5 text-xs font-medium rounded-full transition-colors bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800"
                     >
                       Clear Filters
+                    </button>
+                  )}
+                  {/* Group by Category Toggle */}
+                  {hasCategories && (
+                    <button
+                      onClick={() => setGroupByCategory(!groupByCategory)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
+                        groupByCategory
+                          ? 'bg-indigo-600 text-white dark:bg-indigo-400 dark:text-gray-900'
+                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                      Group by Category
                     </button>
                   )}
                 </div>
@@ -338,16 +414,203 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   ) : (
                     // Show packages when available
                     <>
-                      {[...filteredPackages].sort((a, b) => 
-                        (a.displayName || a.name).localeCompare(b.displayName || b.name)
-                      ).map((pkg) => {
-                        const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
-                        const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
-                        const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
-                        const isExpanded = expandedPackageIds.has(pkg.id);
-                        
-                        return (
-                          <React.Fragment key={pkg.id}>
+                      {groupByCategory && groupedPackages && hasCategories ? (
+                        // Grouped by category view
+                        groupedPackages.sortedCategories.map((category) => {
+                          const categoryPackages = groupedPackages.groups[category];
+                          const isCollapsed = collapsedCategories.has(category);
+                          
+                          return (
+                            <React.Fragment key={`category-${category}`}>
+                              {/* Category Header Row */}
+                              <tr 
+                                className="bg-indigo-50 dark:bg-indigo-900/20 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                                onClick={() => toggleCategoryCollapse(category)}
+                              >
+                                <td colSpan={5} className="px-6 py-3">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <svg 
+                                        className={`w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                      <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                                        {category}
+                                      </span>
+                                      <span className="text-xs text-indigo-500 dark:text-indigo-400 ml-2">
+                                        ({categoryPackages.length} {categoryPackages.length === 1 ? 'item' : 'items'})
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                              
+                              {/* Category Packages */}
+                              {!isCollapsed && categoryPackages.map((pkg) => {
+                                const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
+                                const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
+                                const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
+                                const isExpanded = expandedPackageIds.has(pkg.id);
+                                
+                                return (
+                                  <React.Fragment key={pkg.id}>
+                                    {/* Main Package Row */}
+                                    <tr 
+                                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasExpandableContent ? 'cursor-pointer' : ''}`}
+                                      onClick={() => hasExpandableContent && togglePackageExpansion(pkg.id)}
+                                    >
+                                      <td className="px-6 py-4 whitespace-nowrap pl-12">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
+                                          {getStatusDisplay(pkg.status || 'Unknown')}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                          {pkg.displayName || pkg.name || 'Unknown Package'}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900 dark:text-white">
+                                          {pkg.version || 'Unknown'}
+                                          {pkg.installedVersion && pkg.installedVersion !== pkg.version && (
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">
+                                              {pkg.installedVersion} installed
+                                            </div>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        {formatItemSize(pkg.itemSize) || ''}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                        <div className="flex items-center justify-between">
+                                          <span>{pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}</span>
+                                          {hasExpandableContent && (
+                                            <svg 
+                                              className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200 ml-2 ${isExpanded ? 'rotate-90' : ''}`}
+                                              fill="none" 
+                                              stroke="currentColor" 
+                                              viewBox="0 0 24 24"
+                                            >
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                            </svg>
+                                          )}
+                                        </div>
+                                      </td>
+                                    </tr>
+
+                                    {/* Expandable Error/Warning/Pending Details Row */}
+                                    {isExpanded && hasExpandableContent && (
+                                      <tr className="bg-gray-50 dark:bg-gray-900">
+                                        <td colSpan={5} className="px-6 py-4">
+                                          <div className="space-y-3">
+                                            {/* Errors Section */}
+                                            {pkg.errors && pkg.errors.length > 0 && (
+                                              <div className="space-y-2">
+                                                {pkg.errors.map((error: ErrorMessage, idx: number) => (
+                                                  <div key={error.id || `error-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                      {error.code && (
+                                                        <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                                          {error.code}
+                                                        </span>
+                                                      )}
+                                                      {error.timestamp && (
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                          {formatExactTime(error.timestamp)}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <p className="text-sm text-red-700 dark:text-red-300">
+                                                      {error.message}
+                                                    </p>
+                                                    {error.details && (
+                                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                        {error.details}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                            {/* Warnings Section */}
+                                            {pkg.warnings && pkg.warnings.length > 0 && (
+                                              <div className="space-y-2">
+                                                {pkg.warnings.map((warning: WarningMessage, idx: number) => (
+                                                  <div key={warning.id || `warning-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                                                    <div className="flex items-start justify-between mb-2">
+                                                      {warning.code && (
+                                                        <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
+                                                          {warning.code}
+                                                        </span>
+                                                      )}
+                                                      {warning.timestamp && (
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                          {formatExactTime(warning.timestamp)}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                                      {warning.message}
+                                                    </p>
+                                                    {warning.details && (
+                                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                        {warning.details}
+                                                      </p>
+                                                    )}
+                                                  </div>
+                                                ))}
+                                              </div>
+                                            )}
+
+                                            {/* Pending Reason Section */}
+                                            {hasPendingReason && (
+                                              <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
+                                                <div className="flex items-start gap-3">
+                                                  <div className="flex-shrink-0">
+                                                    <svg className="w-5 h-5 text-cyan-500 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                    </svg>
+                                                  </div>
+                                                  <div>
+                                                    <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
+                                                      PENDING
+                                                    </span>
+                                                    <p className="text-sm text-cyan-700 dark:text-cyan-300 mt-2">
+                                                      {pkg.pendingReason}
+                                                    </p>
+                                                  </div>
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </td>
+                                      </tr>
+                                    )}
+                                  </React.Fragment>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })
+                      ) : (
+                        // Flat list view (no grouping)
+                        <>
+                          {[...filteredPackages].sort((a, b) => 
+                            (a.displayName || a.name).localeCompare(b.displayName || b.name)
+                          ).map((pkg) => {
+                            const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
+                            const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
+                            const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
+                            const isExpanded = expandedPackageIds.has(pkg.id);
+                            
+                            return (
+                              <React.Fragment key={pkg.id}>
                             {/* Main Package Row */}
                             <tr 
                               className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasExpandableContent ? 'cursor-pointer' : ''}`}
@@ -485,6 +748,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           </React.Fragment>
                         );
                       })}
+                        </>
+                      )}
                     </>
                   )}
                 </tbody>

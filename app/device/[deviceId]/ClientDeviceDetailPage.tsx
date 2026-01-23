@@ -17,7 +17,8 @@ import {
   NetworkTab,
   SecurityTab,
   EventsTab,
-  PeripheralsTab
+  PeripheralsTab,
+  IdentityTab
 } from "../../../src/components/tabs"
 import { DeviceDetailSkeleton } from "../../../src/components/skeleton/DeviceDetailSkeleton"
 import { ModuleLoadingState } from "../../../src/components/ModuleLoadingState"
@@ -208,7 +209,7 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
   )
 }
 
-type TabType = 'info' | 'installs' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'peripherals' | 'events'
+type TabType = 'info' | 'installs' | 'applications' | 'management' | 'system' | 'hardware' | 'network' | 'security' | 'identity' | 'peripherals' | 'events'
 
 const tabs: { id: TabType; label: string; icon: string; description: string; accentColor: string }[] = [
   { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Device information, management status, and system details', accentColor: 'monochrome' },
@@ -218,6 +219,7 @@ const tabs: { id: TabType; label: string; icon: string; description: string; acc
   { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', description: 'Hardware specifications and performance', accentColor: 'orange' },
   { id: 'peripherals', label: 'Peripherals', icon: 'M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', description: 'Displays, printers, and connected peripherals', accentColor: 'cyan' },
   { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', description: 'Operating system and system information', accentColor: 'purple' },
+  { id: 'identity', label: 'Identity', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', description: 'User accounts, sessions, and identity management', accentColor: 'indigo' },
   { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', description: 'Security status and compliance', accentColor: 'red' },
   { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', description: 'Network connectivity and settings', accentColor: 'teal' },
   { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', description: 'Event history and activity log', accentColor: 'monochrome' }
@@ -1184,6 +1186,32 @@ export default function ClientDeviceDetailPage() {
               state="loading" 
               icon="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
               accentColor="red"
+              isMac={isMac}
+            />
+          )}
+          </div>
+        )}
+
+        {/* Identity Tab - Progressive loading */}
+        {activeTab === 'identity' && (
+          <div>
+          {isModuleError('identity') ? (
+            <ModuleLoadingState 
+              moduleName="identity" 
+              state="error" 
+              error={getModuleError('identity')}
+              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              accentColor="indigo"
+              onRetry={() => requestModule('identity')}
+            />
+          ) : isModuleLoaded('identity') ? (
+            <IdentityTab device={deviceInfo} />
+          ) : (
+            <ModuleLoadingState 
+              moduleName="identity" 
+              state="loading" 
+              icon="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+              accentColor="indigo"
               isMac={isMac}
             />
           )}
