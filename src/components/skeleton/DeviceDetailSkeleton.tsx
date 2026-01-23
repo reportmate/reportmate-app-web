@@ -18,6 +18,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
     { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', accentColor: 'orange' },
     { id: 'peripherals', label: 'Peripherals', icon: 'M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', accentColor: 'cyan' },
     { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', accentColor: 'purple' },
+    { id: 'identity', label: 'Identity', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', accentColor: 'indigo' },
     { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', accentColor: 'red' },
     { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', accentColor: 'teal' },
     { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' }
@@ -96,6 +97,10 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
       },
       teal: {
         active: 'border-teal-500 text-teal-600 dark:text-teal-400',
+        inactive: 'border-transparent text-gray-500 dark:text-gray-400'
+      },
+      indigo: {
+        active: 'border-indigo-500 text-indigo-600 dark:text-indigo-400',
         inactive: 'border-transparent text-gray-500 dark:text-gray-400'
       },
       cyan: {
@@ -247,6 +252,7 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
         {activeTab === 'peripherals' && <PeripheralsTabSkeleton />}
         {activeTab === 'network' && <NetworkTabSkeleton />}
         {activeTab === 'security' && <SecurityTabSkeleton />}
+        {activeTab === 'identity' && <IdentityTabSkeleton />}
         {activeTab === 'events' && <EventsTabSkeleton />}
       </div>
     </div>
@@ -1075,6 +1081,102 @@ export function SecurityTabSkeleton() {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  )
+}
+
+export function IdentityTabSkeleton() {
+  return (
+    <div className="space-y-6">
+      {/* Header skeleton */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-indigo-100 dark:bg-indigo-900 rounded-lg animate-pulse"></div>
+          <div>
+            <div className="h-7 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+        <div className="text-right mr-8">
+          <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+          <div className="h-8 w-12 bg-indigo-200 dark:bg-indigo-900 rounded animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* Summary Cards Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+        {['Users', 'Directory Services', 'Secure Token'].map((card) => (
+          <div key={card} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-4 h-4 bg-indigo-200 dark:bg-indigo-900 rounded animate-pulse"></div>
+              <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+            <div className="space-y-2">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="flex justify-between items-center py-1">
+                  <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  <div className="h-3 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Table Tabs */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="flex space-x-8">
+          {['User Accounts', 'Active Sessions', 'Login History'].map((tab, idx) => (
+            <div key={tab} className={`py-2 px-1 border-b-2 ${idx === 0 ? 'border-indigo-500' : 'border-transparent'}`}>
+              <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Table Skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50 dark:bg-gray-700/50">
+              <tr>
+                {['User', 'UID', 'Admin', 'Status', 'Last Login', 'Groups'].map((col) => (
+                  <th key={col} className="px-4 py-3 text-left">
+                    <div className="h-3 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+              {[1, 2, 3, 4, 5].map((row) => (
+                <tr key={row}>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-5 w-14 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-5 w-14 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

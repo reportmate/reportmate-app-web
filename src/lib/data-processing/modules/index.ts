@@ -12,6 +12,9 @@ export { extractEvents, type EventsInfo, type EventItem } from './events'
 // Hardware module
 export { extractHardware, type HardwareInfo } from './hardware'
 
+// Identity module
+export { extractIdentity, type IdentityInfo, type UserAccount, type BTMDBHealth } from './identity'
+
 // Installs module
 export { extractInstalls, type InstallsInfo, type InstallPackage, type StandardInstallStatus } from './installs'
 

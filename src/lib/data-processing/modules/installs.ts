@@ -261,6 +261,8 @@ export interface InstallPackage {
   type: string
   lastUpdate: string
   itemSize?: string // Item size in bytes
+  category?: string // Category from pkgsinfo (e.g., "Management", "Drivers", "Utilities")
+  developer?: string // Developer from pkgsinfo
   errors?: ErrorMessage[]
   warnings?: WarningMessage[]
   pendingReason?: string // Why the package is pending (e.g., "Update available: 1.0 → 2.0")
@@ -662,6 +664,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         type: item.type || 'Package',
         lastUpdate: getLatestAttemptTimestamp(item),
         itemSize: item.itemSize,
+        category: item.category || '', // Category from pkgsinfo
+        developer: item.developer || '', // Developer from pkgsinfo
         pendingReason: item.pending_reason || item.pendingReason || '', // Why pending (e.g., "Update available: 1.0 → 2.0")
         failureCount: item.failureCount || 0,
         lastAttemptStatus: item.lastAttemptStatus,

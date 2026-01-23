@@ -15,7 +15,8 @@ import {
   SystemTabSkeleton,
   SecurityTabSkeleton,
   NetworkTabSkeleton,
-  EventsTabSkeleton
+  EventsTabSkeleton,
+  IdentityTabSkeleton
 } from './skeleton/DeviceDetailSkeleton'
 
 interface ModuleLoadingStateProps {
@@ -56,7 +57,8 @@ const getModuleSkeleton = (moduleName: string, isMac?: boolean): React.ReactNode
     system: <SystemTabSkeleton />,
     security: <SecurityTabSkeleton />,
     network: <NetworkTabSkeleton />,
-    events: <EventsTabSkeleton />
+    events: <EventsTabSkeleton />,
+    identity: <IdentityTabSkeleton />
   }
   return skeletonMap[moduleName.toLowerCase()] || null
 }
