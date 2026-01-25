@@ -28,6 +28,11 @@ export async function GET(request: Request) {
       const headers = getInternalApiHeaders()
       headers['Content-Type'] = 'application/json'
       
+      // Debug: Log what auth headers we're sending
+      const hasInternalSecret = !!headers['X-Internal-Secret']
+      const hasPassphrase = !!headers['X-API-PASSPHRASE']
+      console.log(`[SYSTEM API] ${timestamp} - Auth: internal-secret=${hasInternalSecret}, passphrase=${hasPassphrase}`)
+      
       // Add timeout to prevent hanging
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
