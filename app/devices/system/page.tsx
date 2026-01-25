@@ -197,6 +197,10 @@ function SystemPageContent() {
   const [activationFilter, setActivationFilter] = useState('all')
   const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
   
+  // Loading progress state (for progress bar)
+  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
+  const [loadingMessage, setLoadingMessage] = useState<string>('')
+  
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
@@ -303,9 +307,45 @@ function SystemPageContent() {
     } else if (!moduleLoading && systemModuleData.length === 0) {
       console.log('[SystemPage] No system module data available')
       setLoading(false)
+    }, with progress tracking
+    let progressInterval: NodeJS.Timeout | null = null
+    
+    if (moduleLoading && !loading) {
+      setLoading(true)
+      
+      // Start progress tracking
+      let progress = 0
+      setLoadingProgress({ current: 0, total: 100 })
+      setLoadingMessage('Fetching system data...')
+      
+      progressInterval = setInterval(() => {
+        if (progress < 85) {
+          progress += 5
+          setLoadingMessage('Loading operating system information...')
+        } else if (progress < 95) {
+          progress += 1
+          setLoadingMessage('Processing system details...')
+        } else {
+          progress += 0.1
+          setLoadingMessage('Finalizing data...')
+        }
+        progress = Math.min(progress, 99.9)
+        setLoadingProgress({ current: Math.floor(progress), total: 100 })
+      }, 200)
+    } else if (!moduleLoading && loading) {
+      // Data loaded - clear progress and hide loading
+      if (progressInterval) clearInterval(progressInterval)
+      setLoadingProgress({ current: 100, total: 100 })
+      setLoadingMessage('Complete!')
+      setTimeout(() => {
+        setLoading(false)
+      }, 300)
     }
-  }, [systemModuleData, moduleLoading])
-
+    
+    return () => {
+      if (progressInterval) clearInterval(progressInterval)
+    }
+  }, [moduleLoading, l
   useEffect(() => {
     // Handle loading state based on module loading
     setLoading(moduleLoading)
@@ -523,13 +563,49 @@ function SystemPageContent() {
       )
     }
     return true
-  }).sort((a, b) => {
-    let aValue: string | number = ''
-    let bValue: string | number = ''
-    
-    switch (sortColumn) {
-      case 'device':
-        aValue = a.deviceName?.toLowerCase() || ''
+  }).sort((a, b) = className="flex-1 min-w-0">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Operating System Information</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  OS versions, activation status, and system uptime {searchFilteredSystems.length} devices
+                </p>
+                
+                {/* Loading Progress - Inline with title */}
+                {(loading || moduleLoading) && (
+                  <div className="mt-3 max-w-md">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 truncate">
+                            {loadingMessage || 'Loading system data...'}
+                          </p>
+                          {loadingProgress.total > 0 && (
+                            <p className="text-xs text-gray-500 dark:text-gray-500 ml-2 flex-shrink-0">
+                              {loadingProgress.current}/{loadingProgress.total}
+                            </p>
+                          )}
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className="bg-emerald-600 h-2 rounded-full transition-all duration-300 ease-out"
+                            style={{ 
+                              width: loadingProgress.total > 0
+                                ? `${(loadingProgress.current / loadingProgress.total) * 100}%`
+                                : '0%'
+                            }}
+                          ></div>
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                        {loadingProgress.total > 0 
+                          ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%`
+                          : ''
+                        }
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-4 flex-shrink-0
         bValue = b.deviceName?.toLowerCase() || ''
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
       case 'os':

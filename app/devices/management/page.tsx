@@ -8,6 +8,7 @@ import { useSearchParams } from "next/navigation"
 import { CopyButton } from "../../../src/components/ui/CopyButton"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface Management {
   id: string
@@ -117,6 +118,7 @@ function LoadingSkeleton() {
 
 function ManagementPageContent() {
   const searchParams = useSearchParams()
+  const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [management, setManagement] = useState<Management[]>([])
@@ -464,6 +466,13 @@ function ManagementPageContent() {
 
   // Apply shared filters to get final filtered list
   const filteredManagement = baseFilteredManagement.filter(m => {
+    // Global platform filter first
+    if (globalPlatformFilter) {
+      const platform = normalizePlatform(m.raw?.system?.operatingSystem?.name)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
     if (selectedStatuses.length > 0 && !selectedStatuses.includes(m.status || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(m.catalog || '')) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(m.usage || '')) return false

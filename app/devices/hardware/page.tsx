@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -47,6 +48,7 @@ function HardwarePageContent() {
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [processorFilter, setProcessorFilter] = useState<string>('all')
+  const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Chart filter states
   const [selectedModels, setSelectedModels] = useState<string[]>([])
@@ -541,6 +543,14 @@ function HardwarePageContent() {
   }
   // Filter hardware
   const filteredHardware = processedHardware.filter(h => {
+    // Global toolbar platform filter first
+    if (globalPlatformFilter) {
+      const platform = normalizePlatform(getDevicePlatform(h))
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
+    
     // Existing processor filter
     if (processorFilter !== 'all') {
       let processorStr = ''

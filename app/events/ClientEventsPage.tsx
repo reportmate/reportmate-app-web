@@ -10,6 +10,7 @@ import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
+import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 
 const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
@@ -147,6 +148,7 @@ function EventsPageContent() {
   const [totalEvents, setTotalEvents] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Ref for infinite scroll sentinel
   const loadMoreRef = useRef<HTMLDivElement>(null)
@@ -179,6 +181,7 @@ function EventsPageContent() {
       device: event.device,
       deviceName: (event as any).deviceName,
       assetTag: (event as any).assetTag,
+      platform: (event as any).platform,
       kind: event.kind,
       ts: event.ts,
       message: (event as any).message,
@@ -296,9 +299,17 @@ function EventsPageContent() {
     return () => observer.disconnect()
   }, [hasMore, loading, loadingMore, offset, fetchEvents])
 
-  // Filter events based on selected type and search query (client-side)
+  // Filter events based on platform, selected type and search query (client-side)
   const filteredEvents = bundledEvents.filter(event => {
-    // Filter by type first
+    // Filter by platform first (global filter)
+    if (platformFilter) {
+      const eventPlatform = normalizePlatform((event as any).platform)
+      if (!isPlatformVisible(eventPlatform)) {
+        return false
+      }
+    }
+    
+    // Filter by type
     const typeMatch = filterType === 'all' || (event.bundledKinds || []).some(kind => kind.toLowerCase() === filterType.toLowerCase())
     
     // Then filter by search query if provided

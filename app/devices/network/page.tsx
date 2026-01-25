@@ -7,6 +7,7 @@ import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
+import { usePlatformFilterSafe, getDevicePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
 
 interface NetworkDevice {
@@ -32,6 +33,7 @@ function NetworkPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless'>('all')
   const searchParams = useSearchParams()
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'ip' | 'mac' | 'network'>('device')
@@ -164,6 +166,14 @@ function NetworkPageContent() {
       d.serialNumber === n.serialNumber
     )
     const inventory = deviceFromMainAPI?.modules?.inventory
+
+    // Global platform filter first
+    if (platformFilter) {
+      const platform = getDevicePlatform(deviceFromMainAPI || n)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
 
     // Connection type filter
     if (connectionFilter !== 'all') {

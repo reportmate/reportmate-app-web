@@ -11,6 +11,7 @@ import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/Platfo
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { preloadInstallsData } from "../../src/hooks/useInstallsData"
+import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 // WebPubSub message types for JSON subprotocol
 interface WebPubSubMessage {
@@ -109,6 +110,13 @@ export default function ClientDashboard() {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
+  
+  // Filter devices by platform
+  const filteredDevices = useMemo(() => {
+    if (platformFilter === 'all') return devices
+    return devices.filter(device => isPlatformVisible(getDevicePlatform(device)))
+  }, [devices, platformFilter, isPlatformVisible])
   
   // Mark as mounted
   useEffect(() => {
@@ -424,7 +432,7 @@ export default function ClientDashboard() {
           <div className="lg:col-span-3 space-y-8">
             {/* Device Status Widget */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading status chart</div>}>
-              <StatusWidget devices={devices as any} loading={devicesLoading} />
+              <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
             {/* Error and Warning Stats Cards - Side by Side */}
@@ -437,7 +445,7 @@ export default function ClientDashboard() {
 
             {/* New Clients Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
-              <NewClientsWidget devices={devices as any} loading={devicesLoading} />
+              <NewClientsWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
           </div>
 
@@ -459,17 +467,17 @@ export default function ClientDashboard() {
 
             {/* Platform Distribution - Full Width */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading platform stats</div>}>
-              <PlatformDistributionWidget devices={devices as any} loading={devicesLoading} />
+              <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
             {/* OS Version Tracking - 50/50 Split */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* macOS Versions */}
-                <OSVersionPieWidget devices={devices as any} loading={devicesLoading} osType="macOS" />
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
                 
                 {/* Windows Versions */}
-                <OSVersionPieWidget devices={devices as any} loading={devicesLoading} osType="Windows" />
+                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
               </div>
             </ErrorBoundary>
           </div>
