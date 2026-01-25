@@ -103,6 +103,9 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
     }
 
     try {
+      const startTime = Date.now()
+      console.log(`[useDeviceData] Fetching ${moduleType} module data...`)
+      
       const response = await fetch(`/api/modules/${moduleType}`, {
         cache: 'no-store',
         headers: {
@@ -111,11 +114,17 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
         }
       })
       
+      const fetchTime = Date.now() - startTime
+      console.log(`[useDeviceData] ${moduleType} fetch completed in ${fetchTime}ms, status: ${response.status}`)
+      
       if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`[useDeviceData] ${moduleType} error response:`, errorText)
         throw new Error(`HTTP error! status: ${response.status}`)
       }
       
       const data = await response.json()
+      console.log(`[useDeviceData] ${moduleType} data received:`, Array.isArray(data) ? `${data.length} items` : typeof data)
       setModuleData(data)
     } catch (err) {
       console.error(`Error fetching ${moduleType} module data:`, err)
