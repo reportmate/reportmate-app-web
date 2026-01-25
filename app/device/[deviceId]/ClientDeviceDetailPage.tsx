@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
+import { getDevicePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { PlatformBadge } from "../../../src/components/ui/PlatformBadge"
 // Import SMART loading hook (V2 - parallel loading)
 import { useSmartDeviceLoading } from "../../../src/hooks/useSmartDeviceLoading"
 import { 
@@ -715,9 +717,12 @@ export default function ClientDeviceDetailPage() {
             <div className="flex items-center justify-between h-16">
               <div className="flex items-center gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:gap-3 pt-6 pb-6 sm:pt-0 sm:pb-0">
-                  <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                    {deviceInfo.name}
-                  </h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-lg font-bold text-gray-900 dark:text-white">
+                      {deviceInfo.name}
+                    </h1>
+                    <PlatformBadge platform={getDevicePlatform(deviceInfo)} />
+                  </div>
                   
                   {/* Clickable pills with copy functionality */}
                   <div className="flex items-center gap-2 mt-1 sm:mt-0">

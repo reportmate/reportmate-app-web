@@ -7,6 +7,8 @@ import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from "rea
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
+import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
+import { usePlatformFilterSafe, getDevicePlatform } from '../../../src/providers/PlatformFilterProvider'
 
 interface ApplicationItem {
   id: string
@@ -33,6 +35,7 @@ interface ApplicationItem {
   room?: string
   fleet?: string
   assetTag?: string
+  platform?: string
   raw?: any
 }
 
@@ -345,18 +348,6 @@ function shouldIncludeApplication(appName: string): boolean {
     /Security Update for Microsoft/i,
     /^KB\d+/i, // Windows KB updates
     
-    // Drivers and system components (more aggressive)
-    /Driver$/i,
-    /^Intel.*Driver/i,
-    /^NVIDIA.*Driver/i,
-    /^AMD.*Driver/i,
-    /^AMD GPIO2 Driver/i,
-    /^AMD Interface Driver/i,
-    /^AMD PCI Driver/i,
-    /^AMD PPM Provisioning File Driver/i,
-    /^AMD PSP Driver/i,
-    /^AMD_Chipset_Drivers/i,
-    
     // System components and installers
     /^64 Bit HP CIO Components Installer/i,
     /^1394 OHCI Compliant Host Controller/i,
@@ -401,15 +392,19 @@ function ApplicationsPageContent() {
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const [error, setError] = useState<string | null>(null)
   const [filtersExpanded, setFiltersExpanded] = useState(true)
-  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [widgetsExpanded, setWidgetsExpanded] = useState(false)
   const [sortColumn, setSortColumn] = useState<'device' | 'application' | 'version' | 'vendor' | 'usage' | 'catalog' | 'location'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Utilization report state (unified report - includes both inventory and usage data)
   const [utilizationData, setUtilizationData] = useState<UtilizationData | null>(null)
   const [utilizationDays, setUtilizationDays] = useState<number>(30)
   const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
+  
+  // Report type: 'usage' for full usage analytics, 'versions' for version distribution only
+  const [reportType, setReportType] = useState<'usage' | 'versions' | null>(null)
   
   // Device table sorting state (for version distribution device list)
   const [deviceTableSortColumn, setDeviceTableSortColumn] = useState<'deviceName' | 'serialNumber' | 'application' | 'version' | 'location' | 'catalog' | 'lastSeen'>('deviceName')
@@ -653,7 +648,6 @@ function ApplicationsPageContent() {
     try {
       setLoading(true)
       setError(null)
-      setFiltersExpanded(false) // Collapse filters when generating report
       setSearchQuery('') // Clear search field when generating report
       
                   
@@ -736,6 +730,7 @@ function ApplicationsPageContent() {
       setLoadingProgress({ current: 0, total: 0 })
     } finally {
       setLoading(false)
+      setFiltersExpanded(false) // Collapse accordion after report loads
     }
   }
 
@@ -747,7 +742,6 @@ function ApplicationsPageContent() {
     try {
       setLoading(true)
       setError(null)
-      setFiltersExpanded(false)
       
       // Clear search field when generating report
       setSearchQuery('')
@@ -837,6 +831,7 @@ function ApplicationsPageContent() {
         setUtilizationData(null)
       } else {
         setUtilizationData(data)
+        setReportType('usage')
         // Version distribution is now included in the utilization API response
         // No need for separate inventory fetch
                 
@@ -860,7 +855,74 @@ function ApplicationsPageContent() {
       setError(errorMessage)
     } finally {
       setLoading(false)
+      setFiltersExpanded(false) // Collapse accordion after report loads
       // Reset progress after brief delay so completion shows
+      setTimeout(() => setLoadingProgress({ current: 0, total: 0 }), 500)
+    }
+  }
+
+  // Load versions-only report (inventory data with version distribution, no usage analytics)
+  const handleLoadVersionsReport = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      setSearchQuery('')
+      
+      setLoadingProgress({ current: 0, total: 100 })
+      setLoadingMessage('Loading version distribution data...')
+      
+      const selectedAppsParam = selectedApplications.length > 0 
+        ? selectedApplications.join(',') 
+        : ''
+      
+      // Load inventory data for version analysis
+      setLoadingProgress({ current: 20, total: 100 })
+      const inventoryParams = new URLSearchParams()
+      if (selectedAppsParam) {
+        inventoryParams.set('applicationNames', selectedAppsParam)
+      }
+      
+      const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
+      
+      const inventoryResponse = await fetch(inventoryUrl, {
+        cache: 'no-store',
+        headers: { 'Cache-Control': 'no-cache' }
+      })
+      
+      setLoadingProgress({ current: 60, total: 100 })
+      
+      if (!inventoryResponse.ok) {
+        throw new Error(`Failed to load version data: ${inventoryResponse.status}`)
+      }
+      
+      const inventoryData = await inventoryResponse.json()
+      
+      if (Array.isArray(inventoryData)) {
+        setApplications(inventoryData)
+        setReportType('versions')
+        setUtilizationData(null) // Clear any previous usage data
+        setLoadingProgress({ current: 100, total: 100 })
+        setLoadingMessage('Complete!')
+      } else {
+        throw new Error('Invalid data format')
+      }
+      
+      // Save current filter state
+      const currentFilters = JSON.stringify({
+        applications: selectedApplications,
+        usages: selectedUsages,
+        catalogs: selectedCatalogs,
+        locations: selectedLocations
+      })
+      setLastAppliedFilters(currentFilters)
+      
+    } catch (error) {
+      console.error('Failed to load versions data:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+      setError(errorMessage)
+    } finally {
+      setLoading(false)
+      setFiltersExpanded(false) // Collapse accordion after report loads
       setTimeout(() => setLoadingProgress({ current: 0, total: 0 }), 500)
     }
   }
@@ -918,10 +980,13 @@ function ApplicationsPageContent() {
     }
   }
 
-  // Filter applications for display (client-side filtering for real-time updates)
-  const filteredApplications = applications.filter(app => {
+  // Base filter for applications (without version filter - used for version widgets)
+  const baseFilteredApplications = applications.filter(app => {
     // First filter: exclude junk applications
     if (!shouldIncludeApplication(app.name)) return false
+    
+    // Global platform filter
+    if (platformFilter !== 'all' && !isPlatformVisible(app.platform || '')) return false
     
     const matchesSearch = !searchQuery.trim() || 
       app.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -940,20 +1005,28 @@ function ApplicationsPageContent() {
         app.room?.toLowerCase().includes(room.toLowerCase())
       )
     const matchesFleets = selectedFleets.length === 0 || selectedFleets.includes(app.fleet || '')
+    
+    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets
+  })
+
+  // Filter applications for display (includes version filter for table)
+  const filteredApplications = baseFilteredApplications.filter(app => {
     const matchesVersions = selectedVersions.length === 0 || 
       selectedVersions.some(versionFilter => {
         // Handle both app-specific (appName:version) and general version filters
         if (versionFilter.includes(':')) {
           const [filterAppName, filterVersion] = versionFilter.split(':')
           if (filterVersion === 'Unknown') return false
-          return app.name === filterAppName && app.version === filterVersion
+          // Compare using NORMALIZED app name (since versionAnalysis uses normalized names)
+          const normalizedAppName = normalizeAppName(app.name)
+          return normalizedAppName === filterAppName && app.version === filterVersion
         } else {
           if (versionFilter === 'Unknown') return false
           return app.version === versionFilter
         }
       })
     
-    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesVersions
+    return matchesVersions
   })
 
   // Sort filtered applications
@@ -1064,6 +1137,7 @@ function ApplicationsPageContent() {
   const resetReport = () => {
     setApplications([])
     setUtilizationData(null)
+    setReportType(null)
     setSelectedApplications([])
     setSelectedUsages([])
     setSelectedCatalogs([])
@@ -1091,10 +1165,11 @@ function ApplicationsPageContent() {
   }, [filterOptions.applicationNames, searchQuery])
 
   // Version analysis - group by NORMALIZED application name and version
+  // Uses baseFilteredApplications (without version filter) so widgets always show all versions
   const versionAnalysis = useMemo(() => {
     const analysis: VersionAnalysis = {}
     
-    filteredApplications.forEach(app => {
+    baseFilteredApplications.forEach(app => {
       // Use normalized name as the key (same as what's in filterOptions.applicationNames)
       const normalizedName = normalizeAppName(app.name)
       if (!normalizedName) return // Skip if normalization results in empty string
@@ -1107,7 +1182,7 @@ function ApplicationsPageContent() {
     })
     
     return analysis
-  }, [filteredApplications])
+  }, [baseFilteredApplications])
 
   /* Commented out full-page error - using inline table error instead
   if (error) {
@@ -1186,19 +1261,21 @@ function ApplicationsPageContent() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Applications Report
+                {reportType === 'usage' ? 'Applications Usage Report' : 'Applications Report'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {utilizationData 
+                {reportType === 'usage' && utilizationData 
                   ? `${utilizationData.summary.totalAppsTracked} apps tracked across ${utilizationData.summary.uniqueDevices} devices`
-                  : 'Generate report to see application inventory and usage analytics'
+                  : reportType === 'versions' && sortedApplications.length > 0
+                  ? `${sortedApplications.length} applications across ${new Set(sortedApplications.map(app => app.serialNumber)).size} devices`
+                  : 'Generate report to see application inventory across your fleet'
                 }
               </p>
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Time Period Selector - Only show after report is generated */}
-              {utilizationData && (
+              {/* Time Period Selector - Only show for usage reports */}
+              {reportType === 'usage' && utilizationData && (
                 <div className="flex items-center gap-2">
                   <label className="text-sm text-gray-600 dark:text-gray-400">Period:</label>
                   <select
@@ -1234,7 +1311,7 @@ function ApplicationsPageContent() {
                 {/* Clear All Selections Button - Show when selections are active and NO report loaded */}
                 {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && 
                  !loading && 
-                 !utilizationData && (
+                 !reportType && (
                   <button
                     onClick={clearAllFilters}
                     className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium"
@@ -1243,14 +1320,51 @@ function ApplicationsPageContent() {
                   </button>
                 )}
                 
-                {/* Generate Report Button - Hide when loading */}
-                {!loading && (
+                {/* Generate Report Button - Show before any report is generated */}
+                {!loading && !reportType && (
                   <button
-                    onClick={handleLoadUtilization}
+                    onClick={() => handleLoadVersionsReport()}
                     className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-blue-600 hover:bg-blue-700"
                   >
+                    Generate Report
+                  </button>
+                )}
+                
+                {/* Update Report Button - Show when main report is loaded AND filters have changed */}
+                {!loading && reportType === 'versions' && (() => {
+                  const currentFilters = JSON.stringify({
+                    applications: selectedApplications,
+                    usages: selectedUsages,
+                    catalogs: selectedCatalogs,
+                    locations: selectedLocations
+                  })
+                  return lastAppliedFilters && lastAppliedFilters !== currentFilters
+                })() && (
+                  <button
+                    onClick={() => handleLoadVersionsReport()}
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-blue-600 hover:bg-blue-700"
+                  >
+                    Update Report
+                  </button>
+                )}
+                
+                {/* Usage Report Button - Secondary option after main report is generated */}
+                {!loading && reportType === 'versions' && (
+                  <button
+                    onClick={() => handleLoadUtilization()}
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700"
+                  >
+                    Usage Report
+                  </button>
+                )}
+                
+                {/* Update Usage Report Button - Show when usage report is loaded */}
+                {!loading && reportType === 'usage' && (
+                  <button
+                    onClick={() => handleLoadUtilization()}
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700"
+                  >
                     {(() => {
-                      // Check if filters have changed since last generation
                       const currentFilters = JSON.stringify({
                         days: utilizationDays,
                         applications: selectedApplications,
@@ -1259,15 +1373,13 @@ function ApplicationsPageContent() {
                         locations: selectedLocations
                       })
                       const filtersChanged = lastAppliedFilters && lastAppliedFilters !== currentFilters
-                      
-                      if (filtersChanged && utilizationData) return 'Update Report'
-                      return 'Generate Report'
+                      return filtersChanged ? 'Update Usage Report' : 'Usage Report'
                     })()}
                   </button>
                 )}
 
-                {/* Reset Button - Show after report is generated */}
-                {utilizationData && !loading && (
+                {/* Reset Button - Show after any report is generated */}
+                {reportType && !loading && (
                   <button
                     onClick={resetReport}
                     className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
@@ -1280,8 +1392,8 @@ function ApplicationsPageContent() {
                 )}
               </div>
               
-              {/* Export CSV Button */}
-              {utilizationData && utilizationData.applications.length > 0 && (
+              {/* Export CSV Button - Usage Report */}
+              {reportType === 'usage' && utilizationData && utilizationData.applications.length > 0 && (
                 <button
                   onClick={() => {
                     const csvContent = [
@@ -1300,7 +1412,38 @@ function ApplicationsPageContent() {
                     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
                     const link = document.createElement('a')
                     link.href = URL.createObjectURL(blob)
-                    link.download = `applications-report-${utilizationDays}days-${new Date().toISOString().split('T')[0]}.csv`
+                    link.download = `applications-usage-${utilizationDays}days-${new Date().toISOString().split('T')[0]}.csv`
+                    link.click()
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Export Usage CSV
+                </button>
+              )}
+              
+              {/* Export CSV Button - Versions Report */}
+              {reportType === 'versions' && sortedApplications.length > 0 && (
+                <button
+                  onClick={() => {
+                    const csvContent = [
+                      ['Device', 'Serial Number', 'Application', 'Version', 'Catalog', 'Location'].join(','),
+                      ...sortedApplications.map(app => [
+                        app.deviceName || app.serialNumber,
+                        app.serialNumber,
+                        app.name,
+                        app.version,
+                        app.catalog || '',
+                        app.location || ''
+                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                    ].join('\n')
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                    const link = document.createElement('a')
+                    link.href = URL.createObjectURL(blob)
+                    link.download = `applications-${new Date().toISOString().split('T')[0]}.csv`
                     link.click()
                   }}
                   className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
@@ -1435,6 +1578,52 @@ function ApplicationsPageContent() {
                 </span>
               </button>
               
+              {/* Cool Progress View - Show when generating report */}
+              {loading && (
+                <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-t border-gray-200 dark:border-gray-600">
+                  <div className="flex items-center gap-4">
+                    {/* Applications module icon */}
+                    <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                      <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    
+                    {/* Progress info */}
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          {loadingMessage || 'Processing...'}
+                        </span>
+                      </div>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
+                        <div 
+                          className="h-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 transition-all duration-300 ease-out"
+                          style={{ 
+                            width: loadingProgress.total > 0 
+                              ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%` 
+                              : '0%',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s ease-in-out infinite'
+                          }}
+                        ></div>
+                      </div>
+                      
+                      {/* Step indicators */}
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className={`w-2 h-2 rounded-full ${loadingProgress.current >= 20 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${loadingProgress.current >= 40 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${loadingProgress.current >= 60 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${loadingProgress.current >= 80 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                        <div className={`w-2 h-2 rounded-full ${loadingProgress.current >= 100 ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Collapsible Content */}
               {filtersExpanded && (
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
@@ -1487,7 +1676,8 @@ function ApplicationsPageContent() {
                     </div>
                   </div>
 
-                  {/* Fleet Filter */}
+                  {/* Fleet Filter - Only show if fleets exist */}
+                  {filterOptions.fleets.length > 0 && (
                   <div>
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Fleet {selectedFleets.length > 0 && `(${selectedFleets.length} selected)`}
@@ -1508,6 +1698,7 @@ function ApplicationsPageContent() {
                       ))}
                     </div>
                   </div>
+                  )}
 
                 </div>
 
@@ -1548,6 +1739,39 @@ function ApplicationsPageContent() {
                     <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Applications {selectedApplications.length > 0 && `(${selectedApplications.length} selected)`}
                     </h3>
+                    <div className="flex items-center gap-2">
+                      {/* Select All Filtered Results button - shows when search is active */}
+                      {searchQuery && filteredApplicationNames.length > 0 && filteredApplicationNames.length < filterOptions.applicationNames.length && (
+                        <button
+                          onClick={() => {
+                            // Add all filtered results that aren't already selected
+                            const newSelections = filteredApplicationNames.filter(name => !selectedApplications.includes(name))
+                            setSelectedApplications([...selectedApplications, ...newSelections])
+                          }}
+                          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-200 dark:hover:bg-blue-800 rounded-lg transition-colors"
+                        >
+                          Select {filteredApplicationNames.length} Results
+                        </button>
+                      )}
+                      {/* Select All button */}
+                      {selectedApplications.length < filterOptions.applicationNames.length && (
+                        <button
+                          onClick={() => setSelectedApplications([...filterOptions.applicationNames])}
+                          className="px-2 py-1 text-xs bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 rounded-lg transition-colors"
+                        >
+                          Select All ({filterOptions.applicationNames.length})
+                        </button>
+                      )}
+                      {/* Clear All button - when apps are selected */}
+                      {selectedApplications.length > 0 && (
+                        <button
+                          onClick={() => setSelectedApplications([])}
+                          className="px-2 py-1 text-xs bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900 dark:text-red-200 dark:hover:bg-red-800 rounded-lg transition-colors"
+                        >
+                          Clear ({selectedApplications.length})
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <div className="h-96 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
@@ -1587,8 +1811,8 @@ function ApplicationsPageContent() {
           )}
           
 
-          {/* Version Distribution Widget - Shows apps filtered by selectedApplications */}
-          {utilizationData && utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && (
+          {/* Version Distribution Widget - Shows for Usage Report (from API data) */}
+          {reportType === 'usage' && utilizationData && utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && (
             <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <div className="px-6 py-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -1703,10 +1927,108 @@ function ApplicationsPageContent() {
             </div>
           )}
 
-          {/* Report Content - Shows utilization data OR device inventory when versions selected */}
-          {utilizationData && selectedVersions.length === 0 && (
+          {/* Version Distribution Widget - Shows for Versions Report (computed from applications) */}
+          {reportType === 'versions' && Object.keys(versionAnalysis).length > 0 && (
+            <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4">
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                  </svg>
+                  Version Distribution
+                  {selectedVersions.length > 0 && (
+                    <span className="text-sm font-normal text-gray-500 dark:text-gray-400">
+                      ({selectedVersions.length} selected)
+                    </span>
+                  )}
+                  {selectedApplications.length > 0 && (
+                    <span className="text-sm font-normal text-blue-500 dark:text-blue-400">
+                      - {selectedApplications.length} app{selectedApplications.length !== 1 ? 's' : ''} filtered
+                    </span>
+                  )}
+                </h3>
+                {/* Horizontal scrollable container for apps */}
+                <div className="flex overflow-x-auto gap-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
+                  {Object.keys(versionAnalysis)
+                    .sort((a, b) => {
+                      // Sort by total devices descending
+                      const aTotal = Object.values(versionAnalysis[a]).reduce((sum, count) => sum + count, 0)
+                      const bTotal = Object.values(versionAnalysis[b]).reduce((sum, count) => sum + count, 0)
+                      return bTotal - aTotal
+                    })
+                    .slice(0, 50) // Limit to prevent overwhelming
+                    .map(appName => {
+                      const versions = versionAnalysis[appName]
+                      const sortedVersions = Object.entries(versions)
+                        .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                      const total = Object.values(versions).reduce((sum, count) => sum + count, 0)
+                      
+                      return (
+                        <div 
+                          key={appName} 
+                          className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                        >
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>
+                              {appName}
+                            </h4>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">
+                              {total} device{total !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {/* Scrollable version list with max height */}
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {sortedVersions.map(([version, count]) => {
+                              const percentage = Math.round((count / total) * 100)
+                              const versionFilter = `${appName}:${version}`
+                              const isSelected = selectedVersions.includes(versionFilter)
+                              return (
+                                <div 
+                                  key={version} 
+                                  className={`p-2 rounded cursor-pointer transition-colors ${
+                                    isSelected 
+                                      ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500' 
+                                      : 'bg-white dark:bg-gray-600 border border-gray-200 dark:border-gray-500 hover:bg-blue-50 dark:hover:bg-blue-900/30'
+                                  }`}
+                                  onClick={() => toggleVersion(version, appName)}
+                                  title="Click to filter devices with this version"
+                                >
+                                  <div className="flex items-center justify-between mb-1">
+                                    <span className={`text-xs font-medium ${
+                                      isSelected 
+                                        ? 'text-blue-700 dark:text-blue-300 font-bold' 
+                                        : 'text-gray-700 dark:text-gray-300'
+                                    }`}>
+                                      v{version}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {count} ({percentage}%)
+                                    </span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
+                                    <div 
+                                      className={`h-1.5 rounded-full transition-all duration-300 ${
+                                        isSelected ? 'bg-blue-700' : 'bg-blue-600'
+                                      }`}
+                                      style={{ width: `${percentage}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Usage Report Content - Shows utilization data with widgets */}
+          {reportType === 'usage' && utilizationData && selectedVersions.length === 0 && (
             <>
-              {/* Widgets Accordion - Collapsible section */}
+              {/* Widgets Accordion - Collapsible section - ONLY for Usage Report */}
               {(utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
                 <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
                   {/* Widgets Accordion Header */}
@@ -1723,7 +2045,7 @@ function ApplicationsPageContent() {
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Usage Analytics</span>
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
                       {widgetsExpanded ? 'Click to collapse' : 'Click to expand'}
@@ -2111,8 +2433,178 @@ function ApplicationsPageContent() {
             </>
           )}
 
-          {/* Device Inventory Table - Shown when versions are selected, uses versionDistribution from API */}
-          {utilizationData && selectedVersions.length > 0 && utilizationData.versionDistribution && (
+          {/* Versions Report Table - Shown for versions report type */}
+          {reportType === 'versions' && sortedApplications.length > 0 && (
+            <>
+              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    {selectedVersions.length > 0 ? (
+                      <>
+                        Filtered: {selectedVersions.length} version{selectedVersions.length > 1 ? 's' : ''} selected
+                        <button 
+                          onClick={() => setSelectedVersions([])}
+                          className="ml-2 text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 px-2 py-1 rounded transition-colors"
+                        >
+                          Clear
+                        </button>
+                      </>
+                    ) : (
+                      'Application Versions Inventory'
+                    )}
+                  </h3>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    {sortedApplications.length} records
+                  </span>
+                </div>
+              </div>
+              <div className="overflow-x-auto bg-white dark:bg-gray-800">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
+                    <tr>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('application')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Application
+                          {deviceTableSortColumn === 'application' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('version')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Version
+                          {deviceTableSortColumn === 'version' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('deviceName')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Device
+                          {deviceTableSortColumn === 'deviceName' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('location')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Location
+                          {deviceTableSortColumn === 'location' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('catalog')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Catalog
+                          {deviceTableSortColumn === 'catalog' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {(() => {
+                      // Sort applications based on current sort column/direction
+                      const sorted = [...sortedApplications].sort((a, b) => {
+                        let aVal: string | undefined
+                        let bVal: string | undefined
+                        
+                        switch (deviceTableSortColumn) {
+                          case 'deviceName':
+                            aVal = a.deviceName || a.serialNumber
+                            bVal = b.deviceName || b.serialNumber
+                            break
+                          case 'application':
+                            aVal = a.name
+                            bVal = b.name
+                            break
+                          case 'version':
+                            aVal = a.version
+                            bVal = b.version
+                            break
+                          case 'location':
+                            aVal = a.location || ''
+                            bVal = b.location || ''
+                            break
+                          case 'catalog':
+                            aVal = a.catalog || ''
+                            bVal = b.catalog || ''
+                            break
+                          default:
+                            aVal = a.name
+                            bVal = b.name
+                        }
+                        
+                        const comparison = (aVal || '').localeCompare(bVal || '')
+                        return deviceTableSortDirection === 'desc' ? -comparison : comparison
+                      })
+                      
+                      return sorted.map((app, index) => (
+                        <tr key={`${app.serialNumber}-${app.name}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {app.name}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            v{app.version}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={`/device/${app.serialNumber}`}
+                                className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {app.deviceName || app.serialNumber}
+                              </Link>
+                              <PlatformBadge platform={app.platform || ''} size="sm" />
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {app.location || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {app.catalog || '-'}
+                          </td>
+                        </tr>
+                      ))
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
+          {/* Device Inventory Table - Shown when versions are selected in usage report */}
+          {reportType === 'usage' && utilizationData && selectedVersions.length > 0 && utilizationData.versionDistribution && (
             <>
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
                 <div className="flex items-center justify-between mb-4">

@@ -24,7 +24,7 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 // Simple identifier type detection
-function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' | 'serialNumber' | 'deviceName' {
+function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' | 'serialNumber' | 'deviceName' | 'hostname' {
   // UUID pattern: 8-4-4-4-12 hexadecimal characters
   const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
   
@@ -43,6 +43,12 @@ function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' |
     return 'assetTag'
   }
   
+  // Hostname pattern: contains dots or dashes typical of hostnames (e.g., device.domain.com, device-name)
+  const hostnamePattern = /^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$/
+  if (hostnamePattern.test(identifier) && (identifier.includes('.') || identifier.includes('-'))) {
+    return 'hostname'
+  }
+  
   // Everything else is assumed to be a serial number
   return 'serialNumber'
 }
@@ -51,7 +57,7 @@ function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' |
 async function resolveDeviceInMiddleware(identifier: string, _request: NextRequest): Promise<string | null> {
   const identifierType = identifyDeviceIdentifierType(identifier)
   
-  // Only resolve asset tags and device names, not UUIDs or serial numbers
+  // Only resolve asset tags, device names, and hostnames - not UUIDs or serial numbers
   if (identifierType === 'serialNumber' || identifierType === 'uuid') {
     return null
   }
@@ -123,6 +129,17 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
       return device.serialNumber
     }
     
+    // Check hostnames in network modules
+    device = devices.find((d: any) => 
+      d.network?.hostname === identifier ||
+      d.network?.host_name === identifier ||
+      d.system?.hostname === identifier ||
+      d.system?.host_name === identifier
+    )
+    if (device && device.serialNumber) {
+      return device.serialNumber
+    }
+    
     return null
     
   } catch (error) {
@@ -151,7 +168,7 @@ export default async function middleware(request: NextRequest) {
     
     if (!process.env.API_BASE_URL) {
       // Continue without resolution
-    } else if (identifierType === 'assetTag' || identifierType === 'deviceName') {
+    } else if (identifierType === 'assetTag' || identifierType === 'deviceName' || identifierType === 'hostname') {
       const resolvedSerial = await resolveDeviceInMiddleware(deviceIdentifier, request)
       if (resolvedSerial && resolvedSerial !== deviceIdentifier) {
         const newUrl = new URL(getCorrectUrl(request.url))

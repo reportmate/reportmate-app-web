@@ -8,6 +8,7 @@ export interface FleetEvent {
   device: string
   deviceName?: string  // Enhanced with actual device name from API
   assetTag?: string    // Asset tag from inventory
+  platform?: string    // Platform from system.operatingSystem.name (Windows/macOS)
   kind: string
   ts: string
   message?: string
@@ -87,6 +88,7 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
         device: event.device,
         deviceName: event.deviceName,  // Preserve device name from primary event
         assetTag: event.assetTag,      // Preserve asset tag from primary event
+        platform: event.platform,      // Preserve platform from primary event
         kind: primaryKind,
         ts: event.ts, // Use the primary event's timestamp
         message: createBundleMessage(relatedEvents, bundleKinds),
@@ -106,6 +108,7 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
         device: event.device,
         deviceName: event.deviceName,  // Preserve device name
         assetTag: event.assetTag,      // Preserve asset tag
+        platform: event.platform,      // Preserve platform
         kind: event.kind,
         ts: event.ts,
         message: event.message || formatPayloadPreview(event.payload),

@@ -7,6 +7,9 @@ import { formatRelativeTime } from "../../src/lib/time"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { normalizeKeys } from "../../src/lib/utils/powershell-parser"
+import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
+import { FitText } from "../../src/components/ui/FitText"
+import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 interface InventoryItem {
   id: string
@@ -27,6 +30,7 @@ interface InventoryItem {
   model?: string
   uuid?: string
   archived?: boolean
+  platform?: string
   raw?: any
 }
 
@@ -41,6 +45,7 @@ function DevicesPageContent() {
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const searchParams = useSearchParams()
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Initialize search query and filters from URL parameters
   useEffect(() => {
@@ -115,6 +120,7 @@ function DevicesPageContent() {
               model: inventory.model,
               uuid: inventory.uuid || device.deviceId,
               archived: isArchived,
+              platform: getDevicePlatform(device),
               raw: { ...device, status: calculatedStatus }
             }
           })
@@ -187,6 +193,11 @@ function DevicesPageContent() {
             return false
           }
         })
+      }
+      
+      // Apply global platform filter
+      if (platformFilter !== 'all') {
+        filtered = filtered.filter(item => isPlatformVisible(item.platform || ''))
       }
       
       // Then apply search filter
@@ -740,11 +751,11 @@ function DevicesPageContent() {
                     </th>
                     <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-36">
                       <button
-                        onClick={() => handleSort('createdAt')}
+                        onClick={() => handleSort('lastSeen')}
                         className="flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-100 transition-colors"
                       >
-                        Registered
-                        {sortColumn === 'createdAt' && (
+                        Last Seen
+                        {sortColumn === 'lastSeen' && (
                           <span className="text-gray-400">
                             {sortDirection === 'asc' ? '' : ''}
                           </span>
@@ -807,14 +818,18 @@ function DevicesPageContent() {
                   ) : (
                     filteredInventory.map((item) => (
                     <tr key={`${item.serialNumber}-${item.id}`} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                      <td className="px-4 lg:px-6 py-4">
-                        <div>
+                      <td className="px-4 lg:px-6 py-4" style={{ maxWidth: '220px' }}>
+                        <div className="flex items-center gap-2">
                           <Link 
                             href={`/device/${encodeURIComponent(item.serialNumber)}`}
-                            className="text-base font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400"
+                            className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 min-w-0 flex-1"
+                            title={item.deviceName || 'Unknown Device'}
                           >
-                            {item.deviceName || 'Unknown Device'}
+                            <FitText minFontSize={11} maxFontSize={16}>
+                              {item.deviceName || 'Unknown Device'}
+                            </FitText>
                           </Link>
+                          <PlatformBadge platform={item.platform || ''} size="sm" />
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
@@ -870,10 +885,10 @@ function DevicesPageContent() {
                           {item.location || '-'}
                         </div>
                       </td>
-                      <td className="px-4 lg:px-6 py-4 w-36">
-                        <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {item.createdAt ? formatRelativeTime(item.createdAt) : '-'}
-                        </div>
+                      <td className="px-4 lg:px-6 py-4" style={{ maxWidth: '120px' }}>
+                        <FitText minFontSize={10} maxFontSize={14} className="text-gray-500 dark:text-gray-400">
+                          {item.lastSeen ? formatRelativeTime(item.lastSeen) : '-'}
+                        </FitText>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         {(() => {

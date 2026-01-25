@@ -7,6 +7,7 @@ import { EdgeThemeFix } from "../src/components/edge-theme-fix";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
+import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
@@ -169,24 +170,26 @@ export default async function RootLayout({
         />
         <AuthProvider>
           <SWRProvider>
-            <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
-              <EdgeThemeFix />
-              <ErrorBoundary>
-                {isDevelopment ? (
-                  // Development: No AutoAuth component
-                  <ToolbarWrapper preloadedDevices={devices}>
-                    {children}
-                  </ToolbarWrapper>
-                ) : (
-                  // Production: Full authentication with AutoAuth
-                  <AutoAuth>
+            <PlatformFilterProvider>
+              <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+                <EdgeThemeFix />
+                <ErrorBoundary>
+                  {isDevelopment ? (
+                    // Development: No AutoAuth component
                     <ToolbarWrapper preloadedDevices={devices}>
                       {children}
                     </ToolbarWrapper>
-                  </AutoAuth>
-                )}
-              </ErrorBoundary>
-            </ThemeProvider>
+                  ) : (
+                    // Production: Full authentication with AutoAuth
+                    <AutoAuth>
+                      <ToolbarWrapper preloadedDevices={devices}>
+                        {children}
+                      </ToolbarWrapper>
+                    </AutoAuth>
+                  )}
+                </ErrorBoundary>
+              </ThemeProvider>
+            </PlatformFilterProvider>
           </SWRProvider>
         </AuthProvider>
       </body>

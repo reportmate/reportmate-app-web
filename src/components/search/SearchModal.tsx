@@ -308,7 +308,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Find device by name, serial, asset tag, or hostname"
+                placeholder="Search by name, serial, asset tag, or hostname"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="off"

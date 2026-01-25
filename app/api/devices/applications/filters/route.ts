@@ -125,10 +125,6 @@ function shouldIncludeApplication(appName: string): boolean {
     /Update for Windows/i,
     /Security Update for Microsoft/i,
     /^KB\d+/i,
-    /Driver$/i,
-    /^Intel.*Driver/i,
-    /^NVIDIA.*Driver/i,
-    /^AMD.*Driver/i,
     /Microsoft Visual C\+\+ \d{4} x\d{2} (Additional|Minimum) Runtime/i,
     /Microsoft .NET (Runtime|AppHost Pack|Targeting Pack|Host FX Resolver) - [\d\.]+ \(x\d+/i,
     /Microsoft ASP.NET Core [\d\.]+ (Shared Framework|Targeting Pack) \(x\d+/i,
@@ -201,19 +197,39 @@ export async function GET(request: Request) {
     const devicesMap = new Map()
     const deviceAppsCount = new Map() // Track app count per device
     
+    // Collect inventory filters from both devices and applications data
+    const usagesSet = new Set<string>()
+    const catalogsSet = new Set<string>()
+    const locationsSet = new Set<string>()
+    const roomsSet = new Set<string>()
+    const fleetsSet = new Set<string>()
+    
     for (const device of devicesData.devices) {
       if (!device.serialNumber || device.serialNumber.includes('TEST-') || device.serialNumber === 'localhost') {
         continue
       }
 
+      // Extract location from device inventory or direct device fields
+      const deviceLocation = device.location || device.inventory?.location || ''
+      const deviceUsage = device.usage || device.inventory?.usage || ''
+      const deviceCatalog = device.catalog || device.inventory?.catalog || ''
+      
+      // Add device-level inventory values to filter sets
+      if (deviceLocation) {
+        locationsSet.add(deviceLocation)
+        roomsSet.add(deviceLocation)
+      }
+      if (deviceUsage) usagesSet.add(deviceUsage)
+      if (deviceCatalog) catalogsSet.add(deviceCatalog)
+
       devicesMap.set(device.serialNumber, {
         id: device.deviceId || device.serial_number,
         name: device.deviceName || device.name || device.serialNumber,
         serialNumber: device.serialNumber,
-        usage: device.usage || '',
-        catalog: device.catalog || '',
-        location: device.location || '',
-        room: device.location || '',
+        usage: deviceUsage,
+        catalog: deviceCatalog,
+        location: deviceLocation,
+        room: deviceLocation,
         fleet: '',
         modules: {
           applications: { installedApplications: [] }, // Will populate from bulk data
@@ -228,13 +244,6 @@ export async function GET(request: Request) {
     const normalizedAppNames = new Set<string>()
     const publishers = new Set<string>()
     const categories = new Set<string>()
-    
-    // Collect inventory filters from applications data
-    const usagesSet = new Set<string>()
-    const catalogsSet = new Set<string>()
-    const locationsSet = new Set<string>()
-    const roomsSet = new Set<string>()
-    const fleetsSet = new Set<string>()
 
     for (const app of applicationsData) {
       const deviceSerial = app.serialNumber
