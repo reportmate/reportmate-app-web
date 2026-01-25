@@ -33,7 +33,9 @@ import {
   LogIn,
   History,
   ChevronDown,
-  Fingerprint
+  Fingerprint,
+  Key,
+  Scan
 } from 'lucide-react'
 import { extractIdentity, type IdentityInfo, type UserAccount, type BTMDBHealth } from '../../lib/data-processing/modules/identity'
 
@@ -187,6 +189,12 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
 
   // Extract bootstrap token from security module
   const bootstrapToken = device?.modules?.security?.bootstrapToken || device?.security?.bootstrapToken
+
+  // Extract Windows Hello data from security module (Windows only)
+  const rawSecurity = device?.modules?.security || device?.security
+  const parsedSecurity = convertPowerShellObjects(rawSecurity)
+  const normalizedSecurity = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
+  const windowsHello = normalizedSecurity?.windowsHello
 
   // Extract identity data
   const rawIdentity = device?.modules?.identity || device?.identity
@@ -349,6 +357,77 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                     +{identity.platformSSOUsers.registeredUserCount - 3} more registered
                   </div>
                 )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Windows Hello Card - Windows Only */}
+        {!isMac && windowsHello && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Scan className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Windows Hello</h3>
+            </div>
+            <div className="space-y-1">
+              <DetailRow 
+                label="Status" 
+                value={windowsHello.statusDisplay || 'Unknown'}
+                variant={
+                  windowsHello.statusDisplay === 'Enabled' || windowsHello.statusDisplay === 'Business' 
+                    ? 'success' 
+                    : windowsHello.statusDisplay === 'Partially Configured' 
+                    ? 'warning' 
+                    : 'neutral'
+                }
+              />
+              {windowsHello.credentialProviders && (
+                <>
+                  <DetailRow 
+                    label="PIN" 
+                    value={windowsHello.credentialProviders.pinEnabled ? 'Enabled' : 'Disabled'}
+                    variant={windowsHello.credentialProviders.pinEnabled ? 'success' : 'neutral'}
+                  />
+                  <DetailRow 
+                    label="Fingerprint" 
+                    value={windowsHello.credentialProviders.fingerprintEnabled ? 'Enabled' : 'Disabled'}
+                    variant={windowsHello.credentialProviders.fingerprintEnabled ? 'success' : 'neutral'}
+                  />
+                  <DetailRow 
+                    label="Face Recognition" 
+                    value={windowsHello.credentialProviders.faceRecognitionEnabled ? 'Enabled' : 'Disabled'}
+                    variant={windowsHello.credentialProviders.faceRecognitionEnabled ? 'success' : 'neutral'}
+                  />
+                </>
+              )}
+              {windowsHello.credentialGuard && (
+                <DetailRow 
+                  label="Credential Guard" 
+                  value={windowsHello.credentialGuard.isEnabled ? 'Enabled' : 'Disabled'}
+                  variant={windowsHello.credentialGuard.isEnabled ? 'success' : 'neutral'}
+                />
+              )}
+            </div>
+            {/* NGC Key Storage Info */}
+            {windowsHello.ngcKeyStorage?.isConfigured && (
+              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
+                <div className="flex items-center gap-1 text-blue-700 dark:text-blue-300 mb-1">
+                  <Key className="w-3 h-3" />
+                  <span className="font-medium">NGC Key Storage Configured</span>
+                </div>
+                {windowsHello.ngcKeyStorage.providers?.length > 0 && (
+                  <div className="text-blue-600 dark:text-blue-400">
+                    {windowsHello.ngcKeyStorage.providers.map((p: any) => p.name || p.type).slice(0, 2).join(', ')}
+                    {windowsHello.ngcKeyStorage.providers.length > 2 && ` +${windowsHello.ngcKeyStorage.providers.length - 2} more`}
+                  </div>
+                )}
+              </div>
+            )}
+            {/* WebAuthN Info */}
+            {windowsHello.webAuthN?.isEnabled && (
+              <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <CheckCircle className="w-3 h-3" />
+                WebAuthN/FIDO2 Enabled
               </div>
             )}
           </div>

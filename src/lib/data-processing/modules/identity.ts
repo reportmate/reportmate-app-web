@@ -116,6 +116,9 @@ export interface DirectoryServicesInfo {
   activeDirectory: ADBindingInfo
   ldap: LDAPBindingInfo
   directoryNodes?: string
+  // Windows-specific
+  azureAD?: AzureADInfo
+  workgroup?: string
 }
 
 export interface ADBindingInfo {
@@ -126,6 +129,14 @@ export interface ADBindingInfo {
 export interface LDAPBindingInfo {
   bound: boolean
   server?: string
+}
+
+// Windows-specific Entra ID info
+export interface AzureADInfo {
+  joined: boolean
+  registered: boolean
+  tenantId?: string
+  tenantName?: string
 }
 
 // MARK: - Secure Token (macOS MDM)
@@ -198,29 +209,31 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
 function mapUserAccount(user: any): UserAccount {
   return {
     username: user.username || user.user || '',
-    realName: user.realName || user.real_name || user.description || null,
+    realName: user.realName || user.real_name || user.full_name || user.fullName || user.description || null,
     uid: user.uid || 0,
     gid: user.gid || 0,
     homeDirectory: user.homeDirectory || user.home_directory || user.directory || null,
     shell: user.shell || null,
     uuid: user.uuid || null,
     sid: user.sid || user.user_sid || null,
-    accountType: user.accountType || user.account_type || 'Local',
+    accountType: user.accountType || user.account_type || (user.is_local || user.isLocal ? 'Local' : 'Domain'),
     isAdmin: user.isAdmin || user.is_admin || false,
-    isEnabled: user.isEnabled !== undefined ? user.isEnabled : !user.isDisabled,
-    isLocalAccount: user.isLocalAccount || user.is_local_account,
+    isEnabled: user.isEnabled !== undefined ? user.isEnabled : (user.is_disabled !== undefined ? !user.is_disabled : true),
+    isLocalAccount: user.isLocalAccount || user.is_local_account || user.is_local || user.isLocal,
     sshAccess: user.sshAccess || user.ssh_access,
     screenSharingAccess: user.screenSharingAccess || user.screen_sharing_access,
     autoLoginEnabled: user.autoLoginEnabled || user.auto_login_enabled,
     passwordHint: user.passwordHint || user.password_hint,
-    creationTime: user.creationTime || user.creation_time || user.accountCreated,
+    creationTime: user.creationTime || user.creation_time || user.accountCreated || user.created_at,
     passwordLastSet: user.passwordLastSet || user.password_last_set,
     lastLogon: user.lastLogon || user.last_logon || user.time,
     failedLoginCount: user.failedLoginCount || user.failed_login_count || 0,
     lastFailedLogin: user.lastFailedLogin || user.last_failed_login,
     linkedAppleId: user.linkedAppleId || user.linked_apple_id,
     linkedDate: user.linkedDate || user.linked_date,
-    groupMembership: user.groupMembership || user.group_membership,
+    groupMembership: Array.isArray(user.groupMemberships || user.group_memberships) 
+      ? (user.groupMemberships || user.group_memberships).join(', ')
+      : user.groupMembership || user.group_membership,
     isDisabled: user.isDisabled || user.is_disabled || false,
     isLockout: user.isLockout || user.is_lockout
   }
@@ -228,12 +241,12 @@ function mapUserAccount(user: any): UserAccount {
 
 function mapUserGroup(group: any): UserGroup {
   return {
-    groupname: group.groupname || group.group_name || '',
+    groupname: group.groupname || group.group_name || group.name || '',
     gid: group.gid || 0,
     sid: group.sid || group.group_sid,
-    members: group.members,
-    comment: group.comment,
-    groupType: group.groupType || group.group_type
+    members: Array.isArray(group.members) ? group.members.join(', ') : group.members,
+    comment: group.comment || group.description,
+    groupType: group.groupType || group.group_type || (group.is_built_in || group.isBuiltIn ? 'BuiltIn' : 'Local')
   }
 }
 
@@ -241,12 +254,12 @@ function mapLoggedInUser(session: any): LoggedInUser {
   return {
     user: session.user || session.username || '',
     tty: session.tty,
-    host: session.host,
-    time: session.time,
-    pid: session.pid,
+    host: session.host || session.domain,
+    time: session.time || session.login_time || session.loginTime,
+    pid: session.pid || session.session_id || session.sessionId,
     loginTime: session.loginTime || session.login_time || session.time,
-    logonType: session.logonType || session.logon_type || session.type,
-    sessionState: session.sessionState || session.session_state
+    logonType: session.logonType || session.logon_type || session.session_type || session.type,
+    sessionState: session.sessionState || session.session_state || (session.is_active ? 'Active' : 'Disconnected')
   }
 }
 
@@ -281,16 +294,30 @@ function mapBTMDBHealth(btmdb: any): BTMDBHealth {
 }
 
 function mapDirectoryServices(ds: any): DirectoryServicesInfo {
+  // Handle Windows structure (active_directory, azure_ad)
+  const ad = ds.activeDirectory || ds.active_directory || {}
+  
   return {
     activeDirectory: {
-      bound: ds.activeDirectory?.bound || ds.active_directory?.bound || false,
-      domain: ds.activeDirectory?.domain || ds.active_directory?.domain
+      bound: ad.bound || ad.is_domain_joined || ad.isDomainJoined || false,
+      domain: ad.domain || ad.domain_name || ad.domainName
     },
     ldap: {
       bound: ds.ldap?.bound || false,
       server: ds.ldap?.server
     },
-    directoryNodes: ds.directoryNodes || ds.directory_nodes
+    directoryNodes: ds.directoryNodes || ds.directory_nodes,
+    // Windows-specific: Entra ID info
+    ...(ds.azure_ad || ds.azureAd ? {
+      azureAD: {
+        joined: ds.azure_ad?.is_aad_joined || ds.azureAd?.isAadJoined || false,
+        registered: ds.azure_ad?.is_aad_registered || ds.azureAd?.isAadRegistered || false,
+        tenantId: ds.azure_ad?.tenant_id || ds.azureAd?.tenantId,
+        tenantName: ds.azure_ad?.tenant_name || ds.azureAd?.tenantName
+      }
+    } : {}),
+    // Windows-specific: Workgroup
+    ...(ds.workgroup ? { workgroup: ds.workgroup } : {})
   }
 }
 
