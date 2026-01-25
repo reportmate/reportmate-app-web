@@ -101,6 +101,9 @@ interface HardwareData {
     compute_units?: unknown;
     cores?: number;
     performance_tops?: string;
+    performanceTops?: string;
+    isAvailable?: boolean;
+    is_available?: boolean;
   };
   storage?: Array<{
     name?: string;
@@ -365,7 +368,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits) || safeNumber(hardwareData.npu?.compute_units)
   const npuCores = safeNumber(hardwareData.npu?.cores)
   const npuTops = safeString(hardwareData.npu?.performanceTops || hardwareData.npu?.performance_tops)
-  const hasNpu = Boolean(hardwareData.npu)
+  // Only show NPU card if it's actually available with a valid name or compute units
+  const npuIsAvailable = Boolean(hardwareData.npu?.isAvailable || hardwareData.npu?.is_available)
+  const hasNpu = npuIsAvailable && (npuName !== 'Unknown' && npuName !== '' || npuComputeUnits > 0 || npuCores > 0)
   
   const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
   const hasDisplays = displays.length > 0
