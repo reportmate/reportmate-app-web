@@ -29,17 +29,19 @@ export function getInternalApiHeaders(): Record<string, string> {
   // This is the secure method for production - shared secret between containers
   if (process.env.API_INTERNAL_SECRET) {
     headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+    console.log('[API-AUTH] Using API_INTERNAL_SECRET for authentication')
     return headers
   }
   
   // Priority 2: Passphrase authentication (for local development)
   if (process.env.REPORTMATE_PASSPHRASE) {
     headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    console.log('[API-AUTH] Using REPORTMATE_PASSPHRASE for authentication')
     return headers
   }
   
   // Fallback: No auth headers (will rely on internal network detection)
-  console.warn('[API-AUTH] No API_INTERNAL_SECRET or REPORTMATE_PASSPHRASE configured')
+  console.warn('[API-AUTH] No API_INTERNAL_SECRET or REPORTMATE_PASSPHRASE configured - check environment variables')
   return headers
 }
 
