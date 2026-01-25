@@ -22,30 +22,61 @@ export async function GET(request: Request) {
     // Call FastAPI bulk endpoint
     try {
       const url = `${apiBaseUrl}/api/devices/system?limit=${limit}`
+      console.log(`[SYSTEM API] ${timestamp} - Fetching from: ${url}`)
             
       // Use shared authentication headers
       const headers = getInternalApiHeaders()
       headers['Content-Type'] = 'application/json'
       
-      const response = await fetch(url, {
-        headers
-      })
+      // Add timeout to prevent hanging
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
       
-      if (!response.ok) {
-        throw new Error(`FastAPI error: ${response.status} ${response.statusText}`)
-      }
-      
-      const systemData = await response.json()
-            
-      return NextResponse.json(systemData, {
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0',
-          'X-Fetched-At': timestamp,
-          'X-Data-Source': 'fastapi-container'
+      try {
+        const response = await fetch(url, {
+          headers,
+          signal: controller.signal
+        })
+        clearTimeout(timeoutId)
+        
+        if (!response.ok) {
+          throw new Error(`FastAPI error: ${response.status} ${response.statusText}`)
         }
-      })
+        
+        const systemData = await response.json()
+        console.log(`[SYSTEM API] ${timestamp} - Retrieved ${Array.isArray(systemData) ? systemData.length : 'unknown'} devices`)
+              
+        return NextResponse.json(systemData, {
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
+            'X-Fetched-At': timestamp,
+            'X-Data-Source': 'fastapi-container'
+          }
+        })
+      } catch (fetchError) {
+        clearTimeout(timeoutId)
+        
+        // Check if it was a timeout
+        if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+          console.error(`[SYSTEM API] ${timestamp} - Request timed out after 30 seconds`)
+          return NextResponse.json({
+            error: 'System data request timed out',
+            message: 'The system data endpoint took too long to respond',
+            details: 'Request exceeded 30 second timeout'
+          }, { 
+            status: 504,
+            headers: {
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache',
+              'Expires': '0'
+            }
+          })
+        }
+        
+        throw fetchError
+      }
       
     } catch (apiError) {
       console.error(`[SYSTEM API] ${timestamp} - FastAPI error:`, apiError)

@@ -9,6 +9,7 @@ import { formatRelativeTime } from "../../../src/lib/time"
 import { extractSystem } from "../../../src/lib/data-processing/modules/system"
 import { OSVersionPieChart } from "../../../src/lib/modules/graphs/OSVersionPieChart"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface SystemDevice {
   id: string
@@ -186,6 +187,7 @@ function formatUptime(seconds: number): string {
 function SystemPageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const [loading, setLoading] = useState(true)
   const [systems, setSystems] = useState<SystemDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
@@ -283,12 +285,26 @@ function SystemPageContent() {
   })
 
   useEffect(() => {
+    console.log('[SystemPage] Hook data:', {
+      devices: devices.length,
+      systemModuleData: systemModuleData.length,
+      devicesLoading,
+      moduleLoading,
+      error
+    })
+  }, [devices, systemModuleData, devicesLoading, moduleLoading, error])
+
+  useEffect(() => {
     // Set the systems from the module data when it's available
     if (systemModuleData && systemModuleData.length > 0) {
+      console.log('[SystemPage] Setting systems from module data:', systemModuleData.length, 'items')
       setSystems(systemModuleData)
       setLoading(false)
+    } else if (!moduleLoading && systemModuleData.length === 0) {
+      console.log('[SystemPage] No system module data available')
+      setLoading(false)
     }
-  }, [systemModuleData])
+  }, [systemModuleData, moduleLoading])
 
   useEffect(() => {
     // Handle loading state based on module loading
@@ -491,6 +507,14 @@ function SystemPageContent() {
 
   // Apply search filter after processing (so we search the correct device names)
   const searchFilteredSystems = processedSystems.filter(sys => {
+    // Global platform filter first
+    if (globalPlatformFilter) {
+      const platform = normalizePlatform(sys.operatingSystem)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
+    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
