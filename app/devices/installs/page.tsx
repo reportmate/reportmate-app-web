@@ -9,6 +9,7 @@ import { calculateDeviceStatus } from '../../../src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '../../../src/components/widgets/InstallMessages'
 import { CopyButton } from '../../../src/components/ui/CopyButton'
 import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
+import { getDevicePlatform, usePlatformFilterSafe } from '../../../src/providers/PlatformFilterProvider'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -502,7 +503,8 @@ function InstallsPageContent() {
           room: device.modules?.inventory?.location || 'Unknown',
           location: device.modules?.inventory?.location || 'Unknown',
           fleet: device.modules?.inventory?.fleet || 'Unknown',
-          platform: device.modules?.inventory?.platform || device.modules?.system?.operatingSystem?.platform || device.platform || 'Unknown',
+          // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
+          platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
           lastSeen: device.lastSeen,
           // Config data - Cimian has config sub-object, Munki has fields at root
           configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
@@ -3581,10 +3583,10 @@ function InstallsPageContent() {
                             title={device.deviceName || 'Unknown Device'}
                           >
                             <div className="flex items-center gap-1.5">
-                              <PlatformBadge platform={device.platform || device.configType || ''} size="sm" />
                               <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
                                 {device.deviceName}
                               </span>
+                              <PlatformBadge platform={device.platform || device.configType || ''} size="sm" />
                             </div>
                           </Link>
                           <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1 pl-5">
@@ -3779,10 +3781,10 @@ function InstallsPageContent() {
                                 title={device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown Device'}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <PlatformBadge platform={device.platform || device.modules?.system?.operatingSystem?.name || ''} size="sm" />
                                   <span className="text-emerald-600 group-hover:text-emerald-800 dark:text-emerald-400 dark:group-hover:text-emerald-300 font-medium block truncate">
                                     {device.modules?.inventory?.deviceName || device.serialNumber}
                                   </span>
+                                  <PlatformBadge platform={device.platform || device.modules?.system?.operatingSystem?.name || ''} size="sm" />
                                 </div>
                               </Link>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1 pl-5">

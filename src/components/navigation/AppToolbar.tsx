@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation"
 import { DevicePageNavigation } from "./DevicePageNavigation"
 import { DeviceSearchField } from "../search/DeviceSearchField"
 import { SearchModal } from "../search/SearchModal"
+import { PlatformToggle } from "../ui/PlatformToggle"
 
 interface Device {
   deviceId: string
@@ -32,6 +33,10 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
     if (pathname === '/dashboard' || pathname === '/') return 'dashboard'
     return null
   }
+
+  // Hide platform filter on individual device pages (/device/[serialNumber])
+  // Show on: /dashboard, /devices, /devices/*, /events
+  const showPlatformFilter = !pathname.match(/^\/device\/[^/]+$/)
 
   // Global keyboard shortcut (Ctrl/Cmd + K) to open search modal
   useEffect(() => {
@@ -70,9 +75,10 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
               </div>
             </Link>
             
-            {/* Search Field (desktop) - center-aligned */}
-            <div className="hidden md:flex flex-1 items-center">
+            {/* Search Field (desktop) - center-aligned with platform filter on left */}
+            <div className="hidden md:flex flex-1 items-center gap-3">
               <div className="flex-1 max-w-[calc(10%+7.7rem)]"></div>
+              {showPlatformFilter && <PlatformToggle />}
               <div className="flex-1 mr-4">
                 <DeviceSearchField 
                   className="w-full" 

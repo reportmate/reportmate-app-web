@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface IdentityDevice {
   id: string
@@ -52,6 +53,7 @@ function LoadingSkeleton() {
 
 function IdentityPageContent() {
   const searchParams = useSearchParams()
+  const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>([])
@@ -108,6 +110,13 @@ function IdentityPageContent() {
 
   // Filter devices
   const filteredDevices = identityDevices.filter(d => {
+    // Global platform filter first
+    if (globalPlatformFilter) {
+      const platform = normalizePlatform(d.platform)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
     if (platformFilter !== 'all' && d.platform !== platformFilter) return false
     
     if (adminFilter === 'has-admins' && d.adminUsers === 0) return false

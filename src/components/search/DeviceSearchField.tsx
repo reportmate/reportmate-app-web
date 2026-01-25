@@ -20,7 +20,7 @@ interface DeviceSearchFieldProps {
 
 export function DeviceSearchField({ 
   className = "", 
-  placeholder = "Find device by name, serial, asset tag, or hostname",
+  placeholder = "Search by name, serial, asset tag, or hostname",
   preloadedDevices = []
 }: DeviceSearchFieldProps) {
   const router = useRouter()

@@ -1,5 +1,7 @@
 "use client"
 
+import { normalizePlatform } from '../../providers/PlatformFilterProvider'
+
 interface PlatformBadgeProps {
   platform: 'macOS' | 'Windows' | 'Mac' | 'Macintosh' | string
   size?: 'xs' | 'sm' | 'md'
@@ -11,10 +13,9 @@ interface PlatformBadgeProps {
  * Used across tables to indicate device platform at 50% opacity gray
  */
 export function PlatformBadge({ platform, size = 'sm', className = '' }: PlatformBadgeProps) {
-  const normalizedPlatform = platform?.toLowerCase() || ''
-  // Cimian = Windows, Munki = macOS
-  const isMac = normalizedPlatform.includes('mac') || normalizedPlatform.includes('darwin') || normalizedPlatform.includes('macos') || normalizedPlatform === 'munki'
-  const isWindows = normalizedPlatform.includes('windows') || normalizedPlatform.includes('win') || normalizedPlatform === 'cimian'
+  const normalized = normalizePlatform(platform)
+  const isMac = normalized === 'macOS'
+  const isWindows = normalized === 'Windows'
 
   const sizeClasses = {
     xs: 'w-3 h-3',

@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface Security {
   id: string
@@ -56,6 +57,7 @@ function SecurityPageContent() {
   const [security, setSecurity] = useState<Security[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [protectionFilter, setProtectionFilter] = useState('all')
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'lastSeen'>('device')
@@ -101,6 +103,14 @@ function SecurityPageContent() {
 
   // Filter security
   const filteredSecurity = security.filter(s => {
+    // Global platform filter first
+    if (platformFilter) {
+      const platform = normalizePlatform(s.platform)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
+    
     if (protectionFilter === 'protected') {
       if (!s.firewallEnabled || !s.fileVaultEnabled) return false
     } else if (protectionFilter === 'unprotected') {

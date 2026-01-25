@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
+import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface Peripheral {
   id: string
@@ -14,6 +15,7 @@ interface Peripheral {
   serialNumber: string
   lastSeen: string
   collectedAt: string
+  platform?: string
   usbDevices: any[]
   bluetoothDevices: any[]
   printers: any[]
@@ -47,6 +49,7 @@ function PeripheralsPageContent() {
   const [peripherals, setPeripherals] = useState<Peripheral[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [deviceTypeFilter, setDeviceTypeFilter] = useState('all')
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'total' | 'lastSeen'>('device')
@@ -107,6 +110,14 @@ function PeripheralsPageContent() {
 
   // Filter peripherals
   const filteredPeripherals = peripherals.filter(peripheral => {
+    // Global platform filter first
+    if (platformFilter) {
+      const platform = normalizePlatform(peripheral.platform)
+      if (!isPlatformVisible(platform)) {
+        return false
+      }
+    }
+    
     const matchesSearch = peripheral.deviceName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       peripheral.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
       JSON.stringify(peripheral.usbDevices).toLowerCase().includes(searchQuery.toLowerCase()) ||
