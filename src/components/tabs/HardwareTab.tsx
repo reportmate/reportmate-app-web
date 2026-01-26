@@ -358,19 +358,35 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   
   const graphicsName = safeString(hardwareData.graphics?.name)
   const graphicsManufacturer = safeString(hardwareData.graphics?.manufacturer)
-  const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize)
+  const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize) || safeNumber(hardwareData.graphics?.memory_size)
+  const graphicsDriverVersion = safeString(hardwareData.graphics?.driverVersion)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
   // Support both metalSupport (normalized) and metal_support (legacy)
   const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport) || safeString(hardwareData.graphics?.metal_support)
+  
+  // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
+  const cleanGraphicsName = (() => {
+    let name = graphicsName
+    const mfg = graphicsManufacturer.toUpperCase()
+    if (mfg && name.toUpperCase().startsWith(mfg)) {
+      name = name.slice(mfg.length).trim()
+    }
+    // Also handle common variations
+    if (name.toUpperCase().startsWith('NVIDIA ')) name = name.slice(7).trim()
+    if (name.toUpperCase().startsWith('AMD ')) name = name.slice(4).trim()
+    if (name.toUpperCase().startsWith('INTEL ')) name = name.slice(6).trim()
+    return name || graphicsName
+  })()
   
   const npuName = safeString(hardwareData.npu?.name)
   const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits) || safeNumber(hardwareData.npu?.compute_units)
   const npuCores = safeNumber(hardwareData.npu?.cores)
   const npuTops = safeString(hardwareData.npu?.performanceTops || hardwareData.npu?.performance_tops)
-  // Only show NPU card if it's actually available with a valid name or compute units
+  // Only show NPU card if it's actually available with a valid name AND compute units > 0
+  // Empty name with 0 compute units means no real NPU
   const npuIsAvailable = Boolean(hardwareData.npu?.isAvailable || hardwareData.npu?.is_available)
-  const hasNpu = npuIsAvailable && (npuName !== 'Unknown' && npuName !== '' || npuComputeUnits > 0 || npuCores > 0)
+  const hasNpu = npuIsAvailable && npuName !== 'Unknown' && npuName !== '' && (npuComputeUnits > 0 || npuCores > 0)
   
   const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
   const hasDisplays = displays.length > 0
@@ -407,9 +423,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const isUnifiedMemory = hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown');
 
   // Clean up GPU name if it repeats the processor name
-  const displayGraphicsName = isUnifiedMemory && graphicsName.startsWith(processorName) 
-    ? graphicsName.replace(processorName, '').trim() || 'Integrated Graphics'
-    : graphicsName;
+  const displayGraphicsName = isUnifiedMemory && cleanGraphicsName.startsWith(processorName) 
+    ? cleanGraphicsName.replace(processorName, '').trim() || 'Integrated Graphics'
+    : cleanGraphicsName;
 
   return (
     <div className="space-y-8">
@@ -516,8 +532,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     <div className="text-sm text-gray-900 dark:text-white">{graphicsMetalSupport || displayGraphicsName}</div>
                   </div>
 
-                  {/* NPU */}
-                  {hasNpu ? (
+                  {/* NPU - only render if available */}
+                  {hasNpu && (
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-2 mb-2">
                         <Brain className="w-5 h-5 text-pink-500" />
@@ -526,8 +542,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <div className="text-2xl font-bold text-pink-500 mb-1">{npuTops !== 'Unknown' ? `${npuTops} TOPS` : `${npuCores} Cores`}</div>
                       <div className="text-sm text-gray-900 dark:text-white">{npuTops !== 'Unknown' ? `${npuCores} Cores` : ''}</div>
                     </div>
-                  ) : (
-                    <div></div>
                   )}
                 </div>
               </div>
@@ -566,8 +580,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <Wifi className="w-5 h-5 text-teal-500" />
                       <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
                     </div>
-                    <div className="text-2xl font-bold text-teal-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : 'N/A'}</div>
-                    <div className="text-sm text-gray-900 dark:text-white">{wifiVersion !== 'Unknown' ? wifiVersion : (wirelessAvailable ? 'Available' : 'Not Available')}</div>
+                    <div className="text-2xl font-bold text-teal-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : (wirelessAvailable ? 'Available' : 'N/A')}</div>
+                    <div className="text-sm text-gray-900 dark:text-white truncate" title={wirelessName !== 'Unknown' ? wirelessName : undefined}>
+                      {wifiVersion !== 'Unknown' ? wifiVersion : (wirelessName !== 'Unknown' && wirelessName ? wirelessName : (wirelessProtocol !== 'Unknown' && wirelessProtocol ? wirelessProtocol : ''))}
+                    </div>
                   </div>
 
                   {/* Bluetooth */}
@@ -651,15 +667,19 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <Layers className="w-5 h-5 text-green-500" />
                 <h4 className="font-semibold text-gray-900 dark:text-white">GPU</h4>
               </div>
-              <div className="text-2xl font-bold text-green-500 mb-1">{graphicsCores > 0 ? `${graphicsCores} Cores` : graphicsName}</div>
-              {graphicsCores > 0 && <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsName}</div>}
+              <div className="text-2xl font-bold text-green-500 mb-1">{graphicsName}</div>
+              {graphicsMemorySize > 0 && (
+                <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsMemorySize} GB VRAM</div>
+              )}
               <div className="text-xs text-gray-500 dark:text-gray-400">
-                {graphicsMetalSupport !== 'Unknown' ? graphicsMetalSupport : (graphicsMemorySize ? `${graphicsMemorySize} GB VRAM` : 'Discrete GPU')}
+                {graphicsManufacturer !== 'Unknown' && graphicsManufacturer 
+                  ? `${graphicsManufacturer} Discrete Card${graphicsDriverVersion !== 'Unknown' && graphicsDriverVersion ? ` - Driver ${graphicsDriverVersion}` : ''}`
+                  : (graphicsMetalSupport !== 'Unknown' ? graphicsMetalSupport : 'Discrete GPU')}
               </div>
             </div>
 
-            {/* NPU or Empty */}
-            {hasNpu ? (
+            {/* NPU - only render if available */}
+            {hasNpu && (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-2">
                   <Brain className="w-5 h-5 text-pink-500" />
@@ -671,8 +691,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   <div className="text-xs text-gray-500 dark:text-gray-400">{npuCores} Cores</div>
                 )}
               </div>
-            ) : (
-              <div></div>
             )}
 
             {/* Wireless */}
