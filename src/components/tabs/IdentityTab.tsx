@@ -93,15 +93,28 @@ const DetailRow = ({
   </div>
 )
 
-// Platform detection helper
+// Platform detection helper - enhanced to detect macOS from module data
 const isMacOS = (device: any): boolean => {
+  // Check explicit platform field
   const platform = device?.platform?.toLowerCase() || 
                    device?.modules?.metadata?.platform?.toLowerCase() ||
                    device?.metadata?.platform?.toLowerCase() ||
                    device?.modules?.system?.operatingSystem?.platform?.toLowerCase() || ''
   const osName = device?.modules?.system?.operatingSystem?.name?.toLowerCase() || 
                  device?.system?.operatingSystem?.name?.toLowerCase() || ''
-  return platform === 'macos' || platform === 'darwin' || osName.includes('macos') || osName.includes('mac os')
+  
+  if (platform === 'macos' || platform === 'darwin' || osName.includes('macos') || osName.includes('mac os')) {
+    return true
+  }
+  
+  // Fallback: Detect macOS from presence of macOS-specific module data
+  // These fields only exist on macOS devices
+  const identity = device?.modules?.identity || device?.identity
+  if (identity?.btmdbHealth || identity?.secureTokenUsers || identity?.platformSSOUsers) {
+    return true
+  }
+  
+  return false
 }
 
 // BTMDB status color helper
