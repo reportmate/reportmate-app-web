@@ -6,7 +6,6 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
-import { extractSystem } from "../../../src/lib/data-processing/modules/system"
 import { OSVersionPieChart } from "../../../src/lib/modules/graphs/OSVersionPieChart"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
@@ -16,14 +15,20 @@ interface SystemDevice {
   deviceId: string
   deviceName: string
   serialNumber: string
+  assetTag?: string
   lastSeen: string
   collectedAt: string
+  usage?: string
+  catalog?: string
+  location?: string
   operatingSystem: string
   osVersion: string | null
   buildNumber: string | null
   uptime: number | null
   bootTime: string | null
-  raw: any
+  servicesCount: number
+  updatesCount: number
+  tasksCount: number
 }
 
 function LoadingSkeleton() {
@@ -368,7 +373,21 @@ function SystemPageContent() {
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
     )).sort() as string[],
     editions: Array.from(new Set(
-      systems.map(s => s.raw?.operatingSystem?.edition).filter(Boolean)
+      systems.map(s => {
+        // Parse edition from operatingSystem string (e.g., "Windows 11 Enterprise 24H2" -> "Enterprise")
+        const parts = (s.operatingSystem || '').split(' ')
+        if (parts.length >= 3 && parts[0] === 'Windows') {
+          // Find the edition part (skip "Windows 11" and the last part if it's a version like "24H2")
+          const lastPart = parts[parts.length - 1]
+          const isVersion = /^\d{2}H\d$/.test(lastPart) // matches "24H2", "23H1", etc.
+          if (isVersion && parts.length >= 4) {
+            return parts.slice(2, -1).join(' ') // "Enterprise", "Pro", etc.
+          } else if (!isVersion && parts.length >= 3) {
+            return parts.slice(2).join(' ')
+          }
+        }
+        return null
+      }).filter(Boolean)
     )).sort() as string[]
   }
 
@@ -385,37 +404,40 @@ function SystemPageContent() {
       if (s.operatingSystem !== platformFilter) return false
     }
     
-    // Filter by activation status (dropdown)
+    // Filter by activation status (dropdown) - NOT AVAILABLE in lean bulk endpoint
+    // Activation data only available on individual device API calls
     if (activationFilter !== 'all') {
-      const isActivated = s.raw?.operatingSystem?.activation?.isActivated
-      if (activationFilter === 'activated' && !isActivated) return false
-      if (activationFilter === 'not-activated' && isActivated !== false) return false
+      // Skip filter - data not available in lean endpoint
     }
     
-    // Filter by activation status (chips)
+    // Filter by activation status (chips) - NOT AVAILABLE in lean bulk endpoint
     if (selectedActivationStatus.length > 0) {
-      const isActivated = s.raw?.operatingSystem?.activation?.isActivated
-      const status = isActivated === true ? 'Activated' : isActivated === false ? 'Not Activated' : 'Unknown'
-      if (!selectedActivationStatus.includes(status)) return false
+      // Skip filter - data not available in lean endpoint
     }
     
-    // Filter by firmware license (dropdown)
+    // Filter by firmware license (dropdown) - NOT AVAILABLE in lean bulk endpoint
     if (firmwareLicenseFilter !== 'all') {
-      const hasFirmwareLicense = s.raw?.operatingSystem?.activation?.hasFirmwareLicense
-      if (firmwareLicenseFilter === 'has-firmware' && hasFirmwareLicense !== true) return false
-      if (firmwareLicenseFilter === 'no-firmware' && hasFirmwareLicense !== false) return false
+      // Skip filter - data not available in lean endpoint
     }
     
-    // Filter by license type (chips)
+    // Filter by license type (chips) - NOT AVAILABLE in lean bulk endpoint
     if (selectedLicenseType.length > 0) {
-      const hasFirmwareLicense = s.raw?.operatingSystem?.activation?.hasFirmwareLicense
-      const type = hasFirmwareLicense === true ? 'Has OEM License' : hasFirmwareLicense === false ? 'No OEM License' : 'Unknown'
-      if (!selectedLicenseType.includes(type)) return false
+      // Skip filter - data not available in lean endpoint
     }
     
-    // Filter by edition (chips)
+    // Filter by edition (chips) - parse from operatingSystem string
     if (selectedEditions.length > 0) {
-      const edition = s.raw?.operatingSystem?.edition || ''
+      const parts = (s.operatingSystem || '').split(' ')
+      let edition = ''
+      if (parts.length >= 3 && parts[0] === 'Windows') {
+        const lastPart = parts[parts.length - 1]
+        const isVersion = /^\d{2}H\d$/.test(lastPart)
+        if (isVersion && parts.length >= 4) {
+          edition = parts.slice(2, -1).join(' ')
+        } else if (!isVersion && parts.length >= 3) {
+          edition = parts.slice(2).join(' ')
+        }
+      }
       if (!selectedEditions.includes(edition)) return false
     }
     
@@ -425,31 +447,24 @@ function SystemPageContent() {
       
       // Check for Windows Group (e.g., "Windows 11")
       if (decodedFilter.startsWith('Windows ')) {
-        const osName = s.raw?.operatingSystem?.name || s.operatingSystem || ''
-        const versionMatch = osName.match(/Windows\s+(\d+)/)
-        const versionNum = versionMatch ? versionMatch[1] : ''
-        
+        const osName = s.operatingSystem || ''
         // Handle "Windows 10" vs "Windows 11"
-        // Also handle if the name itself is just "Windows 10 Pro" -> matches "Windows 10"
         if (!osName.includes(decodedFilter)) return false
       } 
       else {
         // Try strict match on normalized version
-        const sysVersion = s.raw?.operatingSystem?.version || s.osVersion || ''
+        const sysVersion = s.osVersion || ''
         
-        // Construct the Windows chart keys to match against
+        // Construct the Windows chart keys to match against from flat fields
         let windowsChildKey = ''
         let windowsGroupKey = ''
-        if (s.raw?.operatingSystem) {
-           const osInfo = s.raw.operatingSystem
-           const nameMatch = osInfo.name?.match(/Windows\s+(\d+)/)
-           const windowsVersion = nameMatch ? nameMatch[1] : '11'
-           const versionParts = osInfo.version?.split('.') || []
-           const build = versionParts[2] || osInfo.build || '0'
-           const featureUpdate = osInfo.featureUpdate || '0'
-           const featureNum = parseInt(featureUpdate)
-           windowsGroupKey = `${windowsVersion}.${build}`
-           windowsChildKey = `${windowsVersion}.${build}.${featureNum > 0 ? featureNum : '0'}`
+        const osName = s.operatingSystem || ''
+        const nameMatch = osName.match(/Windows\s+(\d+)/)
+        if (nameMatch) {
+          const windowsVersion = nameMatch[1]
+          const build = s.buildNumber || '0'
+          windowsGroupKey = `${windowsVersion}.${build}`
+          windowsChildKey = `${windowsVersion}.${build}.0`
         }
 
         // Match Logic:
@@ -487,14 +502,17 @@ function SystemPageContent() {
     if (deviceFromMainAPI && deviceFromMainAPI.name !== systemDevice.deviceName) {
           }
     
-    // Create a device object in the format expected by extractSystem
-    const deviceData = {
-      id: systemDevice.deviceId,
-      name: deviceFromMainAPI?.name || systemDevice.deviceName,
-      modules: systemDevice.raw ? { system: systemDevice.raw } : undefined
+    // Create system info directly from flat API fields (no raw needed)
+    const systemInfo = {
+      operatingSystem: systemDevice.operatingSystem,
+      osVersion: systemDevice.osVersion,
+      osBuild: systemDevice.buildNumber,
+      uptime: systemDevice.uptime,
+      lastBootTime: systemDevice.bootTime,
+      servicesCount: systemDevice.servicesCount,
+      updatesCount: systemDevice.updatesCount,
+      tasksCount: systemDevice.tasksCount
     }
-    
-    const systemInfo = extractSystem(deviceData)
     
     return {
       ...systemDevice,
@@ -507,17 +525,21 @@ function SystemPageContent() {
   })
 
   // Create devices formatted for OS Version Widget from systems data
-  // This maps the raw system module data to the format expected by OSVersionBarChart
+  // Uses flat fields from lean API response (no raw needed)
   const devicesForOSWidget = systems.map(sys => {
-    const osInfo = sys.raw?.operatingSystem
     // Detect platform from OS name
-    const osName = osInfo?.name?.toLowerCase() || sys.operatingSystem?.toLowerCase() || ''
+    const osName = sys.operatingSystem?.toLowerCase() || ''
     let platform = 'Unknown'
     if (osName.includes('windows') || osName.includes('microsoft')) {
       platform = 'Windows'
     } else if (osName.includes('macos') || osName.includes('mac os') || osName.includes('darwin')) {
       platform = 'macOS'
     }
+    
+    // Parse OS name to extract edition (e.g., "Windows 11 Enterprise 24H2" -> "Enterprise")
+    const nameParts = sys.operatingSystem?.split(' ') || []
+    const edition = nameParts.length > 2 ? nameParts.slice(2, -1).join(' ') : undefined
+    const displayVersion = nameParts.length > 2 ? nameParts[nameParts.length - 1] : undefined
     
     return {
       deviceId: sys.deviceId,
@@ -528,18 +550,23 @@ function SystemPageContent() {
       totalEvents: 0,
       lastEventTime: sys.lastSeen,
       platform: platform,
-      // Map OS data to the format expected by OSVersionBarChart
-      osVersion: osInfo ? {
-        name: osInfo.name,
-        version: osInfo.version,
-        build: osInfo.build,
-        edition: osInfo.edition,
-        displayVersion: osInfo.displayVersion,
-        featureUpdate: osInfo.featureUpdate
-      } : undefined,
+      // Map flat OS data to the format expected by OSVersionBarChart
+      osVersion: {
+        name: sys.operatingSystem,
+        version: sys.osVersion,
+        build: sys.buildNumber,
+        edition: edition,
+        displayVersion: displayVersion
+      },
       modules: {
         system: {
-          operatingSystem: osInfo
+          operatingSystem: {
+            name: sys.operatingSystem,
+            version: sys.osVersion,
+            build: sys.buildNumber,
+            edition: edition,
+            displayVersion: displayVersion
+          }
         }
       }
     }
@@ -634,7 +661,16 @@ function SystemPageContent() {
                         s.operatingSystem || '',
                         s.osVersion || '',
                         s.buildNumber || '',
-                        s.raw?.operatingSystem?.edition || '',
+                        (() => {
+                          const parts = (s.operatingSystem || '').split(' ')
+                          if (parts.length >= 3 && parts[0] === 'Windows') {
+                            const lastPart = parts[parts.length - 1]
+                            const isVersion = /^\d{2}H\d$/.test(lastPart)
+                            if (isVersion && parts.length >= 4) return parts.slice(2, -1).join(' ')
+                            return parts.slice(2).join(' ')
+                          }
+                          return ''
+                        })(),
                         uptimeStr,
                         s.bootTime || '',
                         s.lastSeen || ''
@@ -1071,52 +1107,26 @@ function SystemPageContent() {
                         <div className="text-sm">
                           <div className="flex items-center gap-2">
                             <span className="text-gray-900 dark:text-white font-medium">
-                              {sys.systemInfo.operatingSystem.name || sys.operatingSystem || 'Unknown'}
+                              {sys.systemInfo?.operatingSystem || sys.operatingSystem || 'Unknown'}
                             </span>
-                            {sys.raw?.operatingSystem?.activation?.isActivated === false && (
-                              <span 
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                                title="Windows is not activated. Device requires a valid license."
-                              >
-                                Unlicensed
-                              </span>
-                            )}
-                            {sys.raw?.operatingSystem?.activation?.hasFirmwareLicense === false && sys.raw?.operatingSystem?.activation?.isActivated !== false && (
-                              <span 
-                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
-                                title={`No usable firmware license for domain/Entra join. ${sys.raw?.operatingSystem?.activation?.firmwareEdition ? `Firmware has: ${sys.raw.operatingSystem.activation.firmwareEdition} (Home/Core can't join domains)` : 'No firmware key detected'}. Currently activated via ${sys.raw?.operatingSystem?.activation?.licenseSource || 'KMS/MAK'}. May lose activation when migrating from AD to Entra ID.`}
-                              >
-                                No OEM License
-                              </span>
-                            )}
                           </div>
                           <div className="text-gray-500 dark:text-gray-400">
-                            {sys.systemInfo.operatingSystem.displayVersion || sys.systemInfo.operatingSystem.version || sys.osVersion || null}
+                            {sys.osVersion || null}
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm space-y-1">
-                          {sys.systemInfo.operatingSystem.build || sys.buildNumber ? (
+                          {sys.buildNumber ? (
                             <div className="text-gray-900 dark:text-white">
-                              {sys.systemInfo.operatingSystem.build || sys.buildNumber}
-                              {sys.systemInfo.operatingSystem.featureUpdate ? `.${sys.systemInfo.operatingSystem.featureUpdate}` : ''}
-                            </div>
-                          ) : null}
-                          {sys.systemInfo.operatingSystem.edition ? (
-                            <div className="text-gray-500 dark:text-gray-400">
-                              {sys.systemInfo.operatingSystem.edition}
+                              {sys.buildNumber}
                             </div>
                           ) : null}
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm">
-                          {sys.raw?.uptimeString ? (
-                            <div className="text-gray-900 dark:text-white">
-                              {sys.raw.uptimeString}
-                            </div>
-                          ) : sys.uptime ? (
+                          {sys.uptime ? (
                             <div className="text-gray-900 dark:text-white">
                               {formatUptime(sys.uptime)}
                             </div>
