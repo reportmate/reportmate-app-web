@@ -118,6 +118,17 @@ export default function ClientDashboard() {
     return devices.filter(device => isPlatformVisible(getDevicePlatform(device)))
   }, [devices, platformFilter, isPlatformVisible])
   
+  // Filter events by platform - only show events from devices that match the platform filter
+  const filteredEvents = useMemo(() => {
+    if (platformFilter === 'all') return events
+    
+    // Create a Set of serial numbers from filtered devices for fast lookup
+    const visibleSerialNumbers = new Set(filteredDevices.map(d => d.serialNumber))
+    
+    // Filter events to only include those from visible devices
+    return events.filter(event => visibleSerialNumbers.has(event.device))
+  }, [events, filteredDevices, platformFilter])
+  
   // Mark as mounted
   useEffect(() => {
     setMounted(true)
@@ -456,7 +467,7 @@ export default function ClientDashboard() {
             {/* Recent Events Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading events</div>}>
               <RecentEventsTable
-                events={events}
+                events={filteredEvents}
                 connectionStatus={connectionStatus}
                 lastUpdateTime={lastUpdateTime}
                 mounted={mounted}
