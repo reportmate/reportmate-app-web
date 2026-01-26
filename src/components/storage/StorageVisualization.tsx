@@ -102,10 +102,16 @@ const DonutChart: React.FC<{
 
   let accumulatedPercentage = 0
   const segments = directories.map((dir, index) => {
-    const percentage = (dir.size / capacity) * 100
+    // Cap each segment percentage to prevent overflow beyond 100%
+    const rawPercentage = (dir.size / capacity) * 100
+    const remainingPercentage = 100 - accumulatedPercentage
+    const percentage = Math.min(rawPercentage, Math.max(0, remainingPercentage))
     const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`
     const strokeDashoffset = -accumulatedPercentage * (circumference / 100)
     accumulatedPercentage += percentage
+
+    // Skip rendering if no remaining space
+    if (percentage <= 0) return null
 
     return (
       <circle
@@ -127,11 +133,11 @@ const DonutChart: React.FC<{
         style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
       />
     )
-  })
+  }).filter(Boolean) // Filter out null segments
 
-  // Calculate used percentage
+  // Calculate used percentage - cap at 100% to prevent visual overflow
   const usedSpace = directories.reduce((sum, dir) => sum + dir.size, 0)
-  const usedPercentage = Math.round((usedSpace / capacity) * 100)
+  const usedPercentage = Math.min(100, Math.round((usedSpace / capacity) * 100))
 
   return (
     <div className="relative inline-block">
