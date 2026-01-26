@@ -1095,6 +1095,208 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         )
       })()}
 
+      {/* Common Vulnerabilities and Exposures (CVE) Table */}
+      {(() => {
+        // Get CVE data from security - support both SOFA (Mac) and Windows Update formats
+        // Mac: sofaUnpatchedCves, sofaSecurityReleaseInfo
+        // Windows: securityUpdates (to be implemented)
+        const sofaCves = security?.sofaUnpatchedCves || security?.sofa_unpatched_cves || []
+        const sofaReleaseInfo = security?.sofaSecurityReleaseInfo || security?.sofa_security_release_info || {}
+        const windowsUpdates = security?.securityUpdates || security?.security_updates || []
+        
+        // Combine Mac and Windows CVE sources
+        const allCves: Array<{
+          cve: string
+          osVersion: string
+          patchedVersion?: string
+          activelyExploited: boolean
+          severity?: string
+          url?: string
+          source: 'sofa' | 'windows'
+        }> = []
+        
+        // Add SOFA CVEs (Mac)
+        if (Array.isArray(sofaCves)) {
+          sofaCves.forEach((cve: any) => {
+            allCves.push({
+              cve: cve.cve || cve.cve_id || 'Unknown',
+              osVersion: cve.os_version || cve.osVersion || sofaReleaseInfo?.os_version || '',
+              patchedVersion: cve.patched_version || cve.patchedVersion || '',
+              activelyExploited: cve.actively_exploited === 'true' || cve.actively_exploited === true || cve.activelyExploited === true,
+              url: cve.url || '',
+              source: 'sofa'
+            })
+          })
+        }
+        
+        // Add Windows Security Updates (Windows)
+        if (Array.isArray(windowsUpdates)) {
+          windowsUpdates.forEach((update: any) => {
+            // Windows updates may have multiple CVEs per update
+            const cves = update.cves || update.cve_ids || (update.cve ? [update.cve] : [])
+            cves.forEach((cveId: string) => {
+              allCves.push({
+                cve: cveId,
+                osVersion: update.os_version || update.osVersion || '',
+                patchedVersion: update.kb_article || update.kbArticle || update.update_id || '',
+                activelyExploited: update.actively_exploited === true || update.exploited === true,
+                severity: update.severity || update.msrc_severity || '',
+                url: update.url || update.support_url || (cveId ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : ''),
+                source: 'windows'
+              })
+            })
+          })
+        }
+        
+        const hasCves = allCves.length > 0
+        const exploitedCount = allCves.filter(c => c.activelyExploited).length
+        const totalCveCount = sofaReleaseInfo?.unique_cves_count || sofaReleaseInfo?.uniqueCvesCount || allCves.length
+        
+        return (
+          <div className="mt-6 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            {/* CVE Table Header */}
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
+                      Common Vulnerabilities and Exposures
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {isMac ? 'SOFA Security Intelligence' : 'Windows Security Updates'} • {hasCves ? `${allCves.length} unpatched` : 'Up to date'}
+                    </p>
+                  </div>
+                </div>
+                {hasCves && (
+                  <div className="flex items-center gap-3">
+                    {exploitedCount > 0 && (
+                      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                        <XCircle className="w-3 h-3" />
+                        {exploitedCount} Actively Exploited
+                      </span>
+                    )}
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {totalCveCount} total CVEs in current release
+                    </span>
+                  </div>
+                )}
+              </div>
+              
+              {/* SOFA Release Info Summary (Mac only) */}
+              {isMac && sofaReleaseInfo && (sofaReleaseInfo.update_name || sofaReleaseInfo.updateName) && (
+                <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                  <span>
+                    <span className="font-medium">Release:</span> {sofaReleaseInfo.update_name || sofaReleaseInfo.updateName}
+                  </span>
+                  {(sofaReleaseInfo.release_date || sofaReleaseInfo.releaseDate) && (
+                    <span>
+                      <span className="font-medium">Date:</span> {new Date(sofaReleaseInfo.release_date || sofaReleaseInfo.releaseDate).toLocaleDateString()}
+                    </span>
+                  )}
+                  {(sofaReleaseInfo.days_since_previous_release || sofaReleaseInfo.daysSincePreviousRelease) && (
+                    <span>
+                      <span className="font-medium">Days since last:</span> {sofaReleaseInfo.days_since_previous_release || sofaReleaseInfo.daysSincePreviousRelease}
+                    </span>
+                  )}
+                  {(sofaReleaseInfo.security_info || sofaReleaseInfo.securityInfo) && (
+                    <a 
+                      href={sofaReleaseInfo.security_info || sofaReleaseInfo.securityInfo} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Apple Security Notes →
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* CVE Table */}
+            {hasCves ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">CVE ID</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">OS Version</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Patched In</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allCves.map((cve, idx) => (
+                      <tr 
+                        key={`${cve.cve}-${idx}`}
+                        className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30"
+                      >
+                        <td className="px-4 py-3">
+                          {cve.url ? (
+                            <a 
+                              href={cve.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="font-mono text-blue-600 dark:text-blue-400 hover:underline"
+                            >
+                              {cve.cve}
+                            </a>
+                          ) : (
+                            <span className="font-mono text-gray-900 dark:text-white">{cve.cve}</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {cve.osVersion || '—'}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                          {cve.patchedVersion || '—'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {cve.activelyExploited ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                              <XCircle className="w-3 h-3" />
+                              Exploited
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                              <AlertTriangle className="w-3 h-3" />
+                              Unpatched
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                            cve.source === 'sofa' 
+                              ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                              : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                          }`}>
+                            {cve.source === 'sofa' ? 'SOFA' : 'MSRC'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="px-5 py-8 text-center">
+                <CheckCircle className="w-10 h-10 mx-auto text-green-500 dark:text-green-400 mb-3" />
+                <p className="text-sm font-medium text-gray-900 dark:text-white">No Unpatched Vulnerabilities</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  {isMac 
+                    ? 'This device is running a fully patched version of macOS'
+                    : 'This device has all available security updates installed'
+                  }
+                </p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
       {/* Debug Accordion for API Data */}
       <div className="mt-6">
         <details className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
