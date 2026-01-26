@@ -93,8 +93,9 @@ const getCategoryTextColor = (category: string, directoryName?: string): string 
 const DonutChart: React.FC<{ 
   directories: StorageDirectory[], 
   capacity: number,
+  freeSpace: number,
   onDirectoryClick?: (directory: StorageDirectory) => void
-}> = ({ directories, capacity, onDirectoryClick }) => {
+}> = ({ directories, capacity, freeSpace, onDirectoryClick }) => {
   const radius = 80  // Reduced from 100 for better space usage
   const strokeWidth = 24  // Reduced from 30 for better space usage
   const normalizedRadius = radius - strokeWidth * 0.5
@@ -135,8 +136,9 @@ const DonutChart: React.FC<{
     )
   }).filter(Boolean) // Filter out null segments
 
-  // Calculate used percentage - cap at 100% to prevent visual overflow
-  const usedSpace = directories.reduce((sum, dir) => sum + dir.size, 0)
+  // Calculate used percentage from actual drive data (capacity - freeSpace), NOT from directory sums
+  // Directory sums miss hidden files, system snapshots, APFS overhead, etc.
+  const usedSpace = capacity - freeSpace
   const usedPercentage = Math.min(100, Math.round((usedSpace / capacity) * 100))
 
   return (
@@ -367,6 +369,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
                 <DonutChart 
                   directories={sortedDirectories} 
                   capacity={selectedDevice.capacity}
+                  freeSpace={selectedDevice.freeSpace}
                   onDirectoryClick={(directory) => {
                     // Toggle expansion of the clicked directory
                     const newExpandedPaths = new Set(expandedPaths)
