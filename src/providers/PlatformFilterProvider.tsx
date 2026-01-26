@@ -5,6 +5,8 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 
 export type Platform = 'macOS' | 'Windows' | 'all'
 
+const STORAGE_KEY = 'reportmate-platform-filter'
+
 interface PlatformFilterContextType {
   // Current platform filter
   platformFilter: Platform
@@ -62,31 +64,92 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
-  // Initialize from URL parameter if present
-  const urlPlatform = searchParams.get('platform')
-  const initialPlatform: Platform = 
-    urlPlatform === 'mac' ? 'macOS' : 
-    urlPlatform === 'win' ? 'Windows' : 
-    defaultPlatform
+  // Initialize platform filter with priority:
+  //   1) URL parameter (highest priority for sharing links)
+  //   2) localStorage (for persistence across navigation)
+  //   3) default value
+  const getInitialPlatform = (): Platform => {
+    const urlPlatform = searchParams.get('platform')
+    if (urlPlatform === 'mac') return 'macOS'
+    if (urlPlatform === 'win') return 'Windows'
+    
+    // Check localStorage (client-side only)
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored === 'macOS' || stored === 'Windows') return stored
+    }
+    
+    return defaultPlatform
+  }
   
-  const [platformFilter, setPlatformFilterState] = useState<Platform>(initialPlatform)
+  const [platformFilter, setPlatformFilterState] = useState<Platform>(getInitialPlatform)
+  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Sync state with URL parameter on mount and when URL changes
+  // Initialize from localStorage on mount (handles SSR)
   useEffect(() => {
+    if (!isInitialized) {
+      const urlPlatform = searchParams.get('platform')
+      if (urlPlatform === 'mac') {
+        setPlatformFilterState('macOS')
+      } else if (urlPlatform === 'win') {
+        setPlatformFilterState('Windows')
+      } else {
+        // No URL param, check localStorage
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (stored === 'macOS' || stored === 'Windows') {
+          setPlatformFilterState(stored)
+        }
+      }
+      setIsInitialized(true)
+    }
+  }, [isInitialized, searchParams])
+
+  // Sync URL parameter changes (for when user shares a link with ?platform=)
+  useEffect(() => {
+    if (!isInitialized) return
+    
     const urlPlatform = searchParams.get('platform')
     if (urlPlatform === 'mac' && platformFilter !== 'macOS') {
       setPlatformFilterState('macOS')
+      localStorage.setItem(STORAGE_KEY, 'macOS')
     } else if (urlPlatform === 'win' && platformFilter !== 'Windows') {
       setPlatformFilterState('Windows')
-    } else if (!urlPlatform && platformFilter !== 'all') {
-      setPlatformFilterState('all')
+      localStorage.setItem(STORAGE_KEY, 'Windows')
     }
-  }, [searchParams, platformFilter])
+    // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
+  }, [searchParams, isInitialized])
+
+  // Sync URL parameter when pathname or filter changes (for persistent filter across navigation)
+  useEffect(() => {
+    if (!isInitialized || platformFilter === 'all') return
+    
+    const currentUrlPlatform = searchParams.get('platform')
+    const expectedParam = platformFilter === 'macOS' ? 'mac' : platformFilter === 'Windows' ? 'win' : null
+    
+    // Only update if URL doesn't match current filter state
+    if (currentUrlPlatform !== expectedParam) {
+      const params = new URLSearchParams(window.location.search)
+      if (expectedParam) {
+        params.set('platform', expectedParam)
+      } else {
+        params.delete('platform')
+      }
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      router.replace(newUrl)
+    }
+  }, [pathname, isInitialized, platformFilter, router])
 
   const setPlatformFilter = useCallback((platform: Platform) => {
     setPlatformFilterState(platform)
     
-    // Update URL parameter
+    // Persist to localStorage for global persistence across navigation
+    if (platform === 'all') {
+      localStorage.removeItem(STORAGE_KEY)
+    } else {
+      localStorage.setItem(STORAGE_KEY, platform)
+    }
+    
+    // Update URL parameter (for sharing/bookmarking)
     const params = new URLSearchParams(searchParams.toString())
     if (platform === 'macOS') {
       params.set('platform', 'mac')
@@ -97,7 +160,7 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
     }
     
     const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
-    router.push(newUrl)
+    router.replace(newUrl) // Use replace instead of push to avoid polluting history
   }, [pathname, router, searchParams])
 
   const showOnlyMac = useCallback(() => {
@@ -115,7 +178,8 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   const isPlatformVisible = useCallback((platform: string): boolean => {
     if (platformFilter === 'all') return true
     const normalized = normalizePlatform(platform)
-    if (normalized === 'unknown') return true // Show unknown platforms when filter is active
+    // If platform is unknown when a filter is active, hide it (don't pollute filtered results)
+    if (normalized === 'unknown') return false
     return normalized === platformFilter
   }, [platformFilter])
 
@@ -123,8 +187,8 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
     if (platformFilter === 'all') return items
     return items.filter(item => {
       const normalized = normalizePlatform(item.platform)
-      // Include unknown platforms so we don't hide data
-      if (normalized === 'unknown') return true
+      // If platform is unknown when a filter is active, hide it
+      if (normalized === 'unknown') return false
       return normalized === platformFilter
     })
   }, [platformFilter])
