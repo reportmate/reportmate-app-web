@@ -116,7 +116,22 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   
   // Graphics - HardwareTab uses safeString(hardwareData.graphics?.name)
   const graphicsName = safeString(hardwareData.graphics?.name)
+  const graphicsManufacturer = safeString(hardwareData.graphics?.manufacturer)
   const gpuCores = safeNumber(hardwareData.graphics?.cores) || safeNumber(hardwareData.graphics?.gpu_cores)
+  
+  // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
+  const cleanGraphicsName = (() => {
+    let name = graphicsName
+    const mfg = graphicsManufacturer.toUpperCase()
+    if (mfg && name.toUpperCase().startsWith(mfg)) {
+      name = name.slice(mfg.length).trim()
+    }
+    // Also handle common variations
+    if (name.toUpperCase().startsWith('NVIDIA ')) name = name.slice(7).trim()
+    if (name.toUpperCase().startsWith('AMD ')) name = name.slice(4).trim()
+    if (name.toUpperCase().startsWith('INTEL ')) name = name.slice(6).trim()
+    return name || graphicsName
+  })()
   
   // Unified Memory Detection - Must be AFTER cpuCores, gpuCores, and chipName are defined
   // Apple Silicon or if CPU name matches GPU name (common in SoCs)
@@ -219,7 +234,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
                   />
                   <Stat 
                     label="GPU" 
-                    value={gpuCores > 0 ? `${gpuCores} cores` : graphicsName}
+                    value={gpuCores > 0 ? `${gpuCores} cores` : cleanGraphicsName}
                   />
                 </div>
                 
@@ -257,7 +272,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
                   />
                   <Stat 
                     label="GPU" 
-                    value={gpuCores > 0 ? `${gpuCores} cores` : graphicsName}
+                    value={gpuCores > 0 ? `${gpuCores} cores` : cleanGraphicsName}
                   />
                 </div>
                 
@@ -311,7 +326,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
           
           <Stat 
             label="Graphics" 
-            value={gpuCores > 0 ? `${graphicsName} (${gpuCores} cores)` : graphicsName}
+            value={gpuCores > 0 ? `${cleanGraphicsName} (${gpuCores} cores)` : cleanGraphicsName}
           />
           
           <Stat 
