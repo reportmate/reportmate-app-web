@@ -394,6 +394,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const wifiGeneration = safeString(hardwareData.wireless?.wifiGeneration)
   const wifiVersion = safeString(hardwareData.wireless?.wifiVersion)
   const wirelessAvailable = Boolean(hardwareData.wireless?.isAvailable)
+  const wirelessName = safeString(hardwareData.wireless?.name)
+  const wirelessProtocol = safeString(hardwareData.wireless?.protocol)
 
   // Bluetooth data
   const bluetoothVersion = safeString(hardwareData.bluetooth?.bluetoothVersion)
@@ -499,7 +501,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
                     </div>
                     <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
-                    <div className="text-sm text-gray-900 dark:text-white">{memoryType} {memoryManufacturer}</div>
+                    <div className="text-sm text-gray-900 dark:text-white">
+                      {memoryType && memoryType !== 'Unknown' ? `${memoryType} ` : ''}{memoryManufacturer}
+                    </div>
                   </div>
 
                   {/* GPU */}
@@ -538,7 +542,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       <h4 className="font-semibold text-gray-900 dark:text-white">Storage</h4>
                     </div>
                     <div className="text-2xl font-bold text-purple-500 mb-1">{formatBytes(totalStorage)}</div>
-                    <div className="text-sm text-gray-900 dark:text-white mb-1">{Math.round((freeStorage / totalStorage) * 100)}% Free</div>
+                    <div className="text-sm text-gray-900 dark:text-white mb-1">{totalStorage > 0 ? Math.min(100, Math.round((freeStorage / totalStorage) * 100)) : 0}% Free</div>
                   </div>
 
                   {/* Battery or Empty */}
@@ -604,7 +608,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
               </div>
               <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
-              <div className="text-sm text-gray-900 dark:text-white mb-1">{memoryType} {memoryManufacturer}</div>
+              <div className="text-sm text-gray-900 dark:text-white mb-1">
+                {memoryType && memoryType !== 'Unknown' ? `${memoryType} ` : ''}{memoryManufacturer}
+              </div>
               {hardwareData.memory?.modules && (
                 <div className="text-xs text-gray-500 dark:text-gray-400">
                   {hardwareData.memory.modules.length} Modules
@@ -646,7 +652,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <h4 className="font-semibold text-gray-900 dark:text-white">GPU</h4>
               </div>
               <div className="text-2xl font-bold text-green-500 mb-1">{graphicsCores > 0 ? `${graphicsCores} Cores` : graphicsName}</div>
-              <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsName}</div>
+              {graphicsCores > 0 && <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsName}</div>}
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {graphicsMetalSupport !== 'Unknown' ? graphicsMetalSupport : (graphicsMemorySize ? `${graphicsMemorySize} GB VRAM` : 'Discrete GPU')}
               </div>
@@ -675,8 +681,15 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <Wifi className="w-5 h-5 text-cyan-500" />
                 <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
               </div>
-              <div className="text-2xl font-bold text-cyan-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : 'N/A'}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{wifiVersion !== 'Unknown' ? wifiVersion : (wirelessAvailable ? 'Available' : 'Not Available')}</div>
+              <div className="text-2xl font-bold text-cyan-500 mb-1">
+                {wifiGeneration !== 'Unknown' ? wifiGeneration : (wirelessProtocol !== 'Unknown' ? wirelessProtocol : (wirelessAvailable ? 'Available' : 'N/A'))}
+              </div>
+              {wirelessName && wirelessName !== 'Unknown' && (
+                <div className="text-sm text-gray-900 dark:text-white mb-1 truncate" title={wirelessName}>{wirelessName}</div>
+              )}
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {wifiVersion !== 'Unknown' ? wifiVersion : (wirelessAvailable ? 'Available' : 'Not Available')}
+              </div>
             </div>
 
             {/* Bluetooth */}
@@ -819,7 +832,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       const freeSpace = safeNumber(drive.freeSpace ?? drive.free_space);
                       const fileSystem = safeString(drive.fileSystem ?? drive.file_system);
                       const deviceName = safeString(drive.deviceName ?? drive.device_name);
-                      const usedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
+                      // Cap usedPercent at 100% and floor at 0% to prevent visual overflow
+                      const rawUsedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
+                      const usedPercent = Math.min(100, Math.max(0, rawUsedPercent));
                       const health = safeString(drive.health);
                       
                       return (
