@@ -190,17 +190,14 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   // Extract bootstrap token from security module
   const bootstrapToken = device?.modules?.security?.bootstrapToken || device?.security?.bootstrapToken
 
-  // Extract Windows Hello data from security module (Windows only)
-  const rawSecurity = device?.modules?.security || device?.security
-  const parsedSecurity = convertPowerShellObjects(rawSecurity)
-  const normalizedSecurity = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
-  const windowsHello = normalizedSecurity?.windowsHello
-
   // Extract identity data
   const rawIdentity = device?.modules?.identity || device?.identity
   const parsedIdentity = convertPowerShellObjects(rawIdentity)
   const normalizedIdentity = parsedIdentity ? normalizeKeys(parsedIdentity) as any : null
   const identity: IdentityInfo = normalizedIdentity ? extractIdentity({ identity: normalizedIdentity }) : extractIdentity({})
+  
+  // Extract Windows Hello data from identity module (Windows only) - migrated from security
+  const windowsHello = normalizedIdentity?.windowsHello
   
   const isMac = isMacOS(device)
 
