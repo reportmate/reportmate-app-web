@@ -23,6 +23,7 @@ interface Management {
   intuneId: string
   tenantName: string
   isEnrolled: boolean
+  platform?: string
   // Inventory fields
   usage?: string
   catalog?: string
@@ -280,6 +281,11 @@ function ManagementPageContent() {
             intuneId: mgmt.intuneId || 'N/A',
             tenantName: mgmt.tenantName || '',
             isEnrolled: mgmt.isEnrolled || false,
+            // Detect platform from multiple sources (provider, OS name, raw data)
+            platform: mgmt.platform || 
+              mgmt.raw?.system?.operatingSystem?.name ||
+              mgmt.raw?.system?.operating_system?.name ||
+              (provider === 'Apple' ? 'macOS' : provider === 'Microsoft Intune' ? 'Windows' : undefined),
             // Inventory fields from consolidated response
             usage: mgmt.usage,
             catalog: mgmt.catalog,
@@ -467,8 +473,8 @@ function ManagementPageContent() {
   // Apply shared filters to get final filtered list
   const filteredManagement = baseFilteredManagement.filter(m => {
     // Global platform filter first
-    if (globalPlatformFilter) {
-      const platform = normalizePlatform(m.raw?.system?.operatingSystem?.name)
+    if (globalPlatformFilter !== 'all') {
+      const platform = normalizePlatform(m.platform)
       if (!isPlatformVisible(platform)) {
         return false
       }

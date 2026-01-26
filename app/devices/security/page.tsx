@@ -104,7 +104,7 @@ function SecurityPageContent() {
   // Filter security
   const filteredSecurity = security.filter(s => {
     // Global platform filter first
-    if (platformFilter) {
+    if (platformFilter !== 'all') {
       const platform = normalizePlatform(s.platform)
       if (!isPlatformVisible(platform)) {
         return false
