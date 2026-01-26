@@ -1,6 +1,7 @@
 "use client"
 
-import { createContext, useContext, useState, useCallback, ReactNode, useMemo } from 'react'
+import { createContext, useContext, useState, useCallback, ReactNode, useMemo, useEffect } from 'react'
+import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 
 export type Platform = 'macOS' | 'Windows' | 'all'
 
@@ -57,11 +58,47 @@ interface PlatformFilterProviderProps {
 }
 
 export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: PlatformFilterProviderProps) {
-  const [platformFilter, setPlatformFilterState] = useState<Platform>(defaultPlatform)
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  
+  // Initialize from URL parameter if present
+  const urlPlatform = searchParams.get('platform')
+  const initialPlatform: Platform = 
+    urlPlatform === 'mac' ? 'macOS' : 
+    urlPlatform === 'win' ? 'Windows' : 
+    defaultPlatform
+  
+  const [platformFilter, setPlatformFilterState] = useState<Platform>(initialPlatform)
+
+  // Sync state with URL parameter on mount and when URL changes
+  useEffect(() => {
+    const urlPlatform = searchParams.get('platform')
+    if (urlPlatform === 'mac' && platformFilter !== 'macOS') {
+      setPlatformFilterState('macOS')
+    } else if (urlPlatform === 'win' && platformFilter !== 'Windows') {
+      setPlatformFilterState('Windows')
+    } else if (!urlPlatform && platformFilter !== 'all') {
+      setPlatformFilterState('all')
+    }
+  }, [searchParams, platformFilter])
 
   const setPlatformFilter = useCallback((platform: Platform) => {
     setPlatformFilterState(platform)
-  }, [])
+    
+    // Update URL parameter
+    const params = new URLSearchParams(searchParams.toString())
+    if (platform === 'macOS') {
+      params.set('platform', 'mac')
+    } else if (platform === 'Windows') {
+      params.set('platform', 'win')
+    } else {
+      params.delete('platform')
+    }
+    
+    const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+    router.push(newUrl)
+  }, [pathname, router, searchParams])
 
   const showOnlyMac = useCallback(() => {
     setPlatformFilterState('macOS')

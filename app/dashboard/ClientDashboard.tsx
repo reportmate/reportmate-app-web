@@ -435,13 +435,15 @@ export default function ClientDashboard() {
               <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* Error and Warning Stats Cards - Side by Side */}
-            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-              <div className="grid grid-cols-2 gap-4">
-                <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} />
-                <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} />
-              </div>
-            </ErrorBoundary>
+            {/* Error and Warning Stats Cards - Side by Side (only show when viewing all platforms) */}
+            {platformFilter === 'all' && (
+              <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
+                <div className="grid grid-cols-2 gap-4">
+                  <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} />
+                  <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} />
+                </div>
+              </ErrorBoundary>
+            )}
 
             {/* New Clients Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>
@@ -470,15 +472,27 @@ export default function ClientDashboard() {
               <PlatformDistributionWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* OS Version Tracking - 50/50 Split */}
+            {/* OS Version Tracking - Conditional display based on platform filter */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading OS stats</div>}>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* macOS Versions */}
-                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
+              {(() => {
+                const showMac = platformFilter === 'all' || platformFilter === 'macOS'
+                const showWin = platformFilter === 'all' || platformFilter === 'Windows'
+                const gridCols = showMac && showWin ? 'lg:grid-cols-2' : 'lg:grid-cols-1'
                 
-                {/* Windows Versions */}
-                <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
-              </div>
+                return (
+                  <div className={`grid grid-cols-1 ${gridCols} gap-6`}>
+                    {/* macOS Versions - only show when filtering macOS or all */}
+                    {showMac && (
+                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="macOS" />
+                    )}
+                    
+                    {/* Windows Versions - only show when filtering Windows or all */}
+                    {showWin && (
+                      <OSVersionPieWidget devices={filteredDevices as any} loading={devicesLoading} osType="Windows" />
+                    )}
+                  </div>
+                )
+              })()}
             </ErrorBoundary>
           </div>
         </div>
