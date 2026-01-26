@@ -128,6 +128,9 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     serialNumber: rawDevice.serialNumber || 'Unknown',
     name: finalName,
     
+    // Platform (required for macOS/Windows-specific UI features like btmdbHealth)
+    platform: rawDevice.platform,
+    
     // Status and timestamps
     lastSeen: normalizedLastSeen,
     status: rawDevice.archived ? 'archived' : calculatedStatus,
