@@ -574,27 +574,36 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     <div></div>
                   )}
 
-                  {/* Wireless */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Wifi className="w-5 h-5 text-teal-500" />
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
+                  {/* Wireless - only render if available */}
+                  {wirelessAvailable && (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Wifi className="w-5 h-5 text-teal-500" />
+                        <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
+                      </div>
+                      <div className="text-2xl font-bold text-teal-500 mb-1">
+                        {wifiGeneration !== 'Unknown' ? wifiGeneration : 'Available'}
+                      </div>
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        {wirelessProtocol !== 'Unknown' ? wirelessProtocol : ''}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate" title={wirelessName !== 'Unknown' ? wirelessName : undefined}>
+                        {wirelessName !== 'Unknown' ? wirelessName : ''}
+                      </div>
                     </div>
-                    <div className="text-2xl font-bold text-teal-500 mb-1">{wifiGeneration !== 'Unknown' ? wifiGeneration : (wirelessAvailable ? 'Available' : 'N/A')}</div>
-                    <div className="text-sm text-gray-900 dark:text-white truncate" title={wirelessName !== 'Unknown' ? wirelessName : undefined}>
-                      {wifiVersion !== 'Unknown' ? wifiVersion : (wirelessName !== 'Unknown' && wirelessName ? wirelessName : (wirelessProtocol !== 'Unknown' && wirelessProtocol ? wirelessProtocol : ''))}
-                    </div>
-                  </div>
+                  )}
 
-                  {/* Bluetooth */}
-                  <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Bluetooth className="w-5 h-5 text-blue-500" />
-                      <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
+                  {/* Bluetooth - only render if available */}
+                  {bluetoothAvailable && (
+                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bluetooth className="w-5 h-5 text-blue-500" />
+                        <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
+                      </div>
+                      <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
+                      <div className="text-sm text-gray-900 dark:text-white">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : 'Available'}</div>
                     </div>
-                    <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
-                    <div className="text-sm text-gray-900 dark:text-white">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -693,32 +702,36 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
             )}
 
-            {/* Wireless */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <Wifi className="w-5 h-5 text-cyan-500" />
-                <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
+            {/* Wireless - only render if available */}
+            {wirelessAvailable && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <Wifi className="w-5 h-5 text-cyan-500" />
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Wireless</h4>
+                </div>
+                <div className="text-2xl font-bold text-cyan-500 mb-1">
+                  {wifiGeneration !== 'Unknown' ? wifiGeneration : 'Available'}
+                </div>
+                <div className="text-sm text-gray-900 dark:text-white mb-1">
+                  {wirelessProtocol !== 'Unknown' ? wirelessProtocol : ''}
+                </div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate" title={wirelessName !== 'Unknown' ? wirelessName : undefined}>
+                  {wirelessName !== 'Unknown' ? wirelessName : ''}
+                </div>
               </div>
-              <div className="text-2xl font-bold text-cyan-500 mb-1">
-                {wifiGeneration !== 'Unknown' ? wifiGeneration : (wirelessProtocol !== 'Unknown' ? wirelessProtocol : (wirelessAvailable ? 'Available' : 'N/A'))}
-              </div>
-              {wirelessName && wirelessName !== 'Unknown' && (
-                <div className="text-sm text-gray-900 dark:text-white mb-1 truncate" title={wirelessName}>{wirelessName}</div>
-              )}
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {wifiVersion !== 'Unknown' ? wifiVersion : (wirelessAvailable ? 'Available' : 'Not Available')}
-              </div>
-            </div>
+            )}
 
-            {/* Bluetooth */}
-            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <Bluetooth className="w-5 h-5 text-blue-500" />
-                <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
+            {/* Bluetooth - only render if available */}
+            {bluetoothAvailable && (
+              <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2 mb-2">
+                  <Bluetooth className="w-5 h-5 text-blue-500" />
+                  <h4 className="font-semibold text-gray-900 dark:text-white">Bluetooth</h4>
+                </div>
+                <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : 'Available'}</div>
               </div>
-              <div className="text-2xl font-bold text-blue-500 mb-1">{bluetoothVersion !== 'Unknown' ? bluetoothVersion : 'N/A'}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{bluetoothStatus !== 'Unknown' ? bluetoothStatus : (bluetoothAvailable ? 'Available' : 'Not Available')}</div>
-            </div>
+            )}
 
           </div>
         )}
