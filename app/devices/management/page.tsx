@@ -91,7 +91,7 @@ function LoadingSkeleton() {
       </div>
 
       {/* Table Skeleton */}
-      <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+      <div className="flex-1 overflow-auto min-h-0">
         <div className="min-w-full">
           <div className="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
             <div className="flex space-x-8">
@@ -835,10 +835,10 @@ function ManagementPageContent() {
   */
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           
           {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -958,6 +958,28 @@ function ManagementPageContent() {
             </div>
           )}
           
+          {/* Shared Device Filters Component - Selections first */}
+          <DeviceFilters
+            filterOptions={filterOptions}
+            selectedStatuses={selectedStatuses}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedPlatforms={selectedPlatforms}
+            selectedUsages={selectedUsages}
+            onStatusToggle={toggleStatus}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onPlatformToggle={togglePlatform}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+          />
+          
           {/* Widgets Accordion */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
             <button
@@ -968,7 +990,7 @@ function ManagementPageContent() {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -1066,31 +1088,9 @@ function ManagementPageContent() {
             </div>
           )}
 
-          {/* Shared Device Filters Component */}
-          <DeviceFilters
-            filterOptions={filterOptions}
-            selectedStatuses={selectedStatuses}
-            selectedCatalogs={selectedCatalogs}
-            selectedAreas={selectedAreas}
-            selectedLocations={selectedLocations}
-            selectedFleets={selectedFleets}
-            selectedPlatforms={selectedPlatforms}
-            selectedUsages={selectedUsages}
-            onStatusToggle={toggleStatus}
-            onCatalogToggle={toggleCatalog}
-            onAreaToggle={toggleArea}
-            onLocationToggle={toggleLocation}
-            onFleetToggle={toggleFleet}
-            onPlatformToggle={togglePlatform}
-            onUsageToggle={toggleUsage}
-            onClearAll={clearAllFilters}
-            searchQuery={searchQuery}
-            onSearchChange={setSearchQuery}
-          />
-
           
 
-          <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+          <div className="flex-1 overflow-auto min-h-0">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

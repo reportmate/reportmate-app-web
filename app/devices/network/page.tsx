@@ -41,6 +41,7 @@ function NetworkPageContent() {
   
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
@@ -157,6 +158,60 @@ function NetworkPageContent() {
     locations: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
     )).sort() as string[]
+  }
+
+  // Calculate wireless statistics for widgets
+  const wirelessStats = {
+    // Wireless State counts
+    wirelessOff: processedNetworkDevices.filter(n => {
+      const state = n.networkInfo.wirelessState?.toLowerCase() || ''
+      return state === 'off' || state === 'disabled'
+    }).length,
+    wirelessOn: processedNetworkDevices.filter(n => {
+      const state = n.networkInfo.wirelessState?.toLowerCase() || ''
+      return state === 'on' || state === 'enabled' || state === 'disconnected'
+    }).length,
+    wirelessConnected: processedNetworkDevices.filter(n => {
+      const state = n.networkInfo.wirelessState?.toLowerCase() || ''
+      const connectionType = n.networkInfo.connectionType?.toLowerCase() || ''
+      return state === 'connected' || (connectionType.includes('wireless') || connectionType.includes('wifi'))
+    }).length,
+    
+    // Network names and counts
+    networkNames: processedNetworkDevices.reduce((acc, n) => {
+      const ssid = n.networkInfo.ssid || n.networkInfo.networkName || 'Unknown'
+      if (ssid && ssid !== 'Unknown' && ssid !== 'N/A') {
+        acc[ssid] = (acc[ssid] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>),
+    
+    // Security types
+    securityTypes: processedNetworkDevices.reduce((acc, n) => {
+      const security = n.networkInfo.wirelessSecurity || n.networkInfo.securityType || 'Unknown'
+      if (security && security !== 'Unknown' && security !== 'N/A') {
+        acc[security] = (acc[security] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>),
+    
+    // Signal quality distribution
+    signalExcellent: processedNetworkDevices.filter(n => {
+      const signal = n.networkInfo.signalStrength || 0
+      return signal >= 75
+    }).length,
+    signalGood: processedNetworkDevices.filter(n => {
+      const signal = n.networkInfo.signalStrength || 0
+      return signal >= 50 && signal < 75
+    }).length,
+    signalFair: processedNetworkDevices.filter(n => {
+      const signal = n.networkInfo.signalStrength || 0
+      return signal >= 25 && signal < 50
+    }).length,
+    signalPoor: processedNetworkDevices.filter(n => {
+      const signal = n.networkInfo.signalStrength || 0
+      return signal > 0 && signal < 25
+    }).length
   }
 
   const filteredNetworkDevices = processedNetworkDevices.filter(n => {
@@ -279,34 +334,64 @@ function NetworkPageContent() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
-          <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden animate-pulse">
+      <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
+        <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+          <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden animate-pulse">
+            {/* Title Skeleton */}
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div>
                   <div className="h-6 w-48 bg-gray-300 dark:bg-gray-600 rounded mb-2"></div>
-                  <div className="h-4 w-64 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                  <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
                 <div className="flex items-center gap-4">
-                  {/* Connection Type Filter Buttons */}
+                  {/* Search skeleton */}
+                  <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                  {/* Connection filters skeleton */}
                   <div className="flex items-center gap-2">
-                    <div className="h-7 w-14 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
-                    <div className="h-7 w-20 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
+                    <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                    <div className="h-8 w-20 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
                   </div>
-                  
-                  {/* Search Field */}
-                  <div className="relative flex-1 max-w-md">
-                    <div className="h-7 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-                  </div>
-                  
-                  {/* Export Button */}
-                  <div className="h-7 w-28 bg-gray-300 dark:bg-gray-600 rounded-lg"></div>
+                  <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
                 </div>
               </div>
             </div>
 
-            <div className="overflow-y-auto h-[calc(100vh-280px)]">
+            {/* Selections Accordion Skeleton */}
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <div className="w-full px-6 py-3 flex items-center justify-between">
+                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+            </div>
+
+            {/* Widgets Accordion Skeleton */}
+            <div className="border-b border-gray-200 dark:border-gray-700">
+              <div className="w-full px-6 py-3 flex items-center justify-between">
+                <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {[1, 2, 3, 4].map(i => (
+                    <div key={i} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded mb-3"></div>
+                      <div className="space-y-2">
+                        {[1, 2, 3].map(j => (
+                          <div key={j} className="flex items-center justify-between">
+                            <div className="h-3 w-16 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                            <div className="h-3 w-8 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Table Skeleton */}
+            <div className="flex-1 overflow-hidden">
               <table className="w-full">
                 <thead className="bg-gray-50 dark:bg-gray-700">
                   <tr>
@@ -318,80 +403,20 @@ function NetworkPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {error ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
-                            <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          </div>
-                          <p className="text-base font-medium text-gray-900 dark:text-white mb-2">Failed to load network data</p>
-                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">{error}</p>
-                          <button 
-                            onClick={() => window.location.reload()} 
-                            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                          >
-                            Try Again
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : loading ? (
-                    [...Array(8)].map((_, i) => (
-                      <tr key={i}>
+                  {[...Array(8)].map((_, i) => (
+                    <tr key={i}>
                       <td className="px-4 py-3 w-48">
                         <div className="flex flex-col justify-center h-12 space-y-1">
-                          <div className="h-4 w-36 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                          <div className="h-3 w-28 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                          <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                          <div className="h-3 w-28 bg-gray-200 dark:bg-gray-700 rounded"></div>
                         </div>
                       </td>
-                      <td className="px-6 py-3 w-48">
-                        <div className="flex items-center gap-2 h-12">
-                          <div className="h-4 w-40 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
-                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 w-32">
-                        <div className="flex items-center gap-2 h-12">
-                          <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
-                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 w-40">
-                        <div className="flex items-center gap-2 h-12">
-                          <div className="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded font-mono"></div>
-                          <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-3 w-44">
-                        <div className="flex flex-col justify-center h-12 space-y-1">
-                          <div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                          <div className="h-3 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div>
-                        </div>
-                      </td>
+                      <td className="px-6 py-3 w-48"><div className="h-4 w-40 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                      <td className="px-6 py-3 w-32"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                      <td className="px-6 py-3 w-40"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                      <td className="px-6 py-3 w-44"><div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                     </tr>
-                    ))
-                  ) : filteredNetwork.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-12 text-center">
-                        <div className="flex flex-col items-center">
-                          <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
-                          </svg>
-                          <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No network data found</h3>
-                          <p className="text-sm text-gray-500 dark:text-gray-400">No network data matches your current search.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredNetwork.map((net) => (
-                      <tr key={net.deviceId} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        <td className="px-4 py-4">Network Data Placeholder</td>
-                      </tr>
-                    ))
-                  )}
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -420,10 +445,10 @@ function NetworkPageContent() {
   */
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0">
-        <div className="bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-0 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border border-gray-200 dark:border-gray-700 border-b-0 flex flex-col min-h-0 overflow-hidden">
           {/* Title Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -451,6 +476,22 @@ function NetworkPageContent() {
                 </div>
               ) : (
                 <div className="flex items-center gap-4">
+                  {/* Search Field */}
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Search devices, IPs, MACs..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="block w-48 md:w-64 pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
+                    />
+                  </div>
+                  
                   {/* Connection Type Filters */}
                   <div className="flex items-center gap-2">
                     <button
@@ -473,22 +514,6 @@ function NetworkPageContent() {
                     >
                       Wireless
                     </button>
-                  </div>
-                  
-                  {/* Search Field */}
-                  <div className="relative flex-1 max-w-md">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <input
-                      type="text"
-                      placeholder="Search devices, IPs, MACs..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-teal-500 focus:border-teal-500"
-                    />
                   </div>
                   
                   {/* Export to CSV Button */}
@@ -549,7 +574,7 @@ function NetworkPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : ''}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -629,36 +654,127 @@ function NetworkPageContent() {
             )}
           </div>
 
-          {/* Search Section */}
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+          {/* Widgets Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            
+            {widgetsExpanded && (
+              <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {/* Wireless State Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Wireless State</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Off</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.wirelessOff}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">On</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.wirelessOn}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Connected</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.wirelessConnected}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Wireless Networks Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Wireless Networks</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {Object.entries(wirelessStats.networkNames).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => (
+                        <div key={name} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px]" title={name}>{name}</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                        </div>
+                      ))}
+                      {Object.keys(wirelessStats.networkNames).length === 0 && (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No networks detected</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Wireless Security Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Wireless Security</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {Object.entries(wirelessStats.securityTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                        <div key={type} className="flex items-center justify-between">
+                          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px]" title={type}>{type}</span>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                        </div>
+                      ))}
+                      {Object.keys(wirelessStats.securityTypes).length === 0 && (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No data available</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Signal Quality Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Signal Quality</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Excellent</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalExcellent}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-teal-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Good</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalGood}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Fair</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalFair}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Poor</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.signalPoor}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  placeholder="Search devices"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
               </div>
-              {(totalActiveFilters > 0 || searchQuery) && (
-                <button
-                  onClick={clearAllFilters}
-                  className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap"
-                >
-                  Clear Selections
-                </button>
-              )}
-            </div>
+            )}
           </div>
 
-          <div className="overflow-y-auto h-[calc(100vh-280px)]">
-            <table className="w-full">
+          <div className="flex-1 overflow-auto min-h-0">
+            <table className="min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th 

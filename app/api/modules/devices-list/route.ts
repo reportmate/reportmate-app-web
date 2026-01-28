@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -9,12 +8,20 @@ export async function GET() {
   try {
     const timestamp = new Date().toISOString()
     
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+    const API_BASE_URL = process.env.API_BASE_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
     
-    // Use shared authentication headers
-    const headers = getInternalApiHeaders()
-
-    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, { headers })
+    // Container-to-container auth requires X-Internal-Secret header
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    }
+    if (process.env.API_INTERNAL_SECRET) {
+      headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+    }
+    
+    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+      headers,
+      signal: AbortSignal.timeout(30000) // 30 second timeout
+    })
 
     if (!devicesResponse.ok) {
       throw new Error(`FastAPI Container returned ${devicesResponse.status}: ${devicesResponse.statusText}`)

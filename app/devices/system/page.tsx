@@ -622,10 +622,10 @@ function SystemPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -700,70 +700,7 @@ function SystemPageContent() {
             </div>
           </div>
 
-          {/* Widgets Accordion - OS Version Charts */}
-          <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
-            {/* Widgets Accordion Header */}
-            <button
-              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-          
-          {/* Widgets Content - Collapsible */}
-          {widgetsExpanded && (
-            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              {/* OS Version Charts - Side by Side with Pie Charts */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Windows OS Version Pie Chart */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/>
-                        </svg>
-                      </div>
-                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Windows Versions</h2>
-                    </div>
-                  </div>
-                  <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
-                  </div>
-                </div>
-                
-                {/* macOS OS Version Pie Chart */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                        <svg className="w-5 h-5 text-red-500 dark:text-red-300" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                        </svg>
-                      </div>
-                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">macOS Versions</h2>
-                    </div>
-                  </div>
-                  <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Filters Accordion Section */}
+          {/* Selections Accordion Section - First */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setFiltersExpanded(!filtersExpanded)}
@@ -778,18 +715,18 @@ function SystemPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-180' : ''}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
             
             {filtersExpanded && (
               <div className="px-6 pb-4 space-y-4">
-                {/* OS Version Filter - NEW */}
+                {/* OS Version Filter */}
                 {osVersionFilter && (
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OS Version</div>
@@ -805,7 +742,7 @@ function SystemPageContent() {
                   </div>
                 )}
                 
-                {/* Edition Filter - NEW */}
+                {/* Edition Filter */}
                 {filterOptions.editions.length > 0 && (
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Edition</div>
@@ -827,7 +764,7 @@ function SystemPageContent() {
                   </div>
                 )}
                 
-                {/* Activation Status Filter - NEW */}
+                {/* Activation Status Filter */}
                 <div>
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Activation Status</div>
                   <div className="flex flex-wrap gap-2">
@@ -849,7 +786,7 @@ function SystemPageContent() {
                   </div>
                 </div>
                 
-                {/* License Type Filter - NEW */}
+                {/* License Type Filter */}
                 <div>
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OEM License</div>
                   <div className="flex flex-wrap gap-2">
@@ -955,6 +892,69 @@ function SystemPageContent() {
             )}
           </div>
 
+          {/* Widgets Accordion - OS Version Charts */}
+          <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
+            {/* Widgets Accordion Header */}
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Widgets Content - Collapsible */}
+          {widgetsExpanded && (
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              {/* OS Version Charts - Side by Side with Pie Charts */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Windows OS Version Pie Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/>
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Windows Versions</h2>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
+                  </div>
+                </div>
+                
+                {/* macOS OS Version Pie Chart */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-red-500 dark:text-red-300" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">macOS Versions</h2>
+                    </div>
+                  </div>
+                  <div className="px-3 py-2">
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Search Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-3">
@@ -983,7 +983,7 @@ function SystemPageContent() {
             </div>
           </div>
 
-          <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+          <div className="flex-1 overflow-auto min-h-0">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
