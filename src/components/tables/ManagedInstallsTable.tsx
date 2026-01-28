@@ -31,7 +31,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
-  const [groupByCategory, setGroupByCategory] = useState(true);
+  const groupByCategory = true; // Always enabled
 
   const togglePackageExpansion = (packageId: string) => {
     const newExpandedIds = new Set(expandedPackageIds);
@@ -51,6 +51,18 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       newCollapsed.add(category);
     }
     setCollapsedCategories(newCollapsed);
+  };
+
+  const toggleAllCategories = () => {
+    if (collapsedCategories.size === 0) {
+      // Collapse all
+      if (groupedPackages) {
+        setCollapsedCategories(new Set(groupedPackages.sortedCategories));
+      }
+    } else {
+      // Expand all
+      setCollapsedCategories(new Set());
+    }
   };
 
   const toggleFilter = (filter: string) => {
@@ -248,20 +260,27 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                       Clear Filters
                     </button>
                   )}
-                  {/* Group by Category Toggle */}
-                  {hasCategories && (
+                  {/* Expand/Collapse All Categories Button */}
+                  {hasCategories && groupedPackages && groupedPackages.sortedCategories.length > 0 && (
                     <button
-                      onClick={() => setGroupByCategory(!groupByCategory)}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 ${
-                        groupByCategory
-                          ? 'bg-indigo-600 text-white dark:bg-indigo-400 dark:text-gray-900'
-                          : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
+                      onClick={toggleAllCategories}
+                      className="px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                      </svg>
-                      Group by Category
+                      {collapsedCategories.size === 0 ? (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                          </svg>
+                          Collapse All
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                          Expand All
+                        </>
+                      )}
                     </button>
                   )}
                 </div>
@@ -424,24 +443,24 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                             <React.Fragment key={`category-${category}`}>
                               {/* Category Header Row */}
                               <tr 
-                                className="bg-indigo-50 dark:bg-indigo-900/20 cursor-pointer hover:bg-indigo-100 dark:hover:bg-indigo-900/30"
+                                className="bg-gray-100 dark:bg-gray-800 cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700"
                                 onClick={() => toggleCategoryCollapse(category)}
                               >
                                 <td colSpan={5} className="px-6 py-3">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                       <svg 
-                                        className={`w-4 h-4 text-indigo-600 dark:text-indigo-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
+                                        className={`w-4 h-4 text-gray-600 dark:text-gray-400 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-90'}`}
                                         fill="none" 
                                         stroke="currentColor" 
                                         viewBox="0 0 24 24"
                                       >
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                       </svg>
-                                      <span className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">
+                                      <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                                         {category}
                                       </span>
-                                      <span className="text-xs text-indigo-500 dark:text-indigo-400 ml-2">
+                                      <span className="text-xs text-gray-600 dark:text-gray-400 ml-2">
                                         ({categoryPackages.length} {categoryPackages.length === 1 ? 'item' : 'items'})
                                       </span>
                                     </div>
