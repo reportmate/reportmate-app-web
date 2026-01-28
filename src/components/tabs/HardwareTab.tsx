@@ -150,6 +150,25 @@ interface HardwareData {
     ambientBrightnessEnabled?: boolean | number;
     type?: 'internal' | 'external';
     connectionType?: string;
+    // Enhanced display info (model-based lookup)
+    diagonal_inches?: number;
+    diagonalInches?: number;
+    ppi?: number;
+    color_gamut?: string;
+    colorGamut?: string;
+    brightness_nits?: number;
+    brightnessNits?: number;
+    peak_brightness_hdr?: number;
+    peakBrightnessHdr?: number;
+    true_tone?: boolean | number;
+    trueTone?: boolean | number;
+    promotion?: boolean | number;
+    refresh_rate?: string;
+    refreshRate?: string;
+    nanotexture_option?: boolean | number;
+    nanotextureOption?: boolean | number;
+    data_source?: string;
+    dataSource?: string;
   }>;
   wireless?: {
     name?: unknown;
@@ -354,6 +373,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Support both performance_cores/efficiency_cores (Mac) and performanceCores/efficiencyCores (Windows)
   const performanceCores = safeNumber(hardwareData.processor?.performance_cores) || safeNumber(hardwareData.processor?.performanceCores)
   const efficiencyCores = safeNumber(hardwareData.processor?.efficiency_cores) || safeNumber(hardwareData.processor?.efficiencyCores)
+  // Apple Silicon detection: Must have BOTH performance AND efficiency cores
   const hasAppleSilicon = performanceCores > 0 && efficiencyCores > 0
   
   const graphicsName = safeString(hardwareData.graphics?.name)
@@ -380,12 +400,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   
   const npuName = safeString(hardwareData.npu?.name)
   const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
-  const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits) || safeNumber(hardwareData.npu?.compute_units)
+  const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits)
   const npuCores = safeNumber(hardwareData.npu?.cores)
-  const npuTops = safeString(hardwareData.npu?.performanceTops || hardwareData.npu?.performance_tops)
-  // Only show NPU card if it's actually available with a valid name AND compute units > 0
-  // Empty name with 0 compute units means no real NPU
-  const npuIsAvailable = Boolean(hardwareData.npu?.isAvailable || hardwareData.npu?.is_available)
+  const npuTops = safeString(hardwareData.npu?.performanceTops)
+  // Check for hasNpu (normalized from has_npu) or isAvailable - after normalizeKeys(), all keys are camelCase
+  const npuIsAvailable = Boolean(hardwareData.npu?.isAvailable || hardwareData.npu?.hasNpu)
+  // Only show NPU card if it's available with a valid name AND has cores
   const hasNpu = npuIsAvailable && npuName !== 'Unknown' && npuName !== '' && (npuComputeUnits > 0 || npuCores > 0)
   
   const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
@@ -407,9 +427,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const hasBattery = !isDesktop && hasBatteryData && (batteryCycleCount > 0 || batteryChargePercent > 0)
 
   // Wireless data
-  const wifiGeneration = safeString(hardwareData.wireless?.wifiGeneration)
-  const wifiVersion = safeString(hardwareData.wireless?.wifiVersion)
-  const wirelessAvailable = Boolean(hardwareData.wireless?.isAvailable)
+  const wifiGeneration = safeString(hardwareData.wireless?.wifiGeneration || hardwareData.wireless?.wifi_generation)
+  const wifiVersion = safeString(hardwareData.wireless?.wifiVersion || hardwareData.wireless?.wifi_version)
+  const wirelessStatus = safeString(hardwareData.wireless?.status)
+  const wirelessAvailable = Boolean(hardwareData.wireless?.isAvailable || hardwareData.wireless?.is_available)
   const wirelessName = safeString(hardwareData.wireless?.name)
   const wirelessProtocol = safeString(hardwareData.wireless?.protocol)
 
@@ -419,8 +440,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const bluetoothAvailable = Boolean(hardwareData.bluetooth?.isAvailable)
 
   // Unified Memory Detection
-  // Apple Silicon or if CPU name matches GPU name (common in SoCs)
-  const isUnifiedMemory = hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown');
+  // 1. Backend flag: unified_memory (set by Mac client for Apple Silicon)
+  // 2. Apple Silicon with performance/efficiency cores (M-series chips)
+  // 3. CPU name matches GPU name (common in SoCs)
+  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unified_memory)
+  const isUnifiedMemory = hasUnifiedMemoryFlag || hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown')
 
   // Clean up GPU name if it repeats the processor name
   const displayGraphicsName = isUnifiedMemory && cleanGraphicsName.startsWith(processorName) 
@@ -566,8 +590,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         <Battery className="w-5 h-5 text-green-500" />
                         <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                       </div>
-                      <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount}</div>
-                      <div className="text-sm text-gray-900 dark:text-white mb-1">Cycles</div>
+                      <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
                       <div className="text-xs text-gray-500 dark:text-gray-400">{Math.round(batteryChargePercent)}% • {batteryHealth}</div>
                     </div>
                   ) : (
@@ -585,10 +608,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {wifiGeneration !== 'Unknown' ? wifiGeneration : 'Available'}
                       </div>
                       <div className="text-sm text-gray-900 dark:text-white">
-                        {wirelessProtocol !== 'Unknown' ? wirelessProtocol : ''}
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 truncate" title={wirelessName !== 'Unknown' ? wirelessName : undefined}>
-                        {wirelessName !== 'Unknown' ? wirelessName : ''}
+                        {wifiVersion !== 'Unknown' ? wifiVersion : ''}
+                        {wifiVersion !== 'Unknown' && wirelessStatus !== 'Unknown' && wirelessStatus && ' • '}
+                        {wirelessStatus !== 'Unknown' && wirelessStatus ? (
+                          <span className="text-gray-500 dark:text-gray-400">{wirelessStatus}</span>
+                        ) : null}
                       </div>
                     </div>
                   )}
@@ -621,9 +645,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
               <div className="text-2xl font-bold text-red-500 mb-1">{processorCores} Cores</div>
               <div className="text-sm text-gray-900 dark:text-white mb-1">{processorName}</div>
-              {safeNumber(hardwareData.processor?.maxSpeed) > 0 && (
+              {hasAppleSilicon && performanceCores > 0 && efficiencyCores > 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400">{performanceCores} Performance + {efficiencyCores} Efficiency</div>
+              ) : safeNumber(hardwareData.processor?.maxSpeed) > 0 ? (
                 <div className="text-xs text-gray-500 dark:text-gray-400">Max: {safeNumber(hardwareData.processor?.maxSpeed)} GHz</div>
-              )}
+              ) : null}
             </div>
 
             {/* RAM */}
@@ -661,8 +687,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   <Battery className="w-5 h-5 text-green-500" />
                   <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                 </div>
-                <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount}</div>
-                <div className="text-sm text-gray-900 dark:text-white mb-1">Cycles</div>
+                <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">{Math.round(batteryChargePercent)}% • {batteryHealth}</div>
               </div>
             ) : (
@@ -677,13 +702,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                 <h4 className="font-semibold text-gray-900 dark:text-white">GPU</h4>
               </div>
               <div className="text-2xl font-bold text-green-500 mb-1">{graphicsName}</div>
+              {graphicsCores > 0 && (
+                <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsCores} Cores</div>
+              )}
               {graphicsMemorySize > 0 && (
                 <div className="text-sm text-gray-900 dark:text-white mb-1">{graphicsMemorySize} GB VRAM</div>
               )}
               <div className="text-xs text-gray-500 dark:text-gray-400">
                 {graphicsManufacturer !== 'Unknown' && graphicsManufacturer 
                   ? `${graphicsManufacturer} Discrete Card${graphicsDriverVersion !== 'Unknown' && graphicsDriverVersion ? ` - Driver ${graphicsDriverVersion}` : ''}`
-                  : (graphicsMetalSupport !== 'Unknown' ? graphicsMetalSupport : 'Discrete GPU')}
+                  : (graphicsMetalSupport !== 'Unknown' && graphicsMetalSupport ? graphicsMetalSupport : 'Discrete GPU')}
               </div>
             </div>
 
@@ -752,12 +780,20 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               const displayType = display.display_type ?? display.displayType
               const displayFirmwareVersion = display.firmware_version ?? display.firmwareVersion
               const displayIsMainDisplay = display.is_main_display ?? display.isMainDisplay
+              // Enhanced fields (model-based lookup)
+              const diagonalInches = display.diagonal_inches ?? display.diagonalInches
+              const ppi = display.ppi
+              const colorGamut = display.color_gamut ?? display.colorGamut
+              const brightnessNits = display.brightness_nits ?? display.brightnessNits
+              const trueTone = display.true_tone ?? display.trueTone
+              const refreshRate = display.refresh_rate ?? display.refreshRate
+              const hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
               
               return (
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                <div className="flex items-end gap-12">
+                <div className="flex items-center gap-8">
                   {/* Left: Icon + Title */}
-                  <div className="flex items-end gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                       <Monitor className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                     </div>
@@ -766,6 +802,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {display.name || 'Unknown Display'}
                       </h4>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {diagonalInches ? `${diagonalInches}" ` : ''}
                         {display.type === 'internal' ? 'Built-in' : 'External'} {displayType}
                       </div>
                     </div>
@@ -775,8 +812,26 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   <div className="flex items-end gap-10 min-w-0 flex-1">
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Resolution</div>
-                      <div className="text-base font-medium text-gray-900 dark:text-white">{display.resolution}</div>
+                      <div className="text-base font-medium text-gray-900 dark:text-white">{display.resolution || 'Unknown'}</div>
                     </div>
+                    {ppi && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Pixel Density</div>
+                        <div className="text-base font-medium text-gray-900 dark:text-white">{ppi} PPI</div>
+                      </div>
+                    )}
+                    {brightnessNits && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Brightness</div>
+                        <div className="text-base font-medium text-gray-900 dark:text-white">{brightnessNits} nits</div>
+                      </div>
+                    )}
+                    {colorGamut && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Color Gamut</div>
+                        <div className="text-base font-medium text-gray-900 dark:text-white">{colorGamut}</div>
+                      </div>
+                    )}
                     <div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
                       <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
@@ -798,6 +853,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
 
                   {/* Right: Badges - Horizontal with Main Display left, Connected right */}
                   <div className="flex flex-row gap-2 flex-shrink-0">
+                    {(trueTone === 1 || trueTone === true) && (
+                      <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-sm font-medium rounded whitespace-nowrap text-center">
+                        True Tone
+                      </span>
+                    )}
+                    {refreshRate && (
+                      <span className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm font-medium rounded whitespace-nowrap text-center">
+                        {refreshRate}
+                      </span>
+                    )}
                     {displayIsMainDisplay === 1 || displayIsMainDisplay === true ? (
                       <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-medium rounded whitespace-nowrap text-center">
                         Main Display
