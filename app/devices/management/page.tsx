@@ -1203,7 +1203,7 @@ function ManagementPageContent() {
                           className="group block min-w-0"
                           title={mgmt.deviceName || 'Unknown Device'}
                         >
-                          <div className="text-sm font-medium text-yellow-600 group-hover:text-yellow-800 dark:text-yellow-400 dark:group-hover:text-yellow-300 truncate">{mgmt.deviceName}</div>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{mgmt.deviceName}</div>
                           <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 font-mono">
                             <span className="inline-flex items-center gap-0.5">
                               {mgmt.serialNumber}

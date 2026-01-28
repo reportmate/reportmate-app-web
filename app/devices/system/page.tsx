@@ -1096,7 +1096,7 @@ function SystemPageContent() {
                           className="group block min-w-0"
                           title={sys.deviceName || 'Unknown Device'}
                         >
-                          <div className="text-sm font-medium text-purple-600 group-hover:text-purple-800 dark:text-purple-400 dark:group-hover:text-purple-300 truncate">{sys.deviceName}</div>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{sys.deviceName}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                             {sys.serialNumber}
                             {sys.assetTag ? ` | ${sys.assetTag}` : ''}

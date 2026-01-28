@@ -302,11 +302,11 @@ function PeripheralsPageContent() {
                     <tr key={peripheral.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 max-w-56">
                         <Link 
-                          href={`/device/${peripheral.deviceId}`}
+                          href={`/device/${peripheral.deviceId}#hardware`}
                           className="group block min-w-0"
                           title={peripheral.deviceName || 'Unknown Device'}
                         >
-                          <div className="text-sm font-medium text-cyan-600 group-hover:text-cyan-800 dark:text-cyan-400 dark:group-hover:text-cyan-300 truncate">{peripheral.deviceName}</div>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{peripheral.deviceName}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                             {peripheral.serialNumber}
                             {(peripheral as any).assetTag && (

@@ -2580,8 +2580,8 @@ function ApplicationsPageContent() {
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <Link
-                                href={`/device/${app.serialNumber}`}
-                                className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                                href={`/device/${app.serialNumber}#applications`}
+                                className="text-sm font-medium text-gray-900 hover:text-gray-700 dark:text-white dark:hover:text-gray-200"
                               >
                                 {app.deviceName || app.serialNumber}
                               </Link>
@@ -2817,8 +2817,8 @@ function ApplicationsPageContent() {
                         <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <Link
-                              href={`/device/${device.serialNumber}`}
-                              className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                              href={`/device/${device.serialNumber}#applications`}
+                              className="text-sm font-medium text-gray-900 hover:text-gray-700 dark:text-white dark:hover:text-gray-200"
                             >
                               {device.deviceName}
                             </Link>

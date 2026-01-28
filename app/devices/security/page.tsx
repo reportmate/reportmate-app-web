@@ -6,6 +6,8 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
+import { calculateDeviceStatus } from "../../../src/lib/data-processing"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 
 interface Security {
@@ -16,52 +18,224 @@ interface Security {
   lastSeen: string
   collectedAt: string
   platform: string
+  // Protection
   firewallEnabled: boolean
+  antivirus?: { name: string; enabled: boolean }
   gatekeeperEnabled: boolean
   systemIntegrityProtection: boolean
+  // Encryption
+  fileVaultEnabled: boolean
+  tpmPresent?: boolean
+  // Boot Security
   secureBootLevel: string
   externalBootLevel: string
+  // Access Control
   activationLockEnabled: boolean
   remoteDesktopEnabled: boolean
-  autoLoginUser: string
-  passwordPolicyEnforced: boolean
   screenLockEnabled: boolean
-  fileVaultEnabled: boolean
-  automaticUpdates: boolean
-  lastSecurityUpdate: string
+  passwordPolicyEnforced: boolean
+  autoLoginUser: string
+  // SSH
   secureShell?: {
     statusDisplay: string
     isConfigured: boolean
+    isServiceRunning: boolean
   }
+  // EDR
+  edrStatus?: string
+  edrActive?: boolean
+  // CVEs
+  cveCount?: number
+  criticalCveCount?: number
+  // Certificates
+  expiredCertCount?: number
+  expiringSoonCertCount?: number
+  // Tampering
+  tpmPresent?: boolean
+  tpmEnabled?: boolean
+  secureBootEnabled?: boolean
+  sipEnabled?: boolean
+  // Inventory
+  status?: string
+  catalog?: string
+  usage?: string
+  location?: string
+  assetTag?: string
+  raw?: any
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
-      {[...Array(10)].map((_, i) => (
-        <div key={i} className="animate-pulse flex space-x-4">
-          <div className="flex-1 space-y-2 py-1">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+    <div>
+      {/* Widgets Accordion Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 animate-pulse">
+          <div className="flex items-center gap-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+          </div>
+          <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+      
+      {/* Widgets Content Skeleton */}
+      <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 animate-pulse">
+              <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-3"></div>
+              <div className="flex items-start gap-6">
+                <div className="relative w-32 h-32 flex-shrink-0">
+                  <div className="w-full h-full bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                </div>
+                <div className="flex-1 space-y-2">
+                  {[...Array(4)].map((_, j) => (
+                    <div key={j} className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2 flex-1">
+                        <div className="w-3 h-3 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                        <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded flex-1 max-w-[80px]"></div>
+                      </div>
+                      <div className="h-4 w-6 bg-gray-200 dark:bg-gray-700 rounded ml-2"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Filters Accordion Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 animate-pulse">
+          <div className="flex items-center gap-2">
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+          </div>
+          <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+      </div>
+
+      {/* Table Skeleton */}
+      <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+        <div className="min-w-full">
+          <div className="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
+            <div className="flex space-x-8">
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-20"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-16"></div>
+              <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24"></div>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {[...Array(15)].map((_, i) => (
+              <div key={i} className="px-3 py-3 flex space-x-8">
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-24"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+                <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-28"></div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      </div>
     </div>
   )
 }
 
 function SecurityPageContent() {
   const searchParams = useSearchParams()
+  const { platformFilter: globalPlatformFilter, isPlatformVisible } = usePlatformFilterSafe()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [security, setSecurity] = useState<Security[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [protectionFilter, setProtectionFilter] = useState('all')
-  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
+  
+  // Shared filter states
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<'device' | 'lastSeen'>('device')
+  const [sortColumn, setSortColumn] = useState<'device' | 'lastSeen' | 'protection' | 'encryption' | 'edr' | 'cve' | 'tampering' | 'certificates'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Accordion states
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  
+  // Donut chart category expansion
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  
+  const toggleCategory = (categoryLabel: string) => {
+    setExpandedCategories(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(categoryLabel)) {
+        newSet.delete(categoryLabel)
+      } else {
+        newSet.add(categoryLabel)
+      }
+      return newSet
+    })
+  }
+
+  // Filter toggle functions
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    )
+  }
+  
+  const toggleCatalog = (catalog: string) => {
+    setSelectedCatalogs(prev => 
+      prev.includes(catalog) ? prev.filter(c => c !== catalog) : [...prev, catalog]
+    )
+  }
+  
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev => 
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+    )
+  }
+  
+  const toggleLocation = (location: string) => {
+    setSelectedLocations(prev => 
+      prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
+    )
+  }
+  
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev => 
+      prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+  
+  const togglePlatform = (platform: string) => {
+    setSelectedPlatforms(prev => 
+      prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
+    )
+  }
+  
+  const toggleUsage = (usage: string) => {
+    setSelectedUsages(prev => 
+      prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
+    )
+  }
+  
+  const clearAllFilters = () => {
+    setSelectedStatuses([])
+    setSelectedCatalogs([])
+    setSelectedAreas([])
+    setSelectedLocations([])
+    setSelectedFleets([])
+    setSelectedPlatforms([])
+    setSelectedUsages([])
+    setProtectionFilter('all')
+    setSearchQuery('')
+  }
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -89,7 +263,14 @@ function SecurityPageContent() {
         }
         
         const data = await response.json()
-        setSecurity(data)
+        
+        // Enrich with calculated status
+        const enrichedData = data.map((s: any) => ({
+          ...s,
+          status: calculateDeviceStatus(s.lastSeen)
+        }))
+        
+        setSecurity(enrichedData)
       } catch (err) {
         console.error('Error fetching security:', err)
         setError(err instanceof Error ? err.message : 'An unexpected error occurred')
@@ -101,22 +282,100 @@ function SecurityPageContent() {
     fetchSecurity()
   }, [])
 
-  // Filter security
+  // Calculate stats for widgets
+  const protectionStatusCounts = security.reduce((acc, curr) => {
+    const isProtected = curr.firewallEnabled && curr.fileVaultEnabled
+    const label = isProtected ? 'Protected' : 'Needs Attention'
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const encryptionCounts = security.reduce((acc, curr) => {
+    const label = curr.fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const firewallCounts = security.reduce((acc, curr) => {
+    const label = curr.firewallEnabled ? 'Enabled' : 'Disabled'
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const edrCounts = security.reduce((acc, curr) => {
+    const label = curr.edrActive ? 'Active' : 'Inactive'
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const sshCounts = security.reduce((acc, curr) => {
+    let label = 'Unknown'
+    if (curr.secureShell?.isServiceRunning) {
+      label = curr.secureShell?.isConfigured ? 'Configured' : 'Running (Not Configured)'
+    } else if (curr.secureShell?.statusDisplay) {
+      label = 'Disabled'
+    }
+    acc[label] = (acc[label] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  // Create filter options
+  const filterOptions: FilterOptions = {
+    statuses: [...new Set(security.map(s => s.status).filter(Boolean))].sort(),
+    catalogs: [...new Set(security.map(s => s.catalog).filter(Boolean))].sort(),
+    areas: [],
+    locations: [...new Set(security.map(s => s.location).filter(Boolean))].sort(),
+    fleets: [],
+    platforms: [...new Set(security.map(s => normalizePlatform(s.platform)).filter(p => p !== 'Unknown'))].sort(),
+    usages: [...new Set(security.map(s => s.usage).filter(Boolean))].sort()
+  }
+
+  // Apply filters
   const filteredSecurity = security.filter(s => {
-    // Global platform filter first
-    if (platformFilter !== 'all') {
+    // Global platform filter
+    if (globalPlatformFilter !== 'all') {
       const platform = normalizePlatform(s.platform)
       if (!isPlatformVisible(platform)) {
         return false
       }
     }
     
+    // Protection filter
     if (protectionFilter === 'protected') {
       if (!s.firewallEnabled || !s.fileVaultEnabled) return false
     } else if (protectionFilter === 'unprotected') {
       if (s.firewallEnabled && s.fileVaultEnabled) return false
     }
     
+    // Status filter
+    if (selectedStatuses.length > 0 && s.status && !selectedStatuses.includes(s.status)) {
+      return false
+    }
+    
+    // Catalog filter
+    if (selectedCatalogs.length > 0 && s.catalog && !selectedCatalogs.includes(s.catalog)) {
+      return false
+    }
+    
+    // Location filter
+    if (selectedLocations.length > 0 && s.location && !selectedLocations.includes(s.location)) {
+      return false
+    }
+    
+    // Platform filter
+    if (selectedPlatforms.length > 0) {
+      const platform = normalizePlatform(s.platform)
+      if (!selectedPlatforms.includes(platform)) {
+        return false
+      }
+    }
+    
+    // Usage filter
+    if (selectedUsages.length > 0 && s.usage && !selectedUsages.includes(s.usage)) {
+      return false
+    }
+    
+    // Search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
@@ -141,6 +400,32 @@ function SecurityPageContent() {
         aValue = a.lastSeen || ''
         bValue = b.lastSeen || ''
         break
+      case 'protection':
+        aValue = (a.firewallEnabled && a.fileVaultEnabled) ? '1' : '0'
+        bValue = (b.firewallEnabled && b.fileVaultEnabled) ? '1' : '0'
+        break
+      case 'encryption':
+        aValue = a.fileVaultEnabled ? '1' : '0'
+        bValue = b.fileVaultEnabled ? '1' : '0'
+        break
+      case 'edr':
+        aValue = a.edrActive ? '1' : '0'
+        bValue = b.edrActive ? '1' : '0'
+        break
+      case 'cve':
+        aValue = String(a.cveCount || 0).padStart(5, '0')
+        bValue = String(b.cveCount || 0).padStart(5, '0')
+        break
+      case 'tampering':
+        const aSecure = normalizePlatform(a.platform) === 'Windows' ? (a.tpmPresent && a.tpmEnabled) : a.secureBootEnabled
+        const bSecure = normalizePlatform(b.platform) === 'Windows' ? (b.tpmPresent && b.tpmEnabled) : b.secureBootEnabled
+        aValue = aSecure ? '1' : '0'
+        bValue = bSecure ? '1' : '0'
+        break
+      case 'certificates':
+        aValue = String(a.certificateCount || 0).padStart(5, '0')
+        bValue = String(b.certificateCount || 0).padStart(5, '0')
+        break
     }
     
     if (sortDirection === 'asc') {
@@ -150,12 +435,118 @@ function SecurityPageContent() {
     }
   })
 
+  // DonutChart component
+  const DonutChart = ({ 
+    data, 
+    colors, 
+    title,
+    onFilter,
+    selectedFilter
+  }: { 
+    data: { label: string; value: number }[]; 
+    colors: Record<string, string>; 
+    title: string;
+    onFilter?: (label: string) => void;
+    selectedFilter?: string;
+  }) => {
+    const total = data.reduce((sum, item) => sum + item.value, 0)
+    let cumulativePercent = 0
+    const radius = 32
+    const circumference = 2 * Math.PI * radius
+
+    if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
+
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">{title}</h3>
+        <div className="flex items-start gap-6">
+          <div className="relative w-32 h-32 flex-shrink-0">
+            <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+              {data.map((item) => {
+                const percent = item.value / total
+                const strokeDasharray = `${percent * circumference} ${circumference}`
+                const strokeDashoffset = -cumulativePercent * circumference
+                cumulativePercent += percent
+                
+                return (
+                  <circle
+                    key={item.label}
+                    cx="50"
+                    cy="50"
+                    r={radius}
+                    fill="transparent"
+                    stroke={colors[item.label] || colors['default'] || '#cbd5e1'}
+                    strokeWidth="16"
+                    strokeDasharray={strokeDasharray}
+                    strokeDashoffset={strokeDashoffset}
+                    className="transition-all duration-300"
+                  />
+                )
+              })}
+            </svg>
+          </div>
+          <div className="flex-1 space-y-2">
+            {data.map(item => {
+              const isSelected = selectedFilter === item.label
+              return (
+                <div 
+                  key={item.label}
+                  className={`flex items-center justify-between text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 p-1 rounded transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700 font-medium ring-1 ring-gray-200 dark:ring-gray-600' : ''}`}
+                  onClick={() => onFilter && onFilter(isSelected ? 'all' : item.label)}
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colors[item.label] || colors['default'] || '#cbd5e1' }} />
+                    <span className="text-gray-600 dark:text-gray-300">{item.label}</span>
+                  </div>
+                  <span className="font-medium text-gray-900 dark:text-white">{item.value}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Colors for charts
+  const protectionColors: Record<string, string> = {
+    'Protected': '#22c55e',
+    'Needs Attention': '#ef4444',
+    'default': '#94a3b8'
+  }
+
+  const encryptionColors: Record<string, string> = {
+    'Encrypted': '#22c55e',
+    'Not Encrypted': '#ef4444',
+    'default': '#94a3b8'
+  }
+
+  const firewallColors: Record<string, string> = {
+    'Enabled': '#22c55e',
+    'Disabled': '#ef4444',
+    'default': '#94a3b8'
+  }
+
+  const edrColors: Record<string, string> = {
+    'Active': '#22c55e',
+    'Inactive': '#ef4444',
+    'default': '#94a3b8'
+  }
+
+  const totalActiveFilters = selectedStatuses.length + selectedCatalogs.length + 
+    selectedLocations.length + selectedPlatforms.length + selectedUsages.length +
+    (protectionFilter !== 'all' ? 1 : 0) + (searchQuery.trim() ? 1 : 0)
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
-        <header className="bg-white dark:bg-gray-900 border-b h-16"></header>
-        <div className="max-w-7xl mx-auto px-4 py-8">
-          <LoadingSkeleton />
+      <div className="min-h-screen bg-gray-50 dark:bg-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 animate-pulse"></div>
+            </div>
+            <LoadingSkeleton />
+          </div>
         </div>
       </div>
     )
@@ -163,29 +554,18 @@ function SecurityPageContent() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+          {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Device Security</h2>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Security status and protection settings {filteredSecurity.length} devices
+                  Security status and protection settings - {filteredSecurity.length} devices
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Protection Filter */}
-                <select
-                  value={protectionFilter}
-                  onChange={(e) => setProtectionFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                >
-                  <option value="all">All Devices</option>
-                  <option value="protected">Well Protected</option>
-                  <option value="unprotected">Needs Attention</option>
-                </select>
-
                 {/* Search */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -204,7 +584,101 @@ function SecurityPageContent() {
               </div>
             </div>
           </div>
-          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+
+          {/* Widgets Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Widgets Content */}
+          {widgetsExpanded && (
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <DonutChart 
+                  title="Protection Status"
+                  data={Object.entries(protectionStatusCounts).map(([label, value]) => ({ label, value }))}
+                  colors={protectionColors}
+                  onFilter={(label) => setProtectionFilter(label === 'Protected' ? 'protected' : label === 'Needs Attention' ? 'unprotected' : 'all')}
+                  selectedFilter={protectionFilter === 'protected' ? 'Protected' : protectionFilter === 'unprotected' ? 'Needs Attention' : undefined}
+                />
+                <DonutChart 
+                  title="Encryption"
+                  data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))}
+                  colors={encryptionColors}
+                />
+                <DonutChart 
+                  title="Detection"
+                  data={Object.entries(edrCounts).map(([label, value]) => ({ label, value }))}
+                  colors={edrColors}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Filters Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters</span>
+                {totalActiveFilters > 0 && (
+                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
+                    {totalActiveFilters}
+                  </span>
+                )}
+              </div>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Filters Content */}
+          {filtersExpanded && (
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+              <DeviceFilters
+                options={filterOptions}
+                selectedStatuses={selectedStatuses}
+                selectedCatalogs={selectedCatalogs}
+                selectedAreas={selectedAreas}
+                selectedLocations={selectedLocations}
+                selectedFleets={selectedFleets}
+                selectedPlatforms={selectedPlatforms}
+                selectedUsages={selectedUsages}
+                onToggleStatus={toggleStatus}
+                onToggleCatalog={toggleCatalog}
+                onToggleArea={toggleArea}
+                onToggleLocation={toggleLocation}
+                onToggleFleet={toggleFleet}
+                onTogglePlatform={togglePlatform}
+                onToggleUsage={toggleUsage}
+                onClearAll={clearAllFilters}
+              />
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="overflow-auto max-h-[calc(100vh-20rem)]">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
@@ -221,23 +695,11 @@ function SecurityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Protection</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Boot Security</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Access Control</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Secure Shell</th>
-                  <th 
-                    onClick={() => handleSort('lastSeen')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                  >
-                    <div className="flex items-center gap-1">
-                      Last Seen
-                      {sortColumn === 'lastSeen' && (
-                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none" onClick={() => handleSort('encryption')}>Encryption</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none" onClick={() => handleSort('edr')}>Detection</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none" onClick={() => handleSort('cve')}>Vulnerabilities</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none" onClick={() => handleSort('tampering')}>Tampering</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none" onClick={() => handleSort('certificates')}>Certificates</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -269,7 +731,7 @@ function SecurityPageContent() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
                         <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-1">No security records found</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400">No security records match your current search.</p>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">No security records match your current filters.</p>
                       </div>
                     </td>
                   </tr>
@@ -278,98 +740,110 @@ function SecurityPageContent() {
                     <tr key={sec.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 max-w-56">
                         <Link 
-                          href={`/device/${sec.deviceId}`}
+                          href={`/device/${sec.serialNumber}#security`}
                           className="group block min-w-0"
                           title={sec.deviceName || 'Unknown Device'}
                         >
-                          <div className="text-sm font-medium text-red-600 group-hover:text-red-800 dark:text-red-400 dark:group-hover:text-red-300 truncate">{sec.deviceName}</div>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{sec.deviceName || 'Unknown'}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                             {sec.serialNumber}
-                            {(sec as any).assetTag && (
-                              <span className="ml-1">| {(sec as any).assetTag}</span>
+                            {sec.assetTag && (
+                              <span className="ml-1">| {sec.assetTag}</span>
                             )}
                           </div>
                         </Link>
                       </td>
+                      {/* Encryption - FileVault (Mac) / BitLocker (Windows) */}
                       <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          sec.fileVaultEnabled 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {normalizePlatform(sec.platform) === 'Windows' ? 'BitLocker' : 'FileVault'} {sec.fileVaultEnabled ? 'On' : 'Off'}
+                        </span>
+                      </td>
+                      {/* Detection Status */}
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          sec.edrActive 
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                        }`}>
+                          {sec.edrActive ? 'Active' : 'Inactive'}
+                        </span>
+                        {sec.edrStatus && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate max-w-[120px]" title={sec.edrStatus}>
+                            {sec.edrStatus}
+                          </div>
+                        )}
+                      </td>
+                      {/* CVE Counts */}
+                      <td className="px-6 py-4">
+                        {(sec.cveCount !== undefined && sec.cveCount > 0) ? (
+                          <div className="flex items-center gap-2">
+                            {sec.criticalCveCount !== undefined && sec.criticalCveCount > 0 && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                                {sec.criticalCveCount} Critical
+                              </span>
+                            )}
+                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                              {sec.cveCount} total
+                            </span>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-green-600 dark:text-green-400">None</span>
+                        )}
+                      </td>
+                      {/* Tampering - Secure Boot (Mac) / TPM (Windows) */}
+                      <td className="px-6 py-4">
+                        {normalizePlatform(sec.platform) === 'Windows' ? (
                           <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            sec.firewallEnabled 
+                            sec.tpmPresent && sec.tpmEnabled
                               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                               : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           }`}>
-                            Firewall {sec.firewallEnabled ? 'On' : 'Off'}
+                            TPM {sec.tpmPresent && sec.tpmEnabled ? 'Active' : 'Inactive'}
                           </span>
-                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                            sec.fileVaultEnabled 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {sec.platform === 'Windows' ? 'BitLocker' : 'FileVault'} {sec.fileVaultEnabled ? 'On' : 'Off'}
-                          </span>
-                          {sec.gatekeeperEnabled && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              Gatekeeper
-                            </span>
-                          )}
-                          {sec.systemIntegrityProtection && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              SIP
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        <div>
-                          <div>{sec.secureBootLevel || 'Unknown'}</div>
-                          {sec.externalBootLevel && sec.externalBootLevel !== 'Unknown' && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              External: {sec.externalBootLevel}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {sec.activationLockEnabled && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              Activation Lock
-                            </span>
-                          )}
-                          {sec.screenLockEnabled && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              Screen Lock
-                            </span>
-                          )}
-                          {sec.passwordPolicyEnforced && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              Password Policy
-                            </span>
-                          )}
-                          {sec.remoteDesktopEnabled && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                              Remote Desktop
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          {sec.secureShell ? (
-                            <div className={`flex items-center gap-1 ${
-                              sec.secureShell.isConfigured 
-                                ? 'text-green-600 dark:text-green-400'
-                                : 'text-gray-500 dark:text-gray-400'
+                        ) : (
+                          <div className="flex flex-wrap gap-1">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              sec.secureBootEnabled
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                             }`}>
-                              {sec.secureShell.isConfigured ? '' : ''} {sec.secureShell.statusDisplay || 'Not Configured'}
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">Unknown</span>
+                              Secure Boot {sec.secureBootEnabled ? 'On' : 'Off'}
+                            </span>
+                            {sec.sipEnabled !== undefined && (
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                sec.sipEnabled
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                  : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                              }`}>
+                                SIP {sec.sipEnabled ? 'On' : 'Off'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      {/* Certificates - Expired/Expiring Soon counts */}
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          {sec.expiredCertCount !== undefined && sec.expiredCertCount > 0 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              {sec.expiredCertCount} Expired
+                            </span>
+                          )}
+                          {sec.expiringSoonCertCount !== undefined && sec.expiringSoonCertCount > 0 && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                              {sec.expiringSoonCertCount} Expiring
+                            </span>
+                          )}
+                          {(!sec.expiredCertCount || sec.expiredCertCount === 0) && 
+                           (!sec.expiringSoonCertCount || sec.expiringSoonCertCount === 0) && (
+                            <span className="text-sm text-green-600 dark:text-green-400">OK</span>
                           )}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {sec.lastSeen ? formatRelativeTime(sec.lastSeen) : '-'}
                       </td>
                     </tr>
                   ))
