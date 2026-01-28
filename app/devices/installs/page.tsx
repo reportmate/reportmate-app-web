@@ -3436,11 +3436,11 @@ function InstallsPageContent() {
                       <td className="px-6 py-4 max-w-56">
                         <div className="flex flex-col min-w-0">
                           <Link
-                            href={`/device/${install.serialNumber}`}
+                            href={`/device/${install.serialNumber}#installs`}
                             className="group block min-w-0"
                             title={install.deviceName || 'Unknown Device'}
                           >
-                            <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
+                            <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 block truncate">
                               {install.deviceName}
                             </span>
                           </Link>
@@ -3578,12 +3578,12 @@ function InstallsPageContent() {
                       <td className="px-4 py-3 max-w-56">
                         <div className="flex flex-col min-w-0">
                           <Link 
-                            href={`/device/${device.serialNumber}`}
+                            href={`/device/${device.serialNumber}#installs`}
                             className="group block min-w-0"
                             title={device.deviceName || 'Unknown Device'}
                           >
                             <div className="flex items-center gap-1.5">
-                              <span className="text-sm font-medium text-blue-600 group-hover:text-blue-800 dark:text-blue-400 dark:group-hover:text-blue-300 block truncate">
+                              <span className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 block truncate">
                                 {device.deviceName}
                               </span>
                               <PlatformBadge platform={device.platform || device.configType || ''} size="sm" />
@@ -3776,12 +3776,12 @@ function InstallsPageContent() {
                           <td className="px-4 py-3 max-w-56">
                             <div className="min-w-0">
                               <Link 
-                                href={`/device/${device.serialNumber}`} 
+                                href={`/device/${device.serialNumber}#installs`} 
                                 className="group block min-w-0"
                                 title={device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown Device'}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-emerald-600 group-hover:text-emerald-800 dark:text-emerald-400 dark:group-hover:text-emerald-300 font-medium block truncate">
+                                  <span className="text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 font-medium block truncate">
                                     {device.modules?.inventory?.deviceName || device.serialNumber}
                                   </span>
                                   <PlatformBadge platform={device.platform || device.modules?.system?.operatingSystem?.name || ''} size="sm" />
@@ -3839,7 +3839,7 @@ function InstallsPageContent() {
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <Link 
-                              href={`/device/${device.serialNumber}?tab=installs`}
+                              href={`/device/${device.serialNumber}#installs`}
                               className="inline-flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
                             >
                               View Details

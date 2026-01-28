@@ -1108,7 +1108,7 @@ function HardwarePageContent() {
                             className="group block min-w-0"
                             title={hw.deviceName || hw.serialNumber || 'Unknown Device'}
                           >
-                            <span className="font-medium text-orange-600 group-hover:text-orange-800 dark:text-orange-400 dark:group-hover:text-orange-300 text-xs block truncate">
+                            <span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-xs block truncate">
                               {hw.deviceName || hw.serialNumber || 'Unknown Device'}
                             </span>
                           </Link>
