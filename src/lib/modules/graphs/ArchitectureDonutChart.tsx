@@ -341,11 +341,11 @@ export function ArchitectureDonutChart({
 
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Architecture</h3>
+      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">Architecture</h3>
       
       {/* Donut Chart */}
-      <div className="flex justify-center mb-4">
-        <svg width="200" height="200" viewBox="0 0 200 200" className="w-48 h-48">
+      <div className="flex justify-center mb-2">
+        <svg width="200" height="200" viewBox="0 0 200 200" className="w-28 h-28">
           {pieSlices.map((slice, index) => (
             <path
               key={slice.architecture}
