@@ -739,13 +739,13 @@ const UserAccessWidget: React.FC<DeviceWidgetProps> = ({ device }) => {
       )}
       {security.ssh_users && (
         <div>
-          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SSH Users</label>
+          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SecureShell Users</label>
           <p className="text-sm text-gray-900 dark:text-white font-mono">{security.ssh_users}</p>
         </div>
       )}
       {security.ssh_groups && (
         <div>
-          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SSH Groups</label>
+          <label className="text-sm font-medium text-gray-600 dark:text-gray-400">SecureShell Groups</label>
           <p className="text-sm text-gray-900 dark:text-white font-mono">{security.ssh_groups}</p>
         </div>
       )}
