@@ -855,7 +855,7 @@ export default function ClientDeviceDetailPage() {
                         )}
                       </button>
                       
-                      {/* Shell (SSH) */}
+                      {/* Shell (SecureShell) */}
                       {(() => {
                         const getActiveIPAddress = () => {
                           if (deviceInfo.modules?.network?.interfaces) {
