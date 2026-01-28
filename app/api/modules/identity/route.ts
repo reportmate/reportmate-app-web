@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -7,7 +6,7 @@ export const revalidate = 0
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 5000) // Max 5000, default 1000
+    const includeArchived = searchParams.get('includeArchived') === 'true'
     const timestamp = new Date().toISOString()
     
     const apiBaseUrl = process.env.API_BASE_URL
@@ -19,16 +18,21 @@ export async function GET(request: Request) {
       }, { status: 500 })
     }
     
-    // Call FastAPI bulk endpoint
+    // Call FastAPI bulk endpoint - NO LIMITS!
     try {
-      const url = `${apiBaseUrl}/api/devices/identity?limit=${limit}`
+      const url = `${apiBaseUrl}/api/devices/identity${includeArchived ? '?includeArchived=true' : ''}`
             
-      // Use shared authentication headers
-      const headers = getInternalApiHeaders()
-      headers['Content-Type'] = 'application/json'
+      // Container-to-container auth requires X-Internal-Secret header
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (process.env.API_INTERNAL_SECRET) {
+        headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+      }
       
       const response = await fetch(url, {
-        headers
+        headers,
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       })
       
       if (!response.ok) {

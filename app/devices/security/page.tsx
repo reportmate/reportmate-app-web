@@ -115,7 +115,7 @@ function LoadingSkeleton() {
       </div>
 
       {/* Table Skeleton */}
-      <div className="overflow-x-auto max-h-[calc(100vh-400px)]">
+      <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
         <div className="min-w-full">
           <div className="bg-gray-50 dark:bg-gray-700 px-3 py-2 border-b border-gray-200 dark:border-gray-600">
             <div className="flex space-x-8">
@@ -318,6 +318,28 @@ function SecurityPageContent() {
     acc[label] = (acc[label] || 0) + 1
     return acc
   }, {} as Record<string, number>)
+
+  // Calculate certificate counts for widgets
+  const certificateCounts = security.reduce((acc, curr) => {
+    const expired = curr.expiredCertCount || 0
+    const expiringSoon = curr.expiringSoonCertCount || 0
+    if (expired > 0) {
+      acc['Expired'] = (acc['Expired'] || 0) + 1
+    }
+    if (expiringSoon > 0) {
+      acc['Expiring Soon'] = (acc['Expiring Soon'] || 0) + 1
+    }
+    if (expired === 0 && expiringSoon === 0) {
+      acc['Valid'] = (acc['Valid'] || 0) + 1
+    }
+    return acc
+  }, {} as Record<string, number>)
+
+  const certificateColors: Record<string, string> = {
+    'Expired': '#ef4444',      // red
+    'Expiring Soon': '#f59e0b', // amber
+    'Valid': '#22c55e'          // green
+  }
 
   // Create filter options
   const filterOptions: FilterOptions = {
@@ -553,9 +575,9 @@ function SecurityPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           {/* Header */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
@@ -585,57 +607,14 @@ function SecurityPageContent() {
             </div>
           </div>
 
-          {/* Widgets Accordion */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-180' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Widgets Content */}
-          {widgetsExpanded && (
-            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <DonutChart 
-                  title="Protection Status"
-                  data={Object.entries(protectionStatusCounts).map(([label, value]) => ({ label, value }))}
-                  colors={protectionColors}
-                  onFilter={(label) => setProtectionFilter(label === 'Protected' ? 'protected' : label === 'Needs Attention' ? 'unprotected' : 'all')}
-                  selectedFilter={protectionFilter === 'protected' ? 'Protected' : protectionFilter === 'unprotected' ? 'Needs Attention' : undefined}
-                />
-                <DonutChart 
-                  title="Encryption"
-                  data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))}
-                  colors={encryptionColors}
-                />
-                <DonutChart 
-                  title="Detection"
-                  data={Object.entries(edrCounts).map(([label, value]) => ({ label, value }))}
-                  colors={edrColors}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Filters Accordion */}
+          {/* Selections Accordion - First */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button
               onClick={() => setFiltersExpanded(!filtersExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filters</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
                 {totalActiveFilters > 0 && (
                   <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
                     {totalActiveFilters}
@@ -643,17 +622,17 @@ function SecurityPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${filtersExpanded ? 'rotate-180' : ''}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
 
-          {/* Filters Content */}
+          {/* Selections Content */}
           {filtersExpanded && (
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
               <DeviceFilters
@@ -677,8 +656,56 @@ function SecurityPageContent() {
             </div>
           )}
 
+          {/* Widgets Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Widgets Content */}
+          {widgetsExpanded && (
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <DonutChart 
+                  title="Protection Status"
+                  data={Object.entries(protectionStatusCounts).map(([label, value]) => ({ label, value }))}
+                  colors={protectionColors}
+                  onFilter={(label) => setProtectionFilter(label === 'Protected' ? 'protected' : label === 'Needs Attention' ? 'unprotected' : 'all')}
+                  selectedFilter={protectionFilter === 'protected' ? 'Protected' : protectionFilter === 'unprotected' ? 'Needs Attention' : undefined}
+                />
+                <DonutChart 
+                  title="Encryption"
+                  data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))}
+                  colors={encryptionColors}
+                />
+                <DonutChart 
+                  title="Detection"
+                  data={Object.entries(edrCounts).map(([label, value]) => ({ label, value }))}
+                  colors={edrColors}
+                />
+                <DonutChart 
+                  title="Certificates"
+                  data={Object.entries(certificateCounts).map(([label, value]) => ({ label, value }))}
+                  colors={certificateColors}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Table */}
-          <div className="overflow-auto max-h-[calc(100vh-20rem)]">
+          <div className="flex-1 overflow-auto min-h-0">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

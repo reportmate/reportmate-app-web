@@ -1496,10 +1496,10 @@ function InstallsPageContent() {
   }, [devices, pendingTableSort])
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-2 sm:pt-4 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
           
 
           {/* Header Section */}
@@ -1878,7 +1878,7 @@ function InstallsPageContent() {
                 </div>
 
                 {/* Skeleton Table */}
-                <div className="overflow-x-auto max-h-[calc(100vh-400px)] overflow-y-auto rounded-b-xl">
+                <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0 rounded-b-xl">
                   <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                     {/* Table Header - Matches actual Config Report table */}
                     <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
@@ -3418,8 +3418,8 @@ function InstallsPageContent() {
 
           {/* Results Section - Regular Installs Table */}
           {installs.length > 0 && !isConfigReport && (
-            <div className="overflow-hidden rounded-b-xl">
-              <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
+            <div className="flex-1 flex flex-col min-h-0 overflow-hidden rounded-b-xl">
+              <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
@@ -3491,7 +3491,7 @@ function InstallsPageContent() {
 
           {/* Config Report Table - Default View - Hide when items filter is active or in generate report mode */}
           {!isGeneratingReport && filteredConfigData.length > 0 && isConfigReport && itemsStatusFilter === 'all' && (
-            <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto rounded-b-xl">
+            <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0 rounded-b-xl">
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
@@ -3716,7 +3716,7 @@ function InstallsPageContent() {
                         : 'These devices have packages with pending updates.'}
                 </p>
               </div>
-              <div className="overflow-x-auto max-h-[calc(100vh-280px)] overflow-y-auto">
+              <div className="flex-1 overflow-x-auto overflow-y-auto min-h-0">
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>

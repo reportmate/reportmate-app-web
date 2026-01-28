@@ -1,47 +1,43 @@
 /**
  * API Authentication Utilities
  * 
- * Provides shared authentication logic for frontendAPI communication.
+ * AUTHENTICATION ARCHITECTURE:
+ * - X-Internal-Secret: For container-to-container auth (frontend → FastAPI)
+ * - X-Client-Passphrase / X-API-PASSPHRASE: For Windows/Mac clients ONLY
  * 
- * Authentication priority (for server-side API calls):
- * 1. API_INTERNAL_SECRET - Shared secret for container-to-container auth (preferred)
- * 2. REPORTMATE_PASSPHRASE - Fallback for local development
- * 
- * The API_BASE_URL should point to:
- * - Production: http://reportmate-functions-api (internal Container App URL)
- * - Development: http://localhost:8000 or external URL
+ * FastAPI requires authentication for ALL requests. The priority is:
+ * 1. API_INTERNAL_SECRET (production container-to-container)
+ * 2. REPORTMATE_PASSPHRASE (local development fallback)
  */
 
 /**
- * Get authentication headers for internal API calls (server-side only).
- * This should ONLY be used in Next.js API routes, not client-side code.
- * 
- * @returns Record of headers to include in fetch requests to the API
+ * Get authentication headers for internal API requests.
+ * Must include X-Internal-Secret for container-to-container communication.
  */
 export function getInternalApiHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     'Cache-Control': 'no-cache',
     'Pragma': 'no-cache',
-    'User-Agent': 'ReportMate-Frontend/1.0'
+    'User-Agent': 'ReportMate-Frontend/1.0',
+    'Content-Type': 'application/json'
   }
   
   // Priority 1: Internal secret for container-to-container authentication
-  // This is the secure method for production - shared secret between containers
+  // This is the REQUIRED method for production - shared secret between containers
   if (process.env.API_INTERNAL_SECRET) {
     headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
-    console.log('[API-AUTH] Using API_INTERNAL_SECRET for authentication')
     return headers
   }
   
   // Priority 2: Passphrase authentication (for local development)
   if (process.env.REPORTMATE_PASSPHRASE) {
     headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
-    console.log('[API-AUTH] Using REPORTMATE_PASSPHRASE for authentication')
+    console.log('[API-AUTH] Using REPORTMATE_PASSPHRASE for authentication (dev mode)')
     return headers
   }
   
-  // Fallback: No auth headers (will rely on internal network detection)
-  console.warn('[API-AUTH] No API_INTERNAL_SECRET or REPORTMATE_PASSPHRASE configured - check environment variables')
+  // Fallback: No auth headers - will result in 401 from FastAPI
+  console.warn('[API-AUTH] WARNING: No API_INTERNAL_SECRET or REPORTMATE_PASSPHRASE configured!')
   return headers
 }
 

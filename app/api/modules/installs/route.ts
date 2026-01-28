@@ -1,6 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { extractInstalls } from '@/src/lib/data-processing/modules/installs'
-import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering and disable caching
 export const dynamic = 'force-dynamic'
@@ -35,12 +34,18 @@ export async function GET(request: NextRequest) {
     // Fetch device data first to get the installs module data
         
     try {
-      // Use shared authentication headers
-      const headers = getInternalApiHeaders()
+      // Container-to-container auth requires X-Internal-Secret header
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (process.env.API_INTERNAL_SECRET) {
+        headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+      }
       
       const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
-        headers
+        headers,
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       })
       
       if (!deviceResponse.ok) {
