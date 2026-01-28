@@ -44,6 +44,14 @@ export async function GET(request: Request) {
         // Determine encryption status (BitLocker for Windows, FileVault for macOS)
         const isEncrypted = raw.encryption?.bitLocker?.isEnabled || raw.encryption?.fileVault?.isEnabled || false;
         
+        // TPM status for Windows
+        const tpmPresent = raw.tpm?.isPresent || raw.tpm?.present || false;
+        const tpmEnabled = raw.tpm?.isEnabled || raw.tpm?.enabled || false;
+        
+        // EDR/AV status
+        const edrActive = raw.antivirus?.isEnabled || raw.edr?.isActive || raw.microsoftDefender?.isEnabled || false;
+        const edrStatus = raw.antivirus?.productName || raw.edr?.productName || raw.microsoftDefender?.productName || '';
+        
         return {
           id: item.id,
           deviceId: item.deviceId,
@@ -52,6 +60,7 @@ export async function GET(request: Request) {
           lastSeen: item.lastSeen,
           collectedAt: item.collectedAt,
           platform: item.platform || 'Unknown',
+          assetTag: item.assetTag,
           
           // Map security fields
           firewallEnabled: raw.firewall?.isEnabled || false,
@@ -61,9 +70,25 @@ export async function GET(request: Request) {
           gatekeeperEnabled: raw.gatekeeper?.isEnabled || false,
           systemIntegrityProtection: raw.sip?.isEnabled || false,
           
-          // Boot security
-          secureBootLevel: raw.tpm?.isEnabled ? 'Secure' : 'Not Secure',
+          // Boot security - macOS Secure Boot
+          secureBootLevel: raw.secureBoot?.enabled ? 'Secure' : 'Not Secure',
+          secureBootEnabled: raw.secureBoot?.enabled || false,
           externalBootLevel: 'Unknown',
+          
+          // TPM for Windows
+          tpmPresent: tpmPresent,
+          tpmEnabled: tpmEnabled,
+          
+          // EDR/AV
+          edrActive: edrActive,
+          edrStatus: edrStatus,
+          
+          // CVE counts (from vulnerability scanning if available)
+          cveCount: raw.vulnerabilities?.total || raw.cves?.total || 0,
+          criticalCveCount: raw.vulnerabilities?.critical || raw.cves?.critical || 0,
+          
+          // Certificate counts
+          certificateCount: raw.certificates?.count || raw.certificates?.length || 0,
           
           // Other security settings
           activationLockEnabled: false,
