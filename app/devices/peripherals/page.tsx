@@ -29,15 +29,71 @@ interface Peripheral {
 
 function LoadingSkeleton() {
   return (
-    <div className="space-y-3">
-      {[...Array(10)].map((_, i) => (
-        <div key={i} className="animate-pulse flex space-x-4">
-          <div className="flex-1 space-y-2 py-1">
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
+    <div className="animate-pulse">
+      {/* Header Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+            <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-64"></div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-40"></div>
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
           </div>
         </div>
-      ))}
+      </div>
+      
+      {/* Widgets Accordion Skeleton */}
+      <div className="border-b border-gray-200 dark:border-gray-700">
+        <div className="w-full px-6 py-3 flex items-center justify-between">
+          <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+          <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+        </div>
+        <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded mb-3"></div>
+                <div className="space-y-2">
+                  {[1, 2, 3].map(j => (
+                    <div key={j} className="flex items-center justify-between">
+                      <div className="h-3 w-20 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                      <div className="h-3 w-8 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Table Skeleton */}
+      <div className="flex-1 overflow-hidden">
+        <table className="min-w-full">
+          <thead className="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+            {[...Array(8)].map((_, i) => (
+              <tr key={i}>
+                <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                <td className="px-6 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }
@@ -54,6 +110,7 @@ function PeripheralsPageContent() {
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'total' | 'lastSeen'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -155,6 +212,44 @@ function PeripheralsPageContent() {
     }
   })
 
+  // Calculate peripheral statistics for widgets
+  const peripheralStats = {
+    // Bluetooth power state
+    bluetoothOn: filteredPeripherals.filter(p => 
+      p.bluetoothDevices && p.bluetoothDevices.length > 0
+    ).length,
+    bluetoothOff: filteredPeripherals.filter(p => 
+      !p.bluetoothDevices || p.bluetoothDevices.length === 0
+    ).length,
+    
+    // Printer names and counts
+    printerNames: filteredPeripherals.reduce((acc, p) => {
+      if (p.printers && Array.isArray(p.printers)) {
+        p.printers.forEach((printer: any) => {
+          const name = printer.name || printer.printerName || 'Unknown Printer'
+          acc[name] = (acc[name] || 0) + 1
+        })
+      }
+      return acc
+    }, {} as Record<string, number>),
+    
+    // USB device types
+    usbTypes: filteredPeripherals.reduce((acc, p) => {
+      if (p.usbDevices && Array.isArray(p.usbDevices)) {
+        p.usbDevices.forEach((device: any) => {
+          const type = device.class || device.type || device.vendor || 'Unknown'
+          acc[type] = (acc[type] || 0) + 1
+        })
+      }
+      return acc
+    }, {} as Record<string, number>),
+    
+    // Total counts
+    totalUSB: filteredPeripherals.reduce((sum, p) => sum + getDeviceCount(p.usbDevices), 0),
+    totalBluetooth: filteredPeripherals.reduce((sum, p) => sum + getDeviceCount(p.bluetoothDevices), 0),
+    totalPrinters: filteredPeripherals.reduce((sum, p) => sum + getDeviceCount(p.printers), 0)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black animate-pulse">
@@ -167,10 +262,10 @@ function PeripheralsPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
               <div>
@@ -215,7 +310,91 @@ function PeripheralsPageContent() {
               </div>
             </div>
           </div>
-          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+
+          {/* Widgets Accordion */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <button
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+            >
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+              <svg 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+            
+            {widgetsExpanded && (
+              <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {/* Bluetooth Power State Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Bluetooth State</h4>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">Has Devices</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{peripheralStats.bluetoothOn}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">No Devices</span>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white">{peripheralStats.bluetoothOff}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Printers Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Printers ({peripheralStats.totalPrinters})</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {Object.entries(peripheralStats.printerNames).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([name, count]) => (
+                        <div key={name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={name}>{name}</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                        </div>
+                      ))}
+                      {Object.keys(peripheralStats.printerNames).length === 0 && (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No printers found</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* USB Devices Widget */}
+                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">USB Devices ({peripheralStats.totalUSB})</h4>
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {Object.entries(peripheralStats.usbTypes).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([type, count]) => (
+                        <div key={type} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={type}>{type}</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                        </div>
+                      ))}
+                      {Object.keys(peripheralStats.usbTypes).length === 0 && (
+                        <span className="text-sm text-gray-500 dark:text-gray-400">No USB devices found</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-auto min-h-0">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

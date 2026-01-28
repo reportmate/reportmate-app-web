@@ -499,10 +499,29 @@ function ApplicationsPageContent() {
         
         // Show loading state without specific numbers initially
         setLoadingProgress({ current: 0, total: 0 })
+        setLoadingMessage('Fetching device count...')
         
-        // Start fetching - simulate progress with estimated device count
+        // Fetch actual device count - no hardcoded fallbacks
+        let estimatedTotal = 0
+        const countResponse = await fetch('/api/devices', {
+          cache: 'no-store',
+          credentials: 'include',
+          headers: { 'Cache-Control': 'no-cache' }
+        })
+        if (countResponse.ok) {
+          const countData = await countResponse.json()
+          estimatedTotal = countData.devices?.length || 0
+        }
+        
+        if (estimatedTotal === 0) {
+          setError('Unable to fetch device count. Please refresh the page.')
+          setLoading(false)
+          setFiltersLoading(false)
+          return
+        }
+        
+        // Start fetching - progress with actual device count
         let progress = 0
-        const estimatedTotal = 234 // Estimated device count (will be replaced with actual)
         
         // Sample device serial numbers with realistic app counts for progress messages
         const sampleDevices = [
@@ -659,8 +678,13 @@ function ApplicationsPageContent() {
         return
       }
       
-      // Start progress animation
-      const estimatedDevices = filterOptions.devicesWithData || 234
+      // Start progress animation - use actual device count from filterOptions
+      const estimatedDevices = filterOptions.devicesWithData
+      if (!estimatedDevices || estimatedDevices === 0) {
+        setError('No device data available. Please refresh the page.')
+        setLoading(false)
+        return
+      }
       let progress = 0
       const progressInterval = setInterval(() => {
         progress += Math.random() * 3 + 1 // Random increment between 1-4
@@ -1252,10 +1276,10 @@ function ApplicationsPageContent() {
   */
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
 
           {/* Header Section */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -1558,7 +1582,7 @@ function ApplicationsPageContent() {
               >
                 <div className="flex items-center gap-3">
                   <svg 
-                    className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${filtersExpanded ? 'rotate-90' : ''}`}
+                    className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`}
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -2038,7 +2062,7 @@ function ApplicationsPageContent() {
                   >
                     <div className="flex items-center gap-2">
                       <svg 
-                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`} 
+                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -2218,7 +2242,7 @@ function ApplicationsPageContent() {
               )}
 
               {/* Utilization Data Table */}
-              <div className="overflow-auto max-h-[calc(100vh-24rem)]">
+              <div className="flex-1 overflow-auto min-h-0">
                 <table className="w-full">
                   <thead className="bg-blue-50 dark:bg-blue-900/30 sticky top-0 z-10">
                     <tr>
@@ -2447,9 +2471,9 @@ function ApplicationsPageContent() {
                         Filtered: {selectedVersions.length} version{selectedVersions.length > 1 ? 's' : ''} selected
                         <button 
                           onClick={() => setSelectedVersions([])}
-                          className="ml-2 text-xs bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 px-2 py-1 rounded transition-colors"
+                          className="ml-2 text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-1.5 rounded-lg transition-colors font-medium"
                         >
-                          Clear
+                          Clear Selections
                         </button>
                       </>
                     ) : (

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { getInternalApiHeaders } from '@/lib/api-auth'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -21,12 +20,18 @@ export async function GET() {
     try {
       const url = `${apiBaseUrl}/api/modules/hardware`
             
-      // Use shared authentication headers
-      const headers = getInternalApiHeaders()
+      // Container-to-container auth requires X-Internal-Secret header
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      }
+      if (process.env.API_INTERNAL_SECRET) {
+        headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+      }
       
       const response = await fetch(url, {
         cache: 'no-store',
-        headers
+        headers,
+        signal: AbortSignal.timeout(30000) // 30 second timeout
       })
       
       if (!response.ok) {
