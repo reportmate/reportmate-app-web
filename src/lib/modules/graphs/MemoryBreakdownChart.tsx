@@ -253,13 +253,18 @@ export function MemoryBreakdownChart({
           count: filteredCount, // Show filtered count
           percentage: totalFilteredDevicesWithMemory > 0 ? Math.round((filteredCount / totalFilteredDevicesWithMemory) * 100) : 0,
           color: range.color,
-          isSelected: selectedMemoryRanges.length === 0 || selectedMemoryRanges.includes(range.range),
-          isGreyedOut: filteredCount === 0
+          isSelected: selectedMemoryRanges.includes(range.range),
+          isGreyedOut: selectedMemoryRanges.length > 0 && !selectedMemoryRanges.includes(range.range)
         }
       })
       // Only show ranges that have actual data in the full dataset
       .filter(item => allRangeCounts[item.range] > 0)
-      .sort((a, b) => b.count - a.count || a.range.localeCompare(b.range))
+      // Sort by size (smallest first: 4 GB, 8 GB, 16 GB, etc.)
+      .sort((a, b) => {
+        const aSize = parseInt(a.range)
+        const bSize = parseInt(b.range)
+        return aSize - bSize
+      })
   }, [devices, selectedMemoryRanges, globalSelectedPlatforms, globalSelectedModels, globalSelectedArchitectures, globalSelectedDeviceTypes])
 
   if (loading) {
@@ -295,23 +300,27 @@ export function MemoryBreakdownChart({
   const totalDevices = memoryData.reduce((sum, item) => sum + item.count, 0)
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Memory</h3>
-        <span className="text-sm text-gray-500 dark:text-gray-400">{totalDevices} devices</span>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Memory</h3>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{totalDevices} devices</span>
       </div>
       
-      <div className="space-y-3">
+      <div className="space-y-1">
         {memoryData.map(item => (
           <div 
             key={item.range}
-            className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            className={`cursor-pointer rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+              item.isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+            }`}
             onClick={() => onMemoryRangeToggle && onMemoryRangeToggle(item.range)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${
                 item.isGreyedOut 
                   ? 'text-gray-400 dark:text-gray-500' 
+                  : item.isSelected
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-900 dark:text-white'
               }`}>{item.range}</span>
               <div className="flex items-center gap-2">

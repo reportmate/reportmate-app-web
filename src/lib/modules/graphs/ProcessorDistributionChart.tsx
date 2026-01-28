@@ -289,10 +289,9 @@ export function ProcessorDistributionChart({
       }
     })
 
-    // Sort by count and get colors
+    // Sort by count (most common first)
     const sortedProcessors = Object.entries(processorCounts)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, 10) // Show top 10 processors
+      .sort(([, a], [, b]) => b - a) // Sort by count descending
 
     const colors = [
       '#3b82f6', // blue-500
@@ -344,23 +343,27 @@ export function ProcessorDistributionChart({
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Processor</h3>
-        <span className="text-sm text-gray-500 dark:text-gray-400">{total} devices</span>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Processor</h3>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-1 max-h-[34rem] overflow-y-auto">
         {processorData.map((item) => (
           <div 
             key={item.processor}
-            className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
+            className={`cursor-pointer rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+              item.isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+            }`}
             onClick={() => onProcessorToggle?.(item.processor)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${
                 item.isGreyedOut 
                   ? 'text-gray-400 dark:text-gray-500' 
+                  : item.isSelected
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-900 dark:text-white'
               }`}>{item.processor}</span>
               <div className="flex items-center gap-2">

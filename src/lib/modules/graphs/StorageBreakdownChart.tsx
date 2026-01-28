@@ -299,23 +299,27 @@ export function StorageBreakdownChart({
   }
 
   return (
-    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 ${className}`}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Storage</h3>
-        <span className="text-sm text-gray-500 dark:text-gray-400">{total} devices</span>
+    <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Storage</h3>
+        <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
       </div>
       
-      <div className="space-y-2">
+      <div className="space-y-1">
         {storageData.map((item) => (
           <div 
             key={item.size}
-            className="cursor-pointer rounded-lg p-2 transition-colors hover:bg-gray-50 dark:hover:bg-gray-700/50"
-            onClick={() => onStorageRangeToggle?.(item.size)}
+            className={`cursor-pointer rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
+              item.isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''
+            }`}
+            onClick={() => onStorageRangeToggle && onStorageRangeToggle(item.range)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${
                 item.isGreyedOut 
                   ? 'text-gray-400 dark:text-gray-500' 
+                  : item.isSelected
+                  ? 'text-blue-600 dark:text-blue-400'
                   : 'text-gray-900 dark:text-white'
               }`}>{item.size}</span>
               <div className="flex items-center gap-2">
