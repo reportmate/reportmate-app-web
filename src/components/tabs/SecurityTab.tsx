@@ -5,16 +5,16 @@
  * 
  * Card Structure:
  * 1. Encryption - BitLocker (Win) / FileVault (Mac)
- * 2. Authentication - Windows Hello (Win) / Platform SSO (Mac)
- * 3. Protection - Defender (Win) / Gatekeeper + MRT + XProtect (Mac)
+ * 2. Protection - Defender (Win) / Gatekeeper + MRT + XProtect (Mac)
+ * 3. Detection - AV/EDR Software
  * 4. Tampering - TPM (Win) / SIP (Mac)
  * 5. Firewall - Both platforms
- * 6. Remote Access - SSH + RDP (Win) / SSH + Screen Sharing (Mac)
+ * 6. Remote Access - SecureShell + RDP (Win) / SecureShell + Screen Sharing (Mac)
  */
 
 import React from 'react'
 import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
-import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Eye, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Search, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
@@ -220,7 +220,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS FileVault + SecureToken + BootstrapToken
+              // macOS FileVault (no token data - that's in IdentityTab now)
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   FileVault Disk Encryption
@@ -231,40 +231,6 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     : fileVaultEnabled ? 'System Volume' : 'None'
                 } />
                 <DetailRow label="Status" isStatus enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
-                {/* Secure Token + Bootstrap Token */}
-                <DetailRow 
-                  label="Secure Token" 
-                  isStatus 
-                  enabled={security?.secureToken?.enabled === true || security?.secureToken?.enabled === 1 || security?.secureToken?.tokenGrantedCount > 0} 
-                  value={(security?.secureToken?.enabled === true || security?.secureToken?.enabled === 1 || security?.secureToken?.tokenGrantedCount > 0) ? 'Granted' : 'Not Granted'}
-                />
-                <DetailRow 
-                  label="Bootstrap Token" 
-                  isStatus 
-                  enabled={security?.bootstrapToken?.escrowed === true || security?.bootstrapToken?.escrowed === 1} 
-                  value={(security?.bootstrapToken?.escrowed === true || security?.bootstrapToken?.escrowed === 1) ? 'Escrowed' : 'Not Escrowed'}
-                />
-                <DetailRow 
-                  label="Token Holders · Volume Owners" 
-                  value={security?.secureToken?.usersWithToken?.length > 0 
-                    ? security.secureToken.usersWithToken.join(', ') 
-                    : 'None'} 
-                />
-                {/* Recovery Keys - Critical for MDM */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <DetailRow 
-                    label="Personal Recovery Key" 
-                    isStatus 
-                    enabled={security?.fileVault?.personalRecoveryKey === true || security?.fileVault?.personalRecoveryKey === 1} 
-                    value={(security?.fileVault?.personalRecoveryKey === true || security?.fileVault?.personalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
-                  />
-                  <DetailRow 
-                    label="Institutional Recovery Key" 
-                    isStatus 
-                    enabled={security?.fileVault?.institutionalRecoveryKey === true || security?.fileVault?.institutionalRecoveryKey === 1} 
-                    value={(security?.fileVault?.institutionalRecoveryKey === true || security?.fileVault?.institutionalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
-                  />
-                </div>
               </>
             ) : (
               // Windows BitLocker (now all camelCase after normalization)
@@ -284,108 +250,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 2. Authentication Card - Platform Specific */}
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
-              <Fingerprint className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-            </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Authentication</h3>
-          </div>
-          
-          <div className="space-y-2">
-            {isMac ? (
-              // macOS Platform SSO
-              <>
-                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  Platform Single Sign-On
-                </div>
-                <DetailRow 
-                  label="Provider" 
-                  value={security?.platformSSO?.provider || 'Not configured'}
-                  tooltip={security?.platformSSO?.extensionIdentifier}
-                />
-                <DetailRow 
-                  label="Registration" 
-                  isStatus
-                  enabled={security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1}
-                  value={(security?.platformSSO?.registered === true || security?.platformSSO?.registered === 1) ? 'Registered' : 'Not Registered'}
-                />
-                {/* Token - read from first user in users array */}
-                <DetailRow 
-                  label="Token" 
-                  isStatus
-                  enabled={security?.platformSSO?.users?.[0]?.tokensPresent === true || security?.platformSSO?.users?.[0]?.tokensPresent === 1}
-                  value={(security?.platformSSO?.users?.[0]?.tokensPresent === true || security?.platformSSO?.users?.[0]?.tokensPresent === 1) ? 'Present' : 'Missing'}
-                />
-                <DetailRow 
-                  label="Method" 
-                  value={security?.platformSSO?.method || 'Unknown'} 
-                />
-                {/* Show registered users - no divider */}
-                {security?.platformSSO?.users?.length > 0 && (
-                  security.platformSSO.users.map((user: any, index: number) => (
-                    <div key={index} className={index > 0 ? "mt-2 pt-2 border-t border-gray-100 dark:border-gray-700" : "mt-2"}>
-                      <DetailRow 
-                        label={user.username ? `/Users/${user.username}` : 'User'} 
-                        value={user.loginEmail || user.upn || '—'} 
-                      />
-                    </div>
-                  ))
-                )}
-                {/* Activation Lock & Find My Mac - moved from Tampering */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <DetailRow 
-                    label="Activation Lock" 
-                    isStatus
-                    enabled={!(security?.activationLock?.status === 'Enabled' || security?.activationLock?.status === 'Likely Enabled')}
-                    value={(security?.activationLock?.status === 'Enabled' || security?.activationLock?.status === 'Likely Enabled') ? 'Locked' : 'Unlocked'}
-                  />
-                  <DetailRow 
-                    label="Find My Mac" 
-                    isStatus
-                    enabled={security?.activationLock?.findMyMac === 'Enabled'}
-                    value={security?.activationLock?.findMyMac === 'Enabled' ? 'Enabled' : 'Disabled'}
-                  />
-                  {/* Always show iCloud account - critical for tracking down user to deactivate */}
-                  <DetailRow 
-                    label="iCloud Account" 
-                    value={security?.activationLock?.email || security?.activationLock?.ownerDisplayName || '—'} 
-                  />
-                </div>
-              </>
-            ) : (
-              // Windows Hello (all camelCase after normalization)
-              <>
-                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  Windows Hello
-                </div>
-                <DetailRow 
-                  label="PIN" 
-                  isStatus 
-                  enabled={windowsHello?.credentialProviders?.pinEnabled} 
-                />
-                <DetailRow 
-                  label="Face Recognition" 
-                  isStatus 
-                  enabled={windowsHello?.credentialProviders?.faceRecognitionEnabled} 
-                />
-                <DetailRow 
-                  label="Fingerprint" 
-                  isStatus 
-                  enabled={windowsHello?.credentialProviders?.fingerprintEnabled} 
-                />
-                <DetailRow 
-                  label="Domain PIN Logon" 
-                  isStatus 
-                  enabled={windowsHello?.policies?.allowDomainPinLogon} 
-                />
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* 3. Protection Card - Platform Specific */}
+        {/* 2. Protection Card - Built-in OS Security Tools */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-3 mb-4">
             <div className="w-9 h-9 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
@@ -399,7 +264,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               // macOS Protection: Gatekeeper + MRT + XProtect
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  Malware Defenses
+                  Built-in Defenses
                 </div>
                 {/* Gatekeeper */}
                 <DetailRow label="Gatekeeper" isStatus enabled={gatekeeperEnabled} value={gatekeeperEnabled ? 'Enabled' : 'Disabled'} />
@@ -432,15 +297,271 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </div>
               </>
             ) : (
-              // Windows Antivirus (all camelCase after normalization)
+              // Windows Built-in Protection: Smart App Control, Core Isolation, Exploit Protection, VBS
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  {security?.antivirus?.name || 'Windows Defender'}
+                  Built-in Defenses
                 </div>
+                {/* Smart App Control - Windows 11 22H2+ only (hide if not available) */}
+                {(security?.deviceGuard?.smartAppControlAvailable || security?.smartAppControl) && (
+                  <DetailRow 
+                    label="Smart App Control" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.smartAppControlState === 'On' || security?.smartAppControl?.enabled || security?.smartAppControl?.state === 'On'}
+                    value={security?.deviceGuard?.smartAppControlState || security?.smartAppControl?.state || (security?.smartAppControl?.enabled ? 'On' : 'Off')}
+                  />
+                )}
+                {/* Core Isolation / Memory Integrity */}
+                <DetailRow 
+                  label="Core Isolation" 
+                  isStatus 
+                  enabled={security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.memoryIntegrity || security?.coreIsolation?.enabled}
+                  value={(security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.memoryIntegrity || security?.coreIsolation?.enabled) ? 'Enabled' : 'Disabled'}
+                />
+                {(security?.deviceGuard?.memoryIntegrityEnabled !== undefined || security?.coreIsolation?.memoryIntegrity !== undefined) && (
+                  <DetailRow 
+                    label="Memory Integrity (HVCI)" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.memoryIntegrityEnabled || security?.coreIsolation?.memoryIntegrity}
+                  />
+                )}
+                {/* Virtualization-based Security */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="VBS (Virtualization-based Security)" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.vbsEnabled || security?.vbs?.enabled || security?.virtualizationBasedSecurity?.enabled}
+                    value={security?.deviceGuard?.vbsStatus || (security?.vbs?.enabled || security?.virtualizationBasedSecurity?.enabled) ? 'Running' : 'Disabled'}
+                  />
+                  {(security?.deviceGuard?.vbsServices?.length > 0 || security?.vbs?.securityServicesRunning || security?.virtualizationBasedSecurity?.services) && (
+                    <DetailRow 
+                      label="VBS Services" 
+                      value={security?.deviceGuard?.vbsServices?.join(', ') || security?.vbs?.securityServicesRunning?.join(', ') || security?.virtualizationBasedSecurity?.services?.join(', ') || 'None'}
+                    />
+                  )}
+                </div>
+                {/* Exploit Protection */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="Exploit Protection" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.exploitProtection?.systemStatus === 'Configured' || security?.exploitProtection?.enabled !== false}
+                    value={security?.deviceGuard?.exploitProtection?.systemStatus || (security?.exploitProtection?.enabled !== false ? 'Enabled' : 'Disabled')}
+                  />
+                  {(security?.deviceGuard?.exploitProtection?.depEnabled !== undefined || security?.exploitProtection?.dep !== undefined) && (
+                    <DetailRow 
+                      label="DEP" 
+                      isStatus 
+                      enabled={security?.deviceGuard?.exploitProtection?.depEnabled ?? security?.exploitProtection?.dep}
+                    />
+                  )}
+                  {(security?.deviceGuard?.exploitProtection?.aslrEnabled !== undefined || security?.exploitProtection?.aslr !== undefined) && (
+                    <DetailRow 
+                      label="ASLR" 
+                      isStatus 
+                      enabled={security?.deviceGuard?.exploitProtection?.aslrEnabled ?? security?.exploitProtection?.aslr}
+                    />
+                  )}
+                  {security?.deviceGuard?.exploitProtection?.cfgEnabled !== undefined && (
+                    <DetailRow 
+                      label="CFG" 
+                      isStatus 
+                      enabled={security.deviceGuard.exploitProtection.cfgEnabled}
+                    />
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* 3. Detection Card - AV/EDR Software */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-9 h-9 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+              <Search className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Detection</h3>
+          </div>
+          
+          <div className="space-y-2">
+            {isMac ? (
+              // macOS: EDR products (Defender, CrowdStrike, SentinelOne) + system extensions
+              <>
+                {/* Primary EDR Products with detailed info */}
+                {security?.edrProducts?.products?.length > 0 ? (
+                  security.edrProducts.products.map((product: any, idx: number) => (
+                    <div key={idx} className={idx > 0 ? 'border-t border-gray-200 dark:border-gray-700 pt-3 mt-3' : ''}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-base font-medium text-gray-900 dark:text-white">
+                          {product.name || product.vendor || 'Unknown EDR'}
+                        </span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          product.healthy === true || product.running === true
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : product.healthy === false
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                        }`}>
+                          {product.healthy === true || product.running === true ? 'Healthy' : product.healthy === false ? 'Issues' : 'Unknown'}
+                        </span>
+                      </div>
+                      
+                      {/* Microsoft Defender specific details */}
+                      {product.identifier === 'com.microsoft.wdav' && (
+                        <>
+                          <DetailRow 
+                            label="Real-time Protection" 
+                            isStatus 
+                            enabled={product.realTimeProtection} 
+                          />
+                          <DetailRow 
+                            label="Cloud Protection" 
+                            isStatus 
+                            enabled={product.cloudProtection}
+                          />
+                          <DetailRow 
+                            label="Tamper Protection" 
+                            isStatus 
+                            enabled={product.tamperProtection}
+                          />
+                          <DetailRow 
+                            label="Behavior Monitoring" 
+                            isStatus 
+                            enabled={product.behaviorMonitoring}
+                          />
+                          <DetailRow label="App Version" value={product.version} />
+                          <DetailRow label="Engine" value={product.engineVersion} />
+                          <DetailRow label="Definitions" value={product.definitionsVersion} />
+                          <DetailRow label="Definitions Updated" value={formatDate(product.definitionsUpdated)} />
+                          <DetailRow 
+                            label="Last Scan" 
+                            value={product.lastScanTime ? `${formatDate(product.lastScanTime)} (${product.lastScanType || 'unknown'})` : 'Never'}
+                          />
+                          {product.lastScanFilesScanned > 0 && (
+                            <DetailRow label="Files Scanned" value={product.lastScanFilesScanned?.toLocaleString()} />
+                          )}
+                          <DetailRow 
+                            label="Threats Detected" 
+                            value={String(product.totalThreatsDetected || 0)}
+                          />
+                          <DetailRow label="Licensed" isStatus enabled={product.licensed} />
+                          <DetailRow 
+                            label="Full Disk Access" 
+                            isStatus 
+                            enabled={product.fullDiskAccess}
+                            value={product.fullDiskAccess ? 'Granted' : 'Not Granted'}
+                          />
+                          {product.healthIssues?.length > 0 && (
+                            <div className="mt-2 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-yellow-800 dark:text-yellow-200">
+                              <div className="font-medium mb-1">Health Issues:</div>
+                              <ul className="list-disc list-inside">
+                                {product.healthIssues.map((issue: string, i: number) => (
+                                  <li key={i}>{issue}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      {/* CrowdStrike specific details */}
+                      {product.identifier === 'com.crowdstrike.falcon' && (
+                        <>
+                          <DetailRow label="Version" value={product.version} />
+                          <DetailRow label="State" value={product.state} />
+                          <DetailRow label="Agent ID" value={product.agentId} mono />
+                        </>
+                      )}
+                      
+                      {/* SentinelOne specific details */}
+                      {product.identifier === 'com.sentinelone.sentinel-agent' && (
+                        <>
+                          <DetailRow label="Version" value={product.version} />
+                          <DetailRow label="Running" isStatus enabled={product.running} />
+                        </>
+                      )}
+                      
+                      {/* Generic EDR fallback */}
+                      {!['com.microsoft.wdav', 'com.crowdstrike.falcon', 'com.sentinelone.sentinel-agent'].includes(product.identifier) && (
+                        <>
+                          <DetailRow label="Version" value={product.version} />
+                          <DetailRow label="Running" isStatus enabled={product.running} />
+                        </>
+                      )}
+                    </div>
+                  ))
+                ) : security?.endpointSecurity?.extensions?.length > 0 ? (
+                  // Fallback: Show system extensions if no detailed EDR data
+                  <>
+                    <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
+                      Endpoint Security Extensions
+                    </div>
+                    {security.endpointSecurity.extensions.slice(0, 3).map((ext: any, idx: number) => (
+                      <div key={idx} className="py-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-gray-900 dark:text-white font-medium">{ext.name || ext.identifier || 'Unknown'}</span>
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            ext.enabled || ext.active || ext.state?.includes('enabled')
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+                          }`}>
+                            {ext.enabled || ext.active || ext.state?.includes('enabled') ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {ext.version && <span className="mr-2">{ext.version}</span>}
+                          {ext.teamId && <span className="font-mono">{ext.teamId}</span>}
+                        </div>
+                      </div>
+                    ))}
+                    {security.endpointSecurity.extensions.length > 3 && (
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                        +{security.endpointSecurity.extensions.length - 3} more extensions
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-sm text-gray-500 dark:text-gray-400">
+                    No EDR products detected
+                  </div>
+                )}
+              </>
+            ) : (
+              // Windows: AV/EDR via Security Center
+              <>
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
+                  {security?.antivirus?.name || 'Windows Security'}
+                </div>
+                <DetailRow 
+                  label="Real-time Protection" 
+                  isStatus 
+                  enabled={security?.antivirus?.realTimeProtection || security?.antivirus?.isEnabled} 
+                />
                 <DetailRow label="Version" value={security?.antivirus?.version} />
-                <DetailRow label="Definitions" value={security?.antivirus?.isUpToDate ? 'Up to date' : 'Needs update'} />
+                <DetailRow 
+                  label="Definitions" 
+                  value={security?.antivirus?.isUpToDate ? 'Up to date' : 'Needs update'} 
+                />
                 <DetailRow label="Last Update" value={formatDate(security?.antivirus?.lastUpdate)} />
-                <DetailRow label="Last Scan" value={`${formatDate(security?.antivirus?.lastScan)}${security?.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`} />
+                <DetailRow 
+                  label="Last Scan" 
+                  value={`${formatDate(security?.antivirus?.lastScan)}${security?.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`} 
+                />
+                {/* Additional EDR products */}
+                {security?.endpointDetection && security.endpointDetection.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    {security.endpointDetection.map((edr: any, idx: number) => (
+                      <DetailRow 
+                        key={idx}
+                        label={edr.name || 'EDR'} 
+                        isStatus 
+                        enabled={edr.running || edr.isRunning}
+                        value={edr.running || edr.isRunning ? 'Active' : 'Inactive'}
+                      />
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>

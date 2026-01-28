@@ -181,11 +181,29 @@ const formatDateSimple = (dateStr?: string | number): string => {
   return formatDate(dateStr).text
 }
 
+// Sorting types
+type UserSortColumn = 'username' | 'realName' | 'uid' | 'isAdmin' | 'lastLogon'
+type SortDirection = 'asc' | 'desc'
+
 export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   const [activeTable, setActiveTable] = useState<'users' | 'sessions' | 'history'>('users')
   const [userSearch, setUserSearch] = useState('')
   const [showAdminsOnly, setShowAdminsOnly] = useState(false)
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
+  
+  // Sorting state - default to username ascending
+  const [sortColumn, setSortColumn] = useState<UserSortColumn>('username')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  
+  // Handle column sort click
+  const handleSort = (column: UserSortColumn) => {
+    if (sortColumn === column) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
   
   // Toggle user row expansion
   const toggleUserExpanded = (username: string) => {
@@ -203,6 +221,19 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   // Extract bootstrap token from security module
   const bootstrapToken = device?.modules?.security?.bootstrapToken || device?.security?.bootstrapToken
 
+  // Extract security data for Authentication card (moved from SecurityTab)
+  const rawSecurity = device?.modules?.security || device?.security
+  const security = rawSecurity ? normalizeKeys(convertPowerShellObjects(rawSecurity)) as any : null
+  
+  // Platform SSO data
+  const platformSSO = security?.platformSSO
+  
+  // Activation Lock / Find My Mac
+  const activationLock = security?.activationLock
+  
+  // Recovery Keys (PRK/IRK)
+  const fileVault = security?.fileVault
+
   // Extract identity data
   const rawIdentity = device?.modules?.identity || device?.identity
   const parsedIdentity = convertPowerShellObjects(rawIdentity)
@@ -210,7 +241,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   const identity: IdentityInfo = normalizedIdentity ? extractIdentity({ identity: normalizedIdentity }) : extractIdentity({})
   
   // Extract Windows Hello data from identity module (Windows only) - migrated from security
-  const windowsHello = normalizedIdentity?.windowsHello
+  const windowsHello = normalizedIdentity?.windowsHello || security?.windowsHello
   
   const isMac = isMacOS(device)
 
@@ -221,6 +252,41 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
       (user.realName?.toLowerCase().includes(userSearch.toLowerCase()))
     const matchesAdminFilter = !showAdminsOnly || user.isAdmin
     return matchesSearch && matchesAdminFilter
+  }).sort((a, b) => {
+    // Apply sorting
+    let aValue: string | number | boolean = ''
+    let bValue: string | number | boolean = ''
+    
+    switch (sortColumn) {
+      case 'username':
+        aValue = a.username?.toLowerCase() || ''
+        bValue = b.username?.toLowerCase() || ''
+        break
+      case 'realName':
+        aValue = a.realName?.toLowerCase() || ''
+        bValue = b.realName?.toLowerCase() || ''
+        break
+      case 'uid':
+        aValue = typeof a.uid === 'number' ? a.uid : parseInt(String(a.uid || '0'), 10)
+        bValue = typeof b.uid === 'number' ? b.uid : parseInt(String(b.uid || '0'), 10)
+        break
+      case 'isAdmin':
+        aValue = a.isAdmin ? 1 : 0
+        bValue = b.isAdmin ? 1 : 0
+        break
+      case 'lastLogon':
+        aValue = a.lastLogon || ''
+        bValue = b.lastLogon || ''
+        break
+    }
+    
+    if (typeof aValue === 'number' && typeof bValue === 'number') {
+      return sortDirection === 'asc' ? aValue - bValue : bValue - aValue
+    }
+    
+    const aStr = String(aValue)
+    const bStr = String(bValue)
+    return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr)
   })
 
   // Filter logged in sessions to only show actual user sessions (not orphaned TTYs)
@@ -279,7 +345,6 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             <DetailRow 
               label="Admin Users" 
               value={summary.adminUsers} 
-              icon={<Shield className="w-3 h-3" />}
               variant={summary.adminUsers > 0 ? 'warning' : 'success'}
             />
             <DetailRow 
@@ -326,49 +391,66 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
-        {/* Platform SSO Card - macOS 13+ Only (moved before Tokens) */}
-        {isMac && identity.platformSSOUsers && identity.platformSSOUsers.supported && (
+        {/* Authentication Card - Platform SSO (Mac) / Device Lock (Windows) - Moved here from below */}
+        {isMac && (platformSSO || activationLock) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Network className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Platform SSO</h3>
+              <Fingerprint className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Authentication</h3>
             </div>
             <div className="space-y-1">
-              <DetailRow 
-                label="Device Registered" 
-                value={identity.platformSSOUsers.deviceRegistered ? 'Yes' : 'No'}
-                variant={identity.platformSSOUsers.deviceRegistered ? 'success' : 'warning'}
-              />
-              {identity.platformSSOUsers.deviceRegistered && (
+              {/* Platform SSO */}
+              {platformSSO && (
                 <>
                   <DetailRow 
-                    label="Registered Users" 
-                    value={identity.platformSSOUsers.registeredUserCount} 
-                    variant="success"
+                    label="Platform SSO" 
+                    value={platformSSO.provider || 'Not configured'}
                   />
                   <DetailRow 
-                    label="Unregistered Users" 
-                    value={identity.platformSSOUsers.unregisteredUserCount}
-                    variant={identity.platformSSOUsers.unregisteredUserCount > 0 ? 'warning' : 'success'}
+                    label="Registration" 
+                    value={(platformSSO.registered === true || platformSSO.registered === 1 || platformSSO.registered === '1') ? 'Registered' : 'Not Registered'}
+                    variant={(platformSSO.registered === true || platformSSO.registered === 1 || platformSSO.registered === '1') ? 'success' : 'warning'}
                   />
+                  {/* SSO Token - check if tokens present using truthy check */}
+                  {platformSSO.users?.[0] !== undefined && (
+                    <DetailRow 
+                      label="SSO Token" 
+                      value={(() => {
+                        const user = platformSSO.users[0];
+                        const hasToken = user.tokensPresent === true || user.tokensPresent === 1 || user.tokensPresent === '1' || user.tokensPresent === 'true';
+                        return hasToken ? 'Present' : 'Missing';
+                      })()}
+                      variant={(() => {
+                        const user = platformSSO.users[0];
+                        const hasToken = user.tokensPresent === true || user.tokensPresent === 1 || user.tokensPresent === '1' || user.tokensPresent === 'true';
+                        return hasToken ? 'success' : 'warning';
+                      })()}
+                    />
+                  )}
                 </>
               )}
+              {/* Activation Lock & Find My */}
+              {activationLock && (
+                <div className={platformSSO ? "border-t border-gray-200 dark:border-gray-700 my-2 pt-2" : ""}>
+                  <DetailRow 
+                    label="Activation Lock" 
+                    value={(activationLock.status === 'Enabled' || activationLock.status === 'Likely Enabled') ? 'Locked' : 'Unlocked'}
+                    variant={(activationLock.status === 'Enabled' || activationLock.status === 'Likely Enabled') ? 'warning' : 'success'}
+                  />
+                  <DetailRow 
+                    label="Find My Mac" 
+                    value={activationLock.findMyMac === 'Enabled' ? 'Enabled' : 'Disabled'}
+                    variant={activationLock.findMyMac === 'Enabled' ? 'success' : 'neutral'}
+                  />
+                  {(activationLock.email || activationLock.ownerDisplayName) && (
+                    <DetailRow 
+                      label="iCloud Account" 
+                      value={activationLock.email || activationLock.ownerDisplayName}
+                    />
+                  )}
+                </div>
+              )}
             </div>
-            {identity.platformSSOUsers.deviceRegistered && identity.platformSSOUsers.users.length > 0 && (
-              <div className="mt-3 space-y-1">
-                {identity.platformSSOUsers.users.filter(u => u.registered).slice(0, 3).map(u => (
-                  <div key={u.username} className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <CheckCircle className="w-3 h-3" />
-                    {u.username}{u.userPrincipalName ? ` (${u.userPrincipalName})` : ''}
-                  </div>
-                ))}
-                {identity.platformSSOUsers.registeredUserCount > 3 && (
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
-                    +{identity.platformSSOUsers.registeredUserCount - 3} more registered
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         )}
 
@@ -447,7 +529,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
         {isMac && (secureTokenUsers || bootstrapToken) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Fingerprint className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+              <Key className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
               <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Tokens</h3>
             </div>
             <div className="space-y-1">
@@ -469,6 +551,23 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                   />
                 </>
               )}
+              {/* Recovery Keys - PRK and IRK */}
+              {fileVault && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    <DetailRow 
+                      label="Personal Recovery Key" 
+                      value={(fileVault.personalRecoveryKey === true || fileVault.personalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
+                      variant={(fileVault.personalRecoveryKey === true || fileVault.personalRecoveryKey === 1) ? 'success' : 'warning'}
+                    />
+                    <DetailRow 
+                      label="Institutional Recovery Key" 
+                      value={(fileVault.institutionalRecoveryKey === true || fileVault.institutionalRecoveryKey === 1) ? 'Escrowed' : 'Not Escrowed'}
+                      variant={(fileVault.institutionalRecoveryKey === true || fileVault.institutionalRecoveryKey === 1) ? 'success' : 'neutral'}
+                    />
+                  </div>
+                </>
+              )}
             </div>
             {secureTokenUsers && secureTokenUsers.usersWithoutToken.length > 0 && (
               <div className="mt-3 p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded text-xs text-yellow-700 dark:text-yellow-300">
@@ -478,6 +577,8 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             )}
           </div>
         )}
+
+        {/* Authentication Card has been moved above - near Platform SSO position */}
 
         {/* Failed Logins Card - Windows Only */}
         {!isMac && summary.failedLoginsLast7Days !== undefined && (
@@ -634,12 +735,72 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             <table className="w-full">
               <thead className="bg-gray-50 dark:bg-gray-700/50">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Display Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">UID</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Admin</th>
+                  <th 
+                    onClick={() => handleSort('realName')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Display Name
+                      {sortColumn === 'realName' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('uid')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      UID
+                      {sortColumn === 'uid' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('isAdmin')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Admin
+                      {sortColumn === 'isAdmin' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Session</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/4">Username</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Login</th>
+                  <th 
+                    onClick={() => handleSort('username')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/4 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Username
+                      {sortColumn === 'username' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('lastLogon')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Last Login
+                      {sortColumn === 'lastLogon' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
                   {isMac && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">Secure Token</th>}
                   {isMac && bootstrapToken && <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider w-20">Bootstrap Token</th>}
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider"></th>
