@@ -740,7 +740,7 @@ function NetworkPageContent() {
                               className="group block min-w-0"
                               title={networkDevice.deviceName || 'Unknown Device'}
                             >
-                              <span className="font-medium text-teal-600 group-hover:text-teal-800 dark:text-teal-400 dark:group-hover:text-teal-300 text-sm leading-tight block truncate">
+                              <span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-sm leading-tight block truncate">
                                 {networkDevice.deviceName || 'Unknown Device'}
                               </span>
                             </Link>

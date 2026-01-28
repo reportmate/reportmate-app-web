@@ -420,7 +420,7 @@ function IdentityPageContent() {
                           className="group block min-w-0"
                           title={device.deviceName || 'Unknown Device'}
                         >
-                          <div className="text-sm font-medium text-indigo-600 group-hover:text-indigo-800 dark:text-indigo-400 dark:group-hover:text-indigo-300 truncate">{device.deviceName}</div>
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{device.deviceName}</div>
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                             {device.serialNumber}
                             <span className="ml-2 text-gray-400">|</span>
