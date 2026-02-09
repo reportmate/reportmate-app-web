@@ -626,7 +626,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </div>
               </>
             ) : (
-              // Windows TPM - support both snake_case and camelCase
+              // Windows TPM + Health Attestation (Secure Boot) - support both snake_case and camelCase
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
                   Trusted Platform Module
@@ -636,6 +636,32 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Activated" isStatus enabled={tpm?.is_activated || tpm?.isActivated} />
                 <DetailRow label="Version" value={tpm?.version} />
                 <DetailRow label="Manufacturer" value={tpm?.manufacturer} />
+                
+                {/* Health Attestation - Secure Boot & Code Integrity */}
+                {(security?.healthAttestation || security?.health_attestation) && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Boot Security
+                    </div>
+                    <DetailRow 
+                      label="Secure Boot" 
+                      isStatus 
+                      enabled={security?.healthAttestation?.secureBootEnabled || security?.health_attestation?.secure_boot_enabled} 
+                    />
+                    <DetailRow 
+                      label="Code Integrity" 
+                      isStatus 
+                      enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
+                    />
+                    <DetailRow 
+                      label="Boot Debugging" 
+                      isStatus 
+                      neutral
+                      enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
+                      value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
+                    />
+                  </div>
+                )}
               </>
             )}
           </div>
