@@ -322,19 +322,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   }
 
   // Data Extraction - Support both snake_case (Mac osquery) and camelCase (Windows)
-  // Note: After normalizeKeys(), all snake_case keys are converted to camelCase
-  
-  // System Identity fields
-  const manufacturer = safeString(hardwareData.manufacturer)
-  const model = safeString(hardwareData.model)
-  const modelIdentifier = safeString(hardwareData.modelIdentifier || hardwareData.model_identifier)
-  
-  // Mac now sends capacity (not size) - source was fixed
   const allStorageDevices = Array.isArray(hardwareData.storage) ? hardwareData.storage : []
   const storageDevices = allStorageDevices.filter((drive: any) => {
-    const capacity = drive.capacity
-    // After normalizeKeys: freeSpace (normalized from free_space or already camelCase)
-    const freeSpace = drive.freeSpace ?? drive.free_space
+    // Support both size (Mac) and capacity (Windows)
+    const capacity = drive.size ?? drive.capacity
+    // Support both free_space (Mac) and freeSpace (Windows)
+    const freeSpace = drive.free_space ?? drive.freeSpace
     return (capacity && capacity > 0) && (freeSpace && freeSpace > 0)
   })
   // Only count INTERNAL drives - support both is_internal (Mac) and isInternal (Windows)
@@ -350,16 +343,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     return isInternal === 1 || isInternal === true
   })
   const totalStorage = internalDrives.reduce((total: number, drive: any) => {
-    const capacity = drive.capacity ?? 0
+    const capacity = drive.size ?? drive.capacity ?? 0
     return total + capacity
   }, 0) || 0
   const freeStorage = internalDrives.reduce((total: number, drive: any) => {
-    const freeSpace = drive.freeSpace ?? drive.free_space ?? 0
+    const freeSpace = drive.free_space ?? drive.freeSpace ?? 0
     return total + freeSpace
   }, 0) || 0
   
-  // Memory - support both physicalMemory (normalized from physical_memory on Mac) and totalPhysical (Windows)
-  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
@@ -381,8 +374,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize) || safeNumber(hardwareData.graphics?.memory_size)
   const graphicsDriverVersion = safeString(hardwareData.graphics?.driverVersion)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  // Support both metalSupport (normalized) and metal_support (legacy)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport) || safeString(hardwareData.graphics?.metal_support)
+  // Support both metal_support (Mac) and metalSupport (Windows)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
   
   // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
   const cleanGraphicsName = (() => {
@@ -484,7 +477,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Manufacturer</div>
               <div className="text-xl font-bold text-gray-900 dark:text-white">
-                {manufacturer}
+                {safeString(hardwareData.manufacturer) || 'Unknown'}
               </div>
             </div>
             
@@ -492,16 +485,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             <div>
               <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model</div>
               <div className="text-xl font-bold text-gray-900 dark:text-white">
-                {model}
+                {safeString(hardwareData.model) || 'Unknown'}
               </div>
             </div>
             
-            {/* Model Identifier */}
-            {modelIdentifier !== 'Unknown' && (
+            {/* Identifier */}
+            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
               <div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Model Identifier</div>
+                <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
                 <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                  {modelIdentifier}
+                  {safeString(hardwareData.model_identifier)}
                 </div>
               </div>
             )}
@@ -534,11 +527,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     )}
                   </div>
 
-                  {/* RAM */}
+                  {/* Memory */}
                   <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2 mb-2">
                       <MemoryStick className="w-5 h-5 text-yellow-500" />
-                      <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
+                      <h4 className="font-semibold text-gray-900 dark:text-white">Memory</h4>
                     </div>
                     <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
                     <div className="text-sm text-gray-900 dark:text-white">
@@ -652,11 +645,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               ) : null}
             </div>
 
-            {/* RAM */}
+            {/* Memory */}
             <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center gap-2 mb-2">
                 <MemoryStick className="w-5 h-5 text-yellow-500" />
-                <h4 className="font-semibold text-gray-900 dark:text-white">RAM</h4>
+                <h4 className="font-semibold text-gray-900 dark:text-white">Memory</h4>
               </div>
               <div className="text-2xl font-bold text-yellow-500 mb-1">{formatBytes(totalMemory)}</div>
               <div className="text-sm text-gray-900 dark:text-white mb-1">
@@ -898,7 +891,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {/* Storage Devices Section - Show when multiple drives with capacity > 0 */}
       {(() => {
         const validDrives = storageDevices.filter((drive: any) => {
-          const driveCapacity = drive.capacity
+          // Support both size (Mac) and capacity (Windows)
+          const driveCapacity = drive.size ?? drive.capacity
           return driveCapacity && safeNumber(driveCapacity) > 0
         });
         return validDrives.length > 1 ? (
@@ -924,7 +918,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {validDrives.map((drive: any, index: number) => {
-                      const capacity = safeNumber(drive.capacity);
+                      const capacity = safeNumber(drive.size ?? drive.capacity);
                       const freeSpace = safeNumber(drive.freeSpace ?? drive.free_space);
                       const fileSystem = safeString(drive.fileSystem ?? drive.file_system);
                       const deviceName = safeString(drive.deviceName ?? drive.device_name);
