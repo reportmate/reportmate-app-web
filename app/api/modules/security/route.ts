@@ -34,7 +34,7 @@ export async function GET(request: Request) {
       
       const response = await fetch(url, {
         headers,
-        signal: AbortSignal.timeout(30000) // 30 second timeout
+        signal: AbortSignal.timeout(90000) // 90 second timeout
       })
       
       if (!response.ok) {
