@@ -2,11 +2,13 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 
 interface IdentityDevice {
   id: string
@@ -111,6 +113,11 @@ function IdentityPageContent() {
   const [platformFilter, setPlatformFilter] = useState('all')
   const [adminFilter, setAdminFilter] = useState('all')
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+
+  const { tableContainerRef, effectiveWidgetsExpanded } = useScrollCollapse(
+    { widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'users' | 'admins' | 'loggedIn' | 'lastSeen'>('device')
@@ -392,7 +399,7 @@ function IdentityPageContent() {
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -401,7 +408,7 @@ function IdentityPageContent() {
               </svg>
             </button>
             
-            {widgetsExpanded && (
+            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Administrator Accounts Widget */}
@@ -482,10 +489,10 @@ function IdentityPageContent() {
                   </div>
                 </div>
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

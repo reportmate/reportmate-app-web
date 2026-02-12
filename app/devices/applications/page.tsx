@@ -9,6 +9,8 @@ import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
 import { usePlatformFilterSafe, getDevicePlatform } from '../../../src/providers/PlatformFilterProvider'
+import { CollapsibleSection } from '../../../src/components/ui/CollapsibleSection'
+import { useScrollCollapse } from '../../../src/hooks/useScrollCollapse'
 
 interface ApplicationItem {
   id: string
@@ -393,6 +395,11 @@ function ApplicationsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [filtersExpanded, setFiltersExpanded] = useState(true)
   const [widgetsExpanded, setWidgetsExpanded] = useState(false)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   const [sortColumn, setSortColumn] = useState<'device' | 'application' | 'version' | 'vendor' | 'usage' | 'catalog' | 'location'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
@@ -406,9 +413,26 @@ function ApplicationsPageContent() {
   // Report type: 'usage' for full usage analytics, 'versions' for version distribution only
   const [reportType, setReportType] = useState<'usage' | 'versions' | null>(null)
   
+  // Report mode: 'has' shows devices WITH the app, 'missing' shows devices WITHOUT
+  const [reportMode, setReportMode] = useState<'has' | 'missing'>('has')
+  
+  // All devices from filters API (for computing missing devices)
+  const [allDevices, setAllDevices] = useState<Array<{
+    serialNumber: string
+    name: string
+    usage?: string
+    catalog?: string
+    location?: string
+    room?: string
+  }>>([])
+  
   // Device table sorting state (for version distribution device list)
   const [deviceTableSortColumn, setDeviceTableSortColumn] = useState<'deviceName' | 'serialNumber' | 'application' | 'version' | 'location' | 'catalog' | 'lastSeen'>('deviceName')
   const [deviceTableSortDirection, setDeviceTableSortDirection] = useState<'asc' | 'desc'>('asc')
+  
+  // Missing devices table sorting state
+  const [missingTableSortColumn, setMissingTableSortColumn] = useState<'deviceName' | 'serialNumber' | 'location' | 'catalog'>('deviceName')
+  const [missingTableSortDirection, setMissingTableSortDirection] = useState<'asc' | 'desc'>('asc')
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('')
@@ -639,6 +663,18 @@ function ApplicationsPageContent() {
           fleets,
           devicesWithData: actualDeviceCount
         })
+        
+        // Store all devices for computing missing report
+        if (data.devices && Array.isArray(data.devices)) {
+          setAllDevices(data.devices.map((d: any) => ({
+            serialNumber: d.serialNumber,
+            name: d.name || d.serialNumber,
+            usage: d.usage,
+            catalog: d.catalog,
+            location: d.location,
+            room: d.room || d.location
+          })))
+        }
         
         // Set progress to complete and show UI immediately
         setLoadingMessage('Complete!')
@@ -995,6 +1031,15 @@ function ApplicationsPageContent() {
     }
   }
 
+  const handleMissingTableSort = (column: typeof missingTableSortColumn) => {
+    if (missingTableSortColumn === column) {
+      setMissingTableSortDirection(missingTableSortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      setMissingTableSortColumn(column)
+      setMissingTableSortDirection('asc')
+    }
+  }
+
   const handleUtilizationSort = (column: typeof utilizationSortColumn) => {
     if (utilizationSortColumn === column) {
       setUtilizationSortDirection(utilizationSortDirection === 'asc' ? 'desc' : 'asc')
@@ -1162,6 +1207,7 @@ function ApplicationsPageContent() {
     setApplications([])
     setUtilizationData(null)
     setReportType(null)
+    setReportMode('has') // Reset to default mode
     setSelectedApplications([])
     setSelectedUsages([])
     setSelectedCatalogs([])
@@ -1187,6 +1233,68 @@ function ApplicationsPageContent() {
       .sort() // Alphabetical sort since we don't have counts without applications data
     return result
   }, [filterOptions.applicationNames, searchQuery])
+
+  // Compute devices that are MISSING the selected applications
+  // Filters: Apply same catalog/usage/location filters to find devices that SHOULD have the app but DON'T
+  const missingDevices = useMemo(() => {
+    if (selectedApplications.length === 0 || reportMode !== 'missing') return []
+    
+    // Get serial numbers of devices that HAVE the selected applications
+    const devicesWithApp = new Set(
+      baseFilteredApplications.map(app => app.serialNumber)
+    )
+    
+    // Filter all devices by current selection criteria, then find those missing the app
+    const filtered = allDevices.filter(device => {
+      // Must not have the app
+      if (devicesWithApp.has(device.serialNumber)) return false
+      
+      // Apply same filters as the report
+      if (selectedUsages.length > 0 && !selectedUsages.includes(device.usage?.toLowerCase() || '')) return false
+      if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(device.catalog?.toLowerCase() || '')) return false
+      if (selectedLocations.length > 0 && !selectedLocations.includes(device.location?.toLowerCase() || '')) return false
+      if (selectedRooms.length > 0) {
+        const matchesRoom = selectedRooms.some(room => 
+          device.location?.toLowerCase().includes(room.toLowerCase()) || 
+          device.room?.toLowerCase().includes(room.toLowerCase())
+        )
+        if (!matchesRoom) return false
+      }
+      
+      return true
+    })
+    
+    // Sort based on current sort column and direction
+    return [...filtered].sort((a, b) => {
+      let aVal: string
+      let bVal: string
+      
+      switch (missingTableSortColumn) {
+        case 'deviceName':
+          aVal = a.name || a.serialNumber
+          bVal = b.name || b.serialNumber
+          break
+        case 'serialNumber':
+          aVal = a.serialNumber
+          bVal = b.serialNumber
+          break
+        case 'location':
+          aVal = a.location || ''
+          bVal = b.location || ''
+          break
+        case 'catalog':
+          aVal = a.catalog || ''
+          bVal = b.catalog || ''
+          break
+        default:
+          aVal = a.name || a.serialNumber
+          bVal = b.name || b.serialNumber
+      }
+      
+      const comparison = aVal.localeCompare(bVal)
+      return missingTableSortDirection === 'asc' ? comparison : -comparison
+    })
+  }, [allDevices, baseFilteredApplications, selectedApplications, selectedUsages, selectedCatalogs, selectedLocations, selectedRooms, reportMode, missingTableSortColumn, missingTableSortDirection])
 
   // Version analysis - group by NORMALIZED application name and version
   // Uses baseFilteredApplications (without version filter) so widgets always show all versions
@@ -1372,12 +1480,43 @@ function ApplicationsPageContent() {
                   </button>
                 )}
                 
+                {/* Missing Report Toggle - Shows devices WITHOUT the selected app */}
+                {!loading && reportType === 'versions' && selectedApplications.length > 0 && (
+                  <button
+                    onClick={() => setReportMode(prev => prev === 'has' ? 'missing' : 'has')}
+                    className={`px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2 ${
+                      reportMode === 'missing' 
+                        ? 'bg-green-600 hover:bg-green-700' 
+                        : 'bg-red-600/80 hover:bg-red-700'
+                    }`}
+                  >
+                    {reportMode === 'missing' ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                    )}
+                    {reportMode === 'missing' ? 'Show Installed' : 'Missing Report'}
+                    {reportMode === 'missing' && (
+                      <span className="bg-white/20 px-1.5 py-0.5 rounded text-xs">
+                        {missingDevices.length}
+                      </span>
+                    )}
+                  </button>
+                )}
+
                 {/* Usage Report Button - Secondary option after main report is generated */}
-                {!loading && reportType === 'versions' && (
+                {!loading && reportType === 'versions' && reportMode !== 'missing' && (
                   <button
                     onClick={() => handleLoadUtilization()}
-                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700"
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700 flex items-center gap-2"
                   >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                     Usage Report
                   </button>
                 )}
@@ -1386,8 +1525,11 @@ function ApplicationsPageContent() {
                 {!loading && reportType === 'usage' && (
                   <button
                     onClick={() => handleLoadUtilization()}
-                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700"
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-purple-600 hover:bg-purple-700 flex items-center gap-2"
                   >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
                     {(() => {
                       const currentFilters = JSON.stringify({
                         days: utilizationDays,
@@ -1448,34 +1590,59 @@ function ApplicationsPageContent() {
                 </button>
               )}
               
-              {/* Export CSV Button - Versions Report */}
-              {reportType === 'versions' && sortedApplications.length > 0 && (
+              {/* Export CSV Button - Versions Report (handles both installed and missing modes) */}
+              {reportType === 'versions' && (sortedApplications.length > 0 || (reportMode === 'missing' && missingDevices.length > 0)) && (
                 <button
                   onClick={() => {
-                    const csvContent = [
-                      ['Device', 'Serial Number', 'Application', 'Version', 'Catalog', 'Location'].join(','),
-                      ...sortedApplications.map(app => [
-                        app.deviceName || app.serialNumber,
-                        app.serialNumber,
-                        app.name,
-                        app.version,
-                        app.catalog || '',
-                        app.location || ''
-                      ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
-                    ].join('\n')
-                    
-                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
-                    const link = document.createElement('a')
-                    link.href = URL.createObjectURL(blob)
-                    link.download = `applications-${new Date().toISOString().split('T')[0]}.csv`
-                    link.click()
+                    if (reportMode === 'missing') {
+                      // Export missing devices report
+                      const appNames = selectedApplications.join(', ')
+                      const csvContent = [
+                        ['Device', 'Serial Number', 'Location', 'Catalog', 'Missing Application'].join(','),
+                        ...missingDevices.map(device => [
+                          device.name || device.serialNumber,
+                          device.serialNumber,
+                          device.location || '',
+                          device.catalog || '',
+                          appNames
+                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].join('\n')
+                      
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                      const link = document.createElement('a')
+                      link.href = URL.createObjectURL(blob)
+                      const safeAppName = selectedApplications[0]?.replace(/[^a-zA-Z0-9]/g, '-') || 'app'
+                      link.download = `missing-${safeAppName}-${new Date().toISOString().split('T')[0]}.csv`
+                      link.click()
+                    } else {
+                      // Export installed applications report (existing behavior)
+                      const csvContent = [
+                        ['Device', 'Serial Number', 'Application', 'Version', 'Catalog', 'Location'].join(','),
+                        ...sortedApplications.map(app => [
+                          app.deviceName || app.serialNumber,
+                          app.serialNumber,
+                          app.name,
+                          app.version,
+                          app.catalog || '',
+                          app.location || ''
+                        ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                      ].join('\n')
+                      
+                      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+                      const link = document.createElement('a')
+                      link.href = URL.createObjectURL(blob)
+                      link.download = `applications-${new Date().toISOString().split('T')[0]}.csv`
+                      link.click()
+                    }
                   }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2"
+                  className={`px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2 ${
+                    reportMode === 'missing' ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'
+                  }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Export CSV
+                  {reportMode === 'missing' ? 'Export Missing CSV' : 'Export CSV'}
                 </button>
               )}
               
@@ -1582,7 +1749,7 @@ function ApplicationsPageContent() {
               >
                 <div className="flex items-center gap-3">
                   <svg 
-                    className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`}
+                    className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`}
                     fill="none" 
                     stroke="currentColor" 
                     viewBox="0 0 24 24"
@@ -1598,7 +1765,7 @@ function ApplicationsPageContent() {
                   </h3>
                 </div>
                 <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {filtersExpanded ? 'Click to collapse' : 'Click to expand'}
+                  {effectiveFiltersExpanded ? 'Click to collapse' : 'Click to expand'}
                 </span>
               </button>
               
@@ -1649,7 +1816,7 @@ function ApplicationsPageContent() {
               )}
               
               {/* Collapsible Content */}
-              {filtersExpanded && (
+              <CollapsibleSection expanded={effectiveFiltersExpanded}>
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
                   <div className="space-y-4">
                 
@@ -1797,7 +1964,7 @@ function ApplicationsPageContent() {
                       )}
                     </div>
                   </div>
-                  <div className="h-96 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
+                  <div className="min-h-48 max-h-[60vh] overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg p-2 bg-white dark:bg-gray-800">
                     <div className="flex flex-wrap gap-1">
                       {filteredApplicationNames.map((name: string) => (
                         <button
@@ -1830,7 +1997,7 @@ function ApplicationsPageContent() {
 
                   </div>
                 </div>
-              )}
+              </CollapsibleSection>
             </div>
           )}
           
@@ -2062,7 +2229,7 @@ function ApplicationsPageContent() {
                   >
                     <div className="flex items-center gap-2">
                       <svg 
-                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                         fill="none" 
                         stroke="currentColor" 
                         viewBox="0 0 24 24"
@@ -2072,14 +2239,14 @@ function ApplicationsPageContent() {
                       <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Usage Analytics</span>
                     </div>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {widgetsExpanded ? 'Click to collapse' : 'Click to expand'}
+                      {effectiveWidgetsExpanded ? 'Click to collapse' : 'Click to expand'}
                     </span>
                   </button>
                 </div>
               )}
 
               {/* Widgets Content - Collapsible */}
-              {widgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
+              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)}>
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
               {/* Summary Cards - Inside Widgets Accordion */}
@@ -2239,10 +2406,10 @@ function ApplicationsPageContent() {
                 </div>
               </div>
               </div>
-              )}
+              </CollapsibleSection>
 
               {/* Utilization Data Table */}
-              <div className="flex-1 overflow-auto min-h-0">
+              <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
                 <table className="w-full">
                   <thead className="bg-blue-50 dark:bg-blue-900/30 sticky top-0 z-10">
                     <tr>
@@ -2457,8 +2624,135 @@ function ApplicationsPageContent() {
             </>
           )}
 
+          {/* Missing Devices Table - Shown when report mode is 'missing' */}
+          {reportType === 'versions' && reportMode === 'missing' && (
+            <>
+              <div className="bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-700 px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-red-900 dark:text-red-200 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                    </svg>
+                    Devices Missing: {selectedApplications.join(', ')}
+                  </h3>
+                  <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                    {missingDevices.length} device{missingDevices.length !== 1 ? 's' : ''} without this application
+                  </span>
+                </div>
+                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
+                  These devices match your filter criteria but do not have the selected application installed.
+                </p>
+              </div>
+              <div className="overflow-x-auto bg-white dark:bg-gray-800">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-red-50 dark:bg-red-900/30">
+                    <tr>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50 select-none"
+                        onClick={() => handleMissingTableSort('deviceName')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Device
+                          {missingTableSortColumn === 'deviceName' && (
+                            <svg className={`w-4 h-4 transition-transform ${missingTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50 select-none"
+                        onClick={() => handleMissingTableSort('serialNumber')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Serial Number
+                          {missingTableSortColumn === 'serialNumber' && (
+                            <svg className={`w-4 h-4 transition-transform ${missingTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50 select-none"
+                        onClick={() => handleMissingTableSort('location')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Location
+                          {missingTableSortColumn === 'location' && (
+                            <svg className={`w-4 h-4 transition-transform ${missingTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th 
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-red-100 dark:hover:bg-red-900/50 select-none"
+                        onClick={() => handleMissingTableSort('catalog')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Catalog
+                          {missingTableSortColumn === 'catalog' && (
+                            <svg className={`w-4 h-4 transition-transform ${missingTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        Status
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                    {missingDevices.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center justify-center">
+                            <svg className="w-12 h-12 mb-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p className="text-lg font-medium mb-1 text-green-600 dark:text-green-400">All devices have this application!</p>
+                            <p className="text-sm">No devices matching your filters are missing the selected application.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      missingDevices.map((device) => (
+                        <tr key={device.serialNumber} className="hover:bg-red-50 dark:hover:bg-red-900/10">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Link
+                              href={`/device/${device.serialNumber}#applications`}
+                              className="text-sm font-medium text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
+                            >
+                              {device.name || device.serialNumber}
+                            </Link>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.serialNumber}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.location || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {device.catalog || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              Missing
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+
           {/* Versions Report Table - Shown for versions report type */}
-          {reportType === 'versions' && sortedApplications.length > 0 && (
+          {reportType === 'versions' && reportMode === 'has' && sortedApplications.length > 0 && (
             <>
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
                 <div className="flex items-center justify-between">

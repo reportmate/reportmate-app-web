@@ -2,13 +2,15 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 
 interface Security {
   id: string
@@ -166,6 +168,11 @@ function SecurityPageContent() {
   // Accordion states
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   
   // Donut chart category expansion
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -622,7 +629,7 @@ function SecurityPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -630,10 +637,9 @@ function SecurityPageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-          </div>
 
-          {/* Selections Content */}
-          {filtersExpanded && (
+            {/* Selections Content */}
+            <CollapsibleSection expanded={effectiveFiltersExpanded}>
             <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
               <DeviceFilters
                 options={filterOptions}
@@ -654,7 +660,8 @@ function SecurityPageContent() {
                 onClearAll={clearAllFilters}
               />
             </div>
-          )}
+            </CollapsibleSection>
+          </div>
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
@@ -664,7 +671,7 @@ function SecurityPageContent() {
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -672,10 +679,9 @@ function SecurityPageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-          </div>
 
-          {/* Widgets Content */}
-          {widgetsExpanded && (
+            {/* Widgets Content */}
+            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
             <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <DonutChart 
@@ -702,10 +708,11 @@ function SecurityPageContent() {
                 />
               </div>
             </div>
-          )}
+            </CollapsibleSection>
+          </div>
 
           {/* Table */}
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

@@ -2,13 +2,15 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { OSVersionPieChart } from "../../../src/lib/modules/graphs/OSVersionPieChart"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 
 interface SystemDevice {
   id: string
@@ -208,6 +210,7 @@ function SystemPageContent() {
   
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
@@ -217,6 +220,11 @@ function SystemPageContent() {
   
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'uptime' | 'lastSeen'>('device')
@@ -715,7 +723,7 @@ function SystemPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -724,7 +732,7 @@ function SystemPageContent() {
               </svg>
             </button>
             
-            {filtersExpanded && (
+            <CollapsibleSection expanded={effectiveFiltersExpanded}>
               <div className="px-6 pb-4 space-y-4">
                 {/* OS Version Filter */}
                 {osVersionFilter && (
@@ -889,7 +897,7 @@ function SystemPageContent() {
                   </div>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
           {/* Widgets Accordion - OS Version Charts */}
@@ -903,7 +911,7 @@ function SystemPageContent() {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -914,7 +922,7 @@ function SystemPageContent() {
           </div>
           
           {/* Widgets Content - Collapsible */}
-          {widgetsExpanded && (
+          <CollapsibleSection expanded={effectiveWidgetsExpanded}>
             <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               {/* OS Version Charts - Side by Side with Pie Charts */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -953,7 +961,7 @@ function SystemPageContent() {
                 </div>
               </div>
             </div>
-          )}
+          </CollapsibleSection>
 
           {/* Search Section */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
@@ -983,7 +991,7 @@ function SystemPageContent() {
             </div>
           </div>
 
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
