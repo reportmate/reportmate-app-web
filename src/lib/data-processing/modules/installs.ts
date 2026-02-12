@@ -1,3 +1,5 @@
+import { normalizeCimianTimestamp } from '../../time'
+
 /**
  * Installs Status Module
  * Handles all install status standardization and processing in isolation
@@ -662,7 +664,9 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         version: item.version || item.installedVersion || '',
         status: finalStatus,  // ENFORCED: Version-based for Cimian, standardized for others
         type: item.type || 'Package',
-        lastUpdate: getLatestAttemptTimestamp(item),
+        // Use lastSeenInSession for DATE PROCESSED (when package was last checked)
+        // Fix Cimian's timezone bug where local time is written with "Z" suffix
+        lastUpdate: normalizeCimianTimestamp(item.lastSeenInSession) || normalizeCimianTimestamp(item.lastUpdate) || '',
         itemSize: item.itemSize,
         category: item.category || '', // Category from pkgsinfo
         developer: item.developer || '', // Developer from pkgsinfo
@@ -677,10 +681,30 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       // Use lastError and lastWarning fields from Cimian
       // These fields contain the actual error/warning messages from the MDM system
       if (item.lastError && item.lastError.trim() !== '') {
+        // Get the most recent failed attempt timestamp from recentAttempts array
+        let errorTimestamp = item.lastAttemptTime || item.lastUpdate || new Date().toISOString()
+        if (item.recentAttempts && Array.isArray(item.recentAttempts) && item.recentAttempts.length > 0) {
+          const failedAttempts = item.recentAttempts.filter((a: any) => 
+            a.status?.toLowerCase() === 'failed' || a.status?.toLowerCase() === 'error'
+          )
+          if (failedAttempts.length > 0) {
+            const latestFailed = failedAttempts.reduce((latest: any, current: any) => {
+              if (!latest?.timestamp) return current
+              if (!current?.timestamp) return latest
+              const currentTime = new Date(current.timestamp).getTime()
+              const latestTime = new Date(latest.timestamp).getTime()
+              return currentTime > latestTime ? current : latest
+            }, failedAttempts[0])
+            if (latestFailed?.timestamp) {
+              errorTimestamp = latestFailed.timestamp
+            }
+          }
+        }
+        
         packageInfo.errors?.push({
           id: `${item.id || item.name}-last-error`,
           message: item.lastError,
-          timestamp: item.lastUpdate || item.lastAttemptTime || new Date().toISOString(),
+          timestamp: errorTimestamp,
           code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'ERROR',
           package: item.name || item.displayName,
           context: { 
@@ -691,10 +715,30 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
               }
       
       if (item.lastWarning && item.lastWarning.trim() !== '') {
+        // Get the most recent warning attempt timestamp from recentAttempts array
+        let warningTimestamp = item.lastAttemptTime || item.lastUpdate || new Date().toISOString()
+        if (item.recentAttempts && Array.isArray(item.recentAttempts) && item.recentAttempts.length > 0) {
+          const warningAttempts = item.recentAttempts.filter((a: any) => 
+            a.status?.toLowerCase() === 'warning'
+          )
+          if (warningAttempts.length > 0) {
+            const latestWarning = warningAttempts.reduce((latest: any, current: any) => {
+              if (!latest?.timestamp) return current
+              if (!current?.timestamp) return latest
+              const currentTime = new Date(current.timestamp).getTime()
+              const latestTime = new Date(latest.timestamp).getTime()
+              return currentTime > latestTime ? current : latest
+            }, warningAttempts[0])
+            if (latestWarning?.timestamp) {
+              warningTimestamp = latestWarning.timestamp
+            }
+          }
+        }
+        
         packageInfo.warnings?.push({
           id: `${item.id || item.name}-last-warning`,
           message: item.lastWarning,
-          timestamp: item.lastUpdate || item.lastAttemptTime || new Date().toISOString(),
+          timestamp: warningTimestamp,
           code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'WARNING',
           package: item.name || item.displayName,
           context: { 
@@ -749,30 +793,12 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   }
 
   for (const pkg of packages) {
-    // Update status and timestamp based on warnings/errors
+    // Update status based on warnings/errors
+    // DO NOT update lastUpdate - keep it as lastSeenInSession
     if (pkg.errors && pkg.errors.length > 0) {
       pkg.status = 'Error'
-      // Update lastUpdate to match the most recent error timestamp
-      // This ensures "Date processed" column shows when the error actually occurred
-      const mostRecentError = pkg.errors.reduce((latest, current) => {
-        if (!latest?.timestamp) return current
-        if (!current?.timestamp) return latest
-        return new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
-      }, pkg.errors[0])
-      if (mostRecentError?.timestamp) {
-        pkg.lastUpdate = mostRecentError.timestamp
-              }
     } else if (pkg.warnings && pkg.warnings.length > 0) {
       pkg.status = 'Warning'
-      // Update lastUpdate to match the most recent warning timestamp
-      const mostRecentWarning = pkg.warnings.reduce((latest, current) => {
-        if (!latest?.timestamp) return current
-        if (!current?.timestamp) return latest
-        return new Date(current.timestamp) > new Date(latest.timestamp) ? current : latest
-      }, pkg.warnings[0])
-      if (mostRecentWarning?.timestamp) {
-        pkg.lastUpdate = mostRecentWarning.timestamp
-              }
     }
     // Otherwise keep the original status
 

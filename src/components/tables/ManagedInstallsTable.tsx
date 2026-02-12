@@ -31,6 +31,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
+  const [copiedMessageId, setCopiedMessageId] = useState<string>('');
   const groupByCategory = true; // Always enabled
 
   const togglePackageExpansion = (packageId: string) => {
@@ -41,6 +42,12 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       newExpandedIds.add(packageId);
     }
     setExpandedPackageIds(newExpandedIds);
+  };
+
+  const copyMessageToClipboard = (messageText: string, messageId: string) => {
+    navigator.clipboard.writeText(messageText);
+    setCopiedMessageId(messageId);
+    setTimeout(() => setCopiedMessageId(''), 2000);
   };
 
   const toggleCategoryCollapse = (category: string) => {
@@ -530,19 +537,47 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                             {/* Errors Section */}
                                             {pkg.errors && pkg.errors.length > 0 && (
                                               <div className="space-y-2">
-                                                {pkg.errors.map((error: ErrorMessage, idx: number) => (
-                                                  <div key={error.id || `error-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
+                                                {pkg.errors.map((error: ErrorMessage, idx: number) => {
+                                                  const errorId = error.id || `error-${pkg.id}-${idx}`;
+                                                  const isCopied = copiedMessageId === errorId;
+                                                  return (
+                                                  <div key={errorId} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
                                                     <div className="flex items-start justify-between mb-2">
-                                                      {error.code && (
-                                                        <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                                                          {error.code}
-                                                        </span>
-                                                      )}
-                                                      {error.timestamp && (
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                          {formatExactTime(error.timestamp)}
-                                                        </span>
-                                                      )}
+                                                      <div className="flex items-center gap-2">
+                                                        {error.code && (
+                                                          <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                                            {error.code}
+                                                          </span>
+                                                        )}
+                                                        {error.timestamp && (
+                                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {formatExactTime(error.timestamp)}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          const fullMessage = `${error.code ? `[${error.code}] ` : ''}${error.message}${error.details ? `\n\nDetails: ${error.details}` : ''}`;
+                                                          copyMessageToClipboard(fullMessage, errorId);
+                                                        }}
+                                                        className={`p-1.5 rounded transition-all duration-200 ${
+                                                          isCopied
+                                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                        }`}
+                                                        title={isCopied ? "Copied!" : "Copy error message"}
+                                                      >
+                                                        {isCopied ? (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                          </svg>
+                                                        ) : (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                          </svg>
+                                                        )}
+                                                      </button>
                                                     </div>
                                                     <p className="text-sm text-red-700 dark:text-red-300">
                                                       {error.message}
@@ -553,26 +588,55 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                       </p>
                                                     )}
                                                   </div>
-                                                ))}
+                                                  );
+                                                })}
                                               </div>
                                             )}
 
                                             {/* Warnings Section */}
                                             {pkg.warnings && pkg.warnings.length > 0 && (
                                               <div className="space-y-2">
-                                                {pkg.warnings.map((warning: WarningMessage, idx: number) => (
-                                                  <div key={warning.id || `warning-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                                                {pkg.warnings.map((warning: WarningMessage, idx: number) => {
+                                                  const warningId = warning.id || `warning-${pkg.id}-${idx}`;
+                                                  const isCopied = copiedMessageId === warningId;
+                                                  return (
+                                                  <div key={warningId} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
                                                     <div className="flex items-start justify-between mb-2">
-                                                      {warning.code && (
-                                                        <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
-                                                          {warning.code}
-                                                        </span>
-                                                      )}
-                                                      {warning.timestamp && (
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                          {formatExactTime(warning.timestamp)}
-                                                        </span>
-                                                      )}
+                                                      <div className="flex items-center gap-2">
+                                                        {warning.code && (
+                                                          <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
+                                                            {warning.code}
+                                                          </span>
+                                                        )}
+                                                        {warning.timestamp && (
+                                                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {formatExactTime(warning.timestamp)}
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          const fullMessage = `${warning.code ? `[${warning.code}] ` : ''}${warning.message}${warning.details ? `\n\nDetails: ${warning.details}` : ''}`;
+                                                          copyMessageToClipboard(fullMessage, warningId);
+                                                        }}
+                                                        className={`p-1.5 rounded transition-all duration-200 ${
+                                                          isCopied
+                                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                        }`}
+                                                        title={isCopied ? "Copied!" : "Copy warning message"}
+                                                      >
+                                                        {isCopied ? (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                          </svg>
+                                                        ) : (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                          </svg>
+                                                        )}
+                                                      </button>
                                                     </div>
                                                     <p className="text-sm text-yellow-700 dark:text-yellow-300">
                                                       {warning.message}
@@ -583,7 +647,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                       </p>
                                                     )}
                                                   </div>
-                                                ))}
+                                                  );
+                                                })}
                                               </div>
                                             )}
 
@@ -596,10 +661,35 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
                                                   </div>
-                                                  <div>
-                                                    <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
-                                                      PENDING
-                                                    </span>
+                                                  <div className="flex-1">
+                                                    <div className="flex items-start justify-between">
+                                                      <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
+                                                        PENDING
+                                                      </span>
+                                                      <button
+                                                        onClick={(e) => {
+                                                          e.stopPropagation();
+                                                          const pendingId = `pending-${pkg.id}`;
+                                                          copyMessageToClipboard(pkg.pendingReason || '', pendingId);
+                                                        }}
+                                                        className={`p-1.5 rounded transition-all duration-200 ${
+                                                          copiedMessageId === `pending-${pkg.id}`
+                                                            ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                            : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                        }`}
+                                                        title={copiedMessageId === `pending-${pkg.id}` ? "Copied!" : "Copy pending reason"}
+                                                      >
+                                                        {copiedMessageId === `pending-${pkg.id}` ? (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                          </svg>
+                                                        ) : (
+                                                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                          </svg>
+                                                        )}
+                                                      </button>
+                                                    </div>
                                                     <p className="text-sm text-cyan-700 dark:text-cyan-300 mt-2">
                                                       {pkg.pendingReason}
                                                     </p>
@@ -683,19 +773,47 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                     {/* Errors Section */}
                                     {pkg.errors && pkg.errors.length > 0 && (
                                       <div className="space-y-2">
-                                        {pkg.errors.map((error: ErrorMessage, idx: number) => (
-                                          <div key={error.id || `error-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
+                                        {pkg.errors.map((error: ErrorMessage, idx: number) => {
+                                          const errorId = error.id || `error-flat-${pkg.id}-${idx}`;
+                                          const isCopied = copiedMessageId === errorId;
+                                          return (
+                                          <div key={errorId} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-red-200 dark:border-red-700">
                                             <div className="flex items-start justify-between mb-2">
-                                              {error.code && (
-                                                <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
-                                                  {error.code}
-                                                </span>
-                                              )}
-                                              {error.timestamp && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                  {formatExactTime(error.timestamp)}
-                                                </span>
-                                              )}
+                                              <div className="flex items-center gap-2">
+                                                {error.code && (
+                                                  <span className="text-xs font-mono text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 px-2 py-1 rounded">
+                                                    {error.code}
+                                                  </span>
+                                                )}
+                                                {error.timestamp && (
+                                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {formatExactTime(error.timestamp)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const fullMessage = `${error.code ? `[${error.code}] ` : ''}${error.message}${error.details ? `\n\nDetails: ${error.details}` : ''}`;
+                                                  copyMessageToClipboard(fullMessage, errorId);
+                                                }}
+                                                className={`p-1.5 rounded transition-all duration-200 ${
+                                                  isCopied
+                                                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                }`}
+                                                title={isCopied ? "Copied!" : "Copy error message"}
+                                              >
+                                                {isCopied ? (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                  </svg>
+                                                ) : (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                  </svg>
+                                                )}
+                                              </button>
                                             </div>
                                             <p className="text-sm text-red-700 dark:text-red-300">
                                               {error.message}
@@ -706,26 +824,55 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               </p>
                                             )}
                                           </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
 
                                     {/* Warnings Section */}
                                     {pkg.warnings && pkg.warnings.length > 0 && (
                                       <div className="space-y-2">
-                                        {pkg.warnings.map((warning: WarningMessage, idx: number) => (
-                                          <div key={warning.id || `warning-${idx}`} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
+                                        {pkg.warnings.map((warning: WarningMessage, idx: number) => {
+                                          const warningId = warning.id || `warning-flat-${pkg.id}-${idx}`;
+                                          const isCopied = copiedMessageId === warningId;
+                                          return (
+                                          <div key={warningId} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-yellow-200 dark:border-yellow-700">
                                             <div className="flex items-start justify-between mb-2">
-                                              {warning.code && (
-                                                <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
-                                                  {warning.code}
-                                                </span>
-                                              )}
-                                              {warning.timestamp && (
-                                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                  {formatExactTime(warning.timestamp)}
-                                                </span>
-                                              )}
+                                              <div className="flex items-center gap-2">
+                                                {warning.code && (
+                                                  <span className="text-xs font-mono text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 px-2 py-1 rounded">
+                                                    {warning.code}
+                                                  </span>
+                                                )}
+                                                {warning.timestamp && (
+                                                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {formatExactTime(warning.timestamp)}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const fullMessage = `${warning.code ? `[${warning.code}] ` : ''}${warning.message}${warning.details ? `\n\nDetails: ${warning.details}` : ''}`;
+                                                  copyMessageToClipboard(fullMessage, warningId);
+                                                }}
+                                                className={`p-1.5 rounded transition-all duration-200 ${
+                                                  isCopied
+                                                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                }`}
+                                                title={isCopied ? "Copied!" : "Copy warning message"}
+                                              >
+                                                {isCopied ? (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                  </svg>
+                                                ) : (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                  </svg>
+                                                )}
+                                              </button>
                                             </div>
                                             <p className="text-sm text-yellow-700 dark:text-yellow-300">
                                               {warning.message}
@@ -736,7 +883,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               </p>
                                             )}
                                           </div>
-                                        ))}
+                                          );
+                                        })}
                                       </div>
                                     )}
 
@@ -749,10 +897,35 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>
                                           </div>
-                                          <div>
-                                            <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
-                                              PENDING
-                                            </span>
+                                          <div className="flex-1">
+                                            <div className="flex items-start justify-between">
+                                              <span className="text-xs font-mono text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-900/20 px-2 py-1 rounded">
+                                                PENDING
+                                              </span>
+                                              <button
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const pendingId = `pending-flat-${pkg.id}`;
+                                                  copyMessageToClipboard(pkg.pendingReason || '', pendingId);
+                                                }}
+                                                className={`p-1.5 rounded transition-all duration-200 ${
+                                                  copiedMessageId === `pending-flat-${pkg.id}`
+                                                    ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 scale-110'
+                                                    : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                                }`}
+                                                title={copiedMessageId === `pending-flat-${pkg.id}` ? "Copied!" : "Copy pending reason"}
+                                              >
+                                                {copiedMessageId === `pending-flat-${pkg.id}` ? (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                  </svg>
+                                                ) : (
+                                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                                                  </svg>
+                                                )}
+                                              </button>
+                                            </div>
                                             <p className="text-sm text-cyan-700 dark:text-cyan-300 mt-2">
                                               {pkg.pendingReason}
                                             </p>

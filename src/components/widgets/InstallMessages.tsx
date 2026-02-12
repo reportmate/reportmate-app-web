@@ -7,13 +7,14 @@ import { AggregatedInstallMessage, aggregateInstallErrors, aggregateInstallWarni
 interface InstallMessagesWidgetsProps {
   devices: any[]
   maxItems?: number
+  onFilter?: (type: 'errors' | 'warnings', message?: string) => void
 }
 
 /**
  * Widget displaying aggregated error messages across all devices
  * Similar to MunkiReport's "Munki Errors" panel
  */
-export function InstallErrorsWidget({ devices, maxItems = 5 }: InstallMessagesWidgetsProps) {
+export function InstallErrorsWidget({ devices, maxItems = 5, onFilter }: InstallMessagesWidgetsProps) {
   const errors = useMemo(() => aggregateInstallErrors(devices), [devices])
   
   if (errors.length === 0) return null
@@ -22,7 +23,11 @@ export function InstallErrorsWidget({ devices, maxItems = 5 }: InstallMessagesWi
   
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-      <div className="flex items-center justify-between mb-3">
+      <div 
+        className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={() => onFilter?.('errors')}
+        title="Click to filter by errors"
+      >
         <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -37,7 +42,9 @@ export function InstallErrorsWidget({ devices, maxItems = 5 }: InstallMessagesWi
         {errors.slice(0, maxItems).map((error, idx) => (
           <div 
             key={idx}
-            className="flex items-start justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded border border-red-100 dark:border-red-900/30 hover:border-red-200 dark:hover:border-red-800 transition-colors"
+            onClick={() => onFilter?.('errors', error.message)}
+            className="flex items-start justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded border border-red-100 dark:border-red-900/30 hover:border-red-200 dark:hover:border-red-800 transition-colors cursor-pointer"
+            title="Click to show devices with this error"
           >
             <p className="text-xs text-gray-700 dark:text-gray-300 flex-1 line-clamp-2" title={error.message}>
               {error.message}
@@ -61,7 +68,7 @@ export function InstallErrorsWidget({ devices, maxItems = 5 }: InstallMessagesWi
  * Widget displaying aggregated warning messages across all devices
  * Similar to MunkiReport's "Munki Warnings" panel
  */
-export function InstallWarningsWidget({ devices, maxItems = 5 }: InstallMessagesWidgetsProps) {
+export function InstallWarningsWidget({ devices, maxItems = 5, onFilter }: InstallMessagesWidgetsProps) {
   const warnings = useMemo(() => aggregateInstallWarnings(devices), [devices])
   
   if (warnings.length === 0) return null
@@ -70,7 +77,11 @@ export function InstallWarningsWidget({ devices, maxItems = 5 }: InstallMessages
   
   return (
     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-      <div className="flex items-center justify-between mb-3">
+      <div 
+        className="flex items-center justify-between mb-3 cursor-pointer hover:opacity-80 transition-opacity"
+        onClick={() => onFilter?.('warnings')}
+        title="Click to filter by warnings"
+      >
         <h3 className="text-base font-semibold text-gray-900 dark:text-white flex items-center gap-2">
           <svg className="w-5 h-5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
@@ -85,7 +96,9 @@ export function InstallWarningsWidget({ devices, maxItems = 5 }: InstallMessages
         {warnings.slice(0, maxItems).map((warning, idx) => (
           <div 
             key={idx}
-            className="flex items-start justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded border border-amber-100 dark:border-amber-900/30 hover:border-amber-200 dark:hover:border-amber-800 transition-colors"
+            onClick={() => onFilter?.('warnings', warning.message)}
+            className="flex items-start justify-between gap-2 p-2 bg-white dark:bg-gray-800 rounded border border-amber-100 dark:border-amber-900/30 hover:border-amber-200 dark:hover:border-amber-800 transition-colors cursor-pointer"
+            title="Click to show devices with this warning"
           >
             <p className="text-xs text-gray-700 dark:text-gray-300 flex-1 line-clamp-2" title={warning.message}>
               {warning.message}

@@ -87,7 +87,7 @@ function InstallsPageContent() {
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
 
-  const { setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+  const { tableContainerRef, setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
@@ -181,6 +181,8 @@ function InstallsPageContent() {
     setSelectedFleets([])
     setSelectedPlatforms([])
     setSearchQuery('')
+    setItemsStatusFilter('all')
+    setWidgetsExpanded(true)
   }
 
   // Fetch filter options
@@ -1015,8 +1017,11 @@ function InstallsPageContent() {
           const cimianItems = device?.modules?.installs?.cimian?.items || []
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
+            const lastError = (item.lastError || '').toLowerCase()
             const status = item.currentStatus?.toLowerCase() || ''
-            return itemName === searchQuery.toLowerCase() && 
+            const searchLower = searchQuery.toLowerCase()
+            // Match by item name OR by error message
+            return (itemName === searchLower || lastError.includes(searchLower)) && 
                    (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'install-error')
           })
         })
@@ -1025,8 +1030,11 @@ function InstallsPageContent() {
           const cimianItems = device?.modules?.installs?.cimian?.items || []
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
+            const lastWarning = (item.lastWarning || '').toLowerCase()
             const status = item.currentStatus?.toLowerCase() || ''
-            return itemName === searchQuery.toLowerCase() && 
+            const searchLower = searchQuery.toLowerCase()
+            // Match by item name OR by warning message
+            return (itemName === searchLower || lastWarning.includes(searchLower)) && 
                    (status.includes('warning') || status === 'needs-attention')
           })
         })
@@ -1355,7 +1363,15 @@ function InstallsPageContent() {
         const cimianItems = device.modules?.installs?.cimian?.items || []
         return cimianItems.some((item: any) => {
           const itemName = (item.itemName || item.name || '').toLowerCase()
-          if (!itemName.includes(lowerQuery)) return false
+          const lastError = (item.lastError || '').toLowerCase()
+          const lastWarning = (item.lastWarning || '').toLowerCase()
+          
+          // Match by item name OR by error/warning message
+          const matchesQuery = itemName.includes(lowerQuery) || 
+                              lastError.includes(lowerQuery) || 
+                              lastWarning.includes(lowerQuery)
+          
+          if (!matchesQuery) return false
           
           // If we have an items status filter, the searched item must have that status
           if (itemsStatusFilter !== 'all') {
@@ -1998,14 +2014,18 @@ function InstallsPageContent() {
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Widgets Accordion Header */}
               <button
-                onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+                onClick={() => {
+                  setWidgetsExpanded(!widgetsExpanded)
+                  // Scroll to top to reset scroll-collapse if stuck
+                  tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                }}
                 className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
                 </div>
                 <svg 
-                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`} 
+                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"
@@ -2018,7 +2038,7 @@ function InstallsPageContent() {
               <CollapsibleSection expanded={effectiveWidgetsExpanded}>
               <div className="bg-white dark:bg-gray-800">
             {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show in config report mode */}
-            {(itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && (
+            {itemsStatusFilter === 'all' && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
               <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
                 [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0].filter(Boolean).length === 3
                   ? 'lg:grid-cols-3'
@@ -2041,7 +2061,6 @@ function InstallsPageContent() {
                         setSearchQuery('')
                         setItemsStatusFilter('errors')
                         setFiltersExpanded(true)
-                        setWidgetsExpanded(false)
                       }
                     }}
                     title="Click to show all devices with errors"
@@ -2120,7 +2139,6 @@ function InstallsPageContent() {
                                   } else {
                                     setSearchQuery(item.name)
                                     setItemsStatusFilter('errors')
-                                    setWidgetsExpanded(false)
                                   }
                                 }}
                               >
@@ -2154,7 +2172,6 @@ function InstallsPageContent() {
                         setSearchQuery('')
                         setItemsStatusFilter('warnings')
                         setFiltersExpanded(true)
-                        setWidgetsExpanded(false)
                       }
                     }}
                     title="Click to show all devices with warnings"
@@ -2233,7 +2250,6 @@ function InstallsPageContent() {
                                   } else {
                                     setSearchQuery(item.name)
                                     setItemsStatusFilter('warnings')
-                                    setWidgetsExpanded(false)
                                   }
                                 }}
                               >
@@ -2267,7 +2283,6 @@ function InstallsPageContent() {
                         setSearchQuery('')
                         setItemsStatusFilter('pending')
                         setFiltersExpanded(true)
-                        setWidgetsExpanded(false)
                       }
                     }}
                     title="Click to show all devices with pending updates"
@@ -2346,7 +2361,6 @@ function InstallsPageContent() {
                                   } else {
                                     setSearchQuery(item.name)
                                     setItemsStatusFilter('pending')
-                                    setWidgetsExpanded(false)
                                   }
                                 }}
                               >
@@ -2370,10 +2384,32 @@ function InstallsPageContent() {
 
             {/* Messages Widgets Row: Error Messages + Warning Messages */}
             {/* Similar to MunkiReport's Munki Errors and Munki Warnings panels */}
-            {itemsStatusFilter === 'all' && !selectedMunkiVersion && !selectedCimianVersion && devices.length > 0 && (
+            {itemsStatusFilter === 'all' && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && devices.length > 0 && (
               <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <InstallErrorsWidget devices={devices} maxItems={8} />
-                <InstallWarningsWidget devices={devices} maxItems={8} />
+                <InstallErrorsWidget 
+                  devices={devices} 
+                  maxItems={8}
+                  onFilter={(type, message) => {
+                    setItemsStatusFilter(type)
+                    if (message) {
+                      setSearchQuery(message)
+                    } else {
+                      setSearchQuery('')
+                    }
+                  }}
+                />
+                <InstallWarningsWidget 
+                  devices={devices} 
+                  maxItems={8}
+                  onFilter={(type, message) => {
+                    setItemsStatusFilter(type)
+                    if (message) {
+                      setSearchQuery(message)
+                    } else {
+                      setSearchQuery('')
+                    }
+                  }}
+                />
               </div>
             )}
             
@@ -2983,7 +3019,7 @@ function InstallsPageContent() {
                   )}
                 </div>
                 <svg 
-                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
+                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : 'rotate-180'}`} 
                   fill="none" 
                   stroke="currentColor" 
                   viewBox="0 0 24 24"

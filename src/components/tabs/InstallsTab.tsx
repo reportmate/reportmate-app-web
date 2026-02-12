@@ -53,52 +53,6 @@ const formatCompactRelativeTime = (timestamp: string): string => {
   }
 }
 
-// Helper function to format duration from seconds to readable format (e.g., "2m 34s" or "1h 5m")
-const formatDuration = (durationSeconds: number | string): string => {
-  // Handle different input types
-  let seconds: number
-  
-  if (typeof durationSeconds === 'string') {
-    if (!durationSeconds || durationSeconds === 'Unknown' || durationSeconds === 'null' || durationSeconds === 'undefined') {
-      return 'Unknown'
-    }
-    seconds = parseInt(durationSeconds, 10)
-    if (isNaN(seconds)) {
-      return 'Unknown'
-    }
-  } else if (typeof durationSeconds === 'number') {
-    seconds = durationSeconds
-  } else {
-    return 'Unknown'
-  }
-
-  if (seconds <= 0) {
-    return 'Unknown'
-  }
-
-  // Convert seconds to hours, minutes, seconds
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const remainingSeconds = seconds % 60
-
-  // Build formatted string
-  const parts_formatted: string[] = []
-  
-  if (hours > 0) {
-    parts_formatted.push(`${hours}h`)
-  }
-  if (minutes > 0) {
-    parts_formatted.push(`${minutes}m`)
-  }
-  if (remainingSeconds > 0 || (hours === 0 && minutes === 0)) {
-    // Always show seconds if it's the only unit, or if there are seconds to show
-    parts_formatted.push(`${remainingSeconds}s`)
-  }
-
-  const formatted = parts_formatted.join(' ')
-  return formatted
-}
-
 const InstallsTabSkeleton = () => (
   <div className="space-y-6 animate-pulse">
     {/* Header Skeleton */}
@@ -426,12 +380,21 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
             </div>
           </div>
 
-          {/* Column 3 - 25% - Duration & Last Seen - Right Aligned with 2% padding */}
+          {/* Column 3 - 25% - Catalog & Last Seen - Right Aligned with 2% padding */}
           <div className="flex-[0_0_25%] space-y-4 flex flex-col items-end pr-[2%]">
             <div className="space-y-2 flex flex-col items-end">
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Duration</div>
-              <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                {formatDuration(processedInstallsData?.config?.duration || 'Unknown')}
+              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Catalog</div>
+              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
+                {(() => {
+                  // Get catalogs from Cimian or Munki
+                  const catalogs = device?.modules?.installs?.cimian?.catalogs || 
+                                   device?.modules?.installs?.munki?.catalogs ||
+                                   []
+                  if (Array.isArray(catalogs) && catalogs.length > 0) {
+                    return catalogs.join(', ')
+                  }
+                  return 'Not configured'
+                })()}
               </div>
             </div>
             <div className="space-y-2 flex flex-col items-end">
