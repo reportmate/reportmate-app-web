@@ -2,12 +2,14 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -61,6 +63,11 @@ function HardwarePageContent() {
   // Accordion states
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   
   // Sorting state
   const [sortColumn, setSortColumn] = useState<'device' | 'model' | 'processor' | 'memory' | 'storage' | 'arch'>('device')
@@ -653,9 +660,9 @@ function HardwarePageContent() {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
                 {totalSelectionsFilters > 0 && <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full">{totalSelectionsFilters} active</span>}
               </div>
-              <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </button>
-            {filtersExpanded && (
+            <CollapsibleSection expanded={effectiveFiltersExpanded}>
               <div className="px-6 pb-4 space-y-4">
                 {/* Status Filter */}
                 <div>
@@ -700,16 +707,16 @@ function HardwarePageContent() {
                   </div>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button onClick={() => setWidgetsExpanded(!widgetsExpanded)} className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
-              <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+              <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveWidgetsExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
-            {widgetsExpanded && (
+            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
               <div className="pb-4">
                 {/* Horizontal scrollable row */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
@@ -732,11 +739,11 @@ function HardwarePageContent() {
                   </div>
                 </div>
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
           {/* Hardware Table */}
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="w-full table-fixed">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

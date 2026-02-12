@@ -2,13 +2,15 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 
 interface NetworkDevice {
   id: string
@@ -42,6 +44,11 @@ function NetworkPageContent() {
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
@@ -574,7 +581,7 @@ function NetworkPageContent() {
                 )}
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${filtersExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -583,7 +590,7 @@ function NetworkPageContent() {
               </svg>
             </button>
             
-            {filtersExpanded && (
+            <CollapsibleSection expanded={effectiveFiltersExpanded}>
               <div className="px-6 pb-4 space-y-4">
                 {/* Usage Filter */}
                 {filterOptions.usages.length > 0 && (
@@ -651,7 +658,7 @@ function NetworkPageContent() {
                   </div>
                 )}
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
           {/* Widgets Accordion */}
@@ -662,7 +669,7 @@ function NetworkPageContent() {
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -671,7 +678,7 @@ function NetworkPageContent() {
               </svg>
             </button>
             
-            {widgetsExpanded && (
+            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Wireless State Widget */}
@@ -770,10 +777,10 @@ function NetworkPageContent() {
                   </div>
                 </div>
               </div>
-            )}
+            </CollapsibleSection>
           </div>
 
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>

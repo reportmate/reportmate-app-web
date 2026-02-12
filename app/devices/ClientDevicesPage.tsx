@@ -428,7 +428,7 @@ function DevicesPageContent() {
               </div>
 
               {/* Table skeleton */}
-              <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+              <div className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
                 <table className="w-full relative">
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
@@ -667,7 +667,7 @@ function DevicesPageContent() {
               </nav>
             </div>
 
-            <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+            <div className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
               <table className="w-full relative">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <tr>
