@@ -562,10 +562,6 @@ function SecurityPageContent() {
     'default': '#94a3b8'
   }
 
-  const totalActiveFilters = selectedStatuses.length + selectedCatalogs.length + 
-    selectedLocations.length + selectedPlatforms.length + selectedUsages.length +
-    (protectionFilter !== 'all' ? 1 : 0) + (searchQuery.trim() ? 1 : 0)
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -614,54 +610,46 @@ function SecurityPageContent() {
             </div>
           </div>
 
-          {/* Selections Accordion - First */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {totalActiveFilters > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 rounded-full">
-                    {totalActiveFilters}
-                  </span>
-                )}
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          {/* Under Development Notice */}
+          <div className="px-6 py-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-            </button>
-
-            {/* Selections Content */}
-            <CollapsibleSection expanded={effectiveFiltersExpanded}>
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
-              <DeviceFilters
-                options={filterOptions}
-                selectedStatuses={selectedStatuses}
-                selectedCatalogs={selectedCatalogs}
-                selectedAreas={selectedAreas}
-                selectedLocations={selectedLocations}
-                selectedFleets={selectedFleets}
-                selectedPlatforms={selectedPlatforms}
-                selectedUsages={selectedUsages}
-                onToggleStatus={toggleStatus}
-                onToggleCatalog={toggleCatalog}
-                onToggleArea={toggleArea}
-                onToggleLocation={toggleLocation}
-                onToggleFleet={toggleFleet}
-                onTogglePlatform={togglePlatform}
-                onToggleUsage={toggleUsage}
-                onClearAll={clearAllFilters}
-              />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  Under Development
+                </h3>
+                <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
+                  This security dashboard is currently under construction. DATA IS NOT ACCURATE YET..
+                </p>
+              </div>
             </div>
-            </CollapsibleSection>
           </div>
+
+          {/* Selections Accordion */}
+          <DeviceFilters
+            filterOptions={filterOptions}
+            selectedStatuses={selectedStatuses}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedPlatforms={selectedPlatforms}
+            selectedUsages={selectedUsages}
+            onStatusToggle={toggleStatus}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onPlatformToggle={togglePlatform}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
+          />
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
@@ -671,7 +659,7 @@ function SecurityPageContent() {
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`} 
+                className={`w-5 h-5 text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"

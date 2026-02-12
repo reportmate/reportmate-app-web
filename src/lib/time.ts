@@ -165,3 +165,49 @@ export function parseInstallTime(timestamp: string | number | undefined): number
   
   return 0
 }
+
+/**
+ * Fix Cimian timestamps that are incorrectly formatted.
+ * Cimian has a bug where it writes local time with "Z" suffix (claiming UTC)
+ * when it's actually Pacific time. This function detects and corrects those timestamps.
+ * 
+ * Note: This is a temporary workaround until the Cimian client is fixed.
+ */
+export function normalizeCimianTimestamp(timestamp: string | undefined): string {
+  if (!timestamp || timestamp === '' || timestamp === 'null' || timestamp === 'undefined') {
+    return ''
+  }
+  
+  try {
+    // For timestamps that already have proper timezone offset, just normalize
+    if (timestamp.includes('-08:00') || timestamp.includes('-07:00') || timestamp.includes('+')) {
+      const date = new Date(timestamp)
+      if (!isNaN(date.getTime())) {
+        return date.toISOString()
+      }
+    }
+    
+    // For timestamps ending with "Z" that Cimian incorrectly generated
+    if (timestamp.endsWith('Z')) {
+      const parsedDate = new Date(timestamp)
+      const now = new Date()
+      
+      if (!isNaN(parsedDate.getTime())) {
+        const hoursDiff = (now.getTime() - parsedDate.getTime()) / (1000 * 60 * 60)
+        
+        // If 6-10 hours "old", it's the timezone bug - treat as local time
+        if (hoursDiff >= 6 && hoursDiff <= 10) {
+          const localTimeStr = timestamp.slice(0, -1) // Remove "Z"
+          const localDate = new Date(localTimeStr)
+          if (!isNaN(localDate.getTime())) {
+            return localDate.toISOString()
+          }
+        }
+      }
+    }
+    
+    return timestamp
+  } catch {
+    return timestamp
+  }
+}
