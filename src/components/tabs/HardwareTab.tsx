@@ -825,17 +825,16 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         <div className="text-base font-medium text-gray-900 dark:text-white">{colorGamut}</div>
                       </div>
                     )}
-                    <div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
-                      <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
-                        {displaySerialNumber ? (
-                          <>
-                            <span>{displaySerialNumber}</span>
-                            <CopyButton value={displaySerialNumber} size="sm" />
-                          </>
-                        ) : 'N/A'}
+                    {/* Only show serial number for external displays */}
+                    {display.type !== 'internal' && displaySerialNumber && (
+                      <div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
+                        <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
+                          <span>{displaySerialNumber}</span>
+                          <CopyButton value={displaySerialNumber} size="sm" />
+                        </div>
                       </div>
-                    </div>
+                    )}
                     {displayFirmwareVersion && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Firmware</div>
@@ -856,17 +855,21 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {refreshRate}
                       </span>
                     )}
-                    {displayIsMainDisplay === 1 || displayIsMainDisplay === true ? (
+                    {/* Only show Main Display badge for external displays */}
+                    {display.type !== 'internal' && (displayIsMainDisplay === 1 || displayIsMainDisplay === true) && (
                       <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-medium rounded whitespace-nowrap text-center">
                         Main Display
                       </span>
-                    ) : null}
-                    <span className={`inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-1 rounded whitespace-nowrap ${
-                      display.online ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      <div className={`w-2 h-2 rounded-full ${display.online ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                      {display.online ? 'Connected' : 'Disconnected'}
-                    </span>
+                    )}
+                    {/* Only show Connected badge for external displays */}
+                    {display.type !== 'internal' && (
+                      <span className={`inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-1 rounded whitespace-nowrap ${
+                        display.online ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                      }`}>
+                        <div className={`w-2 h-2 rounded-full ${display.online ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                        {display.online ? 'Connected' : 'Disconnected'}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
