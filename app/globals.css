@@ -164,17 +164,22 @@
   background: transparent;
 }
 
-/* Custom table scrollbar without gap - improved overlay behavior */
+/* Custom table scrollbar - thin overlay that appears on hover/scroll */
 .table-scrollbar {
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
-  scrollbar-color: transparent transparent;
+  scrollbar-width: thin; /* Firefox: show thin scrollbar */
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
   position: relative;
 }
 
+.dark .table-scrollbar {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
 .table-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-  background: transparent;
+  width: 6px !important;
+  height: 6px !important;
+  background: transparent !important;
+  display: block !important;
 }
 
 .table-scrollbar::-webkit-scrollbar-track {
@@ -182,32 +187,32 @@
 }
 
 .table-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 4px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 3px;
   border: none;
   background-clip: padding-box;
+  transition: background 0.2s ease;
 }
 
 .dark .table-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
 }
 
-/* Show scrollbar when hovering over container or actively scrolling */
-.table-scrollbar:hover::-webkit-scrollbar-thumb,
-.table-scrollbar:active::-webkit-scrollbar-thumb,
-.table-scrollbar.scrolling::-webkit-scrollbar-thumb {
-  opacity: 1;
+/* Darken scrollbar on hover over the container */
+.table-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.dark .table-scrollbar:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
 }
 
 .table-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
-  opacity: 1;
+  background: rgba(0, 0, 0, 0.4);
 }
 
 .dark .table-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 /* Ensure scrollbar corner is transparent */
