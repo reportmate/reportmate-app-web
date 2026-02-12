@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { CollapsibleSection } from '../ui/CollapsibleSection'
 
 export interface FilterOptions {
   statuses: string[]
@@ -31,6 +32,10 @@ interface DeviceFiltersProps {
   onClearAll: () => void
   searchQuery: string
   onSearchChange: (query: string) => void
+  /** Optional external control of expanded state (for scroll-collapse integration) */
+  expanded?: boolean
+  /** Optional callback when expanded state is toggled from within */
+  onToggle?: () => void
 }
 
 export default function DeviceFilters({
@@ -51,9 +56,13 @@ export default function DeviceFilters({
   onUsageToggle,
   onClearAll,
   searchQuery,
-  onSearchChange
+  onSearchChange,
+  expanded: externalExpanded,
+  onToggle
 }: DeviceFiltersProps) {
-  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  const [internalExpanded, setInternalExpanded] = useState(false)
+  const filtersExpanded = externalExpanded !== undefined ? externalExpanded : internalExpanded
+  const setFiltersExpanded = (val: boolean) => setInternalExpanded(val)
   
   const totalActiveFilters = selectedStatuses.length + selectedCatalogs.length + selectedAreas.length + 
     selectedLocations.length + selectedFleets.length + selectedPlatforms.length + selectedUsages.length
@@ -62,7 +71,7 @@ export default function DeviceFilters({
     <div className="border-b border-gray-200 dark:border-gray-700">
       {/* Accordion Header */}
       <button
-        onClick={() => setFiltersExpanded(!filtersExpanded)}
+        onClick={() => onToggle ? onToggle() : setFiltersExpanded(!filtersExpanded)}
         className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">
@@ -84,7 +93,7 @@ export default function DeviceFilters({
       </button>
       
       {/* Accordion Content */}
-      {filtersExpanded && (
+      <CollapsibleSection expanded={filtersExpanded}>
         <div className="px-6 pb-4">
           {/* Smart Grid Layout - maximizes space usage */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-8 gap-y-4">
@@ -241,7 +250,7 @@ export default function DeviceFilters({
             </div>
           )}
         </div>
-      )}
+      </CollapsibleSection>
 
 
     </div>
