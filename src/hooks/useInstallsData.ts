@@ -97,7 +97,7 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
     
     const hasError = cimianItems.some((item: any) => {
       const status = item.currentStatus?.toLowerCase() || ''
-      return status.includes('error') || status.includes('failed') || status === 'needs_reinstall'
+      return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
     })
     
     const hasWarning = cimianItems.some((item: any) => {
@@ -149,7 +149,7 @@ export function getInstallItemsByStatus(devices: any[], statusFilter: 'errors' |
       if (statusFilter === 'all') {
         items.push({ ...item, device })
       } else if (statusFilter === 'errors') {
-        if (status.includes('error') || status.includes('failed') || status === 'needs_reinstall') {
+        if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
           items.push({ ...item, device })
         }
       } else if (statusFilter === 'warnings') {
