@@ -2,13 +2,15 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { CopyButton } from "../../../src/components/ui/CopyButton"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
+import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 
 interface Management {
   id: string
@@ -144,6 +146,11 @@ function ManagementPageContent() {
   // Accordion states
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
+
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
+    { enabled: !loading }
+  )
   
   // Donut chart expanded states
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
@@ -978,6 +985,8 @@ function ManagementPageContent() {
             onClearAll={clearAllFilters}
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
           />
           
           {/* Widgets Accordion */}
@@ -990,7 +999,7 @@ function ManagementPageContent() {
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               </div>
               <svg 
-                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
+                className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`} 
                 fill="none" 
                 stroke="currentColor" 
                 viewBox="0 0 24 24"
@@ -1001,7 +1010,7 @@ function ManagementPageContent() {
           </div>
           
           {/* Widgets Content - Collapsible */}
-          {widgetsExpanded && (
+          <CollapsibleSection expanded={effectiveWidgetsExpanded}>
             <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Widget 1: Provider Collection (Swapped) */}
@@ -1086,11 +1095,11 @@ function ManagementPageContent() {
                 />
               </div>
             </div>
-          )}
+          </CollapsibleSection>
 
           
 
-          <div className="flex-1 overflow-auto min-h-0">
+          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
