@@ -22,7 +22,6 @@ import {
   Users, 
   User, 
   UserCheck, 
-  UserX, 
   Shield, 
   AlertTriangle, 
   CheckCircle, 
@@ -191,9 +190,9 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   const [showAdminsOnly, setShowAdminsOnly] = useState(false)
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
   
-  // Sorting state - default to username ascending
-  const [sortColumn, setSortColumn] = useState<UserSortColumn>('username')
-  const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  // Sorting state - default to last login descending, logged-in users at top
+  const [sortColumn, setSortColumn] = useState<UserSortColumn>('lastLogon')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
   
   // Handle column sort click
   const handleSort = (column: UserSortColumn) => {
@@ -245,15 +244,35 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   
   const isMac = isMacOS(device)
 
+  // Windows built-in system accounts to hide (noise, not useful)
+  const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount', 'defaultaccount', 'guest', 'administrator']
+
+  // Filter logged in sessions to only show actual user sessions (not orphaned TTYs)
+  const activeUserSessions = identity.loggedInUsers.filter(session => 
+    session.user && session.user.trim() !== ''
+  )
+  
+  // Get unique logged-in users for the header count
+  const uniqueLoggedInUsers = [...new Set(activeUserSessions.map(s => s.user))]
+
   // Filter users based on search and admin filter
   const filteredUsers = identity.users.filter(user => {
+    // Hide Windows system accounts
+    if (!isMac && HIDDEN_WINDOWS_ACCOUNTS.includes(user.username.toLowerCase())) return false
     const matchesSearch = userSearch === '' || 
       user.username.toLowerCase().includes(userSearch.toLowerCase()) ||
       (user.realName?.toLowerCase().includes(userSearch.toLowerCase()))
     const matchesAdminFilter = !showAdminsOnly || user.isAdmin
     return matchesSearch && matchesAdminFilter
   }).sort((a, b) => {
-    // Apply sorting
+    // Logged-in users always sort to top
+    const aLoggedIn = (formatDate(a.lastLogon).isActive || 
+      (!isMac && uniqueLoggedInUsers.some(u => u.toLowerCase() === a.username.toLowerCase()))) ? 1 : 0
+    const bLoggedIn = (formatDate(b.lastLogon).isActive || 
+      (!isMac && uniqueLoggedInUsers.some(u => u.toLowerCase() === b.username.toLowerCase()))) ? 1 : 0
+    if (aLoggedIn !== bLoggedIn) return bLoggedIn - aLoggedIn
+    
+    // Apply column sorting
     let aValue: string | number | boolean = ''
     let bValue: string | number | boolean = ''
     
@@ -289,14 +308,6 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
     return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr)
   })
 
-  // Filter logged in sessions to only show actual user sessions (not orphaned TTYs)
-  const activeUserSessions = identity.loggedInUsers.filter(session => 
-    session.user && session.user.trim() !== ''
-  )
-  
-  // Get unique logged-in users for the header count
-  const uniqueLoggedInUsers = [...new Set(activeUserSessions.map(s => s.user))]
-
   if (!normalizedIdentity && identity.users.length === 0) {
     return (
       <div className="text-left py-16">
@@ -310,6 +321,61 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   }
 
   const { summary, btmdbHealth, directoryServices, secureTokenUsers } = identity
+
+  // Get Administrators group members for cross-referencing admin status
+  const adminsGroup = identity.groups.find(g => 
+    g.groupname.toLowerCase() === 'administrators' || g.sid === 'S-1-5-32-544'
+  )
+  const adminMembers = adminsGroup?.members 
+    ? adminsGroup.members.split(',').map(m => m.trim()).filter(Boolean)
+    : []
+
+  // On Windows, enrich user admin status from Administrators group members
+  // This catches domain/Entra ID users whose isAdmin wasn't set by the client
+  if (!isMac && adminMembers.length > 0) {
+    const adminUsernames = adminMembers.map(m => {
+      const parts = m.split('\\')
+      return (parts.length > 1 ? parts[1] : parts[0]).toLowerCase()
+    }).filter(name => !/^S-\d+-/.test(name)) // Skip SID-only entries
+    
+    identity.users.forEach(user => {
+      if (!user.isAdmin && adminUsernames.includes(user.username.toLowerCase())) {
+        user.isAdmin = true
+      }
+    })
+  }
+
+  // On Windows, enrich group memberships from groups data
+  // Domain/Entra ID users may not have groupMembership populated by client
+  if (!isMac && identity.groups.length > 0) {
+    identity.users.forEach(user => {
+      if (!user.groupMembership || user.groupMembership.trim() === '') {
+        const userGroups: string[] = []
+        identity.groups.forEach(group => {
+          if (group.members) {
+            // members is a comma-separated string from the extractor
+            const membersList = group.members.split(',').map(m => m.trim())
+            
+            // Check if user is in this group (match by username, case-insensitive)
+            // Member format can be "DOMAIN\\username", "username", or "S-1-5-..." (SID)
+            const isUserMember = membersList.some(member => {
+              const parts = member.split('\\')
+              const memberName = parts.length > 1 ? parts[1] : parts[0]
+              return memberName.toLowerCase() === user.username.toLowerCase()
+            })
+            
+            if (isUserMember) {
+              userGroups.push(group.groupname)
+            }
+          }
+        })
+        
+        if (userGroups.length > 0) {
+          user.groupMembership = userGroups.join(', ')
+        }
+      }
+    })
+  }
 
   return (
     <div className="space-y-6">
@@ -678,7 +744,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             }`}
           >
             <User className="w-4 h-4 inline mr-2" />
-            User Accounts ({identity.users.length})
+            User Accounts ({filteredUsers.length})
           </button>
           <button
             onClick={() => setActiveTable('sessions')}
@@ -748,6 +814,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                       )}
                     </div>
                   </th>
+                  {isMac && (
                   <th 
                     onClick={() => handleSort('uid')}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
@@ -761,6 +828,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                       )}
                     </div>
                   </th>
+                  )}
                   <th 
                     onClick={() => handleSort('isAdmin')}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
@@ -810,7 +878,10 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                 {filteredUsers.map((user, idx) => {
                   const isExpanded = expandedUsers.has(user.username);
                   const lastLoginInfo = user.lastLogon ? formatDate(user.lastLogon) : null;
-                  const isLoggedIn = lastLoginInfo?.isActive || false;
+                  // macOS: "still" suffix in lastLogon indicates active session
+                  // Windows: cross-reference with uniqueLoggedInUsers from active sessions
+                  const isLoggedIn = lastLoginInfo?.isActive || 
+                    (!isMac && uniqueLoggedInUsers.some(u => u.toLowerCase() === user.username.toLowerCase()));
                   const userHasSecureToken = secureTokenUsers?.usersWithToken?.includes(user.username);
                   
                   return (
@@ -823,7 +894,9 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                         <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
                           {user.realName || '—'}
                         </td>
+                        {isMac && (
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 font-mono">{user.uid}</td>
+                        )}
                         <td className="px-4 py-3">
                           {user.isAdmin ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
@@ -837,7 +910,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                           {isLoggedIn ? (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                               <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                              Logged in
+                              Active
                             </span>
                           ) : (
                             <span className="text-sm text-gray-400 dark:text-gray-500">—</span>
@@ -874,7 +947,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                       {/* Expanded Details */}
                       {isExpanded && (
                         <tr className="bg-gray-50 dark:bg-gray-800/50">
-                          <td colSpan={isMac ? (bootstrapToken ? 9 : 8) : 7} className="px-4 py-4">
+                          <td colSpan={isMac ? (bootstrapToken ? 9 : 8) : 6} className="px-4 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         {/* Basic Info */}
                         <div className="space-y-2">
@@ -976,7 +1049,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             })}
             {filteredUsers.length === 0 && (
               <tr>
-                <td colSpan={isMac ? (bootstrapToken ? 9 : 8) : 7} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                <td colSpan={isMac ? (bootstrapToken ? 9 : 8) : 6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                   No users found matching your criteria
                 </td>
               </tr>
@@ -1119,7 +1192,18 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </summary>
           <div className="border-t border-gray-200 dark:border-gray-700">
             <div className="p-4">
-              <pre className="text-xs overflow-auto max-h-96 text-gray-800 dark:text-gray-200">
+              <div className="flex justify-end gap-2 mb-2">
+                <button
+                  onClick={() => {
+                    const jsonString = JSON.stringify(normalizedIdentity, null, 2)
+                    navigator.clipboard.writeText(jsonString)
+                  }}
+                  className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Copy JSON
+                </button>
+              </div>
+              <pre className="p-4 bg-gray-900 dark:bg-black text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto rounded border border-gray-700">
                 {JSON.stringify(normalizedIdentity, null, 2)}
               </pre>
             </div>
