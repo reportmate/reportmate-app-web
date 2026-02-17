@@ -325,15 +325,35 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  const enrollmentTypeCounts = management.reduce((acc, curr) => {
-    let type = curr.enrollmentType || 'Unknown'
-    // Normalize labels
-    if (type === 'Hybrid Entra Join') type = 'Domain Joined'
-    if (type === 'Entra Join') type = 'Entra Joined'
-    // Mac enrollment types - keep as-is (Automated Device Enrollment, User Approved Enrollment, MDM Enrolled)
-    // Include all types except Unknown and N/A
-    if (type !== 'Unknown' && type !== 'N/A') {
-      acc[type] = (acc[type] || 0) + 1
+  // MDM Bootstrap Type counts - how devices were enrolled into MDM
+  // NOTE: Entra Joined / Domain Joined moved to Identity dashboard
+  const mdmBootstrapCounts = management.reduce((acc, curr) => {
+    // macOS: check enrollmentType directly
+    const enrollmentType = curr.enrollmentType || ''
+    const platform = curr.raw?.system?.operatingSystem?.name || ''
+    const isMac = platform.toLowerCase().includes('macos') || platform.toLowerCase().includes('mac os')
+    const autopilot = curr.raw?.autopilot_config || curr.raw?.autopilotConfig
+    
+    if (isMac) {
+      // macOS enrollment bootstrap types
+      if (enrollmentType === 'Automated Device Enrollment') {
+        acc['ADE'] = (acc['ADE'] || 0) + 1
+      } else if (enrollmentType === 'User Approved Enrollment') {
+        acc['User Approved'] = (acc['User Approved'] || 0) + 1
+      } else if (enrollmentType === 'MDM Enrolled') {
+        acc['Manual'] = (acc['Manual'] || 0) + 1
+      } else if (enrollmentType !== 'Unknown' && enrollmentType !== 'N/A' && enrollmentType) {
+        // Other Mac enrollment types
+        acc['Other'] = (acc['Other'] || 0) + 1
+      }
+    } else {
+      // Windows enrollment bootstrap types
+      if (autopilot?.activated === true || autopilot?.activated === 'true') {
+        acc['AutoPilot'] = (acc['AutoPilot'] || 0) + 1
+      } else if (curr.enrollmentStatus && curr.enrollmentStatus !== 'Not Enrolled') {
+        // Enrolled but not via AutoPilot
+        acc['Manual'] = (acc['Manual'] || 0) + 1
+      }
     }
     return acc
   }, {} as Record<string, number>)
@@ -1042,56 +1062,30 @@ function ManagementPageContent() {
                   selectedFilter={enrollmentStatusFilter}
                 />
 
-                {/* Widget 3: Enrollment Type Donut - Trust status shown as subset indicators */}
+                {/* Widget 3: MDM Bootstrap Type - How devices were enrolled into MDM */}
+                {/* NOTE: Entra Joined / Domain Joined moved to /devices/identity */}
                 <DonutChart 
-                  title="Enrollment Type"
+                  title="MDM Bootstrap"
                   data={[
-                    // Show enrollment types in order: Entra Joined, Domain Joined, then others
-                    // Note: 'Unmanaged' is an enrollmentType from the client (not domain-joined devices without MDM)
-                    ...Object.entries(enrollmentTypeCounts)
+                    // Show MDM bootstrap types: AutoPilot (Win), ADE (Mac), User Approved (Mac), Manual
+                    ...Object.entries(mdmBootstrapCounts)
                       .sort(([a], [b]) => {
-                        // Entra Joined first, Domain Joined second, Mac types third
-                        if (a === 'Entra Joined') return -1
-                        if (b === 'Entra Joined') return 1
-                        if (a === 'Domain Joined') return -1
-                        if (b === 'Domain Joined') return 1
-                        if (a === 'Automated Device Enrollment') return -1
-                        if (b === 'Automated Device Enrollment') return 1
-                        return a.localeCompare(b)
+                        // AutoPilot first, ADE second, User Approved third, Manual last
+                        const order = ['AutoPilot', 'ADE', 'User Approved', 'Manual', 'Other']
+                        return order.indexOf(a) - order.indexOf(b)
                       })
-                      .map(([label, value]) => ({ label, value })),
-                    // Unconfirmed (orange) - devices without domainTrust data - shown in donut, nested in legend
-                    ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : []),
-                    // Broken Trust (red) - devices with broken trust - shown in donut, nested in legend
-                    ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : [])
+                      .map(([label, value]) => ({ label, value }))
                   ]}
                   colors={{
-                    'Entra Joined': '#10b981', // emerald-500
-                    'Domain Joined': '#f59e0b', // amber-500 (Yellow) - domain joined
-                    'Automated Device Enrollment': '#3b82f6', // blue-500 - Mac ADE
-                    'User Approved Enrollment': '#06b6d4', // cyan-500 - Mac User Approved
-                    'MDM Enrolled': '#8b5cf6', // violet-500 - Mac generic MDM
-                    'Unmanaged': '#ef4444', // red-500 - unmanaged (critical issue)
-                    'Unconfirmed': '#f97316', // orange-500 - unconfirmed trust status
-                    'Broken Trust': '#ef4444', // red-500 - broken trust
-                    'Trust Valid': '#eab308', // yellow-500 - valid trust
-                    'AxM Assigned': '#10b981', // emerald-500
-                    'Manual': '#8b5cf6', // violet-500
-                    'default': '#8b5cf6' // violet-500
+                    'AutoPilot': '#3b82f6', // blue-500 - Windows AutoPilot
+                    'ADE': '#10b981', // emerald-500 - Mac Automated Device Enrollment
+                    'User Approved': '#06b6d4', // cyan-500 - Mac User Approved
+                    'Manual': '#f59e0b', // amber-500 - Manual enrollment
+                    'Other': '#8b5cf6', // violet-500 - Other types
+                    'default': '#94a3b8' // slate-400
                   }}
                   onFilter={setTypeFilter}
                   selectedFilter={typeFilter}
-                  nestedItems={[
-                    {
-                      parentLabel: 'Domain Joined',
-                      items: [
-                        // Trust Valid first, then trust issues (Broken Trust, Unconfirmed)
-                        ...(trustValidCount > 0 ? [{ label: 'Trust Valid', value: trustValidCount }] : []),
-                        ...(brokenTrustCount > 0 ? [{ label: 'Broken Trust', value: brokenTrustCount }] : []),
-                        ...(unconfirmedTrustCount > 0 ? [{ label: 'Unconfirmed', value: unconfirmedTrustCount }] : [])
-                      ]
-                    }
-                  ]}
                 />
               </div>
             </div>

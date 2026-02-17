@@ -21,9 +21,10 @@ export interface IdentityInfo {
   loggedInUsers: LoggedInUser[]
   loginHistory: LoginHistoryEntry[]
   btmdbHealth: BTMDBHealth | null  // macOS only
-  directoryServices: DirectoryServicesInfo | null  // macOS only
+  directoryServices: DirectoryServicesInfo | null
   secureTokenUsers: SecureTokenInfo | null  // macOS only
   platformSSOUsers: PlatformSSOUsersInfo | null  // macOS 13+ only
+  enrollmentInfo: EnrollmentInfo | null  // Enrollment type (Entra/Domain/Hybrid)
   summary: IdentitySummary
 }
 
@@ -176,6 +177,28 @@ export interface IdentitySummary {
   currentlyLoggedIn: number
   failedLoginsLast7Days?: number  // Windows
   btmdbStatus?: string  // macOS
+  domainStatus?: string  // Windows: "Hybrid", "Domain", "EntraID", "Standalone"
+}
+
+// MARK: - Enrollment Info (Identity-authoritative - migrated from Management)
+
+export type EnrollmentType = 
+  | 'Entra Joined'
+  | 'Domain Joined' 
+  | 'Hybrid Entra Join'
+  | 'Standalone'
+  | 'Workgroup'
+  | 'Unknown'
+
+export interface EnrollmentInfo {
+  enrollmentType: EnrollmentType
+  entraJoined: boolean
+  domainJoined: boolean
+  enterpriseJoined?: boolean
+  tenantId?: string
+  tenantName?: string
+  domainName?: string
+  workgroup?: string
 }
 
 // MARK: - Extractor Function
@@ -190,6 +213,9 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
   }
 
   const identity = deviceModules.identity
+  
+  // Extract enrollment info from identity module's directoryServices
+  const enrollmentInfo = extractEnrollmentInfoFromIdentity(identity)
 
   return {
     users: identity.users ? identity.users.map(mapUserAccount) : [],
@@ -200,7 +226,51 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
     directoryServices: identity.directoryServices ? mapDirectoryServices(identity.directoryServices) : null,
     secureTokenUsers: identity.secureTokenUsers ? mapSecureTokenInfo(identity.secureTokenUsers) : null,
     platformSSOUsers: identity.platformSSOUsers ? mapPlatformSSOUsers(identity.platformSSOUsers) : null,
+    enrollmentInfo: enrollmentInfo,
     summary: identity.summary ? mapIdentitySummary(identity.summary) : createEmptySummary()
+  }
+}
+
+/**
+ * Extract enrollment info from identity module's directoryServices
+ * This is the authoritative source for Entra/Domain join status
+ */
+function extractEnrollmentInfoFromIdentity(identity: any): EnrollmentInfo | null {
+  const ds = identity?.directoryServices
+  if (!ds) return null
+  
+  // Extract from directoryServices structure
+  const ad = ds.activeDirectory || ds.active_directory || {}
+  const entra = ds.azureAd || ds.azure_ad || ds.entraId || ds.entra_id || {}
+  
+  const domainJoined = ad.bound || ad.is_domain_joined || ad.isDomainJoined || false
+  const entraJoined = entra.joined || entra.is_aad_joined || entra.isAadJoined || 
+                      entra.is_entra_joined || entra.isEntraJoined || false
+  const enterpriseJoined = entra.registered || entra.is_aad_registered || entra.isAadRegistered || false
+  
+  // Determine enrollment type
+  let enrollmentType: EnrollmentType = 'Unknown'
+  if (domainJoined && entraJoined) {
+    enrollmentType = 'Hybrid Entra Join'
+  } else if (entraJoined) {
+    enrollmentType = 'Entra Joined'
+  } else if (domainJoined) {
+    enrollmentType = 'Domain Joined'
+  } else if (ds.workgroup) {
+    enrollmentType = 'Workgroup'
+  } else {
+    enrollmentType = 'Standalone'
+  }
+  
+  return {
+    enrollmentType,
+    entraJoined,
+    domainJoined,
+    enterpriseJoined,
+    tenantId: entra.tenant_id || entra.tenantId,
+    tenantName: entra.tenant_name || entra.tenantName,
+    domainName: ad.domain || ad.domain_name || ad.domainName,
+    workgroup: ds.workgroup
   }
 }
 
@@ -370,6 +440,7 @@ function createEmptyIdentityInfo(): IdentityInfo {
     directoryServices: null,
     secureTokenUsers: null,
     platformSSOUsers: null,
+    enrollmentInfo: null,
     summary: createEmptySummary()
   }
 }

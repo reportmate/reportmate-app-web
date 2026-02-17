@@ -36,6 +36,12 @@ interface IdentityDevice {
   ldapBound?: boolean
   users?: { username: string; realName?: string; isAdmin?: boolean; lastLogon?: string }[]
   loggedInUsernames?: string[]
+  // Enrollment type (migrated from Management - Identity is authoritative)
+  enrollmentType?: string
+  entraJoined?: boolean
+  domainJoined?: boolean
+  tenantId?: string
+  tenantName?: string
 }
 
 function LoadingSkeleton() {
@@ -259,7 +265,17 @@ function IdentityPageContent() {
     // Directory binding stats  
     adBound: identityDevices.filter(d => d.adBound).length,
     ldapBound: identityDevices.filter(d => d.ldapBound).length,
-    notBound: identityDevices.filter(d => !d.adBound && !d.ldapBound).length
+    notBound: identityDevices.filter(d => !d.adBound && !d.ldapBound).length,
+    
+    // Enrollment type counts (Windows devices - migrated from Management)
+    enrollmentTypes: identityDevices.reduce((acc, d) => {
+      const type = d.enrollmentType || 'Unknown'
+      // Only count non-Unknown types
+      if (type !== 'Unknown') {
+        acc[type] = (acc[type] || 0) + 1
+      }
+      return acc
+    }, {} as Record<string, number>)
   }
 
   if (loading) {
@@ -487,6 +503,34 @@ function IdentityPageContent() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Enrollment Type Widget (Windows) - Migrated from Management */}
+                  {Object.keys(identityStats.enrollmentTypes).length > 0 && (
+                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Enrollment Type</h4>
+                      <div className="space-y-2">
+                        {Object.entries(identityStats.enrollmentTypes)
+                          .sort((a, b) => b[1] - a[1])
+                          .map(([type, count]) => {
+                            const colorMap: Record<string, string> = {
+                              'Entra Joined': 'bg-blue-500',
+                              'Domain Joined': 'bg-green-500',
+                              'Hybrid': 'bg-purple-500',
+                              'Workgroup': 'bg-gray-400'
+                            }
+                            return (
+                              <div key={type} className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <div className={`w-2.5 h-2.5 rounded-full ${colorMap[type] || 'bg-gray-400'}`}></div>
+                                  <span className="text-sm text-gray-600 dark:text-gray-400">{type}</span>
+                                </div>
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                              </div>
+                            )
+                          })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </CollapsibleSection>

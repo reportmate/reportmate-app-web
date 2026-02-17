@@ -457,6 +457,50 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
+        {/* Windows Directory Join Status Card - Entra/Domain join info (migrated from Management) */}
+        {!isMac && directoryServices && (
+          directoryServices.azureAD || 
+          directoryServices.activeDirectory?.bound ||
+          directoryServices.workgroup
+        ) && (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Network className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Directory Status</h3>
+            </div>
+            <div className="space-y-1">
+              {/* Entra ID (Azure AD) */}
+              {directoryServices.azureAD && (
+                <>
+                  <DetailRow 
+                    label="Entra ID" 
+                    value={directoryServices.azureAD.joined ? 'Joined' : 
+                           directoryServices.azureAD.registered ? 'Registered' : 'Not Connected'}
+                    variant={directoryServices.azureAD.joined ? 'success' : 
+                             directoryServices.azureAD.registered ? 'neutral' : 'warning'}
+                  />
+                  {directoryServices.azureAD.tenantName && (
+                    <DetailRow label="Tenant" value={directoryServices.azureAD.tenantName} />
+                  )}
+                </>
+              )}
+              {/* Active Directory / Domain Joined */}
+              <DetailRow 
+                label="Domain Joined" 
+                value={directoryServices.activeDirectory?.bound ? 'Yes' : 'No'}
+                variant={directoryServices.activeDirectory?.bound ? 'success' : 'neutral'}
+              />
+              {directoryServices.activeDirectory?.domain && (
+                <DetailRow label="Domain" value={directoryServices.activeDirectory.domain} />
+              )}
+              {/* Workgroup (standalone) */}
+              {directoryServices.workgroup && !directoryServices.activeDirectory?.bound && (
+                <DetailRow label="Workgroup" value={directoryServices.workgroup} />
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Authentication Card - Platform SSO (Mac) / Device Lock (Windows) - Moved here from below */}
         {isMac && (platformSSO || activationLock) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
