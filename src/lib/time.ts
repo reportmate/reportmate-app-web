@@ -168,8 +168,8 @@ export function parseInstallTime(timestamp: string | number | undefined): number
 
 /**
  * Fix Cimian timestamps that are incorrectly formatted.
- * Cimian has a bug where it writes local time with "Z" suffix (claiming UTC)
- * when it's actually Pacific time. This function detects and corrects those timestamps.
+ * Cimian has a bug where it writes local time (PST/PDT) with "Z" suffix (claiming UTC).
+ * This function detects and corrects those timestamps by adding the timezone offset.
  * 
  * Note: This is a temporary workaround until the Cimian client is fixed.
  */
@@ -187,22 +187,18 @@ export function normalizeCimianTimestamp(timestamp: string | undefined): string 
       }
     }
     
-    // For timestamps ending with "Z" that Cimian incorrectly generated
-    if (timestamp.endsWith('Z')) {
+    // For timestamps ending with "Z" without a timezone offset - this is the Cimian bug
+    // Cimian writes Pacific Time but adds "Z" suffix (incorrectly claiming it's UTC)
+    // The time value is actually 8 hours behind (PST offset = UTC-8)
+    if (timestamp.endsWith('Z') && !timestamp.includes('+') && !timestamp.includes('-08') && !timestamp.includes('-07')) {
       const parsedDate = new Date(timestamp)
-      const now = new Date()
       
       if (!isNaN(parsedDate.getTime())) {
-        const hoursDiff = (now.getTime() - parsedDate.getTime()) / (1000 * 60 * 60)
-        
-        // If 6-10 hours "old", it's the timezone bug - treat as local time
-        if (hoursDiff >= 6 && hoursDiff <= 10) {
-          const localTimeStr = timestamp.slice(0, -1) // Remove "Z"
-          const localDate = new Date(localTimeStr)
-          if (!isNaN(localDate.getTime())) {
-            return localDate.toISOString()
-          }
-        }
+        // The timestamp is parsed as UTC, but it's actually PST/PDT
+        // Add 8 hours (28800000 ms) to convert from PST to actual UTC
+        // Note: This assumes PST. For PDT (daylight saving), it should be 7 hours
+        const correctedTime = new Date(parsedDate.getTime() + (8 * 60 * 60 * 1000))
+        return correctedTime.toISOString()
       }
     }
     

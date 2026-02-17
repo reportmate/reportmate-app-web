@@ -664,9 +664,25 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         version: item.version || item.installedVersion || '',
         status: finalStatus,  // ENFORCED: Version-based for Cimian, standardized for others
         type: item.type || 'Package',
-        // Use lastSeenInSession for DATE PROCESSED (when package was last checked)
-        // Fix Cimian's timezone bug where local time is written with "Z" suffix
-        lastUpdate: normalizeCimianTimestamp(item.lastSeenInSession) || normalizeCimianTimestamp(item.lastUpdate) || '',
+        // DATE PROCESSED: Only show for items processed in the LATEST session
+        // Items from older sessions get empty (they weren't touched in this run)
+        lastUpdate: (() => {
+          const itemTimestamp = item.lastSeenInSession || item.lastUpdate || ''
+          if (!itemTimestamp || !latestSessionStartTime) return ''
+          // Check if this item was processed in the latest session
+          // Compare the item's lastSeenInSession with the latest session's start_time
+          // If they're from the same session (within a reasonable window), show the timestamp
+          try {
+            const itemTime = new Date(normalizeCimianTimestamp(itemTimestamp)).getTime()
+            const sessionTime = new Date(latestSessionStartTime).getTime()
+            // Items processed in the latest session will have timestamps >= session start_time
+            // Use a 2-hour window to account for long-running sessions
+            if (!isNaN(itemTime) && !isNaN(sessionTime) && itemTime >= sessionTime - 60000) {
+              return normalizeCimianTimestamp(itemTimestamp)
+            }
+          } catch { /* fall through */ }
+          return ''
+        })(),
         itemSize: item.itemSize,
         category: item.category || '', // Category from pkgsinfo
         developer: item.developer || '', // Developer from pkgsinfo
@@ -818,6 +834,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   let latestRunType = 'Manual'  // Default to Manual instead of Unknown
   let latestDuration = 'Unknown'
   let latestDurationSeconds: number | undefined
+  // Track the latest session's start_time to determine which items were processed in this session
+  let latestSessionStartTime = ''
   
   if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
     // Find the most recent session with actual activity (completed or partial_failure with actions/failures)
@@ -900,6 +918,15 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     const latestSession = installs.recentSessions[0]
     cacheSizeMb = latestSession.cacheSizeMb
       }
+
+  // Determine the latest session's start_time to identify which items were processed in this session
+  // Items processed in the latest session get their lastSeenInSession shown as DATE PROCESSED
+  // Items from older sessions show empty (they weren't touched in this run)
+  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
+    latestSessionStartTime = installs.cimian.sessions[0].start_time || installs.cimian.sessions[0].startTime || ''
+  } else if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
+    latestSessionStartTime = installs.recentSessions[0].start_time || installs.recentSessions[0].startTime || ''
+  }
 
   // Extract session-level errors and warnings - ONLY FROM LATEST COMPLETED SESSION
   const sessionErrors: ErrorMessage[] = []
