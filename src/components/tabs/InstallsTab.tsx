@@ -328,103 +328,89 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data }) => {
 
       {/* Managed Installs Configuration Card */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg border border-gray-200 dark:border-gray-700">
-        <div className="flex gap-8 items-end">
-          {/* Column 1 - 45% - Manifest & Repo */}
-          <div className="flex-[0_0_45%] space-y-4">
-            <div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
-                {processedInstallsData?.config?.manifest || 
-                 device?.modules?.installs?.munki?.manifestName ||
-                 device?.modules?.installs?.munki?.clientIdentifier ||
-                 device?.modules?.installs?.cimian?.config?.ClientIdentifier || 
-                 device?.modules?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
-                 'No manifest configured'}
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
-                {processedInstallsData?.config?.softwareRepoURL || 
-                 device?.modules?.installs?.munki?.softwareRepoURL ||
-                 device?.modules?.installs?.cimian?.config?.SoftwareRepoURL || 
-                 device?.modules?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
-                 'No repo configured'}
-              </div>
+        <div className="grid grid-cols-[2fr_1fr_1fr] grid-rows-2 gap-x-8 gap-y-4">
+
+          {/* Row 1, Col 1 - Manifest */}
+          <div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Manifest</div>
+            <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
+              {processedInstallsData?.config?.manifest || 
+               device?.modules?.installs?.munki?.manifestName ||
+               device?.modules?.installs?.munki?.clientIdentifier ||
+               device?.modules?.installs?.cimian?.config?.ClientIdentifier || 
+               device?.modules?.installs?.cimian?.sessions?.[0]?.config?.client_identifier || 
+               'No manifest configured'}
             </div>
           </div>
 
-          {/* Column 2 - 25% - Run Type & Version - Center Aligned */}
-          <div className="flex-[0_0_25%] space-y-4 text-center">
-            <div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</div>
-              <div className="flex justify-center">
-                <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
-                  {processedInstallsData?.config?.runType || 
-                   device?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
-                   'Auto'}
-                </span>
-              </div>
-            </div>
-            <div>
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
-                {processedInstallsData?.systemName ? `${processedInstallsData.systemName} Version` : 
-                 device?.modules?.installs?.munki ? 'Munki Version' : 'Cimian Version'}
-              </div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border mx-auto inline-block">
-                {processedInstallsData?.config?.version || 
-                 device?.modules?.installs?.munki?.version ||
-                 device?.modules?.installs?.cimian?.version || 
-                 'Unknown'}
-              </div>
+          {/* Row 1, Col 2 - Run Type */}
+          <div className="flex flex-col items-center text-center">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Run Type</div>
+            <span className="px-3 py-1 text-sm font-medium bg-emerald-100 dark:bg-emerald-800 text-emerald-800 dark:text-emerald-200 rounded-full">
+              {processedInstallsData?.config?.runType || 
+               device?.modules?.installs?.cimian?.sessions?.[0]?.run_type || 
+               'Auto'}
+            </span>
+          </div>
+
+          {/* Row 1, Col 3 - Catalog */}
+          <div className="flex flex-col items-end text-right">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Catalog</div>
+            <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border w-fit">
+              {(() => {
+                const catalogs = device?.modules?.installs?.cimian?.catalogs || 
+                                 device?.modules?.installs?.munki?.catalogs || []
+                return Array.isArray(catalogs) && catalogs.length > 0 ? catalogs.join(', ') : 'Not configured'
+              })()}
             </div>
           </div>
 
-          {/* Column 3 - 25% - Catalog & Last Seen - Right Aligned with 2% padding */}
-          <div className="flex-[0_0_25%] space-y-4 flex flex-col items-end pr-[2%]">
-            <div className="space-y-2 flex flex-col items-end">
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Catalog</div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
-                {(() => {
-                  // Get catalogs from Cimian or Munki
-                  const catalogs = device?.modules?.installs?.cimian?.catalogs || 
-                                   device?.modules?.installs?.munki?.catalogs ||
-                                   []
-                  if (Array.isArray(catalogs) && catalogs.length > 0) {
-                    return catalogs.join(', ')
-                  }
-                  return 'Not configured'
-                })()}
-              </div>
-            </div>
-            <div className="space-y-2 flex flex-col items-end">
-              <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Seen Timestamp</div>
-              <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border inline-block ml-auto">
-                {(() => {
-                  const timestamp = processedInstallsData?.config?.lastRun || 
-                                   device?.modules?.installs?.munki?.endTime ||
-                                   device?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
-                                   device?.modules?.installs?.cimian?.sessions?.[0]?.endTime
-                  if (!timestamp) return 'Never'
-                  
-                  try {
-                    return new Date(timestamp).toLocaleString('en-CA', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      second: '2-digit',
-                      hour12: false
-                    }).replace(', ', ' ')
-                  } catch (error) {
-                    console.error('Error formatting timestamp:', timestamp, error)
-                    return String(timestamp)
-                  }
-                })()}
-              </div>
+          {/* Row 2, Col 1 - Repo */}
+          <div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Repo</div>
+            <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border">
+              {processedInstallsData?.config?.softwareRepoURL || 
+               device?.modules?.installs?.munki?.softwareRepoURL ||
+               device?.modules?.installs?.cimian?.config?.SoftwareRepoURL || 
+               device?.modules?.installs?.cimian?.sessions?.[0]?.config?.software_repo_url || 
+               'No repo configured'}
             </div>
           </div>
+
+          {/* Row 2, Col 2 - Version */}
+          <div className="flex flex-col items-center text-center">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">
+              {processedInstallsData?.systemName ? `${processedInstallsData.systemName} Version` : 
+               device?.modules?.installs?.munki ? 'Munki Version' : 'Cimian Version'}
+            </div>
+            <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border w-fit">
+              {processedInstallsData?.config?.version || 
+               device?.modules?.installs?.munki?.version ||
+               device?.modules?.installs?.cimian?.version || 
+               'Unknown'}
+            </div>
+          </div>
+
+          {/* Row 2, Col 3 - Last Seen */}
+          <div className="flex flex-col items-end text-right">
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Last Seen</div>
+            <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border w-fit">
+              {(() => {
+                const timestamp = processedInstallsData?.config?.lastRun || 
+                                 device?.modules?.installs?.munki?.endTime ||
+                                 device?.modules?.installs?.cimian?.sessions?.[0]?.start_time ||
+                                 device?.modules?.installs?.cimian?.sessions?.[0]?.endTime
+                if (!timestamp) return 'Never'
+                try {
+                  return new Date(timestamp).toLocaleString('en-CA', {
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+                  }).replace(', ', ' ')
+                } catch { return String(timestamp) }
+              })()}
+            </div>
+          </div>
+
         </div>
       </div>
 
