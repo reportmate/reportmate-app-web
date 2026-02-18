@@ -531,6 +531,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     errors: 0,
     removed: 0
   }
+  // Declared here to avoid TDZ — used inside the package processing loop below
+  let latestSessionStartTime = ''
 
   // Determine which managed software system to use
   const hasCimianData = installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0
@@ -834,8 +836,6 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   let latestRunType = 'Manual'  // Default to Manual instead of Unknown
   let latestDuration = 'Unknown'
   let latestDurationSeconds: number | undefined
-  // Track the latest session's start_time to determine which items were processed in this session
-  let latestSessionStartTime = ''
   
   if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
     // Find the most recent session with actual activity (completed or partial_failure with actions/failures)
