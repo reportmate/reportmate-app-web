@@ -226,6 +226,13 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
     onClose()
   }
 
+  const navigateToSearch = (query: string) => {
+    setSearchQuery("")
+    setSuggestions([])
+    onClose()
+    router.push(`/devices?search=${encodeURIComponent(query.trim())}`)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -234,7 +241,8 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
       const identifier = device.assetTag || device.serialNumber
       await navigateToDevice(identifier)
     } else if (searchQuery.trim()) {
-      await navigateToDevice(searchQuery.trim())
+      // Navigate to /devices with the query as a search filter
+      navigateToSearch(searchQuery.trim())
     }
   }
 
