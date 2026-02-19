@@ -248,6 +248,14 @@ export function DeviceSearchField({
     }
   }
 
+  const navigateToSearch = (query: string) => {
+    setSearchQuery("")
+    setSuggestions([])
+    setShowSuggestions(false)
+    if (inputRef.current) inputRef.current.blur()
+    router.push(`/devices?search=${encodeURIComponent(query.trim())}`)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -257,8 +265,8 @@ export function DeviceSearchField({
       const identifier = device.assetTag || device.serialNumber
       await navigateToDevice(identifier)
     } else if (searchQuery.trim()) {
-      // Navigate directly to the entered search query
-      await navigateToDevice(searchQuery.trim())
+      // Navigate to /devices with the query as a search filter
+      navigateToSearch(searchQuery.trim())
     }
   }
 
@@ -395,7 +403,7 @@ export function DeviceSearchField({
             left: `${dropdownPosition.left}px`,
             width: `${dropdownPosition.width}px`
           }}
-          className="z-[300] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-64 overflow-y-auto"
+          className="z-[300] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-[32rem] overflow-y-auto"
         >
           {suggestions.map((device, index) => (
             <button
