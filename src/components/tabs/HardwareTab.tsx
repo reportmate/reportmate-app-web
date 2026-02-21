@@ -351,8 +351,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     return total + freeSpace
   }, 0) || 0
   
-  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
-  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - support physicalMemory (normalized from physical_memory), physical_memory (pre-normalization), totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
@@ -374,8 +374,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize) || safeNumber(hardwareData.graphics?.memory_size)
   const graphicsDriverVersion = safeString(hardwareData.graphics?.driverVersion)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  // Support both metal_support (Mac) and metalSupport (Windows)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
+  // Support both metalSupport (normalized from metal_support) and metalSupport (Windows camelCase)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport ?? hardwareData.graphics?.metal_support)
   
   // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
   const cleanGraphicsName = (() => {
@@ -405,13 +405,13 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const hasDisplays = displays.length > 0
   
   // Support both osquery snake_case (Mac) and camelCase (Windows)
-  const batteryCycleCount = safeNumber(hardwareData.battery?.cycle_count) || safeNumber(hardwareData.battery?.cycleCount)
-  const batteryChargePercent = safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
+  const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount) || safeNumber(hardwareData.battery?.cycle_count)
+  const batteryChargePercent = safeNumber(hardwareData.battery?.percentRemaining) || safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
   const batteryHealth = safeString(hardwareData.battery?.health)
   const batteryIsCharging = hardwareData.battery?.charging === 1 || Boolean(hardwareData.battery?.isCharging)
   // osquery: minutes_until_empty, Windows: estimatedRuntime
-  const batteryEstimatedRuntime = hardwareData.battery?.minutes_until_empty 
-    ? `${hardwareData.battery.minutes_until_empty} min`
+  const batteryEstimatedRuntime = (hardwareData.battery?.minutesUntilEmpty || hardwareData.battery?.minutes_until_empty)
+    ? `${hardwareData.battery.minutesUntilEmpty ?? hardwareData.battery.minutes_until_empty} min`
     : (typeof hardwareData.battery?.estimatedRuntime === 'string' ? hardwareData.battery.estimatedRuntime : '')
   const batteryItems = Array.isArray(hardwareData.battery?.items) ? hardwareData.battery.items : null
   const formFactor = hardwareData.formFactor as string | undefined
@@ -422,7 +422,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Wireless data
   const wifiGeneration = safeString(hardwareData.wireless?.wifiGeneration || hardwareData.wireless?.wifi_generation)
   const wifiVersion = safeString(hardwareData.wireless?.wifiVersion || hardwareData.wireless?.wifi_version)
-  const wirelessStatus = safeString(hardwareData.wireless?.status)
+  const rawWirelessStatus = hardwareData.wireless?.status
+  // Suppress hardware-level "off" status — WiFi can be active while interface reports "off"
+  const wirelessStatus = rawWirelessStatus && String(rawWirelessStatus).toLowerCase() !== 'off'
+    ? safeString(rawWirelessStatus)
+    : 'Unknown'
   const wirelessAvailable = Boolean(hardwareData.wireless?.isAvailable || hardwareData.wireless?.is_available)
   const wirelessName = safeString(hardwareData.wireless?.name)
   const wirelessProtocol = safeString(hardwareData.wireless?.protocol)
@@ -433,10 +437,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const bluetoothAvailable = Boolean(hardwareData.bluetooth?.isAvailable)
 
   // Unified Memory Detection
-  // 1. Backend flag: unified_memory (set by Mac client for Apple Silicon)
+  // 1. Backend flag: unifiedMemory (normalized from unified_memory set by Mac client for Apple Silicon)
   // 2. Apple Silicon with performance/efficiency cores (M-series chips)
   // 3. CPU name matches GPU name (common in SoCs)
-  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unified_memory)
+  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unifiedMemory || hardwareData.memory?.unified_memory)
   const isUnifiedMemory = hasUnifiedMemoryFlag || hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown')
 
   // Clean up GPU name if it repeats the processor name
@@ -489,12 +493,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
             </div>
             
-            {/* Identifier */}
-            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+            {/* Identifier - check both normalized (modelIdentifier) and raw (model_identifier) */}
+            {(hardwareData.modelIdentifier || hardwareData.model_identifier) && safeString(hardwareData.modelIdentifier ?? hardwareData.model_identifier) !== 'Unknown' && (
               <div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
                 <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                  {safeString(hardwareData.model_identifier)}
+                  {safeString(hardwareData.modelIdentifier ?? hardwareData.model_identifier)}
                 </div>
               </div>
             )}
@@ -1018,10 +1022,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     {batteryEstimatedRuntime && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Runtime</th>
                     )}
-                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {(hardwareData.battery.designedCapacity !== undefined || hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Design Capacity</th>
                     )}
-                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
+                    {(hardwareData.battery.currentCapacity !== undefined || hardwareData.battery.current_capacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Capacity</th>
                     )}
                   </tr>
@@ -1059,14 +1063,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {batteryEstimatedRuntime}
                       </td>
                     )}
-                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {(hardwareData.battery.designedCapacity !== undefined || hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
+                        {safeNumber(hardwareData.battery.designedCapacity) || safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
                       </td>
                     )}
-                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
+                    {(hardwareData.battery.currentCapacity !== undefined || hardwareData.battery.current_capacity !== undefined) && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.current_capacity) || safeNumber(hardwareData.battery.currentCapacity)} mAh
+                        {safeNumber(hardwareData.battery.currentCapacity) || safeNumber(hardwareData.battery.current_capacity)} mAh
                       </td>
                     )}
                   </tr>

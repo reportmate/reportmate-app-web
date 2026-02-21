@@ -196,24 +196,10 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
     >
       {isMac ? (
         <div className="space-y-3">
-          {/* Mac-specific layout: Model/Model Identifier in 2-column, Chip, 2-column grid, Storage at bottom */}
-          {/* Model and Model Identifier side-by-side in 2-column grid */}
-          <div className="grid grid-cols-2 gap-3">
-            {model !== 'Unknown' && (
-              <Stat 
-                label="Model" 
-                value={model} 
-              />
-            )}
-            {modelIdentifier !== 'Unknown' && (
-              <Stat 
-                label="Identifier" 
-                value={modelIdentifier}
-                isMono
-                showCopyButton
-              />
-            )}
-          </div>
+          {/* Mac-specific layout: Model full-width, Chip, 2-column grid, Storage at bottom */}
+          {model !== 'Unknown' && (
+            <Stat label="Model" value={model} />
+          )}
           
           {isUnifiedMemory ? (
             <>
