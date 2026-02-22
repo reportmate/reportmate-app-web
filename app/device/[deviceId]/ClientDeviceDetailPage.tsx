@@ -514,7 +514,11 @@ export default function ClientDeviceDetailPage() {
   const handleTabChange = async (tabId: TabType) => {
     setActiveTab(tabId)
     if (typeof window !== 'undefined') {
-      window.history.pushState(null, '', `#${tabId}`)
+      // Strip filter param from URL when switching tabs — it's only for initial deep-linking
+      const url = new URL(window.location.href)
+      url.searchParams.delete('filter')
+      url.hash = tabId
+      window.history.pushState(null, '', url.toString())
     }
     
     // Request module if not already loaded (on-demand loading)
