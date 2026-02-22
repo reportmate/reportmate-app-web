@@ -106,7 +106,7 @@ export function useInstallStats() {
 /**
  * Hook for fetching events (used when WebSocket is not available)
  */
-export function useEvents(limit: number = 50) {
+export function useEvents(limit: number = 1000) {
   const { data, error, isLoading, mutate } = useSWR(
     `/api/events?limit=${limit}`,
     fetcher,
