@@ -77,6 +77,16 @@ export function preloadInstallsData() {
 }
 
 /**
+ * Get all install items from a device, checking both Cimian and Munki paths.
+ * Cimian is preferred; falls back to Munki items if no Cimian data.
+ */
+export function getDeviceInstallItems(device: any): any[] {
+  const cimianItems = device?.modules?.installs?.cimian?.items
+  if (cimianItems && cimianItems.length > 0) return cimianItems
+  return device?.modules?.installs?.munki?.items || []
+}
+
+/**
  * Categorize devices by install status
  * Returns arrays of devices with errors, warnings, pending, and healthy installs
  * Note: Warnings and Pending are DIFFERENT categories:
@@ -93,21 +103,21 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
     // Skip archived devices
     if (device.archived === true) continue
     
-    const cimianItems = device.modules?.installs?.cimian?.items || []
+    const cimianItems = getDeviceInstallItems(device)
     
     const hasError = cimianItems.some((item: any) => {
-      const status = item.currentStatus?.toLowerCase() || ''
+      const status = (item.currentStatus || item.status || '').toLowerCase()
       return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
     })
     
     const hasWarning = cimianItems.some((item: any) => {
-      const status = item.currentStatus?.toLowerCase() || ''
+      const status = (item.currentStatus || item.status || '').toLowerCase()
       // Warnings are issues that need attention - NOT pending changes
       return status.includes('warning') || status === 'needs-attention'
     })
 
     const hasPending = cimianItems.some((item: any) => {
-      const status = item.currentStatus?.toLowerCase() || ''
+      const status = (item.currentStatus || item.status || '').toLowerCase()
       // Pending are scheduled changes - installations, removals, updates
       return status.includes('will-be-installed') || status.includes('update-available') || 
              status.includes('update_available') || status.includes('will-be-removed') || 
@@ -141,10 +151,10 @@ export function getInstallItemsByStatus(devices: any[], statusFilter: 'errors' |
   const items: any[] = []
   
   for (const device of devices) {
-    const cimianItems = device.modules?.installs?.cimian?.items || []
+    const cimianItems = getDeviceInstallItems(device)
     
     for (const item of cimianItems) {
-      const status = item.currentStatus?.toLowerCase() || ''
+      const status = (item.currentStatus || item.status || '').toLowerCase()
       
       if (statusFilter === 'all') {
         items.push({ ...item, device })
@@ -153,12 +163,10 @@ export function getInstallItemsByStatus(devices: any[], statusFilter: 'errors' |
           items.push({ ...item, device })
         }
       } else if (statusFilter === 'warnings') {
-        // Warnings are issues - NOT pending changes
         if (status.includes('warning') || status === 'needs-attention') {
           items.push({ ...item, device })
         }
       } else if (statusFilter === 'pending') {
-        // Pending are scheduled changes
         if (status.includes('will-be-installed') || status.includes('update-available') || 
             status.includes('update_available') || status.includes('will-be-removed') || 
             status.includes('pending') || status.includes('scheduled') || 
