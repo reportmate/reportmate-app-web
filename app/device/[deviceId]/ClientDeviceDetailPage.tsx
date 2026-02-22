@@ -246,18 +246,8 @@ export default function ClientDeviceDetailPage() {
     getModuleError
   } = useSmartDeviceLoading(deviceId)
   
-  // Get initial tab from hash
-  const getInitialTab = (): TabType => {
-    if (typeof window !== 'undefined' && window.location.hash) {
-      const hash = window.location.hash.replace('#', '') as TabType
-      if (tabs.some(tab => tab.id === hash)) {
-        return hash
-      }
-    }
-    return 'info'
-  }
-  
-  const [activeTab, setActiveTab] = useState<TabType>(getInitialTab())
+  // Tab state — always starts as 'info' (SSR-safe), synced to URL hash via effect below
+  const [activeTab, setActiveTab] = useState<TabType>('info')
   
   // UI State
   const [visibleTabsCount, setVisibleTabsCount] = useState(tabs.length)
@@ -359,29 +349,28 @@ export default function ClientDeviceDetailPage() {
     return hoverColorMap[accentColor as keyof typeof hoverColorMap] || hoverColorMap.blue
   }
   
-  // Handle URL hash navigation
+  // Unified hash-to-tab sync: runs on mount, deviceId change, and browser back/forward
   useEffect(() => {
-    const handleHashChange = () => {
-      if (typeof window !== 'undefined') {
-        const hash = window.location.hash.replace('#', '') as TabType
-        if (hash && tabs.some(tab => tab.id === hash)) {
-          setActiveTab(hash)
-          
-          // Request module if not already loaded (fixes back/forward button data loading)
-          if (hash !== 'info' && !isModuleLoaded(hash)) {
-            // No await needed here, just trigger request
-            requestModule(hash).catch(() => {})
-          }
-        }
+    const syncHashToTab = () => {
+      const hash = window.location.hash.replace('#', '') as TabType
+      if (hash && tabs.some(tab => tab.id === hash)) {
+        setActiveTab(hash)
+      } else {
+        setActiveTab('info')
       }
     }
     
-    // Listen for hash changes
-    if (typeof window !== 'undefined') {
-      window.addEventListener('hashchange', handleHashChange)
-      return () => window.removeEventListener('hashchange', handleHashChange)
+    // Sync immediately on mount and whenever deviceId changes
+    syncHashToTab()
+    
+    // Listen for hash changes (browser back/forward, programmatic hash changes)
+    window.addEventListener('hashchange', syncHashToTab)
+    window.addEventListener('popstate', syncHashToTab)
+    return () => {
+      window.removeEventListener('hashchange', syncHashToTab)
+      window.removeEventListener('popstate', syncHashToTab)
     }
-  }, [isModuleLoaded, requestModule])
+  }, [deviceId])
 
   // Prefetch module data on hover
   const handleTabHover = (tabId: TabType) => {
@@ -704,7 +693,11 @@ export default function ClientDeviceDetailPage() {
                deviceInfo?.modules?.system?.operatingSystem?.name || 
                deviceInfo?.modules?.system?.operatingSystem?.productName || ''
     const osLower = os.toLowerCase()
-    return osLower.includes('mac') || osLower.includes('darwin') || osLower.includes('macos')
+    if (osLower.includes('mac') || osLower.includes('darwin') || osLower.includes('macos')) return true
+    // Fallback: check hardware model and manufacturer
+    const modelName = (deviceInfo?.modules?.hardware?.system?.model_name || deviceInfo?.modules?.hardware?.model || '').toLowerCase()
+    const hwVendor = (deviceInfo?.modules?.hardware?.system?.hardware_vendor || deviceInfo?.modules?.hardware?.manufacturer || '').toLowerCase()
+    return modelName.includes('mac') || modelName.includes('imac') || hwVendor.includes('apple')
   })()
 
   return (

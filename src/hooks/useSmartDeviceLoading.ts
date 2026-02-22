@@ -127,12 +127,16 @@ export function useSmartDeviceLoading(deviceId: string) {
     const loadAllModules = async () => {
       console.log('[SMART LOAD] Starting background module loading for:', BACKGROUND_MODULES)
       
-      // Mark all as loading first
-      const loadingStates: Record<string, ModuleStatus> = {}
-      BACKGROUND_MODULES.forEach(mod => {
-        loadingStates[mod] = { state: 'loading', data: null, error: null }
+      // Mark unloaded modules as loading (preserve any already-loaded from requestModule/prefetch)
+      setModuleStates(prev => {
+        const next = { ...prev }
+        BACKGROUND_MODULES.forEach(mod => {
+          if (!next[mod] || next[mod].state !== 'loaded') {
+            next[mod] = { state: 'loading', data: null, error: null }
+          }
+        })
+        return next
       })
-      setModuleStates(loadingStates)
       
       // Fetch all in parallel
       const results = await Promise.allSettled(
@@ -170,8 +174,17 @@ export function useSmartDeviceLoading(deviceId: string) {
       
       console.log('[SMART LOAD] All modules loaded, final states:', Object.keys(finalStates).map(k => `${k}: ${finalStates[k].state}`))
       
-      // Single state update with all results
-      setModuleStates(finalStates)
+      // Merge results — don't overwrite modules already loaded by requestModule/prefetch
+      setModuleStates(prev => {
+        const next = { ...prev }
+        Object.entries(finalStates).forEach(([mod, status]) => {
+          // Always update if successful; only set error if module wasn't already loaded
+          if (status.state === 'loaded' || prev[mod]?.state !== 'loaded') {
+            next[mod] = status
+          }
+        })
+        return next
+      })
       
       // Also sync to deviceInfo.modules for legacy components
       setDeviceInfo((prev: any) => {
