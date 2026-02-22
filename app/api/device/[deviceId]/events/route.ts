@@ -20,7 +20,7 @@ export async function GET(
     
     // Extract query parameters for pagination
     const { searchParams } = new URL(request.url)
-    const limit = Math.min(parseInt(searchParams.get('limit') || '100'), 500) // Max 500, default 100
+    const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 1000) // Max 1000, default 1000
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
     
     // Valid event categories - filter out everything else

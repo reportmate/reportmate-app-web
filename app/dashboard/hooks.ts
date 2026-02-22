@@ -179,7 +179,7 @@ export function useLiveEvents() {
     // Function to fetch events from local API
     async function fetchLocalEvents() {
       try {
-        const response = await fetch('/api/events?limit=50')
+        const response = await fetch('/api/events?limit=1000')
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.events) {
@@ -197,7 +197,7 @@ export function useLiveEvents() {
                 setLoadingProgress({ current: eventCount, total: eventCount })
                 setLoadingMessage('Events loaded')
                 
-                return data.events.slice(-50).map(sanitizeEventForDisplay) // Show last 50 events
+                return data.events.slice(-1000).map(sanitizeEventForDisplay) // Show last 1000 events
               }
               
               // Otherwise, merge new events, avoiding duplicates
@@ -207,7 +207,7 @@ export function useLiveEvents() {
                 .map(sanitizeEventForDisplay)
               if (newEvents.length > 0) {
                 setLastUpdateTime(new Date())
-                return [...prev, ...newEvents].slice(-50) // Keep last 50 events
+                return [...prev, ...newEvents].slice(-1000) // Keep last 1000 events
               }
               return prev
             })
@@ -420,7 +420,7 @@ export function useLiveEvents() {
     loadingProgress,
     loadingMessage,
     addEvent: (event: FleetEvent) => {
-      setEvents(prev => [event, ...prev].slice(-50)) // Reduced from 100 to 50 events
+      setEvents(prev => [event, ...prev].slice(-1000)) // Keep last 1000 events
       setLastUpdateTime(new Date())
     }
   }

@@ -164,7 +164,7 @@ export default function ClientDashboard() {
         }
         
         // Single consolidated API call
-        const response = await fetch('/api/dashboard?eventsLimit=50', { cache: 'no-store' })
+        const response = await fetch('/api/dashboard?eventsLimit=200', { cache: 'no-store' })
 
         if (!response.ok) {
           throw new Error(`Failed to load dashboard data: ${response.status}`)
@@ -180,7 +180,9 @@ export default function ClientDashboard() {
           const systemOS = apiDevice.modules?.system?.operatingSystem || {}
           // NOTE: installs data is NOT included in dashboard response (too large ~26MB)
           // Error/warning counts come from pre-calculated installStats instead
-          const deviceName = inventory.deviceName || apiDevice.name || apiDevice.deviceName || apiDevice.serialNumber
+          const deviceName = inventory.deviceName || apiDevice.name || apiDevice.deviceName
+            || apiDevice.modules?.hardware?.system?.computer_name || apiDevice.modules?.hardware?.system?.hostname
+            || apiDevice.serialNumber
           const assetTag = inventory.assetTag || apiDevice.assetTag
           
           // Platform is provided directly by FastAPI

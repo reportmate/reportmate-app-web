@@ -16,6 +16,7 @@ interface RawEvent {
   timestamp?: string
   details?: Record<string, unknown>
   message?: string
+  platform?: string
   // Legacy Azure Functions fields (for compatibility)
   device?: string
   device_id?: string
@@ -28,6 +29,7 @@ interface NormalizedEvent {
   id: string
   device: string
   deviceName?: string  // Enhanced with actual device name
+  platform?: string
   kind: string
   ts: string
   message?: string  // User-friendly message from the database
@@ -43,11 +45,11 @@ export async function GET(request: Request) {
     const offsetParam = searchParams.get('offset')
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
-    const limit = limitParam ? parseInt(limitParam, 10) : 100
+    const limit = limitParam ? parseInt(limitParam, 10) : 1000
     const offset = offsetParam ? parseInt(offsetParam, 10) : 0
     
     // Validate parameters  
-    const validLimit = Math.min(Math.max(limit, 1), 500) // Between 1 and 500 events
+    const validLimit = Math.min(Math.max(limit, 1), 1000) // Between 1 and 1000 events
     const validOffset = Math.max(offset, 0) // Non-negative offset
     
     // Validate and format date parameters
@@ -89,8 +91,8 @@ export async function GET(request: Request) {
     headers['Content-Type'] = 'application/json'
 
     // For pagination with date filters, we need fresh data each time
-    // Only use cache for limit=50 and offset=0 with no date filters (dashboard requests)
-    const shouldCache = validLimit <= 50 && validOffset === 0 && !validStartDate && !validEndDate
+    // Only use cache for limit<=200 and offset=0 with no date filters (dashboard requests)
+    const shouldCache = validLimit <= 1000 && validOffset === 0 && !validStartDate && !validEndDate
     
     if (shouldCache) {
       // Check cache first - but only for dashboard requests
@@ -164,6 +166,7 @@ export async function GET(request: Request) {
               id: event.id,
               device: deviceSerial,  // Keep original serial for compatibility
               deviceName: deviceName,  // Device name from FastAPI (no additional lookup needed!)
+              platform: event.platform,
               kind: event.eventType || event.kind || 'unknown',
               ts: event.timestamp || event.ts || new Date().toISOString(),
               message: event.message,  // Include user-friendly message from database

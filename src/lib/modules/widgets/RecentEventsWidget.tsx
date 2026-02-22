@@ -3,10 +3,11 @@
  * Displays live event feed with real-time updates and intelligent event bundling
  */
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
+import { SlidersHorizontal } from 'lucide-react'
 
 interface RecentEventsTableProps {
   events: FleetEvent[]
@@ -17,6 +18,53 @@ interface RecentEventsTableProps {
   isLoading?: boolean
   loadingProgress?: { current: number, total: number }
   loadingMessage?: string
+}
+
+// Event type filter configuration (Info last — hidden by default)
+const EVENT_FILTERS = [
+  { key: 'success', label: 'Success' },
+  { key: 'warning', label: 'Warnings' },
+  { key: 'error', label: 'Errors' },
+  { key: 'system', label: 'System' },
+  { key: 'info', label: 'Info' },
+] as const
+
+// Inline SVG icons matching /events page style
+const getFilterIcon = (key: string) => {
+  switch (key) {
+    case 'success':
+      return (
+        <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+        </svg>
+      )
+    case 'warning':
+      return (
+        <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+      )
+    case 'error':
+      return (
+        <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+        </svg>
+      )
+    case 'system':
+      return (
+        <svg className="w-4 h-4 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+        </svg>
+      )
+    case 'info':
+      return (
+        <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        </svg>
+      )
+    default:
+      return null
+  }
 }
 
 // Helper function to detect module type from event
@@ -181,12 +229,35 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
+  // Hidden event types - info hidden by default (too noisy)
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterRef = useRef<HTMLDivElement>(null)
   // TODO: Accordion functionality disabled for now - will revisit later
   // const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   // Bundle related events intelligently
   const bundledEvents = useMemo(() => bundleEvents(events), [events])
+  
+  // Filter bundled events based on hidden types
+  const filteredEvents = useMemo(() => {
+    if (hiddenTypes.size === 0) return bundledEvents
+    return bundledEvents.filter(event => !hiddenTypes.has(event.kind.toLowerCase()))
+  }, [bundledEvents, hiddenTypes])
+
+  // Toggle a filter type on/off
+  const toggleFilter = (key: string) => {
+    setHiddenTypes(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
   
   // TODO: Accordion toggle disabled for now - will revisit later
   // const toggleExpanded = (eventId: string) => {
@@ -221,6 +292,19 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
       clearTimeout(timeoutRef.current)
     }
   }
+
+  // Close filter dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false)
+      }
+    }
+    if (filterOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [filterOpen])
 
   // Cleanup timeout on unmount
   React.useEffect(() => {
@@ -306,21 +390,67 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[620px] flex flex-col">
-      <Link
-        href="/events"
-        className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 block hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
-      >
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 block">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Recent Events
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Live activity from fleet
-            </p>
+          <div className="flex items-center gap-3">
+            <Link href="/events" className="hover:opacity-80 transition-opacity">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Recent Events
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                Live activity from fleet
+              </p>
+            </Link>
           </div>
-          <div className="flex items-center gap-4">
-            {/* Connection Status with expansion and tooltip */}
+          <div className="flex items-center gap-3">
+            {/* Filter dropdown */}
+            <div className="relative" ref={filterRef}>
+              <button
+                onClick={() => setFilterOpen(!filterOpen)}
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                  hiddenTypes.size > 0
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
+                    : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'
+                } hover:bg-gray-200 dark:hover:bg-gray-600`}
+              >
+                <SlidersHorizontal className="w-3.5 h-3.5" />
+                Filter
+                {hiddenTypes.size > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200">
+                    {5 - hiddenTypes.size}
+                  </span>
+                )}
+              </button>
+              {filterOpen && (
+                <div className="absolute right-0 top-full mt-1 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50 py-1">
+                  {EVENT_FILTERS.map((filter) => {
+                    const isActive = !hiddenTypes.has(filter.key)
+                    return (
+                      <button
+                        key={filter.key}
+                        onClick={() => toggleFilter(filter.key)}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                          isActive
+                            ? 'bg-blue-600 border-blue-600 dark:bg-blue-500 dark:border-blue-500'
+                            : 'border-gray-300 dark:border-gray-600'
+                        }`}>
+                          {isActive && (
+                            <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                        {getFilterIcon(filter.key)}
+                        <span className="text-gray-700 dark:text-gray-300">{filter.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+            {/* Connection Status */}
             {status.show && (
               <div className="relative">
                 <div 
@@ -349,14 +479,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                 )}
               </div>
             )}
-            {mounted && lastUpdateTime && (
-              <div className="text-sm text-gray-500 dark:text-gray-400">
-                Last update: {formatRelativeTime(lastUpdateTime.toISOString())}
-              </div>
-            )}
           </div>
         </div>
-      </Link>
+      </div>
       
       {events.length === 0 && (isLoading || connectionStatus === 'connecting' || connectionStatus === 'reconnecting') ? (
         // Loading skeleton - show table structure with skeleton rows
@@ -477,7 +602,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {bundledEvents.map((bundledEvent: BundledEvent) => {
+                    {filteredEvents.map((bundledEvent: BundledEvent) => {
                       // TODO: Accordion expand/collapse functionality disabled for now
                       // const isExpanded = expandedEvents.has(bundledEvent.id)
                       // const hasDetails = bundledEvent.hasExpandableDetails
@@ -498,6 +623,14 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                             <td className="w-56 px-3 py-2.5">
                               <Link
                                 href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
+                                  const kind = bundledEvent.kind.toLowerCase()
+                                  const filterMap: Record<string, string> = {
+                                    error: 'error,warning,success',
+                                    warning: 'warning,success',
+                                    success: 'success',
+                                  }
+                                  const filter = filterMap[kind]
+                                  if (filter) return `?filter=${filter}#installs`
                                   const moduleId = getEventModuleId(bundledEvent)
                                   return moduleId ? `#${moduleId}` : ''
                                 })()}`}
