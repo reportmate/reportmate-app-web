@@ -122,7 +122,7 @@ export function bundleEvents(events: FleetEvent[]): BundledEvent[] {
     }
   }
 
-  return bundled.slice(0, 50) // Limit to 50 items
+  return bundled // Return all bundled events (API already limits to 1000)
 }
 
 /**
@@ -192,21 +192,19 @@ function extractErrorWarningDetails(events: FleetEvent[]): Partial<BundledEvent>
 // Determine if two events should be bundled together
 function shouldBundleTogether(event1: FleetEvent, event2: FleetEvent): boolean {
   // Same device is required (already checked in caller)
-  
-  // Bundle events of the same type (info + info, error + error, etc.)
-  if (event1.kind === event2.kind) return true
-  
-  // Bundle success/info events together (data collection events)
+
+  // Never bundle warning or error events — each run's warning/error is distinct and must be visible
+  if (event1.kind === 'error' || event1.kind === 'warning' ||
+      event2.kind === 'error' || event2.kind === 'warning') {
+    return false
+  }
+
+  // Bundle success/info/system events together (routine data collection events)
   const dataCollectionTypes = new Set(['success', 'info', 'system'])
   if (dataCollectionTypes.has(event1.kind) && dataCollectionTypes.has(event2.kind)) {
     return true
   }
-  
-  // Don't bundle errors or warnings with other types
-  if (['error', 'warning'].includes(event1.kind) || ['error', 'warning'].includes(event2.kind)) {
-    return event1.kind === event2.kind
-  }
-  
+
   return false
 }
 
@@ -234,7 +232,17 @@ function createBundleMessage(events: FleetEvent[], kinds: string[]): string {
   })
 
   if (moduleEvents.length === events.length) {
-    // All events are module data collection - create a smart summary
+    // All events are module data collection - use the actual event message if there's only one,
+    // or if all events share the same message
+    if (events.length === 1 && events[0].message) {
+      return events[0].message
+    }
+    const uniqueMessages = [...new Set(events.map(e => e.message).filter(Boolean))]
+    if (uniqueMessages.length === 1 && uniqueMessages[0]) {
+      return uniqueMessages[0]
+    }
+
+    // Multiple different messages — create a smart summary
     const moduleNames = new Set<string>()
     
     events.forEach(event => {
