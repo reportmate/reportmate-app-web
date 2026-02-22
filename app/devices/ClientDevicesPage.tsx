@@ -101,7 +101,7 @@ function DevicesPageContent() {
               id: device.serialNumber || device.deviceId,
               deviceId: device.deviceId,
               // Get deviceName from modules.inventory.deviceName
-              deviceName: inventory.deviceName || device.serialNumber,
+              deviceName: inventory.deviceName || device.modules?.hardware?.system?.computer_name || device.modules?.hardware?.system?.hostname || device.serialNumber,
               serialNumber: device.serialNumber,
               lastSeen: device.lastSeen,
               collectedAt: device.lastSeen,

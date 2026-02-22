@@ -99,6 +99,20 @@ export function validateDeviceStructure(rawDevice: any): void {
  * Each extractor expects: { hardware: {...}, system: {...}, etc. }
  * NOT the individual module data directly
  */
+/**
+ * Infer platform from hardware module data when no explicit platform is set
+ */
+function inferPlatformFromHardware(modules: any): string | undefined {
+  const modelName = modules?.hardware?.system?.model_name || modules?.hardware?.model || ''
+  if (modelName) {
+    const lower = modelName.toLowerCase()
+    if (lower.includes('mac') || lower.includes('imac')) return 'macOS'
+  }
+  const vendor = modules?.hardware?.system?.hardware_vendor || modules?.hardware?.manufacturer || ''
+  if (vendor && vendor.toLowerCase().includes('apple')) return 'macOS'
+  return undefined
+}
+
 export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   // Extract modules data with correct nesting
   const modules = rawDevice.modules || {}
@@ -116,7 +130,13 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const installs = extractInstalls(modules)
   const profiles = extractProfiles(modules)
   
-  const finalName = inventory.deviceName || rawDevice.name || rawDevice.serialNumber || 'Unknown Device'
+  const finalName = inventory.deviceName
+    || rawDevice.name
+    || modules.hardware?.system?.computer_name
+    || modules.hardware?.system?.hostname
+    || modules.network?.hostname
+    || rawDevice.serialNumber
+    || 'Unknown Device'
   
   // Calculate status using centralized logic (single source of truth)
   const normalizedLastSeen = normalizeLastSeen(rawDevice.lastSeen)
@@ -129,7 +149,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     name: finalName,
     
     // Platform (required for macOS/Windows-specific UI features like btmdbHealth)
-    platform: rawDevice.platform,
+    platform: rawDevice.platform || inferPlatformFromHardware(modules),
     
     // Status and timestamps
     lastSeen: normalizedLastSeen,
