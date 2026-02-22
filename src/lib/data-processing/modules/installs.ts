@@ -512,6 +512,37 @@ function findPackageForMessage(message: string, packages: InstallPackage[]): Ins
 }
 
 /**
+ * Extract an item name from a Munki warning/error message text.
+ * Handles common Munki message patterns like:
+ *   "Could not process item ReportMate for install. No pkginfo found in catalogs: ['Production']"
+ *   "Install of ReportMate-1.0 failed with return code 1"
+ *   "Download of ReportMate failed"
+ */
+function extractItemNameFromMessage(message: string): string | null {
+  // "Could not process item X for install/removal/etc"
+  const processMatch = message.match(/Could not process item (.+?) for/i)
+  if (processMatch) return processMatch[1].trim()
+
+  // "Install of X failed" or "Install of X-version failed"
+  const installMatch = message.match(/Install of (.+?)(?:\s+failed|-\d)/i)
+  if (installMatch) return installMatch[1].trim()
+
+  // "Download of X failed"
+  const downloadMatch = message.match(/Download of (.+?) failed/i)
+  if (downloadMatch) return downloadMatch[1].trim()
+
+  // "Could not install X"
+  const couldNotMatch = message.match(/Could not install (.+?)(?:\.|;|$)/i)
+  if (couldNotMatch) return couldNotMatch[1].trim()
+
+  // "Problem with/installing X"
+  const problemMatch = message.match(/Problem (?:with|installing) (.+?)(?:\.|;|$)/i)
+  if (problemMatch) return problemMatch[1].trim()
+
+  return null
+}
+
+/**
  * Extract install status information from device modules
  * Supports both Cimian (Windows/cross-platform) and Munki (macOS) data sources
  * FIXES: Status capitalization issues by enforcing standard format
@@ -1047,62 +1078,111 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       }
     }
     
-    // Legacy fallback: if no items have per-item messages, parse from run-level strings
-    const hasPerItemMessages = packages.some((p: InstallPackage) => (p.errors && p.errors.length > 0) || (p.warnings && p.warnings.length > 0))
-    if (!hasPerItemMessages) {
-      const itemMessages: Map<string, { messages: string[], severity: 'Error' | 'Warning' }> = new Map()
-      
-      if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
-        for (const msg of installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
-          const matchedPkg = findPackageForMessage(msg, packages)
-          if (matchedPkg) {
-            const key = matchedPkg.id || matchedPkg.name
-            const existing = itemMessages.get(key) || { messages: [], severity: 'Error' as const }
-            existing.messages.push(msg)
-            existing.severity = 'Error'
-            itemMessages.set(key, existing)
+    // Parse munki.errors and munki.warnings strings to attach messages to items.
+    // Creates SYNTHETIC items for packages mentioned in messages but missing from munki.items
+    // (e.g., "Could not process item ReportMate for install" when ReportMate isn't in items array)
+    // This always runs — the per-item lastWarning/lastError only covers items that exist.
+    if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
+      for (const msg of installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
+        const matchedPkg = findPackageForMessage(msg, packages)
+        if (matchedPkg) {
+          if (matchedPkg.errors?.some(e => e.message === msg)) continue
+          if (!matchedPkg.errors) matchedPkg.errors = []
+          matchedPkg.errors.push({ id: `munki-run-error-${matchedPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: matchedPkg.name })
+          matchedPkg.status = 'Error'
+        } else {
+          const itemName = extractItemNameFromMessage(msg)
+          if (itemName) {
+            let syntheticPkg = packages.find(p => p.name.toLowerCase() === itemName.toLowerCase())
+            if (!syntheticPkg) {
+              syntheticPkg = {
+                id: itemName.toLowerCase().replace(/\s+/g, '-'),
+                name: itemName,
+                displayName: itemName,
+                version: '',
+                status: 'Error',
+                type: 'munki',
+                lastUpdate: installs.munki.endTime || '',
+                errors: [],
+                warnings: []
+              }
+              packages.push(syntheticPkg)
+            }
+            if (!syntheticPkg.errors) syntheticPkg.errors = []
+            syntheticPkg.errors.push({ id: `munki-run-error-${syntheticPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: itemName })
+            syntheticPkg.status = 'Error'
           } else {
             installsInfo.messages?.errors.push({ id: `munki-run-error-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: 'Munki' })
           }
         }
       }
-      if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
-        for (const msg of installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
-          const matchedPkg = findPackageForMessage(msg, packages)
-          if (matchedPkg) {
-            const key = matchedPkg.id || matchedPkg.name
-            const existing = itemMessages.get(key) || { messages: [], severity: 'Warning' as const }
-            existing.messages.push(msg)
-            itemMessages.set(key, existing)
+    }
+    if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
+      for (const msg of installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
+        const matchedPkg = findPackageForMessage(msg, packages)
+        if (matchedPkg) {
+          if (matchedPkg.warnings?.some(w => w.message === msg)) continue
+          if (!matchedPkg.warnings) matchedPkg.warnings = []
+          matchedPkg.warnings.push({ id: `munki-run-warning-${matchedPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: matchedPkg.name })
+          if (matchedPkg.status !== 'Error') matchedPkg.status = 'Warning'
+        } else {
+          const itemName = extractItemNameFromMessage(msg)
+          if (itemName) {
+            let syntheticPkg = packages.find(p => p.name.toLowerCase() === itemName.toLowerCase())
+            if (!syntheticPkg) {
+              syntheticPkg = {
+                id: itemName.toLowerCase().replace(/\s+/g, '-'),
+                name: itemName,
+                displayName: itemName,
+                version: '',
+                status: 'Warning',
+                type: 'munki',
+                lastUpdate: installs.munki.endTime || '',
+                errors: [],
+                warnings: []
+              }
+              packages.push(syntheticPkg)
+            }
+            if (!syntheticPkg.warnings) syntheticPkg.warnings = []
+            syntheticPkg.warnings.push({ id: `munki-run-warning-${syntheticPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: itemName })
+            if (syntheticPkg.status !== 'Error') syntheticPkg.status = 'Warning'
           } else {
             installsInfo.messages?.warnings.push({ id: `munki-run-warning-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: 'Munki' })
           }
         }
       }
-      for (const [pkgKey, data] of itemMessages) {
-        const pkg = packages.find(p => (p.id || p.name) === pkgKey)
-        if (!pkg) continue
-        const consolidated = data.messages.join(' | ')
-        if (data.severity === 'Error') {
-          if (!pkg.errors) pkg.errors = []
-          pkg.errors.push({ id: `munki-run-error-${pkg.id}`, message: consolidated, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: pkg.name })
-          pkg.status = 'Error'
-        } else {
-          if (!pkg.warnings) pkg.warnings = []
-          pkg.warnings.push({ id: `munki-run-warning-${pkg.id}`, message: consolidated, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: pkg.name })
-          if (pkg.status !== 'Error') pkg.status = 'Warning'
-        }
-      }
     }
     
     if (installs.munki?.problemInstalls && installs.munki.problemInstalls.trim() !== '') {
-      installsInfo.messages?.warnings.push({
-        id: 'munki-problem-installs',
-        message: `Problem installs: ${installs.munki.problemInstalls}`,
-        timestamp: installs.munki.endTime || new Date().toISOString(),
-        code: 'MUNKI_PROBLEM_INSTALLS',
-        package: 'Munki'
-      })
+      const problemItems = installs.munki.problemInstalls.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+      for (const itemName of problemItems) {
+        let pkg = packages.find(p => p.name.toLowerCase() === itemName.toLowerCase())
+        if (!pkg) {
+          pkg = {
+            id: itemName.toLowerCase().replace(/\s+/g, '-'),
+            name: itemName,
+            displayName: itemName,
+            version: '',
+            status: 'Warning',
+            type: 'munki',
+            lastUpdate: installs.munki.endTime || '',
+            errors: [],
+            warnings: []
+          }
+          packages.push(pkg)
+        }
+        if (!pkg.warnings) pkg.warnings = []
+        if (!pkg.warnings.some(w => w.code === 'MUNKI_PROBLEM_INSTALL')) {
+          pkg.warnings.push({
+            id: `munki-problem-${pkg.id}`,
+            message: `Reported as a problem install by Munki`,
+            timestamp: installs.munki.endTime || new Date().toISOString(),
+            code: 'MUNKI_PROBLEM_INSTALL',
+            package: itemName
+          })
+          if (pkg.status !== 'Error') pkg.status = 'Warning'
+        }
+      }
     }
 
     // Recount statuses after attaching Munki warnings/errors to packages
