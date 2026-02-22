@@ -61,11 +61,44 @@ export function useScrollCollapse(
   // Debounce timer to prevent rapid-fire scroll events during re-renders
   const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // Track previous manual states to detect user toggles while collapsed
+  const prevManualStatesRef = useRef<AccordionStates>({ ...manualStates })
+
   // Cooldown: once collapsed, block un-collapse for a short grace period.
   // This prevents the rapid toggle loop when collapsing frees space, resets
   // scrollTop to 0, which would immediately un-collapse.
   const lastCollapseTimeRef = useRef<number>(0)
   const COLLAPSE_COOLDOWN_MS = 400
+
+  // Detect manual toggles while scroll-collapsed.
+  // If the user explicitly opens an accordion, respect it and exit collapse mode.
+  useEffect(() => {
+    const prev = prevManualStatesRef.current
+    if (scrollCollapsed) {
+      const filtersOpened = !(prev.filters ?? false) && (manualStates.filters ?? false)
+      const widgetsOpened = !(prev.widgets ?? false) && (manualStates.widgets ?? false)
+      if (filtersOpened || widgetsOpened) {
+        setScrollCollapsed(false)
+        hadOpenAccordionsRef.current = false
+      }
+    }
+    prevManualStatesRef.current = { ...manualStates }
+  }, [manualStates.filters, manualStates.widgets, scrollCollapsed])
+
+  // Reset scroll-collapsed when content no longer overflows (e.g. after filtering)
+  useEffect(() => {
+    if (!scrollCollapsed || !enabled) return
+    const checkOverflow = () => {
+      const el = currentElementRef.current || tableContainerRef.current
+      if (!el) return
+      if (el.scrollHeight <= el.clientHeight + threshold && el.scrollTop <= 5) {
+        setScrollCollapsed(false)
+        hadOpenAccordionsRef.current = false
+      }
+    }
+    const timer = setTimeout(checkOverflow, 150)
+    return () => clearTimeout(timer)
+  }, [scrollCollapsed, enabled, threshold])
 
   const handleScroll = useCallback(() => {
     if (!enabled) return

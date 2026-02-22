@@ -321,7 +321,7 @@ function PeripheralsPageContent() {
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              onClick={() => setWidgetsExpanded(!effectiveWidgetsExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>

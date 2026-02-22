@@ -1744,7 +1744,7 @@ function ApplicationsPageContent() {
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Collapsible Header */}
               <button
-                onClick={() => setFiltersExpanded(!filtersExpanded)}
+                onClick={() => setFiltersExpanded(!effectiveFiltersExpanded)}
                 className="w-full px-6 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
@@ -2224,7 +2224,7 @@ function ApplicationsPageContent() {
                 <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
                   {/* Widgets Accordion Header */}
                   <button
-                    onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+                    onClick={() => setWidgetsExpanded(!effectiveWidgetsExpanded)}
                     className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-2">

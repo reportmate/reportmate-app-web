@@ -711,7 +711,7 @@ function SystemPageContent() {
           {/* Selections Accordion Section - First */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
+              onClick={() => setFiltersExpanded(!effectiveFiltersExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <div className="flex items-center gap-2">
@@ -904,7 +904,7 @@ function SystemPageContent() {
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
             {/* Widgets Accordion Header */}
             <button
-              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
+              onClick={() => setWidgetsExpanded(!effectiveWidgetsExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
             >
               <div className="flex items-center gap-2">
