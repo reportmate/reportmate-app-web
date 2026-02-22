@@ -2043,9 +2043,7 @@ function InstallsPageContent() {
               {/* Widgets Accordion Header */}
               <button
                 onClick={() => {
-                  setWidgetsExpanded(!widgetsExpanded)
-                  // Scroll to top to reset scroll-collapse if stuck
-                  tableContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
+                  setWidgetsExpanded(!effectiveWidgetsExpanded)
                 }}
                 className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
               >
