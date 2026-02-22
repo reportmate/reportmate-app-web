@@ -19,7 +19,11 @@ export interface ModuleStatus {
   loadedAt?: Date
 }
 
-const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'system', 'network', 'security', 'identity']
+// Modules already loaded by the /info endpoint (no need to re-fetch)
+const INFO_MODULES = new Set(['system', 'hardware', 'management', 'network', 'security', 'inventory'])
+
+// Only fetch modules NOT included in the info response
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'identity']
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (core identity + info tab modules)
@@ -94,6 +98,21 @@ export function useSmartDeviceLoading(deviceId: string) {
         if (cancelled) return
         
         setDeviceInfo(processed)
+        
+        // Seed moduleStates with modules already present from info response
+        // This makes system, hardware, management, network, security tabs immediately available
+        if (processed?.modules) {
+          setModuleStates(prev => {
+            const next = { ...prev }
+            for (const [mod, data] of Object.entries(processed.modules)) {
+              if (data != null && INFO_MODULES.has(mod)) {
+                next[mod] = { state: 'loaded', data, error: null, loadedAt: new Date() }
+              }
+            }
+            return next
+          })
+        }
+        
         setInfoLoading(false)
         
       } catch (error) {

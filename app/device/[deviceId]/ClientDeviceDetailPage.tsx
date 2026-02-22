@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams, useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { identifyDeviceIdentifierType, resolveDeviceIdentifier } from "../../../src/lib/deviceResolver"
@@ -247,6 +247,7 @@ export default function ClientDeviceDetailPage() {
   } = useSmartDeviceLoading(deviceId)
   
   // Tab state — always starts as 'info' (SSR-safe), synced to URL hash via effect below
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('info')
   
   // UI State
@@ -1063,7 +1064,7 @@ export default function ClientDeviceDetailPage() {
               onRetry={() => requestModule('installs')}
             />
           ) : isModuleLoaded('installs') ? (
-            <InstallsTab device={deviceInfo} data={getModuleData('installs')} />
+            <InstallsTab device={deviceInfo} data={getModuleData('installs')} initialFilter={searchParams?.get('filter')?.split(',') ?? undefined} />
           ) : (
             <ModuleLoadingState 
               moduleName="installs" 
