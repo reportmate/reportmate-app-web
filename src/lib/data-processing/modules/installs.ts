@@ -497,6 +497,21 @@ function getLatestAttemptTimestamp(item: any): string {
 }
 
 /**
+ * Find the package that a Munki warning/error message refers to by matching package names in the message text.
+ * Returns the matching InstallPackage or undefined if no match found.
+ */
+function findPackageForMessage(message: string, packages: InstallPackage[]): InstallPackage | undefined {
+  const msgLower = message.toLowerCase()
+  // Try exact name match first (longest names first to avoid partial matches)
+  const sorted = [...packages].sort((a, b) => (b.name?.length || 0) - (a.name?.length || 0))
+  for (const pkg of sorted) {
+    if (pkg.name && msgLower.includes(pkg.name.toLowerCase())) return pkg
+    if (pkg.displayName && pkg.displayName !== pkg.name && msgLower.includes(pkg.displayName.toLowerCase())) return pkg
+  }
+  return undefined
+}
+
+/**
  * Extract install status information from device modules
  * Supports both Cimian (Windows/cross-platform) and Munki (macOS) data sources
  * FIXES: Status capitalization issues by enforcing standard format
@@ -597,7 +612,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       installedVersion: item.installedVersion || '',
       id: item.id || item.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown',
       type: 'munki',
-      lastSeenInSession: item.endTime || installs.munki.endTime || ''
+      lastSeenInSession: item.endTime || installs.munki.endTime || '',
+      // Per-item message from Mac client (consolidated warning/error)
+      message: item.message || undefined,
+      pendingReason: item.pendingReason || undefined
     }))
       }
   else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
@@ -999,25 +1017,116 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   }
 
   // Add Munki-specific errors/warnings if present
+  // Rule: ONE message per item maximum (consolidated at client level, with frontend fallback)
   if (hasMunkiData) {
-    if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
-      installsInfo.messages?.errors.push({
-        id: 'munki-run-errors',
-        message: installs.munki.errors,
-        timestamp: installs.munki.endTime || new Date().toISOString(),
-        code: 'MUNKI_ERROR',
-        package: 'Munki'
-      })
+    // First: check if the Mac client already attached per-item messages
+    // If so, use them directly — they're already consolidated
+    const hasPerItemMessages = packages.some((p: InstallPackage) => (p as any).message)
+    
+    if (hasPerItemMessages) {
+      // New Mac client format: per-item message field already consolidated
+      for (const pkg of packages) {
+        const itemMessage = (pkg as any).message as string | undefined
+        if (itemMessage) {
+          // Determine severity from the item's status (already set by Mac client)
+          if (pkg.status === 'Error') {
+            if (!pkg.errors) pkg.errors = []
+            pkg.errors.push({
+              id: `munki-item-error-${pkg.id}`,
+              message: itemMessage,
+              timestamp: installs.munki.endTime || new Date().toISOString(),
+              code: 'MUNKI_ERROR',
+              package: pkg.name
+            })
+          } else if (pkg.status === 'Warning') {
+            if (!pkg.warnings) pkg.warnings = []
+            pkg.warnings.push({
+              id: `munki-item-warning-${pkg.id}`,
+              message: itemMessage,
+              timestamp: installs.munki.endTime || new Date().toISOString(),
+              code: 'MUNKI_WARNING',
+              package: pkg.name
+            })
+          }
+        }
+      }
+    } else {
+      // Legacy format: parse run-level warnings/errors and match to packages
+      // Consolidate to ONE message per item (join with " | " if multiple match)
+      const itemMessages: Map<string, { messages: string[], severity: 'Error' | 'Warning' }> = new Map()
+      
+      if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
+        const munkiErrorLines = installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        for (const msg of munkiErrorLines) {
+          const matchedPkg = findPackageForMessage(msg, packages)
+          if (matchedPkg) {
+            const key = matchedPkg.id || matchedPkg.name
+            const existing = itemMessages.get(key) || { messages: [], severity: 'Error' as const }
+            existing.messages.push(msg)
+            existing.severity = 'Error'
+            itemMessages.set(key, existing)
+          } else {
+            installsInfo.messages?.errors.push({
+              id: `munki-run-error-system-${munkiErrorLines.indexOf(msg)}`,
+              message: msg,
+              timestamp: installs.munki.endTime || new Date().toISOString(),
+              code: 'MUNKI_ERROR',
+              package: 'Munki'
+            })
+          }
+        }
+      }
+      if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
+        const munkiWarningLines = installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+        for (const msg of munkiWarningLines) {
+          const matchedPkg = findPackageForMessage(msg, packages)
+          if (matchedPkg) {
+            const key = matchedPkg.id || matchedPkg.name
+            const existing = itemMessages.get(key) || { messages: [], severity: 'Warning' as const }
+            existing.messages.push(msg)
+            // Don't downgrade Error to Warning
+            itemMessages.set(key, existing)
+          } else {
+            installsInfo.messages?.warnings.push({
+              id: `munki-run-warning-system-${munkiWarningLines.indexOf(msg)}`,
+              message: msg,
+              timestamp: installs.munki.endTime || new Date().toISOString(),
+              code: 'MUNKI_WARNING',
+              package: 'Munki'
+            })
+          }
+        }
+      }
+      
+      // Apply consolidated messages to packages (one entry per item)
+      for (const [pkgKey, data] of itemMessages) {
+        const pkg = packages.find(p => (p.id || p.name) === pkgKey)
+        if (!pkg) continue
+        const consolidated = data.messages.join(' | ')
+        if (data.severity === 'Error') {
+          if (!pkg.errors) pkg.errors = []
+          pkg.errors.push({
+            id: `munki-run-error-${pkg.id}`,
+            message: consolidated,
+            timestamp: installs.munki.endTime || new Date().toISOString(),
+            code: 'MUNKI_ERROR',
+            package: pkg.name
+          })
+          pkg.status = 'Error'
+        } else {
+          if (!pkg.warnings) pkg.warnings = []
+          pkg.warnings.push({
+            id: `munki-run-warning-${pkg.id}`,
+            message: consolidated,
+            timestamp: installs.munki.endTime || new Date().toISOString(),
+            code: 'MUNKI_WARNING',
+            package: pkg.name
+          })
+          if (pkg.status !== 'Error') pkg.status = 'Warning'
+        }
+      }
     }
-    if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
-      installsInfo.messages?.warnings.push({
-        id: 'munki-run-warnings',
-        message: installs.munki.warnings,
-        timestamp: installs.munki.endTime || new Date().toISOString(),
-        code: 'MUNKI_WARNING',
-        package: 'Munki'
-      })
-    }
+    
     if (installs.munki?.problemInstalls && installs.munki.problemInstalls.trim() !== '') {
       installsInfo.messages?.warnings.push({
         id: 'munki-problem-installs',
@@ -1027,6 +1136,28 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         package: 'Munki'
       })
     }
+
+    // Recount statuses after attaching Munki warnings/errors to packages
+    statusCounts = {
+      installed: 0,
+      pending: 0,
+      warnings: 0,
+      errors: 0,
+      removed: 0
+    }
+    for (const pkg of packages) {
+      switch (pkg.status) {
+        case 'Installed': statusCounts.installed++; break
+        case 'Pending': statusCounts.pending++; break
+        case 'Warning': statusCounts.warnings++; break
+        case 'Error': statusCounts.errors++; break
+        case 'Removed': statusCounts.removed++; break
+      }
+    }
+    installsInfo.totalPackages = packages.length
+    installsInfo.installed = statusCounts.installed
+    installsInfo.pending = statusCounts.pending
+    installsInfo.failed = statusCounts.errors + statusCounts.warnings
   }
 
   
