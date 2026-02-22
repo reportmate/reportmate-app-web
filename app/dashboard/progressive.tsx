@@ -95,7 +95,9 @@ export default function ProgressiveDashboard() {
   const deviceNameMap = useMemo(() => {
     const map: Record<string, string> = {}
     displayDevices.forEach(device => {
-      const name = device?.modules?.inventory?.deviceName || device?.name || device?.deviceName || device?.serialNumber
+      const name = device?.modules?.inventory?.deviceName || device?.name || device?.deviceName
+        || device?.modules?.hardware?.system?.computer_name || device?.modules?.hardware?.system?.hostname
+        || device?.serialNumber
       const serial = device?.serialNumber
       const deviceId = device?.deviceId
       const assetTag = device?.modules?.inventory?.assetTag || device?.assetTag
