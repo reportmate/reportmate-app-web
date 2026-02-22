@@ -415,50 +415,6 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialF
         </div>
       </div>
 
-      {/* System Warning Banner - Warnings about items not in catalog, etc. */}
-      {(() => {
-        const systemWarnings = processedInstallsData?.messages?.warnings || []
-        const munkiWarningString = device?.modules?.installs?.munki?.warnings
-
-        const warningMessages: string[] = []
-        if (systemWarnings.length > 0) {
-          systemWarnings.forEach((w: any) => {
-            if (w.message && !warningMessages.includes(w.message)) warningMessages.push(w.message)
-          })
-        }
-        if (munkiWarningString && typeof munkiWarningString === 'string' && munkiWarningString.trim() && warningMessages.length === 0) {
-          munkiWarningString.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0).forEach((msg: string) => {
-            if (!warningMessages.includes(msg)) warningMessages.push(msg)
-          })
-        }
-
-        if (warningMessages.length === 0) return null
-
-        return (
-          <div className="bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-300 dark:border-amber-700 rounded-lg p-5">
-            <div className="flex items-start gap-4">
-              <div className="flex-shrink-0 w-10 h-10 bg-amber-100 dark:bg-amber-900/40 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-amber-800 dark:text-amber-300">
-                  {warningMessages.length === 1 ? 'Warning' : `${warningMessages.length} Warnings`}
-                </h3>
-                <div className="mt-2 space-y-1">
-                  {warningMessages.map((msg, i) => (
-                    <p key={i} className="text-sm text-amber-700 dark:text-amber-400 font-mono bg-amber-100/60 dark:bg-amber-900/30 px-3 py-2 rounded">
-                      {msg}
-                    </p>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
-
       {/* Run Log Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <button
