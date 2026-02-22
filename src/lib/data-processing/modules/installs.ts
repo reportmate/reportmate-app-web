@@ -614,8 +614,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       type: 'munki',
       lastSeenInSession: item.endTime || installs.munki.endTime || '',
       // Per-item message from Mac client (consolidated warning/error)
-      message: item.message || undefined,
-      pendingReason: item.pendingReason || undefined
+      message: item.message || undefined
     }))
       }
   else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
