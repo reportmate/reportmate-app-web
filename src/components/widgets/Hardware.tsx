@@ -83,13 +83,17 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
     )
   }
 
-  // Detect platform
+  // Detect platform - check OS fields first, then hardware model/manufacturer as fallback
   const operatingSystem = device?.modules?.system?.operatingSystem || device?.modules?.system?.operating_system
   const platform = device?.platform?.toLowerCase() || 
                   operatingSystem?.platform?.toLowerCase() ||
                   operatingSystem?.name?.toLowerCase() ||
                   ''
+  const modelName = (hardwareData.system?.modelName || hardwareData.system?.model_name || hardwareData.model || '').toLowerCase()
+  const hwVendor = (hardwareData.system?.hardwareVendor || hardwareData.system?.hardware_vendor || hardwareData.manufacturer || '').toLowerCase()
   const isMac = platform.includes('mac') || platform.includes('darwin')
+    || modelName.includes('mac') || modelName.includes('imac')
+    || hwVendor.includes('apple')
   
   // === Data Extraction - EXACTLY matching HardwareTab.tsx patterns ===
   

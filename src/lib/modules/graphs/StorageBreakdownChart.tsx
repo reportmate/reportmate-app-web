@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo } from 'react'
+import { getDevicePlatformLabel } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
   deviceId: string
@@ -182,15 +183,7 @@ export function StorageBreakdownChart({
     }
 
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
-      const model = getDeviceModel(device)
-      if (model.toLowerCase().includes('macbook') || 
-          model.toLowerCase().includes('imac') || 
-          model.toLowerCase().includes('mac mini') ||
-          model.toLowerCase().includes('mac pro') ||
-          model.toLowerCase().includes('mac studio')) {
-        return 'Macintosh'
-      }
-      return 'Windows'
+      return getDevicePlatformLabel(device)
     }
 
     const getArchitecture = (device: Device): string => {

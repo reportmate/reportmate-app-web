@@ -4,6 +4,7 @@
  */
 
 import React, { useMemo } from 'react'
+import { getDevicePlatformLabel } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
   deviceId: string
@@ -165,18 +166,11 @@ export function HardwareTypeChart({
 
     // Helper function to get platform
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' | null => {
+      const result = getDevicePlatformLabel(device)
       const model = getModelName(device)
       // NO FAKE DATA - Return null for devices without model info
-      if (!model) return null
-      
-      if (model.toLowerCase().includes('macbook') || 
-          model.toLowerCase().includes('imac') || 
-          model.toLowerCase().includes('mac mini') ||
-          model.toLowerCase().includes('mac pro') ||
-          model.toLowerCase().includes('mac studio')) {
-        return 'Macintosh'
-      }
-      return 'Windows'
+      if (!model && result === 'Other') return null
+      return result
     }
 
     // Apply global filters to get the relevant device subset

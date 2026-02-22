@@ -6,7 +6,7 @@ import { useEffect, useState, useRef, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
-import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
+import { usePlatformFilterSafe, normalizePlatform, getDevicePlatformLabel } from "../../../src/providers/PlatformFilterProvider"
 import { Copy } from "lucide-react"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
@@ -385,12 +385,7 @@ function HardwarePageContent() {
   }
 
   const getDevicePlatform = (h: any): 'Windows' | 'Macintosh' | 'Other' => {
-    const model = getDeviceModel(h).toLowerCase()
-    if (model.includes('macbook') || model.includes('imac') || model.includes('mac mini') ||
-        model.includes('mac pro') || model.includes('mac studio')) {
-      return 'Macintosh'
-    }
-    return 'Windows'
+    return getDevicePlatformLabel(h)
   }
 
   const getStorageRange = (device: any): string => {
