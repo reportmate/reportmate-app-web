@@ -34,7 +34,11 @@ export function extractInventory(inventoryData: any): InventoryInfo {
   const inventoryInfo: InventoryInfo = {}
 
   // Basic inventory fields - support both snake_case (new) and camelCase (legacy)
+  // Fallback chain: inventory.deviceName → hardware.system.computer_name → hardware.system.hostname → network.hostname
   const deviceName = inventory.device_name || inventory.deviceName
+    || inventoryData.hardware?.system?.computer_name
+    || inventoryData.hardware?.system?.hostname
+    || inventoryData.network?.hostname
   const assetTag = inventory.asset_tag || inventory.assetTag
   const serialNumber = inventory.serial_number || inventory.serialNumber
   const purchaseDate = inventory.purchase_date || inventory.purchaseDate

@@ -71,10 +71,10 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
         <div className={`grid ${hasAssignmentDetails ? 'grid-cols-5' : 'grid-cols-1'} gap-6`}>
           {/* Left Column - Device Identity (60% width) */}
           <div className={`space-y-4 ${hasAssignmentDetails ? 'col-span-3' : ''}`}>
-            {/* Device Name */}
+            {/* Device Name - fallback chain: inventory → hardware.system.computer_name → hardware.system.hostname → device.name */}
             <Stat 
               label="Device Name" 
-              value={inventory.deviceName || 'Unknown Device'} 
+              value={inventory.deviceName || (device.modules as any)?.hardware?.system?.computer_name || (device.modules as any)?.hardware?.system?.hostname || device.name || 'Unknown Device'} 
             />
             
             {/* Asset Tag */}

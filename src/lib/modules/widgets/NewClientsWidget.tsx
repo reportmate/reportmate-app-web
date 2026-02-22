@@ -127,9 +127,9 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(func
                 <div className="flex items-start gap-3">
                   {/* Device Info */}
                   <div className="flex-1 min-w-0 pl-4">
-                    {/* Primary - Device Name (Rod Christiansen) or fallback to asset tag */}
+                    {/* Primary - Device Name with full fallback chain */}
                     <div className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {device.modules?.inventory?.deviceName || device.name}
+                      {device.modules?.inventory?.deviceName || (device.name && device.name.toLowerCase() !== 'unknown' ? device.name : null) || device.serialNumber}
                     </div>
                     
                     {/* Secondary - Show identifiers but avoid duplication */}
