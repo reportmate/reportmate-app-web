@@ -552,12 +552,13 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   // Determine which managed software system to use
   const hasCimianData = installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0
   const hasMunkiData = installs.munki?.items && Array.isArray(installs.munki.items) && installs.munki.items.length > 0
+  const hasMunkiSystem = !!installs.munki  // Munki system present even with empty items (catastrophic error)
   
   // Determine system name for UI
   let systemName = 'Managed Installs'
   if (hasCimianData) {
     systemName = 'Cimian'
-  } else if (hasMunkiData) {
+  } else if (hasMunkiData || hasMunkiSystem) {
     systemName = 'Munki'
   }
 
@@ -612,9 +613,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       installedVersion: item.installedVersion || '',
       id: item.id || item.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown',
       type: 'munki',
-      lastSeenInSession: item.endTime || installs.munki.endTime || '',
-      // Per-item message from Mac client (consolidated warning/error)
-      message: item.message || undefined
+      lastSeenInSession: item.endTime || installs.munki.endTime || ''
     }))
       }
   else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
@@ -988,9 +987,9 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     failed: statusCounts.errors + statusCounts.warnings,
     lastUpdate: installs.lastCheckIn || installs.collected_at || '',
     packages,
-    systemName: hasMunkiData ? 'Munki' : (installs.cimian?.config?.systemName || 'Cimian'),
+    systemName: (hasMunkiData || hasMunkiSystem) ? 'Munki' : (installs.cimian?.config?.systemName || 'Cimian'),
     cacheSizeMb,
-    config: hasMunkiData ? {
+    config: (hasMunkiData || hasMunkiSystem) ? {
       // Munki configuration
       type: 'Munki',
       version: installs.munki?.version || '',
@@ -1016,47 +1015,45 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   }
 
   // Add Munki-specific errors/warnings if present
-  // Rule: ONE message per item maximum (consolidated at client level, with frontend fallback)
-  if (hasMunkiData) {
-    // First: check if the Mac client already attached per-item messages
-    // If so, use them directly — they're already consolidated
-    const hasPerItemMessages = packages.some((p: InstallPackage) => (p as any).message)
-    
-    if (hasPerItemMessages) {
-      // New Mac client format: per-item message field already consolidated
-      for (const pkg of packages) {
-        const itemMessage = (pkg as any).message as string | undefined
-        if (itemMessage) {
-          // Determine severity from the item's status (already set by Mac client)
-          if (pkg.status === 'Error') {
-            if (!pkg.errors) pkg.errors = []
-            pkg.errors.push({
-              id: `munki-item-error-${pkg.id}`,
-              message: itemMessage,
-              timestamp: installs.munki.endTime || new Date().toISOString(),
-              code: 'MUNKI_ERROR',
-              package: pkg.name
-            })
-          } else if (pkg.status === 'Warning') {
-            if (!pkg.warnings) pkg.warnings = []
-            pkg.warnings.push({
-              id: `munki-item-warning-${pkg.id}`,
-              message: itemMessage,
-              timestamp: installs.munki.endTime || new Date().toISOString(),
-              code: 'MUNKI_WARNING',
-              package: pkg.name
-            })
-          }
-        }
+  // Per-item lastWarning/lastError fields are populated at client collection time (matching Windows CimianItem pattern)
+  // Frontend just reads them — one message per item max, no splitting/matching needed
+  // Also handles catastrophic errors (e.g. manifest 404) where items array is empty
+  if (hasMunkiData || hasMunkiSystem) {
+    // Check for per-item lastWarning/lastError (set by Mac client's attachMessagesToItems)
+    for (const pkg of packages) {
+      const lastError = (pkg as any).lastError as string | undefined
+      const lastWarning = (pkg as any).lastWarning as string | undefined
+      
+      if (lastError && lastError.trim()) {
+        if (!pkg.errors) pkg.errors = []
+        pkg.errors.push({
+          id: `munki-item-error-${pkg.id}`,
+          message: lastError,
+          timestamp: installs.munki.endTime || new Date().toISOString(),
+          code: 'MUNKI_ERROR',
+          package: pkg.name
+        })
+        pkg.status = 'Error'
+      } else if (lastWarning && lastWarning.trim()) {
+        if (!pkg.warnings) pkg.warnings = []
+        pkg.warnings.push({
+          id: `munki-item-warning-${pkg.id}`,
+          message: lastWarning,
+          timestamp: installs.munki.endTime || new Date().toISOString(),
+          code: 'MUNKI_WARNING',
+          package: pkg.name
+        })
+        if (pkg.status !== 'Error') pkg.status = 'Warning'
       }
-    } else {
-      // Legacy format: parse run-level warnings/errors and match to packages
-      // Consolidate to ONE message per item (join with " | " if multiple match)
+    }
+    
+    // Legacy fallback: if no items have per-item messages, parse from run-level strings
+    const hasPerItemMessages = packages.some((p: InstallPackage) => (p.errors && p.errors.length > 0) || (p.warnings && p.warnings.length > 0))
+    if (!hasPerItemMessages) {
       const itemMessages: Map<string, { messages: string[], severity: 'Error' | 'Warning' }> = new Map()
       
       if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
-        const munkiErrorLines = installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-        for (const msg of munkiErrorLines) {
+        for (const msg of installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
           const matchedPkg = findPackageForMessage(msg, packages)
           if (matchedPkg) {
             const key = matchedPkg.id || matchedPkg.name
@@ -1065,62 +1062,34 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
             existing.severity = 'Error'
             itemMessages.set(key, existing)
           } else {
-            installsInfo.messages?.errors.push({
-              id: `munki-run-error-system-${munkiErrorLines.indexOf(msg)}`,
-              message: msg,
-              timestamp: installs.munki.endTime || new Date().toISOString(),
-              code: 'MUNKI_ERROR',
-              package: 'Munki'
-            })
+            installsInfo.messages?.errors.push({ id: `munki-run-error-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: 'Munki' })
           }
         }
       }
       if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
-        const munkiWarningLines = installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
-        for (const msg of munkiWarningLines) {
+        for (const msg of installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
           const matchedPkg = findPackageForMessage(msg, packages)
           if (matchedPkg) {
             const key = matchedPkg.id || matchedPkg.name
             const existing = itemMessages.get(key) || { messages: [], severity: 'Warning' as const }
             existing.messages.push(msg)
-            // Don't downgrade Error to Warning
             itemMessages.set(key, existing)
           } else {
-            installsInfo.messages?.warnings.push({
-              id: `munki-run-warning-system-${munkiWarningLines.indexOf(msg)}`,
-              message: msg,
-              timestamp: installs.munki.endTime || new Date().toISOString(),
-              code: 'MUNKI_WARNING',
-              package: 'Munki'
-            })
+            installsInfo.messages?.warnings.push({ id: `munki-run-warning-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: 'Munki' })
           }
         }
       }
-      
-      // Apply consolidated messages to packages (one entry per item)
       for (const [pkgKey, data] of itemMessages) {
         const pkg = packages.find(p => (p.id || p.name) === pkgKey)
         if (!pkg) continue
         const consolidated = data.messages.join(' | ')
         if (data.severity === 'Error') {
           if (!pkg.errors) pkg.errors = []
-          pkg.errors.push({
-            id: `munki-run-error-${pkg.id}`,
-            message: consolidated,
-            timestamp: installs.munki.endTime || new Date().toISOString(),
-            code: 'MUNKI_ERROR',
-            package: pkg.name
-          })
+          pkg.errors.push({ id: `munki-run-error-${pkg.id}`, message: consolidated, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: pkg.name })
           pkg.status = 'Error'
         } else {
           if (!pkg.warnings) pkg.warnings = []
-          pkg.warnings.push({
-            id: `munki-run-warning-${pkg.id}`,
-            message: consolidated,
-            timestamp: installs.munki.endTime || new Date().toISOString(),
-            code: 'MUNKI_WARNING',
-            package: pkg.name
-          })
+          pkg.warnings.push({ id: `munki-run-warning-${pkg.id}`, message: consolidated, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_WARNING', package: pkg.name })
           if (pkg.status !== 'Error') pkg.status = 'Warning'
         }
       }

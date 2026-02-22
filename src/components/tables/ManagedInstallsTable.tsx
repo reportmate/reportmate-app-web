@@ -24,11 +24,13 @@ const formatItemSize = (sizeBytes?: string): string => {
 
 interface ManagedInstallsTableProps {
   data: InstallsInfo;
+  initialStatusFilter?: string[];
+  initialSearchQuery?: string;
 }
 
-export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data }) => {
-  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
+export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data, initialStatusFilter, initialSearchQuery }) => {
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(() => new Set(initialStatusFilter ?? []));
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery ?? '');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string>('');
@@ -389,7 +391,37 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                 </thead>
                 <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                   {!hasPackages ? (
-                    // Empty state when managed system is configured but no packages
+                    // Empty state: show error banner if there are system errors, otherwise show "system active" message
+                    (data.messages?.errors && data.messages.errors.length > 0) ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-6">
+                        <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg p-5">
+                          <div className="flex items-start gap-4">
+                            <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-semibold text-red-800 dark:text-red-300">Last Run Failed</h3>
+                              <div className="mt-2 space-y-1">
+                                {data.messages.errors.map((error, i) => (
+                                  <p key={error.id || i} className="text-sm text-red-700 dark:text-red-400 font-mono bg-red-100/60 dark:bg-red-900/30 px-3 py-2 rounded">
+                                    {error.message}
+                                  </p>
+                                ))}
+                              </div>
+                              {data.config?.lastRun && (
+                                <p className="text-xs text-red-500 dark:text-red-500 mt-3">
+                                  {new Date(data.config.lastRun).toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                    ) : (
                     <tr>
                       <td colSpan={5} className="px-6 py-16">
                         <div className="text-center">
@@ -412,6 +444,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                         </div>
                       </td>
                     </tr>
+                    )
                   ) : filteredPackages.length === 0 && statusFilter.size > 0 ? (
                     // Empty state when filters are active but no matching packages
                     <tr>

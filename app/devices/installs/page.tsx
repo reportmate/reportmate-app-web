@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } fr
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '../../../src/lib/time'
-import { categorizeDevicesByInstallStatus, aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem } from '../../../src/hooks/useInstallsData'
+import { categorizeDevicesByInstallStatus, aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem, getDeviceInstallItems } from '../../../src/hooks/useInstallsData'
 import { calculateDeviceStatus } from '../../../src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '../../../src/components/widgets/InstallMessages'
 import { CopyButton } from '../../../src/components/ui/CopyButton'
@@ -92,7 +92,24 @@ function InstallsPageContent() {
     { enabled: !loading && !filtersLoading }
   )
   const searchParams = useSearchParams()
-  
+  const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
+
+  // Apply global platform filter (?platform=mac or ?platform=win)
+  // For installs: mac = only devices with Munki data, win = only devices with Cimian data
+  // Declared early to avoid temporal dead zone when referenced in handleConfigReport
+  const platformFilteredDevices = useMemo(() => {
+    if (platformFilter === 'all') return devices
+    return devices.filter((device: any) => {
+      let platform = getDevicePlatform(device)
+      // Installs-specific fallback: use install manager presence when generic platform detection fails
+      if (platform === 'unknown') {
+        if (device.modules?.installs?.cimian) platform = 'Windows'
+        else if (device.modules?.installs?.munki) platform = 'macOS'
+      }
+      return isPlatformVisible(platform)
+    })
+  }, [devices, platformFilter, isPlatformVisible])
+
   // Filter state
   const [selectedInstalls, setSelectedInstalls] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
@@ -436,7 +453,7 @@ function InstallsPageContent() {
   
   // Helper function to classify item status
   const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
-    const status = item.currentStatus?.toLowerCase() || ''
+    const status = (item.currentStatus || item.status || '').toLowerCase()
     
     // Check for errors first
     if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
@@ -462,7 +479,7 @@ function InstallsPageContent() {
 
   // Config Report handler - now the default view
   const handleConfigReport = useCallback(async () => {
-    if (devices.length === 0) return // Guard against empty devices
+    if (platformFilteredDevices.length === 0) return // Guard against empty devices
     
     try {
       setLoading(true)
@@ -471,7 +488,7 @@ function InstallsPageContent() {
       setSearchQuery('')
       
       // Process devices to extract config data with item counts
-      const configData = devices.map(device => {
+      const configData = platformFilteredDevices.map(device => {
         const cimianConfig = device.modules?.installs?.cimian
         const munkiConfig = device.modules?.installs?.munki
         
@@ -540,7 +557,7 @@ function InstallsPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [devices])
+  }, [platformFilteredDevices])
   
   // Reset report handler - returns to default config report view
   const handleResetReport = () => {
@@ -798,14 +815,22 @@ function InstallsPageContent() {
   // Auto-load Config Report when devices are loaded (default view)
   // Use setTimeout to defer processing and allow UI to render first
   useEffect(() => {
-    if (devices.length > 0 && !isConfigReport && configReportData.length === 0 && !hasGeneratedReport && itemsStatusFilter === 'all') {
+    if (platformFilteredDevices.length > 0 && !isConfigReport && configReportData.length === 0 && !hasGeneratedReport && itemsStatusFilter === 'all') {
       // Defer to next frame to allow UI to update first
       const timeoutId = setTimeout(() => {
         handleConfigReport()
       }, 0)
       return () => clearTimeout(timeoutId)
     }
-  }, [devices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
+  }, [platformFilteredDevices.length, isConfigReport, configReportData.length, hasGeneratedReport, itemsStatusFilter, handleConfigReport])
+
+  // Re-generate config report when platform filter changes
+  useEffect(() => {
+    if (platformFilteredDevices.length > 0 && isConfigReport) {
+      handleConfigReport()
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformFilter])
 
   // Handle URL filter parameter (from dashboard click-through)
   useEffect(() => {
@@ -821,8 +846,8 @@ function InstallsPageContent() {
 
   // Categorize devices by install status (for filtered views)
   const { devicesWithErrors, devicesWithWarnings, devicesWithPending } = useMemo(() => {
-    return categorizeDevicesByInstallStatus(devices)
-  }, [devices])
+    return categorizeDevicesByInstallStatus(platformFilteredDevices)
+  }, [platformFilteredDevices])
 
   // Calculate device status counts (Active/Stale/Missing)
   // Counts should reflect data with OTHER filters applied (not deviceStatusFilter itself)
@@ -1014,11 +1039,11 @@ function InstallsPageContent() {
       let relevantDevices: any[] = []
       if (itemsStatusFilter === 'errors') {
         relevantDevices = devicesWithErrors.filter((device: any) => {
-          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          const cimianItems = getDeviceInstallItems(device)
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const lastError = (item.lastError || '').toLowerCase()
-            const status = item.currentStatus?.toLowerCase() || ''
+            const status = (item.currentStatus || item.status || '').toLowerCase()
             const searchLower = searchQuery.toLowerCase()
             // Match by item name OR by error message
             return (itemName === searchLower || lastError.includes(searchLower)) && 
@@ -1027,11 +1052,11 @@ function InstallsPageContent() {
         })
       } else if (itemsStatusFilter === 'warnings') {
         relevantDevices = devicesWithWarnings.filter((device: any) => {
-          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          const cimianItems = getDeviceInstallItems(device)
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const lastWarning = (item.lastWarning || '').toLowerCase()
-            const status = item.currentStatus?.toLowerCase() || ''
+            const status = (item.currentStatus || item.status || '').toLowerCase()
             const searchLower = searchQuery.toLowerCase()
             // Match by item name OR by warning message
             return (itemName === searchLower || lastWarning.includes(searchLower)) && 
@@ -1040,10 +1065,10 @@ function InstallsPageContent() {
         })
       } else if (itemsStatusFilter === 'pending') {
         relevantDevices = devicesWithPending.filter((device: any) => {
-          const cimianItems = device?.modules?.installs?.cimian?.items || []
+          const cimianItems = getDeviceInstallItems(device)
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
-            const status = item.currentStatus?.toLowerCase() || ''
+            const status = (item.currentStatus || item.status || '').toLowerCase()
             return itemName === searchQuery.toLowerCase() && 
                    (status.includes('will-be-installed') || status.includes('update-available') || 
                     status.includes('update_available') || status.includes('will-be-removed') || 
@@ -1061,7 +1086,7 @@ function InstallsPageContent() {
       })
     } else {
       // Default: count all devices
-      devices.forEach((device: any) => {
+      platformFilteredDevices.forEach((device: any) => {
         const status = calculateDeviceStatus(device.lastSeen)
         if (status === 'active') counts.active++
         else if (status === 'stale') counts.stale++
@@ -1069,7 +1094,7 @@ function InstallsPageContent() {
       })
     }
     return counts
-  }, [installs, devices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter, isConfigReport, configReportData, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+  }, [installs, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter, isConfigReport, configReportData, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
 
   // Calculate install status counts (Installed/Pending/Warnings/Errors/Removed)
   // Counts should reflect data with OTHER filters applied (not installStatusFilter itself)
@@ -1267,16 +1292,16 @@ function InstallsPageContent() {
 
   // Check if we have any Munki or Cimian installations
   const hasMunkiInstalls = useMemo(() => {
-    return devices.some((d: any) => d?.modules?.installs?.munki?.version)
-  }, [devices])
+    return platformFilteredDevices.some((d: any) => d?.modules?.installs?.munki?.version)
+  }, [platformFilteredDevices])
 
   const hasCimianInstalls = useMemo(() => {
-    return devices.some((d: any) => d?.modules?.installs?.cimian?.version)
-  }, [devices])
+    return platformFilteredDevices.some((d: any) => d?.modules?.installs?.cimian?.version)
+  }, [platformFilteredDevices])
 
   // Get filtered devices based on all filters (items status, device status, inventory, and search)
   const statusFilteredDevices = useMemo(() => {
-    let filtered = devices
+    let filtered = platformFilteredDevices
     
     // Filter by items status (errors/warnings/pending from install items)
     if (itemsStatusFilter === 'errors') filtered = devicesWithErrors
@@ -1326,14 +1351,14 @@ function InstallsPageContent() {
     // Filter by selected installs (pills) if present
     if (selectedInstalls.length > 0) {
       filtered = filtered.filter((device: any) => {
-        const cimianItems = device.modules?.installs?.cimian?.items || []
+        const cimianItems = getDeviceInstallItems(device)
         return cimianItems.some((item: any) => {
           const itemName = item.itemName || item.name || ''
           if (!selectedInstalls.includes(itemName)) return false
           
           // If we have an items status filter, the selected item must have that status
           if (itemsStatusFilter !== 'all') {
-            const status = item.currentStatus?.toLowerCase() || ''
+            const status = (item.currentStatus || item.status || '').toLowerCase()
             if (itemsStatusFilter === 'errors') {
               return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
             } else if (itemsStatusFilter === 'warnings') {
@@ -1360,7 +1385,7 @@ function InstallsPageContent() {
         if (deviceName.includes(lowerQuery) || serial.includes(lowerQuery)) return true
         
         // Check if any affected packages match the search AND have the filtered status
-        const cimianItems = device.modules?.installs?.cimian?.items || []
+        const cimianItems = getDeviceInstallItems(device)
         return cimianItems.some((item: any) => {
           const itemName = (item.itemName || item.name || '').toLowerCase()
           const lastError = (item.lastError || '').toLowerCase()
@@ -1375,7 +1400,7 @@ function InstallsPageContent() {
           
           // If we have an items status filter, the searched item must have that status
           if (itemsStatusFilter !== 'all') {
-            const status = item.currentStatus?.toLowerCase() || ''
+            const status = (item.currentStatus || item.status || '').toLowerCase()
             if (itemsStatusFilter === 'errors') {
               return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
             } else if (itemsStatusFilter === 'warnings') {
@@ -1393,20 +1418,20 @@ function InstallsPageContent() {
     }
     
     return filtered
-  }, [itemsStatusFilter, deviceStatusFilter, devices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
 
   // Aggregate items with errors across all devices
   const itemsWithErrors = useMemo(() => {
     const errorItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
     // Exclude archived devices from counts
-    devices.forEach((device: any) => {
+    platformFilteredDevices.forEach((device: any) => {
       if (device.archived === true) return // Skip archived devices
       
-      const cimianItems = device?.modules?.installs?.cimian?.items || []
+      const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
         // Check for error statuses
-        const status = item.currentStatus?.toLowerCase() || ''
+        const status = (item.currentStatus || item.status || '').toLowerCase()
         if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'install-error') {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!errorItems[itemName]) {
@@ -1432,7 +1457,7 @@ function InstallsPageContent() {
         ? a.count - b.count 
         : b.count - a.count
     })
-  }, [devices, errorTableSort])
+  }, [platformFilteredDevices, errorTableSort])
 
   // Aggregate items with warnings across all devices
   // Note: Warnings are DIFFERENT from Pending - warnings indicate issues, pending indicates scheduled changes
@@ -1440,13 +1465,13 @@ function InstallsPageContent() {
     const warningItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
     // Exclude archived devices from counts
-    devices.forEach((device: any) => {
+    platformFilteredDevices.forEach((device: any) => {
       if (device.archived === true) return // Skip archived devices
       
-      const cimianItems = device?.modules?.installs?.cimian?.items || []
+      const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
         // Check for warning statuses ONLY (not pending statuses)
-        const status = item.currentStatus?.toLowerCase() || ''
+        const status = (item.currentStatus || item.status || '').toLowerCase()
         if (status.includes('warning') || status === 'needs-attention') {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!warningItems[itemName]) {
@@ -1472,20 +1497,20 @@ function InstallsPageContent() {
         ? a.count - b.count 
         : b.count - a.count
     })
-  }, [devices, warningTableSort])
+  }, [platformFilteredDevices, warningTableSort])
 
   // Aggregate items with pending status across all devices
   const itemsWithPending = useMemo(() => {
     const pendingItems: Record<string, { name: string; count: number; devices: string[] }> = {}
     
     // Exclude archived devices from counts
-    devices.forEach((device: any) => {
+    platformFilteredDevices.forEach((device: any) => {
       if (device.archived === true) return // Skip archived devices
       
-      const cimianItems = device?.modules?.installs?.cimian?.items || []
+      const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
         // Check for pending statuses - scheduled installations, updates, removals
-        const status = item.currentStatus?.toLowerCase() || ''
+        const status = (item.currentStatus || item.status || '').toLowerCase()
         // Include: will-be-installed, update-available, will-be-removed, pending-*, *-pending, update_available
         if (status.includes('will-be-installed') || 
             status.includes('update-available') || status.includes('update_available') ||
@@ -1516,7 +1541,7 @@ function InstallsPageContent() {
         ? a.count - b.count 
         : b.count - a.count
     })
-  }, [devices, pendingTableSort])
+  }, [platformFilteredDevices, pendingTableSort])
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
@@ -1856,6 +1881,41 @@ function InstallsPageContent() {
                         {[...Array(4)].map((_, i) => (
                           <div key={i} className="flex justify-between items-center py-1">
                             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Skeleton Messages Widgets Row - Error Messages + Warning Messages */}
+                  <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6 border-t border-gray-200 dark:border-gray-700">
+                    {/* Skeleton Error Messages */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-5 h-5 bg-red-200 dark:bg-red-900/50 rounded-full"></div>
+                        <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Warning Messages */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-5 h-5 bg-amber-200 dark:bg-amber-900/50 rounded-full"></div>
+                        <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-32"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
                             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
                           </div>
                         ))}
@@ -2410,10 +2470,10 @@ function InstallsPageContent() {
 
             {/* Messages Widgets Row: Error Messages + Warning Messages */}
             {/* Similar to MunkiReport's Munki Errors and Munki Warnings panels */}
-            {itemsStatusFilter === 'all' && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && devices.length > 0 && (
+            {itemsStatusFilter === 'all' && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && platformFilteredDevices.length > 0 && (
               <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <InstallErrorsWidget 
-                  devices={devices} 
+                  devices={platformFilteredDevices} 
                   maxItems={8}
                   onFilter={(type, message) => {
                     setItemsStatusFilter(type)
@@ -2425,7 +2485,7 @@ function InstallsPageContent() {
                   }}
                 />
                 <InstallWarningsWidget 
-                  devices={devices} 
+                  devices={platformFilteredDevices} 
                   maxItems={8}
                   onFilter={(type, message) => {
                     setItemsStatusFilter(type)
@@ -2457,7 +2517,7 @@ function InstallsPageContent() {
                 </h3>
                 <div className="h-40 overflow-y-auto space-y-3">
                   {(() => {
-                    if (filtersLoading || !devices || devices.length === 0) {
+                    if (filtersLoading || !platformFilteredDevices || platformFilteredDevices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
                           <div className="space-y-1">
@@ -2479,7 +2539,7 @@ function InstallsPageContent() {
                     }
                     
                     const repoCounts: Record<string, number> = {}
-                    devices.forEach((d: any) => {
+                    platformFilteredDevices.forEach((d: any) => {
                       const repoUrl = d.modules?.installs?.cimian?.config?.SoftwareRepoURL || d.modules?.installs?.munki?.softwareRepoURL
                       if (repoUrl) {
                         repoCounts[repoUrl] = (repoCounts[repoUrl] || 0) + 1
@@ -2561,7 +2621,7 @@ function InstallsPageContent() {
                 <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
                                         
-                    if (filtersLoading || !devices || devices.length === 0) {
+                    if (filtersLoading || !platformFilteredDevices || platformFilteredDevices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
                           <div className="space-y-1">
@@ -2582,7 +2642,7 @@ function InstallsPageContent() {
                       )
                     }
                     
-                    const munkiDevices = (devices || []).filter((d: any) => {
+                    const munkiDevices = (platformFilteredDevices || []).filter((d: any) => {
                       const hasMunki = d?.modules?.installs?.munki?.version
                       return hasMunki
                     })
@@ -2677,7 +2737,7 @@ function InstallsPageContent() {
                 <div className="h-40 overflow-y-auto space-y-2">
                   {(() => {
                                         
-                    if (filtersLoading || !devices || devices.length === 0) {
+                    if (filtersLoading || !platformFilteredDevices || platformFilteredDevices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
                           <div className="space-y-1">
@@ -2698,7 +2758,7 @@ function InstallsPageContent() {
                       )
                     }
                     
-                    const cimianDevices = (devices || []).filter((d: any) => {
+                    const cimianDevices = (platformFilteredDevices || []).filter((d: any) => {
                       const hasCimian = d?.modules?.installs?.cimian?.version
                       if (hasCimian) {
                                               }
@@ -2795,7 +2855,7 @@ function InstallsPageContent() {
                 <div className="h-40 overflow-y-auto space-y-3">
                   {(() => {
                                         
-                    if (filtersLoading || !devices || devices.length === 0) {
+                    if (filtersLoading || !platformFilteredDevices || platformFilteredDevices.length === 0) {
                       return (
                         <div className="space-y-3 animate-pulse">
                           <div className="space-y-1">
@@ -2819,7 +2879,7 @@ function InstallsPageContent() {
                     // Collect manifests from Cimian ClientIdentifier
                     const manifestCounts: Record<string, { count: number; devices: any[] }> = {}
                     
-                    devices.forEach((device: any) => {
+                    platformFilteredDevices.forEach((device: any) => {
                       // Check Cimian ClientIdentifier (the manifest path)
                       const cimianManifest = device?.modules?.installs?.cimian?.config?.ClientIdentifier
                       if (cimianManifest) {
@@ -2912,7 +2972,7 @@ function InstallsPageContent() {
             {searchQuery && (itemsStatusFilter === 'errors' || itemsStatusFilter === 'warnings') && !filtersLoading && (
               <div className="px-6 py-4">
                 <SelectedItemMessages
-                  devices={devices}
+                  devices={platformFilteredDevices}
                   itemName={searchQuery}
                   messageType={itemsStatusFilter === 'errors' ? 'errors' : 'warnings'}
                   onClose={() => {
@@ -3846,21 +3906,21 @@ function InstallsPageContent() {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {statusFilteredDevices.map((device: any) => {
-                      const cimianItems = device.modules?.installs?.cimian?.items || []
+                      const cimianItems = getDeviceInstallItems(device)
                       
                       // First filter by status type
                       const statusFilteredItems = itemsStatusFilter === 'errors'
                         ? cimianItems.filter((item: any) => {
-                            const status = item.currentStatus?.toLowerCase() || ''
+                            const status = (item.currentStatus || item.status || '').toLowerCase()
                             return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
                           })
                         : itemsStatusFilter === 'warnings'
                           ? cimianItems.filter((item: any) => {
-                              const status = item.currentStatus?.toLowerCase() || ''
+                              const status = (item.currentStatus || item.status || '').toLowerCase()
                               return status.includes('warning') || status === 'needs-attention'
                             })
                           : cimianItems.filter((item: any) => {
-                              const status = item.currentStatus?.toLowerCase() || ''
+                              const status = (item.currentStatus || item.status || '').toLowerCase()
                               return status.includes('will-be-installed') || status.includes('update-available') || 
                                      status.includes('update_available') || status.includes('will-be-removed') || 
                                      status.includes('pending') || status.includes('scheduled') || 
