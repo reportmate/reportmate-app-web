@@ -278,7 +278,32 @@ export function getDevicePlatform(device: any): 'macOS' | 'Windows' | 'unknown' 
     return normalizePlatform(legacyOs)
   }
   
+  // Priority 5: Hardware module model/manufacturer detection
+  const modelName = device.modules?.hardware?.system?.model_name || device.modules?.hardware?.model || ''
+  if (modelName) {
+    const modelLower = modelName.toLowerCase()
+    if (modelLower.includes('mac') || modelLower.includes('imac')) return 'macOS'
+    if (modelLower.includes('surface') || modelLower.includes('thinkpad') || modelLower.includes('latitude') || modelLower.includes('optiplex')) return 'Windows'
+  }
+  
+  const hwVendor = device.modules?.hardware?.system?.hardware_vendor || device.modules?.hardware?.manufacturer || ''
+  if (hwVendor) {
+    const vendorLower = hwVendor.toLowerCase()
+    if (vendorLower.includes('apple')) return 'macOS'
+  }
+  
   return 'unknown'
+}
+
+/**
+ * Chart-friendly platform label using full detection chain.
+ * Returns 'Macintosh'/'Windows'/'Other' for chart display contexts.
+ */
+export function getDevicePlatformLabel(device: any): 'Windows' | 'Macintosh' | 'Other' {
+  const platform = getDevicePlatform(device)
+  if (platform === 'macOS') return 'Macintosh'
+  if (platform === 'Windows') return 'Windows'
+  return 'Other'
 }
 
 export { normalizePlatform }

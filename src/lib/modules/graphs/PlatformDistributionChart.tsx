@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react'
+import { getDevicePlatform } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
   deviceId: string
@@ -62,30 +63,9 @@ interface PlatformStats {
 
 // Helper function to detect platform from device
 const detectPlatform = (device: Device): 'Windows' | 'macOS' | 'Linux' | 'Unknown' => {
-  // CRITICAL FIX: Always trust the API platform field - it's already correctly detected
-  if (device.platform) {
-    const platformLower = device.platform.toLowerCase()
-    if (platformLower === 'windows') return 'Windows'
-    if (platformLower === 'macos') return 'macOS'
-    if (platformLower === 'linux') return 'Linux'
-  }
-  
-  // Fallback: Check system module OS info (for devices with detailed data)
-  const systemOS = device.modules?.system?.operatingSystem?.name?.toLowerCase()
-  if (systemOS) {
-    if (systemOS.includes('windows')) return 'Windows'
-    if (systemOS.includes('mac') || systemOS.includes('darwin')) return 'macOS'
-    if (systemOS.includes('linux')) return 'Linux'
-  }
-
-  // Fallback: Check legacy OS field
-  const os = device.os?.toLowerCase()
-  if (os) {
-    if (os.includes('windows')) return 'Windows'
-    if (os.includes('mac') || os.includes('darwin')) return 'macOS'
-    if (os.includes('linux')) return 'Linux'
-  }
-
+  const result = getDevicePlatform(device)
+  if (result === 'macOS') return 'macOS'
+  if (result === 'Windows') return 'Windows'
   return 'Unknown'
 }
 
