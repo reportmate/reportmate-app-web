@@ -240,7 +240,6 @@ export default function ClientDeviceDetailPage() {
     allModulesLoaded,
     requestModule,
     isModuleLoaded,
-    isModuleLoading,
     isModuleError,
     getModuleData,
     getModuleError
@@ -255,7 +254,7 @@ export default function ClientDeviceDetailPage() {
   const tabsContainerRef = useRef<HTMLElement>(null)
   const [copySuccess, setCopySuccess] = useState(false)
   const [isResolving, setIsResolving] = useState(false)
-  const [showReportsDropdown, setShowReportsDropdown] = useState(false)
+  const [, setShowReportsDropdown] = useState(false)
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
   const reportsDropdownRef = useRef<HTMLDivElement>(null)
   const actionsDropdownRef = useRef<HTMLDivElement>(null)
@@ -525,7 +524,7 @@ export default function ClientDeviceDetailPage() {
     if (tabId !== 'info' && !isModuleLoaded(tabId)) {
       try {
         await requestModule(tabId)
-      } catch (_error) {
+      } catch {
         // Module load failed - will show error state in UI
       }
     }
@@ -557,7 +556,7 @@ export default function ClientDeviceDetailPage() {
           setIsResolving(false)
           return
         }
-      } catch (_error) {
+      } catch {
         // Resolution failed - stay on current page
         setIsResolving(false)
         return
@@ -599,7 +598,7 @@ export default function ClientDeviceDetailPage() {
           const os = parsed?.os || parsed?.system?.operatingSystem?.name || ''
           return os.toLowerCase().includes('mac') || os.toLowerCase().includes('darwin')
         }
-      } catch (e) {
+      } catch {
         // Ignore parsing errors
       }
       return undefined // Let skeleton default to unified layout
@@ -686,7 +685,7 @@ export default function ClientDeviceDetailPage() {
       // Show success feedback
       setCopySuccess(true)
       setTimeout(() => setCopySuccess(false), 2000)
-    } catch (_error) {
+    } catch {
       // Silent fail - clipboard access may be denied
     }
   }

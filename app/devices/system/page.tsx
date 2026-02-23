@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
@@ -205,8 +205,8 @@ function SystemPageContent() {
   const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
   
   // Loading progress state (for progress bar)
-  const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
-  const [loadingMessage, setLoadingMessage] = useState<string>('')
+  const [, setLoadingProgress] = useState({ current: 0, total: 0 })
+  const [, setLoadingMessage] = useState<string>('')
   
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)

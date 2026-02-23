@@ -106,7 +106,7 @@ export default function ClientDashboard() {
   const [mounted, setMounted] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
-  const fetchAbortRef = useRef(false)
+  const _fetchAbortRef = useRef(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
   const maxReconnectAttempts = 5

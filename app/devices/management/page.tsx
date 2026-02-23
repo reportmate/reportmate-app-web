@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { CopyButton } from "../../../src/components/ui/CopyButton"
@@ -371,7 +371,7 @@ function ManagementPageContent() {
 
   // Count Broken Trust - Domain-joined devices with trustStatus === 'Broken'
   // Use deviceState.domainJoined as source of truth (not enrollmentType)
-  const brokenTrustCount = management.filter(m => {
+  const _brokenTrustCount = management.filter(m => {
     const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const trustStatus = m.raw?.domainTrust?.trustStatus
     return isDomainJoined && trustStatus === 'Broken'
@@ -379,14 +379,14 @@ function ManagementPageContent() {
 
   // Count Unconfirmed Trust - Domain Joined devices without domainTrust data yet
   // Use deviceState.domainJoined as source of truth
-  const unconfirmedTrustCount = management.filter(m => {
+  const _unconfirmedTrustCount = management.filter(m => {
     const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const hasDomainTrust = m.raw?.domainTrust != null
     return isDomainJoined && !hasDomainTrust
   }).length
 
   // Count Valid Trust - Domain Joined devices with healthy/valid trust status
-  const trustValidCount = management.filter(m => {
+  const _trustValidCount = management.filter(m => {
     const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const trustStatus = m.raw?.domainTrust?.trustStatus
     const hasDomainTrust = m.raw?.domainTrust != null
@@ -394,7 +394,7 @@ function ManagementPageContent() {
   }).length
 
   // Count Unmanaged - Domain Joined devices without MDM enrollment
-  const unmanagedCount = management.filter(m => {
+  const _unmanagedCount = management.filter(m => {
     const isDomainJoined = m.raw?.deviceState?.domainJoined === true
     const isEnrolled = m.isEnrolled === true
     return isDomainJoined && !isEnrolled
@@ -485,7 +485,7 @@ function ManagementPageContent() {
   })
 
   // Calculate inventory filter counts based on data filtered by widgets/search (not inventory filters)
-  const filterCounts = {
+  const _filterCounts = {
     active: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'active').length,
     stale: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'stale').length,
     missing: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'missing').length,
@@ -737,7 +737,7 @@ function ManagementPageContent() {
           {data.map((item) => {
             const percentage = total > 0 ? Math.round((item.value / total) * 100) : 0
             const color = colors[item.label] || colors['default'] || 'bg-gray-500'
-            const bgClass = color.replace('text-', 'bg-').replace('800', '600').replace('900', '600') // Simple heuristic for bar color
+            const _bgClass = color.replace('text-', 'bg-').replace('800', '600').replace('900', '600') // Simple heuristic for bar color
             const isSelected = selectedFilter === item.label
             
             return (
