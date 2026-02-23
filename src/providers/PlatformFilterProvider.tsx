@@ -117,7 +117,7 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
       localStorage.setItem(STORAGE_KEY, 'Windows')
     }
     // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
-  }, [searchParams, isInitialized])
+  }, [searchParams, isInitialized, platformFilter])
 
   // Sync URL parameter when pathname or filter changes (for persistent filter across navigation)
   useEffect(() => {
@@ -137,7 +137,7 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
       const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
       router.replace(newUrl)
     }
-  }, [pathname, isInitialized, platformFilter, router])
+  }, [pathname, isInitialized, platformFilter, router, searchParams])
 
   const setPlatformFilter = useCallback((platform: Platform) => {
     setPlatformFilterState(platform)
