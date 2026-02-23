@@ -105,14 +105,14 @@ export const UsageDistributionChart: React.FC<{ apps: ApplicationInfo[], maxItem
           <div key={app.id || index} className="group">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="w-5 text-xs font-medium text-gray-400 flex-shrink-0">
+                <span className="w-5 text-xs font-medium text-gray-400 shrink-0">
                   {index + 1}.
                 </span>
                 <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
                   {app.displayName || app.name}
                 </span>
               </div>
-              <div className="flex items-center gap-3 flex-shrink-0 ml-2">
+              <div className="flex items-center gap-3 shrink-0 ml-2">
                 <span className="text-xs text-gray-500 dark:text-gray-400">
                   {formatPercent(app.usage?.totalSeconds || 0, totalSeconds)}
                 </span>
@@ -182,25 +182,25 @@ export const UsageSummaryStats: React.FC<{ apps: ApplicationInfo[] }> = ({ apps 
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-      <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-4">
+      <div className="bg-linear-to-br from-blue-50 to-blue-100 dark:from-blue-900/30 dark:to-blue-800/20 rounded-xl p-4">
         <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{stats.appsWithUsage}</div>
         <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">Active Apps</div>
         <div className="text-[10px] text-blue-500 dark:text-blue-500 mt-0.5">of {stats.totalApps} total</div>
       </div>
       
-      <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-4">
+      <div className="bg-linear-to-br from-purple-50 to-purple-100 dark:from-purple-900/30 dark:to-purple-800/20 rounded-xl p-4">
         <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatDuration(stats.totalSeconds)}</div>
         <div className="text-xs text-purple-600 dark:text-purple-400 mt-1">Total Usage</div>
         <div className="text-[10px] text-purple-500 dark:text-purple-500 mt-0.5">{stats.totalLaunches.toLocaleString()} launches</div>
       </div>
       
-      <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 rounded-xl p-4">
+      <div className="bg-linear-to-br from-green-50 to-green-100 dark:from-green-900/30 dark:to-green-800/20 rounded-xl p-4">
         <div className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.uniqueUsers}</div>
         <div className="text-xs text-green-600 dark:text-green-400 mt-1">Unique Users</div>
         <div className="text-[10px] text-green-500 dark:text-green-500 mt-0.5">across all apps</div>
       </div>
       
-      <div className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-4">
+      <div className="bg-linear-to-br from-amber-50 to-amber-100 dark:from-amber-900/30 dark:to-amber-800/20 rounded-xl p-4">
         <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{stats.unusedApps}</div>
         <div className="text-xs text-amber-600 dark:text-amber-400 mt-1">Unused Apps</div>
         <div className="text-[10px] text-amber-500 dark:text-amber-500 mt-0.5">no recent activity</div>
@@ -262,7 +262,7 @@ export const MostActiveUsersWidget: React.FC<{ apps: ApplicationInfo[], maxUsers
         
         return (
           <div key={stat.user} className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center shrink-0">
               <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
                 {username?.[0]?.toUpperCase() || '?'}
               </span>
@@ -278,7 +278,7 @@ export const MostActiveUsersWidget: React.FC<{ apps: ApplicationInfo[], maxUsers
               </div>
               <div className="h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div 
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"
+                  className="h-full bg-linear-to-r from-blue-500 to-purple-500 rounded-full"
                   style={{ width: `${percentage}%` }}
                 />
               </div>
@@ -327,7 +327,7 @@ export const RecentlyUsedWidget: React.FC<{ apps: ApplicationInfo[], maxItems?: 
           key={app.id || index}
           className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
-          <div className="w-9 h-9 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+          <div className="w-9 h-9 bg-linear-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-lg flex items-center justify-center shrink-0">
             <svg className="w-4 h-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
             </svg>
@@ -340,7 +340,7 @@ export const RecentlyUsedWidget: React.FC<{ apps: ApplicationInfo[], maxItems?: 
               {formatRelativeTime(app.usage!.lastUsed!)}
             </div>
           </div>
-          <div className="text-right flex-shrink-0">
+          <div className="text-right shrink-0">
             <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
               {formatDuration(app.usage?.totalSeconds || 0)}
             </div>
@@ -409,7 +409,7 @@ export const UnusedAppsWidget: React.FC<{ apps: ApplicationInfo[], daysThreshold
             key={app.id || index}
             className="flex items-center gap-3 p-2 bg-amber-50 dark:bg-amber-900/10 rounded-lg border border-amber-200 dark:border-amber-800/30"
           >
-            <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center shrink-0">
               <svg className="w-4 h-4 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
@@ -422,7 +422,7 @@ export const UnusedAppsWidget: React.FC<{ apps: ApplicationInfo[], daysThreshold
                 {app.publisher || 'Unknown publisher'}
               </div>
             </div>
-            <div className="text-xs text-amber-600 dark:text-amber-400 flex-shrink-0">
+            <div className="text-xs text-amber-600 dark:text-amber-400 shrink-0">
               {app.usage?.lastUsed 
                 ? formatRelativeTime(app.usage.lastUsed)
                 : 'Never used'}

@@ -63,7 +63,7 @@ export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublab
         {showCopyButton && value ? (
           <button
             onClick={handleCopy}
-            className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex-shrink-0"
+            className="ml-2 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
             title={copied ? 'Copied!' : 'Copy to clipboard'}
           >
             {copied ? (
@@ -77,7 +77,7 @@ export const Stat: React.FC<StatProps> = ({ label, value, isMono = false, sublab
             )}
           </button>
         ) : (
-          <div className="w-6 h-6 ml-2 flex-shrink-0"></div>
+          <div className="w-6 h-6 ml-2 shrink-0"></div>
         )}
       </dd>
       {sublabel && (

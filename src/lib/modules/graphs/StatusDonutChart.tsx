@@ -260,7 +260,7 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
           >
             <div className="flex items-center gap-3">
               <div 
-                className="w-4 h-4 rounded-full flex-shrink-0"
+                className="w-4 h-4 rounded-full shrink-0"
                 style={{ backgroundColor: item.color }}
               />
               <span className="text-sm font-medium text-gray-900 dark:text-white">
@@ -271,7 +271,7 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
               <span className="text-sm text-gray-600 dark:text-gray-400">
                 {item.count}
               </span>
-              <span className="text-xs text-gray-500 dark:text-gray-500 min-w-[3rem] text-right">
+              <span className="text-xs text-gray-500 dark:text-gray-500 min-w-12 text-right">
                 {item.percentage}%
               </span>
             </div>

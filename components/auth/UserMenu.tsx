@@ -82,7 +82,7 @@ export default function UserMenu() {
             className="fixed inset-0 z-10"
             onClick={() => setIsOpen(false)}
           />
-          <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-[200]">
+          <div className="absolute right-0 mt-2 w-64 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-200">
             <div className="py-1">
               {/* User Info */}
               <div className="px-4 py-3 border-b border-gray-100">

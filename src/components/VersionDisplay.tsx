@@ -102,7 +102,7 @@ export function VersionDisplay() {
       
       {showTooltip && (
         <div 
-          className="absolute top-full right-0 mt-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[200] min-w-48 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
+          className="absolute top-full right-0 mt-2 p-3 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-200 min-w-48 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-750 active:bg-gray-100 dark:active:bg-gray-700 transition-colors"
           onClick={(e) => { e.stopPropagation(); handleCopyToClipboard(); }}
           onMouseEnter={() => setShowTooltip(true)}
         >

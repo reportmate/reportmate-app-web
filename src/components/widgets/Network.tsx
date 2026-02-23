@@ -127,7 +127,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                     </span>
                     <button
                       onClick={() => navigator.clipboard.writeText(ethernetInterface?.ipAddress || network.ipAddress || '')}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -145,7 +145,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                     </span>
                     <button
                       onClick={() => navigator.clipboard.writeText(ethernetInterface?.macAddress || network.macAddress || '')}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -166,7 +166,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                     </span>
                     <button
                       onClick={() => navigator.clipboard.writeText(wifiData?.ipAddress || wifiInterface?.ipAddress || '')}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -184,7 +184,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
                     </span>
                     <button
                       onClick={() => navigator.clipboard.writeText(wifiData?.macAddress || wifiInterface?.macAddress || '')}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-3 h-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">

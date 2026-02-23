@@ -369,7 +369,7 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
 
         {/* Filter Controls - Right Side */}
         {onFilterChange && (availableFilters.architectures.length > 0 || availableFilters.catalogs.length > 0 || availableFilters.usages.length > 0) && (
-          <div className="w-64 flex-shrink-0 space-y-4">
+          <div className="w-64 shrink-0 space-y-4">
             
             {/* Usage Filter */}
             {availableFilters.usages.length > 0 && (

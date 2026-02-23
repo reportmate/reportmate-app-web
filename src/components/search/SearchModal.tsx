@@ -298,7 +298,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
   if (!isOpen) return null
 
   return (
-      <div className="fixed inset-0 z-[300] overflow-y-auto">
+      <div className="fixed inset-0 z-300 overflow-y-auto">
       {/* Backdrop */}
       <div 
         className="fixed inset-0 bg-black/50 transition-opacity"
@@ -369,7 +369,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
                 >
                   <div className="flex items-center gap-3">
                     {/* Status indicator */}
-                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getStatusColor(device.status)}`}></div>
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${getStatusColor(device.status)}`}></div>
                     
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-gray-900 dark:text-gray-100 truncate">
@@ -399,7 +399,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
                     </div>
                     
                     {/* Navigation arrow */}
-                    <svg className="w-4 h-4 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>

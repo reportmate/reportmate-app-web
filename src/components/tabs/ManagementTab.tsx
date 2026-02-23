@@ -970,7 +970,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 {(domainTrust.error_message || domainTrust.errorMessage) && (
                   <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
                     <div className="flex items-start gap-2">
-                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
                       <span className="text-sm text-red-700 dark:text-red-300">{domainTrust.error_message || domainTrust.errorMessage}</span>
@@ -1000,10 +1000,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             {isMac ? (
               <>
                 {/* Certificate Wrapper with gradient background */}
-                <div className="bg-gradient-to-b from-amber-100/8 to-amber-200/12 dark:from-yellow-900/5 dark:to-yellow-900/15 rounded-lg border border-amber-300/30 dark:border-yellow-700/25 p-5">
+                <div className="bg-linear-to-b from-amber-100/8 to-amber-200/12 dark:from-yellow-900/5 dark:to-yellow-900/15 rounded-lg border border-amber-300/30 dark:border-yellow-700/25 p-5">
                   {/* Header with Seal Icon */}
                   <div className="flex items-start gap-4 mb-5">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <svg className="w-12 h-12 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
@@ -1101,10 +1101,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               /* Windows: Certificate Card */
               <>
                 {/* Certificate Wrapper with gradient background */}
-                <div className="bg-gradient-to-b from-amber-100/8 to-amber-200/12 dark:from-yellow-900/5 dark:to-yellow-900/15 rounded-lg border border-amber-300/30 dark:border-yellow-700/25 p-5">
+                <div className="bg-linear-to-b from-amber-100/8 to-amber-200/12 dark:from-yellow-900/5 dark:to-yellow-900/15 rounded-lg border border-amber-300/30 dark:border-yellow-700/25 p-5">
                   {/* Header with Seal Icon */}
                   <div className="flex items-start gap-4 mb-5">
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <svg className="w-12 h-12 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
                       </svg>
@@ -1341,14 +1341,14 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                     <div className="flex items-center gap-4 flex-1 min-w-0">
                       {/* Expand/Collapse Icon */}
                       <svg 
-                        className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
+                        className={`w-5 h-5 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                       
                       {/* Profile Icon */}
-                      <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center shrink-0">
                         <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
@@ -1374,7 +1374,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                     </div>
                     
                     {/* Right Side Badges */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-3 shrink-0">
                       {payloadCount > 0 && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
                           {payloadCount} payload{payloadCount !== 1 ? 's' : ''}
@@ -1562,14 +1562,14 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {/* Expand/Collapse Icon */}
                       <svg 
-                        className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
+                        className={`w-4 h-4 text-gray-400 transition-transform shrink-0 ${isExpanded ? 'rotate-90' : ''}`} 
                         fill="none" stroke="currentColor" viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
                       
                       {/* Gear Icon */}
-                      <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <div className="w-8 h-8 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1583,7 +1583,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                     </div>
                     
                     {/* Settings Count */}
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
                       {settingCount} setting{settingCount !== 1 ? 's' : ''}
                     </span>
                   </button>

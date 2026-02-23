@@ -398,7 +398,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                       <td colSpan={5} className="px-6 py-6">
                         <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 rounded-lg p-5">
                           <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
+                            <div className="shrink-0 w-10 h-10 bg-red-100 dark:bg-red-900/40 rounded-full flex items-center justify-center">
                               <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
                               </svg>
@@ -690,7 +690,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                             {hasPendingReason && (
                                               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
                                                 <div className="flex items-start gap-3">
-                                                  <div className="flex-shrink-0">
+                                                  <div className="shrink-0">
                                                     <svg className="w-5 h-5 text-cyan-500 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                                     </svg>
@@ -926,7 +926,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                     {hasPendingReason && (
                                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
                                         <div className="flex items-start gap-3">
-                                          <div className="flex-shrink-0">
+                                          <div className="shrink-0">
                                             <svg className="w-5 h-5 text-cyan-500 dark:text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                             </svg>

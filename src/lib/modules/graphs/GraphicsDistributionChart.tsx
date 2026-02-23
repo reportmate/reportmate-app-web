@@ -454,7 +454,7 @@ export function GraphicsDistributionChart({
         <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
       </div>
       
-      <div className="space-y-1 max-h-[34rem] overflow-y-auto">
+      <div className="space-y-1 max-h-136 overflow-y-auto">
         {graphicsData.map((item) => (
           <div 
             key={item.graphics}

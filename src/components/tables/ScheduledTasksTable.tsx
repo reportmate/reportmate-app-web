@@ -236,7 +236,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
               </button>
               
               {dropdownOpen && (
-                <div className="absolute z-[200] mt-1 w-full sm:w-48 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                <div className="absolute z-200 mt-1 w-full sm:w-48 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black/5 focus:outline-none sm:text-sm">
                   {filterOptions.map((option) => (
                     <button
                       key={option.value}
@@ -339,7 +339,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
                         {task.lastRunCode || 'N/A'}
                       </div>
                       {task.lastRunMessage && (
-                        <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap break-words leading-tight" title={task.lastRunMessage}>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-pre-wrap wrap-break-word leading-tight" title={task.lastRunMessage}>
                           {task.lastRunMessage}
                         </div>
                       )}

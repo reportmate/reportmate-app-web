@@ -51,18 +51,18 @@ export const HardwarePageSkeleton: React.FC = () => {
             <div className="px-6 pb-4">
               <div className="flex gap-6 overflow-x-auto pb-2">
                 {/* Type & Architecture Stacked - w-56 */}
-                <div className="flex-shrink-0 w-56 flex flex-col gap-4">
+                <div className="shrink-0 w-56 flex flex-col gap-4">
                   <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                   <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                 </div>
                 {/* Models - w-96 */}
-                <div className="flex-shrink-0 w-96 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                <div className="shrink-0 w-96 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                 {/* Processor - w-80 */}
-                <div className="flex-shrink-0 w-80 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                <div className="shrink-0 w-80 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                 {/* Graphics - w-80 */}
-                <div className="flex-shrink-0 w-80 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
+                <div className="shrink-0 w-80 h-64 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                 {/* Memory & Storage Stacked - w-64 */}
-                <div className="flex-shrink-0 w-64 flex flex-col gap-4">
+                <div className="shrink-0 w-64 flex flex-col gap-4">
                   <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                   <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg animate-pulse"></div>
                 </div>

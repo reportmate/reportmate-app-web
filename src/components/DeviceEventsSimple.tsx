@@ -525,7 +525,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
               <header className="flex justify-between items-center gap-4 min-w-0">
                 <div className="flex items-center gap-3 flex-1 min-w-0 flex-wrap">
                   {/* Event Type Pill */}
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} flex-shrink-0`}>
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getEventTypeConfig(ev.kind).bg} shrink-0`}>
                     {normalizeEventKind(ev.kind || '')}
                   </span>
                   
@@ -533,13 +533,13 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   {ev.isBundle && bundledEventIds.length > 0 ? (
                     <div className="flex items-center gap-1 flex-wrap">
                       {bundledEventIds.map((eventId: string) => (
-                        <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
+                        <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono shrink-0">
                           #{eventId}
                         </span>
                       ))}
                     </div>
                   ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
+                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono shrink-0">
                       #{ev.id}
                     </span>
                   )}
@@ -550,7 +550,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   </span>
                   
                   {/* Timestamp */}
-                  <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
+                  <span className="text-sm text-gray-500 dark:text-gray-400 shrink-0">
                     {formatTimestamp(ev.ts)}
                   </span>
                 </div>
@@ -565,7 +565,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                       fetchFullPayload(ev.id);
                     }
                   }}
-                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
+                  className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors shrink-0"
                   aria-expanded={expanded === ev.id}
                   aria-controls={`payload-${ev.id}`}
                 >

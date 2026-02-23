@@ -715,20 +715,20 @@ function HardwarePageContent() {
               <div className="pb-4">
                 {/* Horizontal scrollable row */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
-                  <div className="flex-shrink-0 w-48 flex flex-col gap-4">
+                  <div className="shrink-0 w-48 flex flex-col gap-4">
                     <DeviceTypeDonutChart devices={processedHardware} loading={loading} selectedDeviceTypes={selectedDeviceTypes} onDeviceTypeToggle={handleDeviceTypeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} />
                     <ArchitectureDonutChart devices={processedHardware} loading={loading} selectedArchitectures={selectedArchitectures} onArchitectureToggle={handleArchitectureToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
-                  <div className="flex-shrink-0 w-[22rem]">
+                  <div className="shrink-0 w-88">
                     <HardwareTypeChart devices={processedHardware} loading={loading} selectedModels={selectedModels} onModelToggle={handleModelToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
-                  <div className="flex-shrink-0 w-72">
+                  <div className="shrink-0 w-72">
                     <ProcessorDistributionChart devices={processedHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
-                  <div className="flex-shrink-0 w-72">
+                  <div className="shrink-0 w-72">
                     <GraphicsDistributionChart devices={processedHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
                   </div>
-                  <div className="flex-shrink-0 w-72 flex flex-col gap-4">
+                  <div className="shrink-0 w-72 flex flex-col gap-4">
                     <MemoryBreakdownChart devices={processedHardware} loading={loading} selectedMemoryRanges={selectedMemoryRanges} onMemoryRangeToggle={handleMemoryRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                     <StorageBreakdownChart devices={processedHardware} loading={loading} selectedStorageRanges={selectedStorageRanges} onStorageRangeToggle={handleStorageRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
@@ -759,7 +759,7 @@ function HardwarePageContent() {
                 ) : (
                   filteredHardware.map((hw) => (
                     <tr key={hw.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-4 py-3 w-56"><div className="flex flex-col justify-center min-w-0"><Link href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`} className="group block min-w-0" title={hw.deviceName || hw.serialNumber || 'Unknown Device'}><span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-sm leading-tight block truncate">{hw.deviceName || hw.serialNumber || 'Unknown Device'}</span></Link><div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight"><span className="truncate max-w-32">{hw.serialNumber}</span><button onClick={() => copyToClipboard(hw.serialNumber)} className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0" title="Copy serial number"><Copy size={10} /></button>{hw.assetTag && <><span>|</span><span className="truncate max-w-20">{hw.assetTag}</span></>}</div></div></td>
+                      <td className="px-4 py-3 w-56"><div className="flex flex-col justify-center min-w-0"><Link href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`} className="group block min-w-0" title={hw.deviceName || hw.serialNumber || 'Unknown Device'}><span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-sm leading-tight block truncate">{hw.deviceName || hw.serialNumber || 'Unknown Device'}</span></Link><div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight"><span className="truncate max-w-32">{hw.serialNumber}</span><button onClick={() => copyToClipboard(hw.serialNumber)} className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0" title="Copy serial number"><Copy size={10} /></button>{hw.assetTag && <><span>|</span><span className="truncate max-w-20">{hw.assetTag}</span></>}</div></div></td>
                       <td className="px-4 py-3 w-40" style={{ maxWidth: '160px' }}>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{hw.manufacturer || hw.raw?.manufacturer || ''}</div>
                         <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">

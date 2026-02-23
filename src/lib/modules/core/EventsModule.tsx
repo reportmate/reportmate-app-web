@@ -254,7 +254,7 @@ const RecentEventsWidget: React.FC = () => {
         <div className="space-y-3">
           {events.map((event, index) => (
             <div key={event.id || index} className="flex items-center space-x-3">
-              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+              <div className={`w-2 h-2 rounded-full shrink-0 ${
                 event.kind === 'success' 
                   ? 'bg-green-500'
                   : event.kind === 'warning'

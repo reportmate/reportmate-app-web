@@ -111,7 +111,7 @@ export const ConnectionStatusWidget: React.FC<ConnectionStatusWidgetProps> = ({
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
       >
-        <div className={`w-2 h-2 rounded-full ${status.dot} flex-shrink-0`}></div>
+        <div className={`w-2 h-2 rounded-full ${status.dot} shrink-0`}></div>
         <div className={`transition-all duration-300 ease-in-out ${
           isHovered ? 'opacity-100 w-auto ml-2' : 'opacity-0 w-0 ml-0'
         }`}>
