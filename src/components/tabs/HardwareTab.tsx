@@ -16,14 +16,8 @@ import {
   Wifi, 
   Bluetooth, 
   Monitor, 
-  Box, 
-  Zap, 
   Activity,
-  Microchip,
   Layers,
-  Smartphone,
-  Laptop,
-  Server,
   Brain
 } from 'lucide-react'
 
@@ -259,7 +253,7 @@ const formatBytes = (bytes: number) => {
 
 // --- Sub-components for the new layout ---
 
-const SpecCard = ({ 
+const _SpecCard = ({ 
   title, 
   icon: Icon, 
   children, 
@@ -283,7 +277,7 @@ const SpecCard = ({
   </div>
 )
 
-const DetailRow = ({ label, value, subValue }: { label?: string, value: React.ReactNode, subValue?: string }) => (
+const _DetailRow = ({ label, value, subValue }: { label?: string, value: React.ReactNode, subValue?: string }) => (
   <div>
     {label && <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</div>}
     <div className="text-sm font-medium text-gray-900 dark:text-white">{value}</div>
@@ -393,7 +387,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   })()
   
   const npuName = safeString(hardwareData.npu?.name)
-  const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
+  const _npuManufacturer = safeString(hardwareData.npu?.manufacturer)
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits)
   const npuCores = safeNumber(hardwareData.npu?.cores)
   const npuTops = safeString(hardwareData.npu?.performanceTops)
@@ -785,7 +779,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               const brightnessNits = display.brightness_nits ?? display.brightnessNits
               const trueTone = display.true_tone ?? display.trueTone
               const refreshRate = display.refresh_rate ?? display.refreshRate
-              const hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
+              const _hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
               
               return (
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">

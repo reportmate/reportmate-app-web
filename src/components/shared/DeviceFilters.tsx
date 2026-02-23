@@ -54,9 +54,6 @@ export default function DeviceFilters({
   onFleetToggle,
   onPlatformToggle,
   onUsageToggle,
-  onClearAll,
-  searchQuery,
-  onSearchChange,
   expanded: externalExpanded,
   onToggle
 }: DeviceFiltersProps) {

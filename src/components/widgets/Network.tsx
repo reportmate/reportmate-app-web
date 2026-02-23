@@ -65,8 +65,8 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   const hasBoth = hasEthernet && hasWifi
   
   // VPN status
-  const vpnActive = network.vpnActive
-  const vpnName = network.vpnName
+  const _vpnActive = network.vpnActive
+  const _vpnName = network.vpnName
   
   // Get primary IP for display check
   const primaryIp = ethernetInterface?.ipAddress || wifiInterface?.ipAddress || network.ipAddress

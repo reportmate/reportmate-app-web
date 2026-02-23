@@ -29,7 +29,6 @@ import {
   AlertTriangle, 
   CheckCircle, 
   XCircle,
-  Clock,
   Database,
   Network,
   LogIn,
@@ -39,7 +38,7 @@ import {
   Key,
   Scan
 } from 'lucide-react'
-import { extractIdentity, type IdentityInfo, type UserAccount, type BTMDBHealth } from '../../lib/data-processing/modules/identity'
+import { extractIdentity, type IdentityInfo } from '../../lib/data-processing/modules/identity'
 
 interface IdentityTabProps {
   device: any
@@ -120,7 +119,7 @@ const isMacOS = (device: any): boolean => {
 }
 
 // BTMDB status color helper
-const getBTMDBStatusVariant = (status: string): 'success' | 'warning' | 'error' | 'neutral' => {
+const _getBTMDBStatusVariant = (status: string): 'success' | 'warning' | 'error' | 'neutral' => {
   switch (status) {
     case 'healthy': return 'success'
     case 'warning': return 'warning'
@@ -130,7 +129,7 @@ const getBTMDBStatusVariant = (status: string): 'success' | 'warning' | 'error' 
 }
 
 // Format date helper - handles UNIX timestamps, ISO strings, and "still" suffix
-const formatDate = (dateStr?: string | number, showActiveIndicator = false): { text: string, isActive: boolean } => {
+const formatDate = (dateStr?: string | number, _showActiveIndicator = false): { text: string, isActive: boolean } => {
   if (!dateStr) return { text: 'Unknown', isActive: false }
   
   const strValue = String(dateStr)

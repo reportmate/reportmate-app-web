@@ -15,7 +15,7 @@
 import React from 'react'
 import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
-import { Lock, BrickWall, HardDrive, Fingerprint, Cpu, Terminal, Shield, ShieldCheck, Key, Search, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Lock, BrickWall, HardDrive, Cpu, Terminal, Shield, ShieldCheck, Search, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
@@ -147,30 +147,30 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const gatekeeperEnabled = security?.gatekeeper?.enabled === 1 || 
                             security?.gatekeeper?.enabled === true
   // Secure Boot (Mac)
-  const macSecureBootEnabled = security?.secureBoot?.secureBootEnabled === 1 || 
+  const _macSecureBootEnabled = security?.secureBoot?.secureBootEnabled === 1 || 
                                security?.secureBoot?.secureBootEnabled === true
   // Firmware Password
-  const firmwarePasswordEnabled = security?.firmwarePassword?.enabled === 1 || 
+  const _firmwarePasswordEnabled = security?.firmwarePassword?.enabled === 1 || 
                                   security?.firmwarePassword?.enabled === true
   // SSH (Mac) - note: enabled means it's ON, which could be a security concern
-  const macSshEnabled = security?.ssh?.enabled === 1 || 
+  const _macSshEnabled = security?.ssh?.enabled === 1 || 
                         security?.ssh?.enabled === true
 
   // === Windows Security Status ===
   // Support both snake_case (new API) and camelCase (legacy) - all normalized to camelCase now
   // Windows Hello 
   const windowsHello = security?.windowsHello
-  const windowsHelloEnabled = windowsHello?.statusDisplay !== 'Disabled' && (
+  const _windowsHelloEnabled = windowsHello?.statusDisplay !== 'Disabled' && (
     windowsHello?.credentialProviders?.pinEnabled || 
     windowsHello?.credentialProviders?.faceRecognitionEnabled ||
     windowsHello?.credentialProviders?.fingerprintEnabled
   )
   // TPM 
   const tpm = security?.tpm
-  const tpmActive = tpm?.isPresent && tpm?.isEnabled && tpm?.isActivated
+  const _tpmActive = tpm?.isPresent && tpm?.isEnabled && tpm?.isActivated
   // SSH (Windows)
   const secureShellData = security?.secureShell || secureShell
-  const sshConfigured = secureShellData?.isConfigured || secureShellData?.isServiceRunning
+  const _sshConfigured = secureShellData?.isConfigured || secureShellData?.isServiceRunning
 
   // === Common Security Status ===
   // Firewall - handle both Mac and Windows formats (all normalized to camelCase now)
