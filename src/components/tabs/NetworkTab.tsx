@@ -78,13 +78,13 @@ const ActiveConnectionCard: React.FC<{
   isWiFi: boolean
   wifiData?: any
   dnsServers?: string[]
-}> = ({ iface, connectionType, isWiFi, wifiData, dnsServers }) => {
+}> = ({ iface, isWiFi, wifiData, dnsServers }) => {
   // Determine icon and colors based on type
   const bgColor = 'bg-white dark:bg-gray-800'
   const borderColor = 'border-gray-200 dark:border-gray-700'
   const iconBg = isWiFi ? 'bg-blue-100 dark:bg-blue-900' : 'bg-emerald-100 dark:bg-emerald-900'
   const iconColor = isWiFi ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'
-  const accentColor = isWiFi ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'
+  const _accentColor = isWiFi ? 'text-blue-600 dark:text-blue-400' : 'text-emerald-600 dark:text-emerald-400'
 
   // Get IPv4 address
   const getIPv4 = (ipAddress: string | string[] | undefined): string | null => {
@@ -442,7 +442,7 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                   </ul>
                 ) : (
                   <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
-                    No networks match "{wifiSearch}"
+                    No networks match &quot;{wifiSearch}&quot;
                   </div>
                 )}
               </div>
