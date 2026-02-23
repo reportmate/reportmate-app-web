@@ -20,6 +20,11 @@ export interface NetworkInfo {
   interfaceName?: string
   vpnName?: string
   vpnActive?: boolean
+  wirelessState?: string
+  wirelessSecurity?: string
+  securityType?: string
+  networkName?: string
+  localHostname?: string
   // Enhanced DNS and NETBIOS for active connection
   activeDnsServers?: string[]
   activeNetbiosName?: string
@@ -365,7 +370,9 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         bytesReceived: iface.bytes_received || iface.bytesReceived,
         linkSpeed: iface.link_speed || iface.linkSpeed,
         wirelessProtocol: iface.wireless_protocol || iface.wirelessProtocol,
-        wirelessBand: iface.wireless_band || iface.wirelessBand
+        wirelessBand: iface.wireless_band || iface.wirelessBand,
+        ssid: iface.ssid,
+        channel: iface.channel
       }
     })
 

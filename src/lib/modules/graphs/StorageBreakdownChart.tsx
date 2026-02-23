@@ -51,7 +51,7 @@ interface StorageBreakdownChartProps {
 }
 
 interface StorageData {
-  range: string
+  size: string
   count: number
   percentage: number
   color: string
@@ -305,7 +305,7 @@ export function StorageBreakdownChart({
             className={`cursor-pointer rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
               item.isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''
             }`}
-            onClick={() => onStorageRangeToggle && onStorageRangeToggle(item.range)}
+            onClick={() => onStorageRangeToggle && onStorageRangeToggle(item.size)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${
