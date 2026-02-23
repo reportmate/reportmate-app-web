@@ -18,6 +18,98 @@ interface DeviceSearchFieldProps {
   preloadedDevices?: Device[]  // Optional pre-loaded devices for instant search
 }
 
+// Pure helper functions moved outside component for stable references
+const normalizeValue = (value?: string) =>
+  (value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+
+const getDeviceHostname = (device: Device) =>
+  device.hostname || (device as any)?.modules?.network?.hostname || (device as any)?.network?.hostname
+
+const getDeviceLocation = (device: Device) =>
+  device.location || (device as any)?.modules?.inventory?.location
+
+const editDistance = (a: string, b: string) => {
+  if (a === b) return 0
+  if (!a) return b.length
+  if (!b) return a.length
+
+  const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
+  for (let i = 0; i <= a.length; i++) matrix[i][0] = i
+  for (let j = 0; j <= b.length; j++) matrix[0][j] = j
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost
+      )
+    }
+  }
+  return matrix[a.length][b.length]
+}
+
+const scoreTokenAgainstTarget = (token: string, target: string) => {
+  if (!token || !target) return 0
+  const targetTokens = target.split(' ').filter(Boolean)
+  let bestScore = 0
+
+  for (const word of targetTokens) {
+    if (word.includes(token)) {
+      return 4
+    }
+    const distance = editDistance(token, word)
+    if (distance <= 1) {
+      bestScore = Math.max(bestScore, 3)
+      continue
+    }
+    if (token.length >= 6 && distance <= 2) {
+      bestScore = Math.max(bestScore, 2)
+    }
+  }
+
+  if (bestScore > 0) return bestScore
+
+  let index = 0
+  for (const char of target) {
+    if (char === token[index]) index += 1
+    if (index === token.length) return 1
+  }
+
+  return 0
+}
+
+const getDeviceMatchScore = (device: Device, query: string) => {
+  const normalizedQuery = normalizeValue(query)
+  if (!normalizedQuery) return 0
+  const tokens = normalizedQuery.split(' ').filter(Boolean)
+  if (tokens.length === 0) return 0
+
+  const targets = [
+    normalizeValue(device.name),
+    normalizeValue(device.serialNumber),
+    normalizeValue(device.assetTag),
+    normalizeValue(getDeviceHostname(device)),
+    normalizeValue(getDeviceLocation(device))
+  ].filter(Boolean)
+
+  let totalScore = 0
+  for (const token of tokens) {
+    let bestTokenScore = 0
+    for (const target of targets) {
+      bestTokenScore = Math.max(bestTokenScore, scoreTokenAgainstTarget(token, target))
+    }
+    if (bestTokenScore === 0) return 0
+    totalScore += bestTokenScore
+  }
+
+  return totalScore
+}
+
 export function DeviceSearchField({ 
   className = "", 
   placeholder = "Search by name, serial, asset, or hostname",
@@ -46,97 +138,6 @@ export function DeviceSearchField({
     document.addEventListener('keydown', handleGlobalKeydown)
     return () => document.removeEventListener('keydown', handleGlobalKeydown)
   }, [])
-
-  const normalizeValue = (value?: string) =>
-    (value || '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, ' ')
-      .trim()
-
-  const getDeviceHostname = (device: Device) =>
-    device.hostname || (device as any)?.modules?.network?.hostname || (device as any)?.network?.hostname
-
-  const getDeviceLocation = (device: Device) =>
-    device.location || (device as any)?.modules?.inventory?.location
-
-  const editDistance = (a: string, b: string) => {
-    if (a === b) return 0
-    if (!a) return b.length
-    if (!b) return a.length
-
-    const matrix = Array.from({ length: a.length + 1 }, () => new Array(b.length + 1).fill(0))
-    for (let i = 0; i <= a.length; i++) matrix[i][0] = i
-    for (let j = 0; j <= b.length; j++) matrix[0][j] = j
-
-    for (let i = 1; i <= a.length; i++) {
-      for (let j = 1; j <= b.length; j++) {
-        const cost = a[i - 1] === b[j - 1] ? 0 : 1
-        matrix[i][j] = Math.min(
-          matrix[i - 1][j] + 1,
-          matrix[i][j - 1] + 1,
-          matrix[i - 1][j - 1] + cost
-        )
-      }
-    }
-    return matrix[a.length][b.length]
-  }
-
-  const scoreTokenAgainstTarget = (token: string, target: string) => {
-    if (!token || !target) return 0
-    const targetTokens = target.split(' ').filter(Boolean)
-    let bestScore = 0
-
-    for (const word of targetTokens) {
-      if (word.includes(token)) {
-        return 4
-      }
-      const distance = editDistance(token, word)
-      if (distance <= 1) {
-        bestScore = Math.max(bestScore, 3)
-        continue
-      }
-      if (token.length >= 6 && distance <= 2) {
-        bestScore = Math.max(bestScore, 2)
-      }
-    }
-
-    if (bestScore > 0) return bestScore
-
-    let index = 0
-    for (const char of target) {
-      if (char === token[index]) index += 1
-      if (index === token.length) return 1
-    }
-
-    return 0
-  }
-
-  const getDeviceMatchScore = (device: Device, query: string) => {
-    const normalizedQuery = normalizeValue(query)
-    if (!normalizedQuery) return 0
-    const tokens = normalizedQuery.split(' ').filter(Boolean)
-    if (tokens.length === 0) return 0
-
-    const targets = [
-      normalizeValue(device.name),
-      normalizeValue(device.serialNumber),
-      normalizeValue(device.assetTag),
-      normalizeValue(getDeviceHostname(device)),
-      normalizeValue(getDeviceLocation(device))
-    ].filter(Boolean)
-
-    let totalScore = 0
-    for (const token of tokens) {
-      let bestTokenScore = 0
-      for (const target of targets) {
-        bestTokenScore = Math.max(bestTokenScore, scoreTokenAgainstTarget(token, target))
-      }
-      if (bestTokenScore === 0) return 0
-      totalScore += bestTokenScore
-    }
-
-    return totalScore
-  }
 
   const searchDevices = useCallback(async (query: string) => {
     setIsLoading(true)

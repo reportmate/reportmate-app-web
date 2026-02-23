@@ -83,6 +83,7 @@ export function useScrollCollapse(
       }
     }
     prevManualStatesRef.current = { ...manualStates }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Track individual properties, not the object ref which may be recreated each render
   }, [manualStates.filters, manualStates.widgets, scrollCollapsed])
 
   // Reset scroll-collapsed when content no longer overflows (e.g. after filtering)
