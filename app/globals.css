@@ -1,6 +1,3 @@
-/* Import skeleton animations */
-@import '../src/styles/skeleton.css' layer(base);
-
 @import 'tailwindcss';
 
 @custom-variant dark (&:is(.dark *));
@@ -337,4 +334,90 @@ body {
 .tab-button:hover .tab-label-transition,
 .tab-button.active .tab-label-transition {
   transition-delay: 0.1s; /* Slight delay for smoother feel */
+}
+
+/* Skeleton loading animations */
+@layer base {
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  @keyframes loading-progress {
+    0% {
+      transform: translateX(-100%);
+    }
+    50% {
+      transform: translateX(0%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 2s ease-in-out infinite;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    background-size: 200% 100%;
+  }
+
+  .dark .animate-shimmer {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+    background-size: 200% 100%;
+  }
+
+  .skeleton-base {
+    background-color: rgb(229 231 235);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dark .skeleton-base {
+    background-color: rgb(55 65 81);
+  }
+
+  .skeleton-base::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.4),
+      transparent
+    );
+    animation: shimmer 2s ease-in-out infinite;
+  }
+
+  .dark .skeleton-base::after {
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.1),
+      transparent
+    );
+  }
+
+  .skeleton-stagger-1 { animation-delay: 0.1s; }
+  .skeleton-stagger-2 { animation-delay: 0.2s; }
+  .skeleton-stagger-3 { animation-delay: 0.3s; }
+  .skeleton-stagger-4 { animation-delay: 0.4s; }
+  .skeleton-stagger-5 { animation-delay: 0.5s; }
 }
