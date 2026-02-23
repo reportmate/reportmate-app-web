@@ -301,7 +301,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac pending Apple updates
-  let rawPendingUpdates = modules?.system?.pendingAppleUpdates || modules?.system?.pending_apple_updates
+  const rawPendingUpdates = modules?.system?.pendingAppleUpdates || modules?.system?.pending_apple_updates
   if (rawPendingUpdates && Array.isArray(rawPendingUpdates)) {
     systemInfo.pendingAppleUpdates = rawPendingUpdates.map((update: any) => ({
       name: update.name || update.display_name || '',
@@ -316,7 +316,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac install history from package_receipts
-  let rawInstallHistory = modules?.system?.installHistory || modules?.system?.install_history
+  const rawInstallHistory = modules?.system?.installHistory || modules?.system?.install_history
   if (rawInstallHistory && Array.isArray(rawInstallHistory)) {
     systemInfo.installHistory = rawInstallHistory.map((item: any) => ({
       packageId: item.packageId || item.package_id || '',
@@ -362,7 +362,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac Login Items
-  let rawLoginItems = modules?.system?.loginItems || modules?.system?.login_items
+  const rawLoginItems = modules?.system?.loginItems || modules?.system?.login_items
   if (rawLoginItems && Array.isArray(rawLoginItems)) {
     systemInfo.loginItems = rawLoginItems.map((item: any) => ({
       name: item.name || '',
@@ -375,7 +375,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac System Extensions
-  let rawSystemExtensions = modules?.system?.systemExtensions || modules?.system?.system_extensions
+  const rawSystemExtensions = modules?.system?.systemExtensions || modules?.system?.system_extensions
   if (rawSystemExtensions && Array.isArray(rawSystemExtensions)) {
     systemInfo.systemExtensions = rawSystemExtensions.map((ext: any) => ({
       identifier: ext.identifier || '',
@@ -393,7 +393,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac Kernel Extensions
-  let rawKernelExtensions = modules?.system?.kernelExtensions || modules?.system?.kernel_extensions
+  const rawKernelExtensions = modules?.system?.kernelExtensions || modules?.system?.kernel_extensions
   if (rawKernelExtensions && Array.isArray(rawKernelExtensions)) {
     systemInfo.kernelExtensions = rawKernelExtensions.map((kext: any) => ({
       name: kext.name || '',
@@ -407,7 +407,7 @@ export function extractSystem(deviceModules: any): SystemInfo {
   }
 
   // Extract Mac Privileged Helper Tools
-  let rawPrivilegedHelpers = modules?.system?.privilegedHelperTools || modules?.system?.privileged_helper_tools
+  const rawPrivilegedHelpers = modules?.system?.privilegedHelperTools || modules?.system?.privileged_helper_tools
   if (rawPrivilegedHelpers && Array.isArray(rawPrivilegedHelpers)) {
     systemInfo.privilegedHelperTools = rawPrivilegedHelpers.map((helper: any) => ({
       name: helper.name || '',

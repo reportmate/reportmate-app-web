@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { HardwarePageSkeleton } from "../../../src/components/skeleton/HardwarePageSkeleton"
@@ -133,7 +133,7 @@ function HardwarePageContent() {
     setSelectedDeviceTypes(prev => prev.includes(deviceType) ? prev.filter(d => d !== deviceType) : [...prev, deviceType])
   }
 
-  const handlePlatformToggle = (platform: string) => {
+  const _handlePlatformToggle = (platform: string) => {
     setSelectedPlatforms(prev => prev.includes(platform) ? prev.filter(p => p !== platform) : [platform])
   }
 
@@ -151,7 +151,7 @@ function HardwarePageContent() {
     setSelectedLocations(prev => prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location])
   }
 
-  const hasActiveFilters = () => {
+  const _hasActiveFilters = () => {
     return selectedModels.length > 0 || selectedMemoryRanges.length > 0 || selectedStorageRanges.length > 0 ||
            selectedArchitectures.length > 0 || selectedDeviceTypes.length > 0 || selectedProcessors.length > 0 ||
            selectedGraphics.length > 0 || selectedPlatforms.length > 0 || selectedStatuses.length > 0 ||
@@ -514,7 +514,7 @@ function HardwarePageContent() {
     }
     
     if (processorFilter !== 'all') {
-      let processorStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 
+      const processorStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 
         (typeof h.processor === 'object' && h.processor ? ((h.processor as any).name || '').toLowerCase() : '')
       if (!processorStr.includes(processorFilter.toLowerCase())) return false
     }
@@ -558,7 +558,7 @@ function HardwarePageContent() {
     return sortDirection === 'asc' ? aValue.localeCompare(bValue) : bValue.localeCompare(aValue)
   })
 
-  const getChartFilteredData = (excludeFilters: string[] = []) => {
+  const _getChartFilteredData = (excludeFilters: string[] = []) => {
     return processedHardware.filter(h => {
       if (processorFilter !== 'all') {
         const processorStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 

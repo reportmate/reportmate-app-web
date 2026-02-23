@@ -6,7 +6,6 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
-import { formatRelativeTime } from '../../lib/time'
 
 interface PolicySetting {
   name: string
@@ -215,9 +214,9 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       // Group by policy_name (CSP area) - aggregate multiple policy entries into one group
       const groupedByArea: Record<string, { policies: any[], settings: Map<string, { value: string, isEnabled: boolean }> }> = {}
       
-      let skippedUUID = 0
-      let skippedEmpty = 0
-      let processedPolicies = 0
+      const _skippedUUID = 0
+      const _skippedEmpty = 0
+      const _processedPolicies = 0
       
       intunePolicies.forEach((policy: any) => {
         const policyName = policy.policy_name || policy.policyName || ''
@@ -856,7 +855,7 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
               <div>• data prop: {data ? 'exists' : 'missing'}</div>
               <div className="mt-2"><strong>intune_policies sample (first 3):</strong></div>
               {((device?.modules?.profiles?.intune_policies || device?.profiles?.intune_policies || []) as any[]).slice(0, 3).map((p: any, i: number) => (
-                <div key={i}>  [{i}] policy_name: "{p?.policy_name || '(empty)'}", config keys: {Object.keys(p?.configuration || {}).length}</div>
+                <div key={i}>  [{i}] policy_name: &quot;{p?.policy_name || '(empty)'}&quot;, config keys: {Object.keys(p?.configuration || {}).length}</div>
               ))}
             </div>
             <div className="flex justify-end gap-2 mb-2">
