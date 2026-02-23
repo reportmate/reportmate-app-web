@@ -157,7 +157,7 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
         }`}
         title="More tabs"
       >
-        <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
         </svg>
         
@@ -178,7 +178,7 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
           />
           
           {/* Dropdown content */}
-          <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[200]">
+          <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-200">
             {tabs.map((tab) => {
               const isActive = activeTab === tab.id
               const colors = getDropdownAccentColors(tab.accentColor, isActive)
@@ -197,7 +197,7 @@ function OverflowTabsDropdown({ tabs, activeTab, onTabChange }: OverflowTabsDrop
                   }`}
                   title={tab.description}
                 >
-                  <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                   </svg>
                   <span>{tab.label}</span>
@@ -826,7 +826,7 @@ export default function ClientDeviceDetailPage() {
                     </svg>
                   </button>
                   {showActionsDropdown && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-[200]">
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-200">
                       {/* Copy Link */}
                       <button
                         onClick={() => {
@@ -982,14 +982,14 @@ export default function ClientDeviceDetailPage() {
                     <button
                       onClick={() => handleTabChange(tab.id)}
                       onMouseEnter={() => handleTabHover(tab.id)}
-                      className={`tab-button flex items-center justify-center p-3.5 border-b-2 font-medium text-sm transition-all duration-200 ease-in-out flex-shrink-0 rounded-t-lg ${
+                      className={`tab-button flex items-center justify-center p-3.5 border-b-2 font-medium text-sm transition-all duration-200 ease-in-out shrink-0 rounded-t-lg ${
                         isActive 
                           ? getTabAccentColors(tab.accentColor, true)
                           : `border-transparent text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 ${getHoverAccentColors(tab.accentColor)}`
                       }`}
                       title={tab.description}
                     >
-                      <svg className="w-6 h-6 flex-shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-6 h-6 shrink-0 transition-colors duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                       </svg>
                       {/* Text that always starts collapsed but expands on hover */}

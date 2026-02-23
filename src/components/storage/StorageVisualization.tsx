@@ -226,7 +226,7 @@ const DirectoryTreeItem: React.FC<{
             </div>
           </div>
           
-          <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="flex items-center gap-4 shrink-0">
             <div className="text-right">
               <div className="font-semibold text-gray-900 dark:text-white">
                 {formatBytes(directory.size)}
@@ -343,7 +343,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
       {/* Main Content - True Two Column Layout */}
       <div className="flex gap-8">
         {/* Left Sidebar - Storage Analysis & Drive Overview (20%) */}
-        <div className="w-1/5 flex-shrink-0">
+        <div className="w-1/5 shrink-0">
           <div className="sticky top-4 space-y-6">
             {/* Storage Analysis Header */}
             <div>
@@ -365,7 +365,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
               </div>
               
               {/* Donut Chart */}
-              <div className="flex-shrink-0 py-5">
+              <div className="shrink-0 py-5">
                 <DonutChart 
                   directories={sortedDirectories} 
                   capacity={selectedDevice.capacity}
@@ -423,7 +423,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
         </div>
 
         {/* Gap Space (5%) */}
-        <div className="w-[3%] flex-shrink-0"></div>
+        <div className="w-[3%] shrink-0"></div>
 
         {/* Right Side - Directory Breakdown (75%) */}
         <div className="w-3/4 min-w-0 overflow-hidden">

@@ -871,7 +871,7 @@ function NetworkPageContent() {
                               <span className="truncate max-w-32">{networkDevice.serialNumber}</span>
                               <button
                                 onClick={() => copyToClipboard(networkDevice.serialNumber)}
-                                className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                 title="Copy serial number"
                               >
                                 <Copy size={10} />
@@ -882,7 +882,7 @@ function NetworkPageContent() {
                                   <span className="truncate max-w-20">{networkDevice.assetTag}</span>
                                   <button
                                     onClick={() => copyToClipboard(networkDevice.assetTag!)}
-                                    className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                    className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                     title="Copy asset tag"
                                   >
                                     <Copy size={10} />
@@ -900,7 +900,7 @@ function NetworkPageContent() {
                             {(networkDevice.networkInfo.dnsAddress || networkDevice.networkInfo.hostname) && (
                               <button
                                 onClick={() => copyToClipboard(networkDevice.networkInfo.dnsAddress || networkDevice.networkInfo.hostname)}
-                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                 title="Copy DNS address"
                               >
                                 <Copy size={14} />
@@ -916,7 +916,7 @@ function NetworkPageContent() {
                             {(ipv4Address || networkDevice.networkInfo.ipAddress) && (
                               <button
                                 onClick={() => copyToClipboard(ipv4Address || networkDevice.networkInfo.ipAddress)}
-                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                 title="Copy IP address"
                               >
                                 <Copy size={14} />
@@ -932,7 +932,7 @@ function NetworkPageContent() {
                             {networkDevice.networkInfo.macAddress && (
                               <button
                                 onClick={() => copyToClipboard(networkDevice.networkInfo.macAddress)}
-                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0"
+                                className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 shrink-0"
                                 title="Copy MAC address"
                               >
                                 <Copy size={14} />

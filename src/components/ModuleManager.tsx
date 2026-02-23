@@ -138,7 +138,7 @@ export const ModuleManager: React.FC<ModuleManagerProps> = ({ onClose }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-6xl h-5/6 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
@@ -282,7 +282,7 @@ const InstalledModulesTab: React.FC<{
                     type="checkbox"
                     checked={runtime.enabled}
                     onChange={(e) => onToggle(moduleId, e.target.checked)}
-                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200/50"
                   />
                   <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                     {runtime.enabled ? 'Enabled' : 'Disabled'}
@@ -480,7 +480,7 @@ const RepositoriesTab: React.FC<{
                     onChange={(_e) => {
                       // Handle repository toggle
                     }}
-                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50"
+                    className="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200/50"
                   />
                   <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
                     Enabled

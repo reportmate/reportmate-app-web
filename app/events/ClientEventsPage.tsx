@@ -1089,7 +1089,7 @@ function EventsPageContent() {
                                 } w-32 justify-center px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
                               >
                                 {statusConfig && (
-                                  <div className={`w-4 h-4 flex-shrink-0 -mt-1 ${statusConfig.text}`}>
+                                  <div className={`w-4 h-4 shrink-0 -mt-1 ${statusConfig.text}`}>
                                     {statusConfig.icon}
                                   </div>
                                 )}
@@ -1442,7 +1442,7 @@ function EventsPageContent() {
                     {/* Message */}
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
-                      <div className="text-sm text-gray-900 dark:text-white break-words">
+                      <div className="text-sm text-gray-900 dark:text-white wrap-break-word">
                         {getEventMessage(event)}
                       </div>
                     </div>

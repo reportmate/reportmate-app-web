@@ -345,7 +345,7 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
       {/* Combined layout: Donut on left, Bars on right */}
       <div className="flex gap-4 items-start">
         {/* Donut Chart - larger */}
-        <div className="w-36 h-36 flex-shrink-0">
+        <div className="w-36 h-36 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie

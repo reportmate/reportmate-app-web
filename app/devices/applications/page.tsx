@@ -1333,12 +1333,12 @@ function ApplicationsPageContent() {
                 </Link>
                 <div className="h-6 w-px bg-gray-300 dark:bg-gray-600"></div>
                 <div className="flex items-center gap-3 min-w-0">
-                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                   </svg>
                 </div>
               </div>
-              <div className="flex items-center gap-2 sm:gap-4 flex-shrink-0">
+              <div className="flex items-center gap-2 sm:gap-4 shrink-0">
                 <div className="hidden lg:flex">
                   <DevicePageNavigation className="flex items-center gap-2" />
                 </div>
@@ -1772,7 +1772,7 @@ function ApplicationsPageContent() {
               
               {/* Cool Progress View - Show when generating report */}
               {loading && (
-                <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-t border-gray-200 dark:border-gray-600">
+                <div className="px-6 py-4 bg-linear-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-t border-gray-200 dark:border-gray-600">
                   <div className="flex items-center gap-4">
                     {/* Applications module icon */}
                     <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
@@ -1792,7 +1792,7 @@ function ApplicationsPageContent() {
                       {/* Progress bar */}
                       <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 overflow-hidden">
                         <div 
-                          className="h-2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-blue-600 transition-all duration-300 ease-out"
+                          className="h-2 rounded-full bg-linear-to-r from-blue-500 via-indigo-500 to-blue-600 transition-all duration-300 ease-out"
                           style={{ 
                             width: loadingProgress.total > 0 
                               ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%` 
@@ -2054,7 +2054,7 @@ function ApplicationsPageContent() {
                       return (
                         <div 
                           key={appName} 
-                          className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                          className="shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
                         >
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>
@@ -2158,7 +2158,7 @@ function ApplicationsPageContent() {
                       return (
                         <div 
                           key={appName} 
-                          className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
+                          className="shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600"
                         >
                           <div className="flex items-center justify-between mb-3">
                             <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>

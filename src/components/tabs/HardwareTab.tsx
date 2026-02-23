@@ -785,7 +785,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
                 <div className="flex items-center gap-8">
                   {/* Left: Icon + Title */}
-                  <div className="flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-3 shrink-0">
                     <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                       <Monitor className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                     </div>
@@ -843,7 +843,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   </div>
 
                   {/* Right: Badges - Horizontal with Main Display left, Connected right */}
-                  <div className="flex flex-row gap-2 flex-shrink-0">
+                  <div className="flex flex-row gap-2 shrink-0">
                     {(trueTone === 1 || trueTone === true) && (
                       <span className="px-3 py-1 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-sm font-medium rounded whitespace-nowrap text-center">
                         True Tone

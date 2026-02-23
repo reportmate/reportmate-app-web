@@ -597,7 +597,7 @@ function DevicesPageContent() {
                 
                 {/* Separator - Status/Usage */}
                 <div className="flex items-center px-2">
-                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
+                  <div className="h-6 w-px bg-linear-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
                 </div>
                 
                 {/* Usage Filters */}
@@ -631,7 +631,7 @@ function DevicesPageContent() {
                 
                 {/* Separator - Usage/Catalog */}
                 <div className="flex items-center px-2">
-                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
+                  <div className="h-6 w-px bg-linear-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
                 </div>
                 
                 {/* Catalog Filters */}

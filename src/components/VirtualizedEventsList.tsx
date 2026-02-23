@@ -65,12 +65,12 @@ const EventRow = memo(({
       className="flex items-center px-4 py-2 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
     >
       {/* Type Badge */}
-      <div className="w-20 flex-shrink-0">
+      <div className="w-20 shrink-0">
         {getKindBadge(event.kind)}
       </div>
       
       {/* Device */}
-      <div className="w-48 flex-shrink-0 truncate">
+      <div className="w-48 shrink-0 truncate">
         <Link 
           href={`/device/${event.device}`}
           className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline truncate block"
@@ -90,7 +90,7 @@ const EventRow = memo(({
       </div>
       
       {/* Time */}
-      <div className="w-32 flex-shrink-0 text-right">
+      <div className="w-32 shrink-0 text-right">
         <span className="text-xs text-gray-500 dark:text-gray-400">
           {mounted ? formatRelativeTime(event.ts) : ''}
         </span>

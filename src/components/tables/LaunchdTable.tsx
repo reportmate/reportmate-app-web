@@ -35,14 +35,14 @@ const formatPlistContent = (content: string | undefined): React.ReactNode => {
   try {
     const parsed = JSON.parse(content)
     return (
-      <pre className="text-xs font-mono whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+      <pre className="text-xs font-mono whitespace-pre-wrap wrap-break-word text-gray-800 dark:text-gray-200">
         {JSON.stringify(parsed, null, 2)}
       </pre>
     )
   } catch {
     // If not JSON, show as-is
     return (
-      <pre className="text-xs font-mono whitespace-pre-wrap break-words text-gray-800 dark:text-gray-200">
+      <pre className="text-xs font-mono whitespace-pre-wrap wrap-break-word text-gray-800 dark:text-gray-200">
         {content}
       </pre>
     )
@@ -348,7 +348,7 @@ export const LaunchdTable: React.FC<LaunchdTableProps> = ({
               </button>
               
               {dropdownOpen && (
-                <div className="absolute z-[200] mt-1 w-full sm:w-52 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                <div className="absolute z-200 mt-1 w-full sm:w-52 bg-white dark:bg-gray-700 shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black/5 focus:outline-none sm:text-sm">
                   {scopeOptions.map((option) => (
                     <button
                       key={option.value}
@@ -506,7 +506,7 @@ export const LaunchdTable: React.FC<LaunchdTableProps> = ({
                             </div>
                           </div>
                           {hasPlistContent && (
-                            <span className="flex-shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" title="Click to view plist configuration">
+                            <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" title="Click to view plist configuration">
                               plist
                             </span>
                           )}
@@ -546,7 +546,7 @@ export const LaunchdTable: React.FC<LaunchdTableProps> = ({
                       <tr className="bg-gray-50 dark:bg-gray-900/50">
                         <td colSpan={6} className="px-6 py-4">
                           <div className="flex items-start gap-4">
-                            <div className="flex-shrink-0">
+                            <div className="shrink-0">
                               <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
                                 <svg className="w-4 h-4 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />

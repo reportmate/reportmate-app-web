@@ -100,7 +100,7 @@ const NewClientsWidgetSkeleton: React.FC = () => (
 // Recent Events Widget Skeleton
 const RecentEventsWidgetSkeleton: React.FC = () => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[582px] flex flex-col">
-    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+    <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0">
       <div className="flex items-center justify-between">
         <div>
           <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
@@ -213,7 +213,7 @@ const PlatformDistributionWidgetSkeleton: React.FC = () => (
           </div>
           
           {/* Filter controls */}
-          <div className="w-64 flex-shrink-0 space-y-4">
+          <div className="w-64 shrink-0 space-y-4">
             {[...Array(3)].map((_, i) => (
               <div key={i}>
                 <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
@@ -248,8 +248,8 @@ const OSVersionWidgetSkeleton: React.FC<{ osType: 'macOS' | 'Windows' }> = ({ os
     <div className="p-6">
       <div className="flex gap-4 items-center">
         {/* Donut Chart Skeleton */}
-        <div className="w-36 h-36 flex-shrink-0 relative">
-          <div className="absolute inset-0 rounded-full border-[16px] border-gray-200 dark:border-gray-700 animate-pulse"></div>
+        <div className="w-36 h-36 shrink-0 relative">
+          <div className="absolute inset-0 rounded-full border-16 border-gray-200 dark:border-gray-700 animate-pulse"></div>
         </div>
 
         {/* Bar Chart Skeleton */}

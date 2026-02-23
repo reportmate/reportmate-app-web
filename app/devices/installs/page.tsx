@@ -1563,7 +1563,7 @@ function InstallsPageContent() {
                     setSelectedInstalls([])
                     handleConfigReport()
                   }}
-                  className="p-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center justify-center flex-shrink-0"
+                  className="p-2 bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors flex items-center justify-center shrink-0"
                   title="Back to Config Report"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1571,7 +1571,7 @@ function InstallsPageContent() {
                   </svg>
                 </button>
               )}
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                   Managed Software Update Reporting
                 </h2>
@@ -1599,7 +1599,7 @@ function InstallsPageContent() {
                           {loadingMessage || 'Loading managed installs data...'}
                         </p>
                         {loadingProgress.total > 0 && (
-                          <p className="text-xs text-gray-500 dark:text-gray-500 ml-2 flex-shrink-0">
+                          <p className="text-xs text-gray-500 dark:text-gray-500 ml-2 shrink-0">
                             {loadingProgress.current}/{loadingProgress.total}
                           </p>
                         )}
@@ -1615,7 +1615,7 @@ function InstallsPageContent() {
                         ></div>
                       </div>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400 flex-shrink-0">
+                    <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">
                       {loadingProgress.total > 0 
                         ? `${Math.round((loadingProgress.current / loadingProgress.total) * 100)}%`
                         : ''

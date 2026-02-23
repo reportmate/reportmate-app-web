@@ -394,7 +394,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[620px] flex flex-col">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 block">
+      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0 block">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link href="/events" className="hover:opacity-80 transition-opacity">
@@ -435,7 +435,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                         onClick={() => toggleFilter(filter.key)}
                         className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
-                        <div className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                           isActive
                             ? 'bg-blue-600 border-blue-600 dark:bg-blue-500 dark:border-blue-500'
                             : 'border-gray-300 dark:border-gray-600'
@@ -464,7 +464,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                   onMouseEnter={handleMouseEnter}
                   onMouseLeave={handleMouseLeave}
                 >
-                  <div className={`w-2 h-2 rounded-full ${status.dot} flex-shrink-0`}></div>
+                  <div className={`w-2 h-2 rounded-full ${status.dot} shrink-0`}></div>
                   <div className={`transition-all duration-300 ease-in-out ${
                     isHovered ? 'opacity-100 w-auto ml-2' : 'opacity-0 w-0 ml-0'
                   }`}>

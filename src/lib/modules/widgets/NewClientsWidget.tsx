@@ -73,7 +73,7 @@ export const NewClientsWidget: React.FC<NewClientsWidgetProps> = React.memo(func
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden h-[600px] flex flex-col">
       <Link
         href="/devices"
-        className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0 block hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+        className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 shrink-0 block hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
       >
         <div className="flex items-center justify-between">
           <div>

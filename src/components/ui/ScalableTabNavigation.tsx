@@ -43,14 +43,14 @@ export const ScalableTabNavigation: React.FC<ScalableTabNavigationProps> = ({
           <div key={tab.id} className="relative group">
             <button
               onClick={() => onTabChange(tab.id)}
-              className={`tab-button flex items-center justify-center p-3 border-b-2 font-medium text-sm transition-all duration-200 ease-in-out flex-shrink-0 ${
+              className={`tab-button flex items-center justify-center p-3 border-b-2 font-medium text-sm transition-all duration-200 ease-in-out shrink-0 ${
                 activeTab === tab.id
                   ? 'active border-blue-500 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-t-lg'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50 dark:text-gray-400 dark:hover:text-gray-300 dark:hover:bg-gray-700/50 rounded-t-lg'
               }`}
               title={tab.description}
             >
-              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
               </svg>
               <span className={`tab-label-transition overflow-hidden whitespace-nowrap ${
@@ -83,7 +83,7 @@ export const ScalableTabNavigation: React.FC<ScalableTabNavigationProps> = ({
               }`}
               title={tab.description}
             >
-              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
               </svg>
               <span className="hidden md:inline whitespace-nowrap">{tab.label}</span>
@@ -144,7 +144,7 @@ export const ScalableTabNavigation: React.FC<ScalableTabNavigationProps> = ({
 
             {/* Dropdown menu */}
             {showOverflow && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-[200]">
+              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-200">
                 {overflowTabs.map((tab) => (
                   <button
                     key={tab.id}
@@ -159,7 +159,7 @@ export const ScalableTabNavigation: React.FC<ScalableTabNavigationProps> = ({
                     }`}
                     title={tab.description}
                   >
-                    <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={tab.icon} />
                     </svg>
                     <span>{tab.label}</span>

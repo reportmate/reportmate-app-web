@@ -829,7 +829,7 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                     <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">{device.uri}</span>
                     <button
                       onClick={() => copyToClipboard(device.uri!)}
-                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       title="Copy Queue"
                     >
                       {copiedUri === device.uri ? (
@@ -850,7 +850,7 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                     <span className="text-gray-900 dark:text-gray-100 font-mono text-xs">{device.ppd}</span>
                     <button
                       onClick={() => copyToClipboard(device.ppd!)}
-                      className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                       title="Copy PPD"
                     >
                       {copiedUri === device.ppd ? (
@@ -884,7 +884,7 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
                           </div>
                           <button
                             onClick={() => copyToClipboard(filter.path || filter.name)}
-                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            className="shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                             title="Copy Filter Path"
                           >
                             {copiedUri === (filter.path || filter.name) ? (
@@ -1009,7 +1009,7 @@ const ExternalStorageContent = ({ devices }: { devices: ExternalStorageDevice[] 
 // Helper Components
 const InfoRow = ({ label, value, fullWidth = false }: { label: string; value: string; fullWidth?: boolean }) => (
   <div className={`flex ${fullWidth ? 'flex-col gap-1' : 'items-center gap-4'}`}>
-    <span className={`text-gray-500 dark:text-gray-400 ${fullWidth ? '' : 'w-28 flex-shrink-0'}`}>{label}</span>
+    <span className={`text-gray-500 dark:text-gray-400 ${fullWidth ? '' : 'w-28 shrink-0'}`}>{label}</span>
     <span className={`text-gray-900 dark:text-gray-100 font-medium ${fullWidth ? 'break-all font-mono text-xs' : 'truncate'}`} title={value}>{value}</span>
   </div>
 )

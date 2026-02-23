@@ -455,7 +455,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
                     <span className="font-mono text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '11px' }} title={hardwareUuid}>{hardwareUuid}</span>
                     <button
                       onClick={() => navigator.clipboard.writeText(hardwareUuid)}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,7 +474,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
                     <span className="font-mono text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '11px' }} title={intuneDeviceId}>{intuneDeviceId}</span>
                     <button
                       onClick={() => navigator.clipboard.writeText(intuneDeviceId)}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -493,7 +493,7 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
                     <span className="font-mono text-gray-900 dark:text-gray-100 truncate" style={{ fontSize: '11px' }} title={entraObjectId}>{entraObjectId}</span>
                     <button
                       onClick={() => navigator.clipboard.writeText(entraObjectId)}
-                      className="flex-shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                      className="shrink-0 p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                       title="Copy to clipboard"
                     >
                       <svg className="w-4 h-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
