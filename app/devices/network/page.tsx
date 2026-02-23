@@ -204,19 +204,19 @@ function NetworkPageContent() {
     
     // Signal quality distribution
     signalExcellent: processedNetworkDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = Number(n.networkInfo.signalStrength) || 0
       return signal >= 75
     }).length,
     signalGood: processedNetworkDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = Number(n.networkInfo.signalStrength) || 0
       return signal >= 50 && signal < 75
     }).length,
     signalFair: processedNetworkDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = Number(n.networkInfo.signalStrength) || 0
       return signal >= 25 && signal < 50
     }).length,
     signalPoor: processedNetworkDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = Number(n.networkInfo.signalStrength) || 0
       return signal > 0 && signal < 25
     }).length
   }

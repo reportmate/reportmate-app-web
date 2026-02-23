@@ -49,10 +49,10 @@ interface Security {
   cveCount?: number
   criticalCveCount?: number
   // Certificates
+  certificateCount?: number
   expiredCertCount?: number
   expiringSoonCertCount?: number
   // Tampering
-  tpmPresent?: boolean
   tpmEnabled?: boolean
   secureBootEnabled?: boolean
   sipEnabled?: boolean
@@ -349,13 +349,13 @@ function SecurityPageContent() {
 
   // Create filter options
   const filterOptions: FilterOptions = {
-    statuses: [...new Set(security.map(s => s.status).filter(Boolean))].sort(),
-    catalogs: [...new Set(security.map(s => s.catalog).filter(Boolean))].sort(),
+    statuses: [...new Set(security.map(s => s.status).filter((s): s is string => Boolean(s)))].sort(),
+    catalogs: [...new Set(security.map(s => s.catalog).filter((s): s is string => Boolean(s)))].sort(),
     areas: [],
-    locations: [...new Set(security.map(s => s.location).filter(Boolean))].sort(),
+    locations: [...new Set(security.map(s => s.location).filter((s): s is string => Boolean(s)))].sort(),
     fleets: [],
-    platforms: [...new Set(security.map(s => normalizePlatform(s.platform)).filter(p => p !== 'Unknown'))].sort(),
-    usages: [...new Set(security.map(s => s.usage).filter(Boolean))].sort()
+    platforms: [...new Set(security.map(s => normalizePlatform(s.platform)).filter(p => p !== 'unknown'))].sort(),
+    usages: [...new Set(security.map(s => s.usage).filter((s): s is string => Boolean(s)))].sort()
   }
 
   // Apply filters
