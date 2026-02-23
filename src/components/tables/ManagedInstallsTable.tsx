@@ -89,7 +89,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   };
 
   // getFilteredPackages and useMemo hooks must be called before any early return
-  const getFilteredPackages = () => {
+  const filteredPackages = useMemo(() => {
     if (!data || !data.packages || !Array.isArray(data.packages) || data.packages.length === 0) {
       return [];
     }
@@ -113,9 +113,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     }
     
     return filtered;
-  };
-
-  const filteredPackages = getFilteredPackages();
+  }, [data, statusFilter, searchQuery]);
 
   // Group packages by category
   const groupedPackages = useMemo(() => {

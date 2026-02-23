@@ -101,20 +101,20 @@ const DonutChart: React.FC<{
   const normalizedRadius = radius - strokeWidth * 0.5
   const circumference = normalizedRadius * 2 * Math.PI
 
-  let accumulatedPercentage = 0
-  const segments = directories.map((dir, index) => {
-    // Cap each segment percentage to prevent overflow beyond 100%
+  const segments = directories.reduce<{ elements: (React.ReactElement | null)[], accumulated: number }>((acc, dir, index) => {
     const rawPercentage = (dir.size / capacity) * 100
-    const remainingPercentage = 100 - accumulatedPercentage
+    const remainingPercentage = 100 - acc.accumulated
     const percentage = Math.min(rawPercentage, Math.max(0, remainingPercentage))
     const strokeDasharray = `${(percentage / 100) * circumference} ${circumference}`
-    const strokeDashoffset = -accumulatedPercentage * (circumference / 100)
-    accumulatedPercentage += percentage
+    const strokeDashoffset = -acc.accumulated * (circumference / 100)
+    acc.accumulated += percentage
 
-    // Skip rendering if no remaining space
-    if (percentage <= 0) return null
+    if (percentage <= 0) {
+      acc.elements.push(null)
+      return acc
+    }
 
-    return (
+    acc.elements.push(
       <circle
         key={index}
         stroke={getCategoryColor(dir.category, dir.name)}
@@ -134,7 +134,8 @@ const DonutChart: React.FC<{
         style={{ filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.1))' }}
       />
     )
-  }).filter(Boolean) // Filter out null segments
+    return acc
+  }, { elements: [], accumulated: 0 }).elements.filter(Boolean)
 
   // Calculate used percentage from actual drive data (capacity - freeSpace), NOT from directory sums
   // Directory sums miss hidden files, system snapshots, APFS overhead, etc.
@@ -273,7 +274,7 @@ export const StorageVisualization: React.FC<StorageVisualizationProps> = ({ stor
   const selectedDevice = validDevices[selectedDeviceIndex] || null
   const sortedDirectories = useMemo(() => {
     if (!selectedDevice) return []
-    return selectedDevice.rootDirectories.sort((a, b) => b.size - a.size)
+    return [...selectedDevice.rootDirectories].sort((a, b) => b.size - a.size)
   }, [selectedDevice])
 
   if (validDevices.length === 0) {

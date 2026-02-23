@@ -363,8 +363,11 @@ export const UnusedAppsWidget: React.FC<{ apps: ApplicationInfo[], daysThreshold
   daysThreshold = 30,
   maxItems = 5
 }) => {
+  const nowRef = React.useRef(0)
+  // eslint-disable-next-line react-hooks/purity -- Date.now() is intentional for time-based filtering
+  if (nowRef.current === 0) nowRef.current = Date.now()
   const unusedApps = useMemo(() => {
-    const thresholdDate = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000)
+    const thresholdDate = new Date(nowRef.current - daysThreshold * 24 * 60 * 60 * 1000)
     
     return [...apps]
       .filter(app => {
@@ -376,11 +379,11 @@ export const UnusedAppsWidget: React.FC<{ apps: ApplicationInfo[], daysThreshold
       .slice(0, maxItems)
   }, [apps, daysThreshold, maxItems])
 
-  const totalUnused = apps.filter(app => {
+  const totalUnused = useMemo(() => apps.filter(app => {
     if (!app.usage?.lastUsed) return true
-    const thresholdDate = new Date(Date.now() - daysThreshold * 24 * 60 * 60 * 1000)
+    const thresholdDate = new Date(nowRef.current - daysThreshold * 24 * 60 * 60 * 1000)
     return new Date(app.usage.lastUsed) < thresholdDate
-  }).length
+  }).length, [apps, daysThreshold])
 
   if (unusedApps.length === 0) {
     return (
