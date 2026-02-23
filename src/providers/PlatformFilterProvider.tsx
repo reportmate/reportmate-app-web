@@ -64,25 +64,9 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   const pathname = usePathname()
   const searchParams = useSearchParams()
   
-  // Initialize platform filter with priority:
-  //   1) URL parameter (highest priority for sharing links)
-  //   2) localStorage (for persistence across navigation)
-  //   3) default value
-  const getInitialPlatform = (): Platform => {
-    const urlPlatform = searchParams.get('platform')
-    if (urlPlatform === 'mac') return 'macOS'
-    if (urlPlatform === 'win') return 'Windows'
-    
-    // Check localStorage (client-side only)
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored === 'macOS' || stored === 'Windows') return stored
-    }
-    
-    return defaultPlatform
-  }
-  
-  const [platformFilter, setPlatformFilterState] = useState<Platform>(getInitialPlatform)
+  // Always initialize with defaultPlatform to avoid hydration mismatch.
+  // The useEffect below syncs from localStorage/URL after hydration.
+  const [platformFilter, setPlatformFilterState] = useState<Platform>(defaultPlatform)
   const [isInitialized, setIsInitialized] = useState(false)
 
   // Initialize from localStorage on mount (handles SSR)
