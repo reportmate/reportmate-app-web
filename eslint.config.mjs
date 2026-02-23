@@ -5,7 +5,7 @@ const eslintConfig = [
   ...nextConfig,
   ...tsConfig,
   {
-    ignores: ["src/lib/modules/**", "next-env.d.ts", "public/**", ".agents/**"],
+    ignores: ["src/lib/modules/**", "next-env.d.ts", "public/**", ".agents/**", "test-system-endpoint.js"],
   },
   {
     rules: {
