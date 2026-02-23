@@ -94,7 +94,7 @@ export const UsageDistributionChart: React.FC<{ apps: ApplicationInfo[], maxItem
     <div className="space-y-3">
       {topApps.map((app, index) => {
         const percentage = ((app.usage?.totalSeconds || 0) / maxSeconds) * 100
-        const totalPercentage = ((app.usage?.totalSeconds || 0) / totalSeconds) * 100
+        const _totalPercentage = ((app.usage?.totalSeconds || 0) / totalSeconds) * 100
         
         // Generate gradient color based on position
         const hue = 210 + (index * 15) // Blue to purple gradient
@@ -256,7 +256,7 @@ export const MostActiveUsersWidget: React.FC<{ apps: ApplicationInfo[], maxUsers
 
   return (
     <div className="space-y-3">
-      {userStats.map((stat, index) => {
+      {userStats.map((stat) => {
         const percentage = (stat.totalSeconds / maxSeconds) * 100
         const username = stat.user.includes('\\') ? stat.user.split('\\').pop() : stat.user
         

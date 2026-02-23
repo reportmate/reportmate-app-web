@@ -31,7 +31,7 @@ function VirtualTableInner<T>({
   const [scrollTop, setScrollTop] = useState(0);
 
   // Calculate visible range
-  const { startIndex, endIndex, visibleCount } = useMemo(() => {
+  const { startIndex, endIndex } = useMemo(() => {
     const visibleCount = Math.ceil(containerHeight / rowHeight);
     const startIndex = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
     const endIndex = Math.min(data.length, startIndex + visibleCount + overscan * 2);

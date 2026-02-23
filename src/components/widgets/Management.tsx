@@ -321,12 +321,12 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
 
   // Device authentication and profile info
   const deviceDetails = management.deviceDetails || management.device_details || {}
-  const deviceAuthStatus = deviceDetails.deviceAuthStatus || deviceDetails.device_auth_status
+  const _deviceAuthStatus = deviceDetails.deviceAuthStatus || deviceDetails.device_auth_status
   
   // Profile count - Mac uses installed_profiles, Windows uses profiles
   const installedProfiles = management.installed_profiles || management.installedProfiles || []
   const profiles = management.profiles || []
-  const profileCount = installedProfiles.length || profiles.length || 0
+  const _profileCount = installedProfiles.length || profiles.length || 0
 
   // Device identification information
   const intuneDeviceId = deviceDetails.intuneDeviceId || deviceDetails.intune_device_id
@@ -335,23 +335,23 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   // Organization - from ADE configuration or tenant details
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
   const tenantDetails = management.tenant_details || management.tenantDetails || {}
-  const organization = adeConfiguration.organization || tenantDetails.tenant_name || tenantDetails.tenantName
+  const _organization = adeConfiguration.organization || tenantDetails.tenant_name || tenantDetails.tenantName
   
   // Hardware UUID - from top-level device data
   const hardwareUuid = (device as any).deviceId
   
   // Mac compliance status (from osquery security checks)
   const complianceStatus = management.complianceStatus || management.compliance_status || {}
-  const complianceScore = complianceStatus.complianceScore ?? complianceStatus.compliance_score
+  const _complianceScore = complianceStatus.complianceScore ?? complianceStatus.compliance_score
   
   // Mac device identifiers
   const deviceIdentifiers = management.deviceIdentifiers || management.device_identifiers || {}
-  const macSerialNumber = deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_serial
-  const macUuid = deviceIdentifiers.uuid
-  const macAssetTag = deviceIdentifiers.assetTag || deviceIdentifiers.asset_tag
+  const _macSerialNumber = deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_serial
+  const _macUuid = deviceIdentifiers.uuid
+  const _macAssetTag = deviceIdentifiers.assetTag || deviceIdentifiers.asset_tag
 
   // Helper function to get enrollment type color
-  const getEnrollmentTypeColor = (type?: string) => {
+  const _getEnrollmentTypeColor = (type?: string) => {
     if (!type) return 'info'
     
     const typeLower = type.toLowerCase()
