@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { extractNetwork } from "../../../src/lib/data-processing/modules/network"
@@ -31,7 +31,7 @@ interface NetworkDevice {
 function NetworkPageContent() {
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless'>('all')
   const searchParams = useSearchParams()
@@ -81,7 +81,7 @@ function NetworkPageContent() {
     )
   }
   
-  const clearAllFilters = () => {
+  const _clearAllFilters = () => {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])

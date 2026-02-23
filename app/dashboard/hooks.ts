@@ -213,7 +213,7 @@ export function useLiveEvents() {
             })
           }
         }
-      } catch (error) {
+      } catch {
         // Silently fail - polling will retry
       }
     }
@@ -349,7 +349,7 @@ export function useLiveEvents() {
           console.error("WebSocket error:", error)
         }
         
-        ws.onclose = (event) => {
+        ws.onclose = () => {
           if (!isActive) return
           wsRef.current = null
           

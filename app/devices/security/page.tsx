@@ -2,10 +2,9 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, useRef, Suspense } from "react"
+import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { formatRelativeTime } from "../../../src/lib/time"
 import { calculateDeviceStatus } from "../../../src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
@@ -175,9 +174,9 @@ function SecurityPageContent() {
   )
   
   // Donut chart category expansion
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const [, setExpandedCategories] = useState<Set<string>>(new Set())
   
-  const toggleCategory = (categoryLabel: string) => {
+  const _toggleCategory = (categoryLabel: string) => {
     setExpandedCategories(prev => {
       const newSet = new Set(prev)
       if (newSet.has(categoryLabel)) {
@@ -303,7 +302,7 @@ function SecurityPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  const firewallCounts = security.reduce((acc, curr) => {
+  const _firewallCounts = security.reduce((acc, curr) => {
     const label = curr.firewallEnabled ? 'Enabled' : 'Disabled'
     acc[label] = (acc[label] || 0) + 1
     return acc
@@ -315,7 +314,7 @@ function SecurityPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  const sshCounts = security.reduce((acc, curr) => {
+  const _sshCounts = security.reduce((acc, curr) => {
     let label = 'Unknown'
     if (curr.secureShell?.isServiceRunning) {
       label = curr.secureShell?.isConfigured ? 'Configured' : 'Running (Not Configured)'
@@ -550,7 +549,7 @@ function SecurityPageContent() {
     'default': '#94a3b8'
   }
 
-  const firewallColors: Record<string, string> = {
+  const _firewallColors: Record<string, string> = {
     'Enabled': '#22c55e',
     'Disabled': '#ef4444',
     'default': '#94a3b8'

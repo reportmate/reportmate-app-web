@@ -145,7 +145,7 @@ function EventsPageContent() {
   // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
-  const [totalEvents, setTotalEvents] = useState(0)
+  const [, setTotalEvents] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()

@@ -6,7 +6,6 @@ import { ThemeToggle } from '../../src/components/theme-toggle'
 
 export default function ClientSettingsPage() {
   const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations'>('general')
-  const [showModuleManager, setShowModuleManager] = useState(false)
 
   const menuItems = [
     { id: 'general', name: 'General', icon: '' },
