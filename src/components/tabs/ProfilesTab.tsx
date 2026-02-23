@@ -214,24 +214,16 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
       // Group by policy_name (CSP area) - aggregate multiple policy entries into one group
       const groupedByArea: Record<string, { policies: any[], settings: Map<string, { value: string, isEnabled: boolean }> }> = {}
       
-      const _skippedUUID = 0
-      const _skippedEmpty = 0
-      const _processedPolicies = 0
-      
       intunePolicies.forEach((policy: any) => {
         const policyName = policy.policy_name || policy.policyName || ''
         
         // Skip UUID policy names - those are just enrollment containers
         if (isUUID(policyName)) {
-          skippedUUID++
           return
         }
         if (!policyName) {
-          skippedEmpty++
           return
         }
-        
-        processedPolicies++
         
         if (!groupedByArea[policyName]) {
           groupedByArea[policyName] = { policies: [], settings: new Map() }

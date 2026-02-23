@@ -15,8 +15,13 @@ interface Device {
   osName?: string
   security?: any
   securityFeatures?: any
+  metadata?: any
+  management?: any
   modules?: {
     security?: any
+    system?: any
+    metadata?: any
+    management?: any
   }
 }
 

@@ -52,7 +52,7 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
   )
   
   // Get WiFi details
-  const wifiData = network.wifiInterface || (wifiInterface ? {
+  const wifiData: any = network.wifiInterface || (wifiInterface ? {
     ssid: wifiInterface.ssid,
     protocol: wifiInterface.wirelessProtocol,
     ipAddress: wifiInterface.ipAddress,

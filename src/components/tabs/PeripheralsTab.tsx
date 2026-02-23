@@ -169,6 +169,7 @@ interface SerialPort {
 
 interface PeripheralsData {
   collectedAt?: string
+  moduleVersion?: string
   usbDevices?: USBDevice[]
   inputDevices?: InputDevices
   audioDevices?: AudioDevice[]

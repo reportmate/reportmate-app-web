@@ -54,7 +54,7 @@ export const ProfilesWidget: React.FC<ProfilesWidgetProps> = ({ device }) => {
   const profiles = rawProfiles ? normalizeKeys(rawProfiles) as ProfilesData : null
   const hasProfilesInfo = profiles && profiles.profiles && profiles.profiles.length > 0
 
-  if (!hasProfilesInfo) {
+  if (!hasProfilesInfo || !profiles.profiles) {
     return (
       <StatBlock 
         title="Profiles" 

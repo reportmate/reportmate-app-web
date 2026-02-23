@@ -50,7 +50,7 @@ export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
   const printers = rawPrinters ? normalizeKeys(rawPrinters) as PrintersData : null
   const hasPrintersInfo = printers && printers.printers && printers.printers.length > 0
 
-  if (!hasPrintersInfo) {
+  if (!hasPrintersInfo || !printers.printers) {
     return (
       <StatBlock 
         title="Printers" 

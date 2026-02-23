@@ -75,6 +75,7 @@ interface Device {
   id: string
   name: string
   serialNumber?: string
+  platform?: string
   // Modules structure
   modules?: {
     system?: {
