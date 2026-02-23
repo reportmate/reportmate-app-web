@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     const selectedCatalogs = searchParams.getAll('catalogs').map(c => c.toLowerCase());
     const selectedRooms = searchParams.getAll('rooms');
     const selectedFleets = searchParams.getAll('fleets');
-    const selectedPlatforms = searchParams.getAll('platforms').map(p => p.toLowerCase());
+    const _selectedPlatforms = searchParams.getAll('platforms').map(p => p.toLowerCase());
     
         
     // If device ID is provided, return data for specific device
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
     }
 
     // No device ID - use the shared data fetcher directly (no HTTP call needed)
-    const timestamp = new Date().toISOString();
+    const _timestamp = new Date().toISOString();
         
     // Direct function call - no internal HTTP request, no middleware interception
     const dataResult = await getDevicesWithInstalls();
@@ -84,7 +84,7 @@ export async function GET(request: Request) {
         
     // Debug: log first device structure
     if (devicesWithInstalls.length > 0) {
-      const firstDevice = devicesWithInstalls[0];
+      const _firstDevice = devicesWithInstalls[0];
           }
 
     // Transform device data into install records for the report

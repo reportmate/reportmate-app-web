@@ -63,7 +63,7 @@ export async function GET(request: Request) {
             startTime: Date.now()
           });
 
-          const timestamp = new Date().toISOString();
+          const _timestamp = new Date().toISOString();
                     
           // Fetch all devices first
           const apiResponse = await fetch(`${API_BASE_URL}/api/devices`, {
@@ -106,8 +106,8 @@ export async function GET(request: Request) {
 
           for (let i = 0; i < devices.length; i += batchSize) {
             const batch = devices.slice(i, i + batchSize);
-            const batchNumber = Math.floor(i/batchSize) + 1;
-            const totalBatches = Math.ceil(devices.length/batchSize);
+            const _batchNumber = Math.floor(i/batchSize) + 1;
+            const _totalBatches = Math.ceil(devices.length/batchSize);
             
                         
             const batchPromises = batch.map(async (device: any, index: number) => {

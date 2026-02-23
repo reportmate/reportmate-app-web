@@ -84,7 +84,7 @@ export async function GET(request: Request) {
     }
 
     // Determine if running on localhost
-    const isLocalhost = request.headers.get('host')?.includes('localhost') || request.headers.get('host')?.includes('127.0.0.1')
+    const _isLocalhost = request.headers.get('host')?.includes('localhost') || request.headers.get('host')?.includes('127.0.0.1')
 
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
@@ -210,7 +210,7 @@ export async function GET(request: Request) {
         try {
           const errorText = await response.text();
           console.error('[EVENTS API] Error details:', errorText);
-        } catch (e) {
+        } catch {
           console.error('[EVENTS API] Could not read error body');
         }
         // Fall through to local fallback

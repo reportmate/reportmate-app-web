@@ -145,7 +145,7 @@ export async function GET(request: Request) {
     const timestamp = new Date().toISOString()
     const { headers: requestHeaders } = request
     const host = requestHeaders.get('host') || ''
-    const isLocalDev = host.includes('localhost')
+    const _isLocalDev = host.includes('localhost')
     
     
     // PERFORMANCE FIX: Use FastAPI bulk applications endpoint instead of fetching each device individually
