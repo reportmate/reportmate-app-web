@@ -39,7 +39,7 @@ function parseMdmCertificate(mdmCertificate: any): {
   if (mdmCertificate.output && typeof mdmCertificate.output === 'string') {
     try {
       // Clean up the JSON string - handle osquery's escaped format with semicolons INSIDE quotes
-      let cleanJson = mdmCertificate.output
+      const cleanJson = mdmCertificate.output
         .replace(/";\\",/g, '",')       // Fix: "value";\", → "value",
         .replace(/";\\"\n/g, '"\n')     // Fix: "value";\" \n → "\n
         .replace(/";\s*,/g, '",')       // Fix: "value"; , → "value",
@@ -159,6 +159,45 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)
 
+  // Extract data needed by hooks before early return (with safe defaults)
+  // Wrapped in useMemo so references are stable for downstream useMemo deps
+  const installedProfiles = useMemo(
+    () => management?.installed_profiles || management?.installedProfiles || [],
+    [management?.installed_profiles, management?.installedProfiles]
+  )
+  const managedPolicies = useMemo(
+    () => management?.managed_policies || management?.managedPolicies || [],
+    [management?.managed_policies, management?.managedPolicies]
+  )
+
+  // Hooks must be called unconditionally — before any early return
+  const filteredProfiles = useMemo(() => {
+    if (!profileSearch.trim()) return installedProfiles
+    const search = profileSearch.toLowerCase()
+    return installedProfiles.filter((profile: any) => {
+      const name = (profile.name || profile.identifier || '').toLowerCase()
+      const identifier = (profile.identifier || '').toLowerCase()
+      const org = (profile.organization || '').toLowerCase()
+      return name.includes(search) || identifier.includes(search) || org.includes(search)
+    })
+  }, [installedProfiles, profileSearch])
+  
+  // Filter managed policies by search
+  const filteredPolicies = useMemo(() => {
+    if (!policySearch.trim()) return managedPolicies
+    const search = policySearch.toLowerCase()
+    return managedPolicies.filter((policy: any) => {
+      const domain = (policy.domain || '').toLowerCase()
+      // Also check individual settings for search term
+      const settings = policy.settings || []
+      const settingsMatch = settings.some((s: any) => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.value || '').toLowerCase().includes(search)
+      )
+      return domain.includes(search) || settingsMatch
+    })
+  }, [managedPolicies, policySearch])
+
   if (!management) {
     return (
       <div className="text-center py-16">
@@ -194,12 +233,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const tenantDetails = management.tenant_details || management.tenantDetails || {}
   const deviceDetails = management.device_details || management.deviceDetails || {}
   // NOTE: compliance_status removed from management module - moved to security module
-  const remoteManagement = management.remote_management || management.remoteManagement || {}
-  const installedProfiles = management.installed_profiles || management.installedProfiles || []
+  const _remoteManagement = management.remote_management || management.remoteManagement || {}
   const profiles = management.profiles || []
-  const managedPolicies = management.managed_policies || management.managedPolicies || []
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
-  const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
+  const _deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
   
   // Toggle profile expansion
   const toggleProfile = (identifier: string) => {
@@ -227,33 +264,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     })
   }
   
-  // Filter profiles by search
-  const filteredProfiles = useMemo(() => {
-    if (!profileSearch.trim()) return installedProfiles
-    const search = profileSearch.toLowerCase()
-    return installedProfiles.filter((profile: any) => {
-      const name = (profile.name || profile.identifier || '').toLowerCase()
-      const identifier = (profile.identifier || '').toLowerCase()
-      const org = (profile.organization || '').toLowerCase()
-      return name.includes(search) || identifier.includes(search) || org.includes(search)
-    })
-  }, [installedProfiles, profileSearch])
-  
-  // Filter managed policies by search
-  const filteredPolicies = useMemo(() => {
-    if (!policySearch.trim()) return managedPolicies
-    const search = policySearch.toLowerCase()
-    return managedPolicies.filter((policy: any) => {
-      const domain = (policy.domain || '').toLowerCase()
-      // Also check individual settings for search term
-      const settings = policy.settings || []
-      const settingsMatch = settings.some((s: any) => 
-        (s.name || '').toLowerCase().includes(search) ||
-        (s.value || '').toLowerCase().includes(search)
-      )
-      return domain.includes(search) || settingsMatch
-    })
-  }, [managedPolicies, policySearch])
+  // Filter profiles by search — already computed above early return
   
   // Parse the MDM certificate (handles nested JSON in 'output' field)
   const mdmCertificate = parseMdmCertificate(mdmCertificateRaw)
@@ -325,7 +336,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Extract expiry date from validity range string
   // Input: "[ 2025-03-25 22:47:56.000 UTC -- 2035-03-25 23:17:56.000 UTC ]"
   // Output: "Mar 25, 2035"
-  const formatCertificateValidity = (validityString?: string) => {
+  const _formatCertificateValidity = (validityString?: string) => {
     if (!validityString) return 'Unknown'
     
     // Try to parse the end date from the range
@@ -1317,7 +1328,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               const isExpanded = expandedProfiles.has(identifier)
               const payloads = profile.payloads || []
               const payloadCount = payloads.length || profile.payload_count || 0
-              const isVerified = profile.verification_state === 'verified'
+              const _isVerified = profile.verification_state === 'verified'
               const isRemovalDisallowed = profile.removal_disallowed === true || profile.removal_disallowed === 'true'
               
               return (
