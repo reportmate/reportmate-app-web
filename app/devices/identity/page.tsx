@@ -714,7 +714,7 @@ function IdentityPageContent() {
                                   BTMDB {device.btmdbStatus}
                                 </span>
                               )}
-                              {device.secureTokenMissing !== null && device.secureTokenMissing > 0 && (
+                              {device.secureTokenMissing != null && device.secureTokenMissing > 0 && (
                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" title="Users missing Secure Token">
                                   {device.secureTokenMissing} no token
                                 </span>

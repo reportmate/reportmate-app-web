@@ -2139,19 +2139,13 @@ function InstallsPageContent() {
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
-                      if (itemsStatusFilter === 'errors' && !searchQuery) {
-                        setItemsStatusFilter('all')
-                        setFiltersExpanded(false)
-                        setWidgetsExpanded(true)
-                      } else {
-                        setSearchQuery('')
-                        setItemsStatusFilter('errors')
-                        setFiltersExpanded(true)
-                      }
+                      setSearchQuery('')
+                      setItemsStatusFilter('errors')
+                      setFiltersExpanded(true)
                     }}
                     title="Click to show all devices with errors"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'errors' && !searchQuery ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className="text-lg font-medium flex items-center gap-2 text-gray-900 dark:text-white">
                       <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -2207,36 +2201,23 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithErrors.map((item) => {
-                              const isSelected = searchQuery === item.name && itemsStatusFilter === 'errors'
-                              return (
+                          {itemsWithErrors.map((item) => (
                               <tr 
                                 key={item.name} 
-                                className={`cursor-pointer transition-colors ${
-                                  isSelected 
-                                    ? 'bg-red-100 dark:bg-red-900/40 hover:bg-red-200 dark:hover:bg-red-900/60' 
-                                    : 'hover:bg-gray-100 dark:hover:bg-gray-600'
-                                }`}
+                                className="cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-600"
                                 onClick={() => {
-                                  if (isSelected) {
-                                    setSearchQuery('')
-                                    setItemsStatusFilter('all')
-                                    setWidgetsExpanded(true)
-                                  } else {
-                                    setSearchQuery(item.name)
-                                    setItemsStatusFilter('errors')
-                                  }
+                                  setSearchQuery(item.name)
+                                  setItemsStatusFilter('errors')
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-red-700 dark:text-red-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className="px-4 py-2 text-sm truncate max-w-[200px] text-gray-900 dark:text-white" title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-red-600 dark:text-red-400">
                                   {item.count}
                                 </td>
                               </tr>
-                            )})
-                          }
+                            ))}
                         </tbody>
                       </table>
                     )}
@@ -2250,19 +2231,13 @@ function InstallsPageContent() {
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
-                      if (itemsStatusFilter === 'warnings' && !searchQuery) {
-                        setItemsStatusFilter('all')
-                        setFiltersExpanded(false)
-                        setWidgetsExpanded(true)
-                      } else {
-                        setSearchQuery('')
-                        setItemsStatusFilter('warnings')
-                        setFiltersExpanded(true)
-                      }
+                      setSearchQuery('')
+                      setItemsStatusFilter('warnings')
+                      setFiltersExpanded(true)
                     }}
                     title="Click to show all devices with warnings"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'warnings' && !searchQuery ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className="text-lg font-medium flex items-center gap-2 text-gray-900 dark:text-white">
                       <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -2318,36 +2293,23 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithWarnings.map((item) => {
-                              const isSelected = searchQuery === item.name && itemsStatusFilter === 'warnings'
-                              return (
+                          {itemsWithWarnings.map((item) => (
                               <tr 
                                 key={item.name} 
-                                className={`cursor-pointer transition-colors ${
-                                  isSelected 
-                                    ? 'bg-amber-100 dark:bg-amber-900/40 hover:bg-amber-200 dark:hover:bg-amber-900/60' 
-                                    : 'hover:bg-gray-100 dark:hover:bg-gray-600'
-                                }`}
+                                className="cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-600"
                                 onClick={() => {
-                                  if (isSelected) {
-                                    setSearchQuery('')
-                                    setItemsStatusFilter('all')
-                                    setWidgetsExpanded(true)
-                                  } else {
-                                    setSearchQuery(item.name)
-                                    setItemsStatusFilter('warnings')
-                                  }
+                                  setSearchQuery(item.name)
+                                  setItemsStatusFilter('warnings')
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-amber-700 dark:text-amber-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className="px-4 py-2 text-sm truncate max-w-[200px] text-gray-900 dark:text-white" title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-amber-600 dark:text-amber-400">
                                   {item.count}
                                 </td>
                               </tr>
-                            )})
-                          }
+                            ))}
                         </tbody>
                       </table>
                     )}
@@ -2361,19 +2323,13 @@ function InstallsPageContent() {
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
-                      if (itemsStatusFilter === 'pending' && !searchQuery) {
-                        setItemsStatusFilter('all')
-                        setFiltersExpanded(false)
-                        setWidgetsExpanded(true)
-                      } else {
-                        setSearchQuery('')
-                        setItemsStatusFilter('pending')
-                        setFiltersExpanded(true)
-                      }
+                      setSearchQuery('')
+                      setItemsStatusFilter('pending')
+                      setFiltersExpanded(true)
                     }}
                     title="Click to show all devices with pending updates"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'pending' && !searchQuery ? 'text-cyan-700 dark:text-cyan-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className="text-lg font-medium flex items-center gap-2 text-gray-900 dark:text-white">
                       <svg className="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -2429,36 +2385,23 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithPending.map((item) => {
-                              const isSelected = searchQuery === item.name && itemsStatusFilter === 'pending'
-                              return (
+                          {itemsWithPending.map((item) => (
                               <tr 
                                 key={item.name} 
-                                className={`cursor-pointer transition-colors ${
-                                  isSelected 
-                                    ? 'bg-cyan-100 dark:bg-cyan-900/40 hover:bg-cyan-200 dark:hover:bg-cyan-900/60' 
-                                    : 'hover:bg-gray-100 dark:hover:bg-gray-600'
-                                }`}
+                                className="cursor-pointer transition-colors hover:bg-gray-100 dark:hover:bg-gray-600"
                                 onClick={() => {
-                                  if (isSelected) {
-                                    setSearchQuery('')
-                                    setItemsStatusFilter('all')
-                                    setWidgetsExpanded(true)
-                                  } else {
-                                    setSearchQuery(item.name)
-                                    setItemsStatusFilter('pending')
-                                  }
+                                  setSearchQuery(item.name)
+                                  setItemsStatusFilter('pending')
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-cyan-700 dark:text-cyan-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className="px-4 py-2 text-sm truncate max-w-[200px] text-gray-900 dark:text-white" title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-cyan-600 dark:text-cyan-400">
                                   {item.count}
                                 </td>
                               </tr>
-                            )})
-                          }
+                            ))}
                         </tbody>
                       </table>
                     )}

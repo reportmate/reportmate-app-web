@@ -360,13 +360,13 @@ function ManagementPageContent() {
 
   // Create filter options for shared DeviceFilters component
   const filterOptions: FilterOptions = {
-    statuses: [...new Set(management.map(m => m.status).filter(Boolean))].sort(),
-    catalogs: [...new Set(management.map(m => m.catalog).filter(Boolean))].sort(),
-    areas: [], // Add areas when available in data
-    locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
-    fleets: [], // Add fleets when available in data  
+    statuses: [...new Set(management.map(m => m.status).filter((s): s is string => Boolean(s)))].sort(),
+    catalogs: [...new Set(management.map(m => m.catalog).filter((s): s is string => Boolean(s)))].sort(),
+    areas: [],
+    locations: [...new Set(management.map(m => m.location).filter((s): s is string => Boolean(s)))].sort(),
+    fleets: [],
     platforms: [...new Set(management.map(m => m.raw?.system?.operatingSystem?.name || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
-    usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
+    usages: [...new Set(management.map(m => m.usage).filter((s): s is string => Boolean(s)))].sort()
   }
 
   // Count Broken Trust - Domain-joined devices with trustStatus === 'Broken'

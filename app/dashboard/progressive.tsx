@@ -190,8 +190,8 @@ export default function ProgressiveDashboard() {
             {/* Error and Warning Stats - ORIGINAL DESIGN */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
               <div className="grid grid-cols-1 gap-4">
-                <ErrorStatsWidget devices={displayDevices} />
-                <WarningStatsWidget devices={displayDevices} />
+                <ErrorStatsWidget />
+                <WarningStatsWidget />
               </div>
             </ErrorBoundary>
 

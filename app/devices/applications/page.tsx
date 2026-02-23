@@ -111,6 +111,7 @@ interface VersionDistribution {
 
 interface UtilizationData {
   status: string
+  message?: string
   applications: UtilizationApp[]
   topUsers: TopUser[]
   singleUserApps: SingleUserApp[]
@@ -3101,8 +3102,8 @@ function ApplicationsPageContent() {
                       
                       // Sort devices based on selected column and direction
                       const sortedDevices = [...devices].sort((a, b) => {
-                        let aVal: any = a[deviceTableSortColumn]
-                        let bVal: any = b[deviceTableSortColumn]
+                        let aVal: any = (a as Record<string, any>)[deviceTableSortColumn]
+                        let bVal: any = (b as Record<string, any>)[deviceTableSortColumn]
                         
                         // Handle null/undefined values
                         if (aVal === null || aVal === undefined) aVal = ''
@@ -3157,7 +3158,7 @@ function ApplicationsPageContent() {
                             {device.catalog || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {formatRelativeTime(device.lastSeen)}
+                            {device.lastSeen ? formatRelativeTime(device.lastSeen) : '-'}
                           </td>
                         </tr>
                       ))
