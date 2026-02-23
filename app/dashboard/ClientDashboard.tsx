@@ -138,14 +138,17 @@ export default function ClientDashboard() {
   const deviceNameMap = useMemo(() => {
     const nameMap: Record<string, string> = {}
     devices.forEach((device) => {
-      if (device.serialNumber) {
-        nameMap[device.serialNumber] = device.name
+      // Only map entries with meaningful names (not Unknown or same as serial)
+      const name = device.name
+      const isMeaningful = name && name.toLowerCase() !== 'unknown' && name !== device.serialNumber
+      if (device.serialNumber && isMeaningful) {
+        nameMap[device.serialNumber] = name
       }
-      if (device.deviceId && device.deviceId !== device.serialNumber) {
-        nameMap[device.deviceId] = device.name
+      if (device.deviceId && device.deviceId !== device.serialNumber && isMeaningful) {
+        nameMap[device.deviceId] = name
       }
-      if (device.assetTag) {
-        nameMap[device.assetTag] = device.name
+      if (device.assetTag && isMeaningful) {
+        nameMap[device.assetTag] = name
       }
     })
     return nameMap

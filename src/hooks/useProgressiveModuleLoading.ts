@@ -34,7 +34,6 @@ export function useProgressiveModuleLoading(
     'system',
     'network',
     'security',
-    'profiles',
     'applications',
     'peripherals'
   ]

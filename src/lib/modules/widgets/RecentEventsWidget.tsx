@@ -117,7 +117,7 @@ const isInstallsEvent = (event: BundledEvent) => {
 // Helper function to get device display name
 const getDeviceName = (event: FleetEvent, deviceNameMap: Record<string, string>) => {
   // First priority: Use deviceName from enhanced events API
-  if (event.deviceName && event.deviceName !== event.device) {
+  if (event.deviceName && event.deviceName !== event.device && event.deviceName.toLowerCase() !== 'unknown') {
     return event.deviceName
   }
   
@@ -229,8 +229,12 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // Hidden event types - info hidden by default (too noisy)
+  // Info hidden by default (too noisy) — treated as the "no filter" baseline
+  const DEFAULT_HIDDEN = useMemo(() => new Set(['info']), [])
   const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  // Only show filter as active when user has deviated from the default state
+  const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
+    [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
   const [filterOpen, setFilterOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
   // TODO: Accordion functionality disabled for now - will revisit later
@@ -408,14 +412,14 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               <button
                 onClick={() => setFilterOpen(!filterOpen)}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
-                  hiddenTypes.size > 0
+                  isFilterCustomized
                     ? 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800'
                     : 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'
                 } hover:bg-gray-200 dark:hover:bg-gray-600`}
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
                 Filter
-                {hiddenTypes.size > 0 && (
+                {isFilterCustomized && (
                   <span className="ml-0.5 px-1.5 py-0.5 text-[10px] font-semibold rounded-full bg-blue-200 text-blue-800 dark:bg-blue-800 dark:text-blue-200">
                     {5 - hiddenTypes.size}
                   </span>
