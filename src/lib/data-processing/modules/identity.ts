@@ -235,7 +235,7 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
  * Extract enrollment info from identity module's directoryServices
  * This is the authoritative source for Entra/Domain join status
  */
-function extractEnrollmentInfoFromIdentity(identity: any): EnrollmentInfo | null {
+export function extractEnrollmentInfoFromIdentity(identity: any): EnrollmentInfo | null {
   const ds = identity?.directoryServices
   if (!ds) return null
   
