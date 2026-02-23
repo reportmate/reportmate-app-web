@@ -88,71 +88,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     setStatusFilter(new Set());
   };
 
-  // Early return for completely missing data
-  if (!data) {
-    return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Install Data</h3>
-        <p className="text-gray-600 dark:text-gray-400">No managed install data is available.</p>
-      </div>
-    );
-  }
-
-  // Check if this is truly no managed installs system vs. no packages
-  const hasManagementSystem = data?.config || data?.systemName;
-  const hasPackages = data?.packages && Array.isArray(data.packages) && data.packages.length > 0;
-
-  // Only show "No Managed Installs" if there's no management system configured at all
-  if (!data || (!hasManagementSystem && !hasPackages)) {
-    return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Managed Installs</h3>
-        <p className="text-gray-600 dark:text-gray-400">This device does not have managed software installations configured.</p>
-      </div>
-    );
-  }
-
-  const getStatusColor = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    switch (statusLower) {
-      case 'installed':
-        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-      case 'pending':
-        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200';
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
-      case 'error':
-        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'removed':
-        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
-      default:
-        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    }
-  };
-
-  // UPDATED: Display proper capitalization while maintaining lowercase comparison
-  const getStatusDisplay = (status: string) => {
-    const statusLower = status?.toLowerCase() || '';
-    switch (statusLower) {
-      case 'installed': return 'Installed';
-      case 'pending': return 'Pending';
-      case 'warning': return 'Warning';
-      case 'error': return 'Error';
-      case 'removed': return 'Removed';
-      default: return status || 'Unknown';
-    }
-  };
-
+  // getFilteredPackages and useMemo hooks must be called before any early return
   const getFilteredPackages = () => {
     if (!data || !data.packages || !Array.isArray(data.packages) || data.packages.length === 0) {
       return [];
@@ -228,6 +164,71 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const hasCategories = useMemo(() => {
     return filteredPackages.some(pkg => pkg.category && pkg.category.trim() !== '');
   }, [filteredPackages]);
+
+  // Early return for completely missing data
+  if (!data) {
+    return (
+      <div className="text-center py-16">
+        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Install Data</h3>
+        <p className="text-gray-600 dark:text-gray-400">No managed install data is available.</p>
+      </div>
+    );
+  }
+
+  // Check if this is truly no managed installs system vs. no packages
+  const hasManagementSystem = data?.config || data?.systemName;
+  const hasPackages = data?.packages && Array.isArray(data.packages) && data.packages.length > 0;
+
+  // Only show "No Managed Installs" if there's no management system configured at all
+  if (!data || (!hasManagementSystem && !hasPackages)) {
+    return (
+      <div className="text-center py-16">
+        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2-2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Managed Installs</h3>
+        <p className="text-gray-600 dark:text-gray-400">This device does not have managed software installations configured.</p>
+      </div>
+    );
+  }
+
+  const getStatusColor = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'installed':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'pending':
+        return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'error':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'removed':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  // UPDATED: Display proper capitalization while maintaining lowercase comparison
+  const getStatusDisplay = (status: string) => {
+    const statusLower = status?.toLowerCase() || '';
+    switch (statusLower) {
+      case 'installed': return 'Installed';
+      case 'pending': return 'Pending';
+      case 'warning': return 'Warning';
+      case 'error': return 'Error';
+      case 'removed': return 'Removed';
+      default: return status || 'Unknown';
+    }
+  };
 
   // Calculate counts for each status (handle empty packages array)
   const packages = data?.packages && Array.isArray(data.packages) ? data.packages : [];
