@@ -133,31 +133,6 @@ interface DeviceData {
   [key: string]: unknown;
 }
 
-/**
- * Format a relative time string like "2 hours ago" or "5 minutes ago"
- */
-function formatRelativeTime(dateString: string | undefined | null): string {
-  if (!dateString) return '';
-  
-  try {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-    
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    
-    return date.toLocaleDateString();
-  } catch {
-    return '';
-  }
-}
-
 interface SystemTabProps {
   device: DeviceData
   data?: Record<string, unknown>
@@ -250,13 +225,14 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   // Use modules.system data only - support both snake_case (Windows) and camelCase (Mac)
   // Mac uses camelCase: operatingSystem, systemDetails, uptimeString
   // Windows uses snake_case: operating_system, uptime_string
-  const rawOsInfo = device.modules?.system?.operatingSystem || device.modules?.system?.operating_system
-  const uptimeString = device.modules?.system?.uptimeString || device.modules?.system?.uptime_string
+  const sysModule = device.modules?.system as any
+  const rawOsInfo = sysModule?.operatingSystem || sysModule?.operating_system
+  const uptimeString = sysModule?.uptimeString || sysModule?.uptime_string
 
   // Normalize OS info to support both snake_case and camelCase field access
   // Mac stores timezone, locale, keyboardLayouts in systemDetails (separate field)
   // Windows stores them directly in operating_system
-  const systemDetails = device.modules?.system?.systemDetails || device.modules?.system?.system_details || {}
+  const systemDetails = sysModule?.systemDetails || sysModule?.system_details || {}
   
   const osInfo = rawOsInfo ? {
     name: rawOsInfo.name || rawOsInfo.product_name,
@@ -774,7 +750,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
       {/* Mac: Background Activity - Consolidated launchd services and scheduled tasks */}
       {isMac && (scheduledTasks.length > 0 || services.length > 0) && (
         <LaunchdTable 
-          launchdItems={[...scheduledTasks, ...services]} 
+          launchdItems={[...scheduledTasks, ...services] as any} 
           title="Background Activity" 
           defaultScope="system"
         />
@@ -1141,7 +1117,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
       <DebugAccordion
         data={device?.modules?.system}
         label="device.modules.system"
-        moduleVersion={device?.modules?.system?.moduleVersion}
+        moduleVersion={(device?.modules?.system as any)?.moduleVersion}
       />
     </div>
   )

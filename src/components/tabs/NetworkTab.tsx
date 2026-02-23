@@ -372,25 +372,25 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
                 <span className="font-semibold text-gray-900 dark:text-white">Network Quality</span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                {networkData.networkQuality.downlinkCapacity && (
+                {networkData.networkQuality?.downlinkCapacity && (
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Download</div>
                     <div className="text-lg font-bold text-gray-900 dark:text-white">{networkData.networkQuality.downlinkCapacity}</div>
                   </div>
                 )}
-                {networkData.networkQuality.uplinkCapacity && (
+                {networkData.networkQuality?.uplinkCapacity && (
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Upload</div>
                     <div className="text-lg font-bold text-gray-900 dark:text-white">{networkData.networkQuality.uplinkCapacity}</div>
                   </div>
                 )}
-                {networkData.networkQuality.idleLatency && (
+                {networkData.networkQuality?.idleLatency && (
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Latency</div>
                     <div className="text-lg font-bold text-gray-900 dark:text-white">{networkData.networkQuality.idleLatency}</div>
                   </div>
                 )}
-                {networkData.networkQuality.downlinkResponsiveness && (
+                {networkData.networkQuality?.downlinkResponsiveness && (
                   <div className="text-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Quality</div>
                     <div className="text-lg font-bold text-gray-900 dark:text-white">

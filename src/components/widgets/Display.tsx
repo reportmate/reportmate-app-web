@@ -66,7 +66,7 @@ export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
   }
 
   // Use modular data if available, otherwise use legacy
-  if (hasDisplayInfo) {
+  if (hasDisplayInfo && displays.displays) {
     const primaryDisplay = displays.displays.find(d => d.isPrimary) || displays.displays[0]
     const externalCount = displays.displays.filter(d => !d.isBuiltIn).length
     

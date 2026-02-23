@@ -6,13 +6,16 @@ import { ReactNode } from 'react'
 
 interface ToolbarWrapperProps {
   preloadedDevices?: Array<{
-    serialNumber?: string
+    deviceId: string
+    serialNumber: string
+    name: string
     serial_number?: string
     deviceName?: string
     device_name?: string
     assetTag?: string
     asset_tag?: string
     hostname?: string
+    status: string
     network?: { hostname?: string }
   }>
   children?: ReactNode

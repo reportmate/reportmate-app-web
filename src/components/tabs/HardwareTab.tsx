@@ -766,7 +766,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             Displays
           </h3>
           <div className="space-y-4">
-            {displays.map((display, index) => {
+            {displays.map((display: any, index: number) => {
               // Support both snake_case (Mac osquery) and camelCase (Windows)
               const displaySerialNumber = display.serial_number ?? display.serialNumber
               const displayType = display.display_type ?? display.displayType
@@ -1125,7 +1125,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       <DebugAccordion
         data={device?.modules?.hardware}
         label="device.modules.hardware"
-        moduleVersion={device?.modules?.hardware?.moduleVersion}
+        moduleVersion={device?.modules?.hardware?.moduleVersion as string | undefined}
       />
     </div>
   )

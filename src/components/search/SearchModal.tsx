@@ -10,6 +10,7 @@ interface Device {
   assetTag?: string
   hostname?: string
   status: string
+  location?: string
 }
 
 interface SearchModalProps {
