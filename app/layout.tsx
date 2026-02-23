@@ -8,6 +8,7 @@ import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
 import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
+import { DebugModeProvider } from "../src/providers/DebugModeProvider";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
@@ -172,6 +173,7 @@ export default async function RootLayout({
           <SWRProvider>
             <PlatformFilterProvider>
               <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
+                <DebugModeProvider>
                 <EdgeThemeFix />
                 <ErrorBoundary>
                   {isDevelopment ? (
@@ -188,6 +190,7 @@ export default async function RootLayout({
                     </AutoAuth>
                   )}
                 </ErrorBoundary>
+                </DebugModeProvider>
               </ThemeProvider>
             </PlatformFilterProvider>
           </SWRProvider>
