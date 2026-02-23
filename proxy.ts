@@ -148,7 +148,7 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
   }
 }
 
-export default async function middleware(request: NextRequest) {
+export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
   const hostname = request.nextUrl.hostname
   
