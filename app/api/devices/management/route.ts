@@ -6,7 +6,7 @@ export const revalidate = 0
 
 export async function GET() {
   try {
-    const timestamp = new Date().toISOString()
+    const _timestamp = new Date().toISOString()
         
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
