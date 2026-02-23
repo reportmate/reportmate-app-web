@@ -18,6 +18,7 @@ const nextConfig = {
 
   // Turbopack configuration (default bundler in Next.js 16)
   turbopack: {
+    root: import.meta.dirname,
     resolveAlias: {
       fs: { browser: './empty-module.js' },
       net: { browser: './empty-module.js' },
