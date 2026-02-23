@@ -3,12 +3,12 @@
 // Force dynamic rendering and disable caching for applications page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense, useMemo, useRef, useCallback } from "react"
+import { useEffect, useState, Suspense, useMemo } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
-import { usePlatformFilterSafe, getDevicePlatform } from '../../../src/providers/PlatformFilterProvider'
+import { usePlatformFilterSafe } from '../../../src/providers/PlatformFilterProvider'
 import { CollapsibleSection } from '../../../src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '../../../src/hooks/useScrollCollapse'
 
@@ -699,7 +699,7 @@ function ApplicationsPageContent() {
     fetchAllData()
   }, [])
 
-  const handleLoadAll = async () => {
+  const _handleLoadAll = async () => {
     try {
       setLoading(true)
       setError(null)
@@ -1129,7 +1129,7 @@ function ApplicationsPageContent() {
     return sortDirection === 'asc' ? compareResult : -compareResult
   })
 
-  const handleSort = (column: typeof sortColumn) => {
+  const _handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
     } else {
@@ -1138,7 +1138,7 @@ function ApplicationsPageContent() {
     }
   }
 
-  const hasActiveFilters = selectedApplications.length > 0 || searchQuery.trim() || 
+  const _hasActiveFilters = selectedApplications.length > 0 || searchQuery.trim() || 
                           selectedUsages.length > 0 || selectedCatalogs.length > 0 || 
                           selectedLocations.length > 0 || selectedRooms.length > 0
 
@@ -1165,7 +1165,7 @@ function ApplicationsPageContent() {
     )
   }
 
-  const toggleLocation = (location: string) => {
+  const _toggleLocation = (location: string) => {
     setSelectedLocations(prev => 
       prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
     )
@@ -2379,7 +2379,7 @@ function ApplicationsPageContent() {
                     Most Used by Time
                   </h3>
                   <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {utilizationData.applications.slice(0, 10).map((app, idx) => (
+                    {utilizationData.applications.slice(0, 10).map((app) => (
                       <div key={app.name} className="space-y-1">
                         <div className="flex items-center justify-between">
                           <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
@@ -2550,7 +2550,7 @@ function ApplicationsPageContent() {
                               }
                               const sortedVersions = Object.entries(versions)
                                 .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
-                              const totalDevices = Object.values(versions).reduce((sum, count) => sum + count, 0)
+                              const _totalDevices = Object.values(versions).reduce((sum, count) => sum + count, 0)
                               if (sortedVersions.length === 1) {
                                 return (
                                   <span className="text-xs text-gray-700 dark:text-gray-300">

@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } fr
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '../../../src/lib/time'
-import { categorizeDevicesByInstallStatus, aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem, getDeviceInstallItems } from '../../../src/hooks/useInstallsData'
+import { categorizeDevicesByInstallStatus, getDeviceInstallItems } from '../../../src/hooks/useInstallsData'
 import { calculateDeviceStatus } from '../../../src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '../../../src/components/widgets/InstallMessages'
 import { CopyButton } from '../../../src/components/ui/CopyButton'
@@ -58,7 +58,7 @@ function InstallsPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [filtersExpanded, setFiltersExpanded] = useState(false) // Collapsed by default since Config Report is default view
   const [devices, setDevices] = useState<any[]>([])
-  const [isPending, startTransition] = useTransition() // For non-blocking state updates
+  const [, startTransition] = useTransition() // For non-blocking state updates
   const [isConfigReport, setIsConfigReport] = useState(false)
   const [configReportData, setConfigReportData] = useState<any[]>([])
   const [selectedManifest, setSelectedManifest] = useState<string>('')
@@ -87,7 +87,7 @@ function InstallsPageContent() {
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
 
-  const { tableContainerRef, setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+  const { setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
@@ -230,7 +230,7 @@ function InstallsPageContent() {
             estimatedTotal = countData.devices.length
                       }
         }
-      } catch (e) {
+} catch {
               }
       
       // Fallback if all else fails
@@ -303,7 +303,7 @@ function InstallsPageContent() {
       }
       
       // Get the actual device count from the response
-      const actualDeviceCount = data.devicesWithData || 0
+      const _actualDeviceCount = data.devicesWithData || 0
       
       setFilterOptions(data)
       
@@ -2207,7 +2207,7 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithErrors.map((item, idx) => {
+                          {itemsWithErrors.map((item) => {
                               const isSelected = searchQuery === item.name && itemsStatusFilter === 'errors'
                               return (
                               <tr 
@@ -2318,7 +2318,7 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithWarnings.map((item, idx) => {
+                          {itemsWithWarnings.map((item) => {
                               const isSelected = searchQuery === item.name && itemsStatusFilter === 'warnings'
                               return (
                               <tr 
@@ -2429,7 +2429,7 @@ function InstallsPageContent() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                          {itemsWithPending.map((item, idx) => {
+                          {itemsWithPending.map((item) => {
                               const isSelected = searchQuery === item.name && itemsStatusFilter === 'pending'
                               return (
                               <tr 

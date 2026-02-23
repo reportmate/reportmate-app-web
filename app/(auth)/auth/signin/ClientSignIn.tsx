@@ -55,7 +55,7 @@ function SignInContent() {
           callbackUrl,
           redirect: true
         })
-      } catch (err) {
+      } catch {
         setErrorMessage('Failed to initiate sign-in. Please try again.')
         setStatus('error')
         hasTriggeredSignIn.current = false
@@ -77,7 +77,7 @@ function SignInContent() {
         callbackUrl,
         redirect: true 
       })
-    } catch (err) {
+    } catch {
       setErrorMessage('Failed to initiate sign-in. Please try again.')
       setStatus('error')
     }
