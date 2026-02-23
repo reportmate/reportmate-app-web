@@ -3,7 +3,7 @@
  * Managed software installations and updates
  */
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useParams } from 'next/navigation'
 import { ManagedInstallsTable } from '../tables/ManagedInstallsTable'
 import { extractInstalls, type InstallsInfo } from '../../lib/data-processing/modules/installs'
@@ -55,7 +55,7 @@ const formatCompactRelativeTime = (timestamp: string): string => {
   }
 }
 
-const InstallsTabSkeleton = () => (
+const _InstallsTabSkeleton = () => (
   <div className="space-y-6 animate-pulse">
     {/* Header Skeleton */}
     <div className="flex items-center justify-between">
@@ -138,7 +138,7 @@ const InstallsTabSkeleton = () => (
 
 export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialFilter }) => {
   const params = useParams()
-  const deviceId = params?.deviceId as string
+  const _deviceId = params?.deviceId as string
   const [isLogExpanded, setIsLogExpanded] = useState(false)
   const [logContent, setLogContent] = useState<string | null>(null)
   const [isLogLoading, setIsLogLoading] = useState(false)

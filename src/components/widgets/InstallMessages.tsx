@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import { AggregatedInstallMessage, aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem } from '../../hooks/useInstallsData'
+import { aggregateInstallErrors, aggregateInstallWarnings, getMessagesForItem } from '../../hooks/useInstallsData'
 
 interface InstallMessagesWidgetsProps {
   devices: any[]

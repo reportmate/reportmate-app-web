@@ -131,7 +131,7 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
   const osMarketingName = isMac 
     ? getMacOSMarketingName(operatingSystem?.version)
     : getWindowsMarketingName(operatingSystem?.displayVersion)
-  const osName = `${osLabel}${osMarketingName ? ' ' + osMarketingName : ''}`
+  const _osName = `${osLabel}${osMarketingName ? ' ' + osMarketingName : ''}`
   
   // Get locale/timezone/keyboard from correct location
   const locale = operatingSystem?.locale || systemDetails?.locale

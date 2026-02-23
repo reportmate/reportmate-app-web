@@ -1,7 +1,5 @@
 "use client"
 
-import { useRef, useEffect, useState } from "react"
-
 interface CollapsibleSectionProps {
   expanded: boolean
   children: React.ReactNode

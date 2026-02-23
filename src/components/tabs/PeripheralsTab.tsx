@@ -20,7 +20,7 @@
 import React, { useState, useMemo } from 'react'
 import { 
   Usb, Keyboard, Volume2, Bluetooth, Zap, Printer, 
-  ScanLine, HardDrive, ChevronRight, Wifi, WifiOff,
+  ScanLine, HardDrive, Wifi, WifiOff,
   Mouse, Tablet, Speaker, Mic, Hand, Monitor, LucideIcon,
   Copy, Check
 } from 'lucide-react'
@@ -499,7 +499,7 @@ const USBThunderboltContent = ({
   usbDevices: USBDevice[]
   thunderboltDevices: ThunderboltDevice[] 
 }) => {
-  const total = usbDevices.length + thunderboltDevices.length
+  const _total = usbDevices.length + thunderboltDevices.length
   
   return (
     <div className="space-y-6">
@@ -786,7 +786,7 @@ const PrintersContent = ({ devices }: { devices: PrinterDevice[] }) => {
   })
 
   // Helper to get printer commands as string
-  const getCommandsString = (commands: string | string[] | undefined): string => {
+  const _getCommandsString = (commands: string | string[] | undefined): string => {
     if (!commands) return ''
     if (typeof commands === 'string') return commands.trim()
     if (Array.isArray(commands)) return commands.filter(c => c).join(', ')

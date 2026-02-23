@@ -181,8 +181,6 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
-  // State for launchd scope filter (Mac)
-  const [launchdScopeFilter, setLaunchdScopeFilter] = useState<'all' | 'system' | 'user' | 'apple'>('all')
   // State for privileged helper tools search
   const [helperSearch, setHelperSearch] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null);

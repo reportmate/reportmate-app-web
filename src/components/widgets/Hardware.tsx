@@ -104,7 +104,7 @@ export const HardwareWidget: React.FC<HardwareWidgetProps> = ({ device }) => {
   const model = safeString(hardwareData.model)
   
   // Model Identifier - Mac specific identifier (e.g., "Mac16,11")
-  const modelIdentifier = safeString(hardwareData.modelIdentifier || hardwareData.model_identifier)
+  const _modelIdentifier = safeString(hardwareData.modelIdentifier || hardwareData.model_identifier)
   
   // Chip name for Mac (e.g., "M4 Pro", "M3 Max")
   const chipName = safeString(hardwareData.processor?.chip || hardwareData.processor?.name || hardwareData.processor)

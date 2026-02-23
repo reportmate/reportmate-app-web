@@ -115,9 +115,9 @@ class MemoryManager {
   }
 
   // Log memory status
-  logMemoryStatus(context?: string) {
+  logMemoryStatus(_context?: string) {
     const memStats = this.getMemoryStats()
-    const compStats = this.getComponentStats()
+    const _compStats = this.getComponentStats()
     
     // Warn if memory usage is high
     if (memStats && memStats.usedJSHeapSize > 100) { // 100MB threshold

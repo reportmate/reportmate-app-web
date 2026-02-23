@@ -11,7 +11,7 @@ interface DevicePageNavigationProps {
   currentPage?: 'devices' | 'events' | 'dashboard' | null
 }
 
-export const DevicePageNavigation: React.FC<DevicePageNavigationProps> = ({ className = "flex items-center gap-4 mb-6", currentPage = null }) => {
+export const DevicePageNavigation: React.FC<DevicePageNavigationProps> = ({ className = "flex items-center gap-4 mb-6" }) => {
   return (
     <div className={className}>
       {/* Devices Link - Always visible */}

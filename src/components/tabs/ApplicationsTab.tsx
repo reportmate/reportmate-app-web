@@ -6,7 +6,6 @@
 import React, { useMemo, useState } from 'react'
 import { ApplicationsTable } from '../tables'
 import { extractApplications } from '../../lib/data-processing/modules/applications'
-import { formatRelativeTime } from '../../lib/time'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
 
@@ -37,7 +36,7 @@ interface ActiveSession {
 }
 
 // macOS applicationUsage structure
-interface MacApplicationUsage {
+interface _MacApplicationUsage {
   status?: string
   captureMethod?: string
   totalLaunches?: number
@@ -114,7 +113,7 @@ interface ApplicationsTabProps {
 }
 
 // Helper to format duration
-function formatDuration(seconds: number): string {
+function _formatDuration(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`
   const hours = Math.floor(seconds / 3600)
@@ -123,7 +122,7 @@ function formatDuration(seconds: number): string {
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
-  const [activeFilter, setActiveFilter] = useState<'all' | 'unused' | 'singleUser' | 'withUsage'>('all')
+  const [activeFilter] = useState<'all' | 'unused' | 'singleUser' | 'withUsage'>('all')
   
   // Normalize snake_case to camelCase for applications module
   // Prefer direct data prop if available
@@ -142,10 +141,13 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   // For macOS SQLiteWatcher, check captureMethod instead of isCaptureEnabled
   const captureMethod = usageData?.captureMethod || usageData?.CaptureMethod
   const isUsageAvailable = captureMethod === 'SQLiteWatcher' || usageData?.isCaptureEnabled || usageData?.IsCaptureEnabled || false
-  const usageStatus = isUsageAvailable ? 'available' : (usageData?.status || usageData?.Status || 'unavailable')
+  const _usageStatus = isUsageAvailable ? 'available' : (usageData?.status || usageData?.Status || 'unavailable')
   
-  // Get active sessions from macOS data
-  const activeSessions: ActiveSession[] = usageData?.activeSessions || usageData?.ActiveSessions || []
+  // Get active sessions from macOS data — wrapped in useMemo for stable reference
+  const activeSessions: ActiveSession[] = useMemo(
+    () => usageData?.activeSessions || usageData?.ActiveSessions || [],
+    [usageData?.activeSessions, usageData?.ActiveSessions]
+  )
   
   // Build usage map by app path for efficient lookup
   const usageByPath = useMemo(() => {
@@ -307,19 +309,19 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   }).length
 
   // Usage statistics
-  const appsWithUsage = processedApps.filter((app: ApplicationInfo) => app.usage?.launchCount && app.usage.launchCount > 0).length
-  const unusedApps = processedApps.filter((app: ApplicationInfo) => {
+  const _appsWithUsage = processedApps.filter((app: ApplicationInfo) => app.usage?.launchCount && app.usage.launchCount > 0).length
+  const _unusedApps = processedApps.filter((app: ApplicationInfo) => {
     if (!app.usage?.lastUsed) return true
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     return new Date(app.usage.lastUsed) < thirtyDaysAgo
   }).length
-  const singleUserApps = processedApps.filter((app: ApplicationInfo) => app.usage?.uniqueUserCount === 1).length
-  const totalUsageHours = processedApps.reduce((sum: number, app: ApplicationInfo) => 
+  const _singleUserApps = processedApps.filter((app: ApplicationInfo) => app.usage?.uniqueUserCount === 1).length
+  const _totalUsageHours = processedApps.reduce((sum: number, app: ApplicationInfo) => 
     sum + (app.usage?.totalSeconds || 0) / 3600, 0
   )
   
   // Top apps by usage
-  const topAppsByUsage = useMemo(() => {
+  const _topAppsByUsage = useMemo(() => {
     return [...processedApps]
       .filter((app: ApplicationInfo) => app.usage?.totalSeconds && app.usage.totalSeconds > 0)
       .sort((a: ApplicationInfo, b: ApplicationInfo) => (b.usage?.totalSeconds || 0) - (a.usage?.totalSeconds || 0))

@@ -445,7 +445,7 @@ export function mapStatusToEventType(status: StandardInstallStatus): 'success' |
  * 
  * Supports both snake_case (new) and camelCase (legacy) field names
  */
-function getLatestAttemptTimestamp(item: any): string {
+function _getLatestAttemptTimestamp(item: any): string {
   // Support both snake_case and camelCase field names
   const status = standardizeInstallStatus(item.status || item.current_status || item.currentStatus || '');
   const installCount = item.install_count ?? item.installCount ?? 0;
@@ -586,11 +586,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   const hasMunkiSystem = !!installs.munki  // Munki system present even with empty items (catastrophic error)
   
   // Determine system name for UI
-  let systemName = 'Managed Installs'
+  let _systemName = 'Managed Installs'
   if (hasCimianData) {
-    systemName = 'Cimian'
+    _systemName = 'Cimian'
   } else if (hasMunkiData || hasMunkiSystem) {
-    systemName = 'Munki'
+    _systemName = 'Munki'
   }
 
   // Process recent installs (contains Cimian data) - Use cimian.items as primary source
