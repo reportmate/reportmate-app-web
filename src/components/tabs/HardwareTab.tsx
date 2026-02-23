@@ -7,6 +7,7 @@ import React from 'react'
 import { StorageVisualization } from '../storage'
 import { CopyButton } from '../ui/CopyButton'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
+import { DebugAccordion } from '../DebugAccordion'
 import { 
   Cpu, 
   MemoryStick, 
@@ -1127,38 +1128,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
       )}
 
-      {/* Debug Accordion */}
-      <div className="mt-6">
-        <details className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
-          <summary className="cursor-pointer px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">
-            <div className="flex items-center gap-2">
-              <Activity className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Debug API JSON Data</span>
-            </div>
-            <span className="text-xs text-gray-500 dark:text-gray-400">
-              device.modules.hardware
-            </span>
-          </summary>
-          <div className="border-t border-gray-200 dark:border-gray-700">
-            <div className="p-4">
-              <div className="flex justify-end gap-2 mb-2">
-                <button
-                  onClick={() => {
-                    const jsonString = JSON.stringify(device?.modules?.hardware, null, 2)
-                    navigator.clipboard.writeText(jsonString)
-                  }}
-                  className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  Copy JSON
-                </button>
-              </div>
-              <pre className="p-4 bg-gray-900 dark:bg-black text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto rounded border border-gray-700">
-                {JSON.stringify(device?.modules?.hardware, null, 2)}
-              </pre>
-            </div>
-          </div>
-        </details>
-      </div>
+      <DebugAccordion
+        data={device?.modules?.hardware}
+        label="device.modules.hardware"
+        moduleVersion={device?.modules?.hardware?.moduleVersion}
+      />
     </div>
   )
 }
