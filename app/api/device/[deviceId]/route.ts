@@ -354,7 +354,7 @@ export async function GET(
         })
         
         // Build device name from inventory module (for logging only)
-        const deviceIdentifier = data.inventory?.deviceName || deviceMetadata.serialNumber || 'Unknown Device'
+        const _deviceIdentifier = data.inventory?.deviceName || deviceMetadata.serialNumber || 'Unknown Device'
         
         // Return properly structured response - STANDARDIZED NESTED FORMAT
         const responseData = {

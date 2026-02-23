@@ -39,7 +39,7 @@ export async function GET(
           }
         });
       } else {
-        const errorText = await response.text();
+        const _errorText = await response.text();
                 return NextResponse.json({
           error: 'Event payload not available',
           message: `API returned ${response.status}: ${response.statusText}`,
@@ -53,7 +53,7 @@ export async function GET(
           }
         });
       }
-    } catch (fetchError) {
+    } catch {
             
       return NextResponse.json({
         error: 'Event payload not available',

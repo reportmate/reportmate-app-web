@@ -17,7 +17,7 @@ export const revalidate = 0
  */
 export async function GET(request: Request) {
   try {
-    const timestamp = new Date().toISOString()
+    const _timestamp = new Date().toISOString()
     const { searchParams } = new URL(request.url)
     
         

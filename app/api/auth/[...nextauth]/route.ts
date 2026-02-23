@@ -39,7 +39,7 @@ const authOptions: NextAuthOptions = {
       // Always allow sign in - let NextAuth handle any issues
       return true
     },
-    async redirect({ url, baseUrl }) {
+    async redirect({ url }) {
       const correctBaseUrl = 'https://reportmate.ecuad.ca'
             
       if (url.startsWith("/")) {

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     
         
     // Get managed identity principal ID from Azure Container Apps
-    const managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
+    const _managedIdentityId = process.env.AZURE_CLIENT_ID || process.env.MSI_CLIENT_ID
 
     // Try Azure Functions first, fall back to local processing if it fails
     let response: Response | null = null
@@ -131,7 +131,7 @@ export async function POST(request: Request) {
 
 // Also support HEAD requests for endpoint availability checks
 export async function HEAD() {
-  const timestamp = new Date().toISOString()
+  const _timestamp = new Date().toISOString()
     
   return new Response(null, {
     status: 200,

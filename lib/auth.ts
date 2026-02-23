@@ -233,11 +233,11 @@ export const authOptions: NextAuthOptions = {
   },
 
   events: {
-  async signIn({ user, account, profile: _profile }) {
+  async signIn({ user: _user, account: _account, profile: _profile }) {
       // User signed in
     },
     
-    async signOut({ session }) {
+    async signOut({ session: _session }) {
       // User signed out
     }
   },

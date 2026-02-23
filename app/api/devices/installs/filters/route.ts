@@ -33,7 +33,7 @@ async function fetchBulkInstallRecords(API_BASE_URL: string): Promise<any[]> {
     return records;
 }
 
-export async function GET(request: Request) {
+export async function GET(_request: Request) {
   const API_BASE_URL = process.env.API_BASE_URL || 'http://reportmate-functions-api';
 
   try {

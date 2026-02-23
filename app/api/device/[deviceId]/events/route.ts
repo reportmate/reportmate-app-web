@@ -100,7 +100,7 @@ export async function GET(
           }
         })
       }
-    } catch (error) {
+    } catch {
       // API unavailable - return empty events (no fake data)
             return NextResponse.json({
         success: true,
