@@ -24,6 +24,7 @@ import {
   Mouse, Tablet, Speaker, Mic, Hand, Monitor, LucideIcon,
   Copy, Check
 } from 'lucide-react'
+import { DebugAccordion } from '../DebugAccordion'
 
 // Type definitions
 interface USBDevice {
@@ -480,6 +481,12 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
       <div className="overflow-auto">
         {renderAllContent()}
       </div>
+
+      <DebugAccordion
+        data={device?.modules?.peripherals}
+        label="device.modules.peripherals"
+        moduleVersion={device?.modules?.peripherals?.moduleVersion as string | undefined}
+      />
     </div>
   )
 }

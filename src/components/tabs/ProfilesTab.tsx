@@ -876,6 +876,11 @@ export const ProfilesTab: React.FC<ProfilesTabProps> = ({ device, data }) => {
           </div>
         </div>
       </details>
+      {device?.modules?.profiles?.moduleVersion && (
+        <p className="mt-2 text-xs text-gray-400 dark:text-gray-600">
+          Module version {device.modules.profiles.moduleVersion}
+        </p>
+      )}
     </div>
   )
 }
