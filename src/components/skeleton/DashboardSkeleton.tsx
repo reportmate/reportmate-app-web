@@ -198,7 +198,7 @@ const PlatformDistributionWidgetSkeleton: React.FC = () => (
                 <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative overflow-hidden">
                   <div 
                     className="h-full rounded-full bg-blue-200 dark:bg-blue-700 animate-pulse flex items-center justify-end pr-2"
-                    style={{ width: `${i === 0 ? 100 : Math.random() * 50 + 10}%` }}
+                    style={{ width: `${i === 0 ? 100 : 35}%` }}
                   >
                     <div className="w-4 h-3 bg-white rounded animate-pulse"></div>
                   </div>

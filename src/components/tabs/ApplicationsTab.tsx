@@ -4,6 +4,8 @@
  */
 
 import React, { useMemo, useState } from 'react'
+
+const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000
 import { ApplicationsTable } from '../tables'
 import { extractApplications } from '../../lib/data-processing/modules/applications'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
@@ -279,7 +281,8 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     }
     
     if (activeFilter === 'unused') {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+      // eslint-disable-next-line react-hooks/purity -- Date.now() is intentional for time-based filtering
+      const thirtyDaysAgo = new Date(Date.now() - THIRTY_DAYS_MS)
       return processedApps.filter((app: ApplicationInfo) => {
         if (!app.usage?.lastUsed) return true // No usage data = unused
         const lastUsed = new Date(app.usage.lastUsed)
@@ -297,28 +300,20 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   }, [processedApps, activeFilter])
 
   // Calculate statistics
-  const totalApps = processedApps.length
-  const signedApps = processedApps.filter((app: ApplicationInfo) => 
-    (app as unknown as Record<string, unknown>).signed_by || app.publisher !== 'Unknown Publisher'
-  ).length
-  const recentApps = processedApps.filter((app: ApplicationInfo) => {
-    if (!app.installDate) return false
-    const installDate = new Date(app.installDate)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    return installDate > thirtyDaysAgo
-  }).length
-
-  // Usage statistics
-  const _appsWithUsage = processedApps.filter((app: ApplicationInfo) => app.usage?.launchCount && app.usage.launchCount > 0).length
-  const _unusedApps = processedApps.filter((app: ApplicationInfo) => {
-    if (!app.usage?.lastUsed) return true
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    return new Date(app.usage.lastUsed) < thirtyDaysAgo
-  }).length
-  const _singleUserApps = processedApps.filter((app: ApplicationInfo) => app.usage?.uniqueUserCount === 1).length
-  const _totalUsageHours = processedApps.reduce((sum: number, app: ApplicationInfo) => 
-    sum + (app.usage?.totalSeconds || 0) / 3600, 0
-  )
+  const { totalApps, signedApps, recentApps } = useMemo(() => {
+    // eslint-disable-next-line react-hooks/purity -- Date.now() is intentional for time-based filtering
+    const thirtyDaysAgo = Date.now() - THIRTY_DAYS_MS
+    return {
+      totalApps: processedApps.length,
+      signedApps: processedApps.filter((app: ApplicationInfo) => 
+        (app as unknown as Record<string, unknown>).signed_by || app.publisher !== 'Unknown Publisher'
+      ).length,
+      recentApps: processedApps.filter((app: ApplicationInfo) => {
+        if (!app.installDate) return false
+        return new Date(app.installDate).getTime() > thirtyDaysAgo
+      }).length,
+    }
+  }, [processedApps])
   
   // Top apps by usage
   const _topAppsByUsage = useMemo(() => {

@@ -103,11 +103,11 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
     if (!validEvents.length) return []
     
     // Convert to FleetEvent format
-    const fleetEvents: FleetEvent[] = validEvents.map(event => ({
-      id: event.id || `event-${Math.random()}`,
+    const fleetEvents: FleetEvent[] = validEvents.map((event, index) => ({
+      id: event.id || `event-${index}`,
       device: 'current-device',
       kind: event.kind || 'info',
-      ts: event.ts || new Date().toISOString(),
+      ts: event.ts || '1970-01-01T00:00:00.000Z',
       message: (event as Record<string, unknown>).message as string | undefined,
       payload: (event.raw as Record<string, unknown>) || {}
     }))

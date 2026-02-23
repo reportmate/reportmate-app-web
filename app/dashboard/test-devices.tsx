@@ -5,8 +5,10 @@ import { useEffect, useState } from "react"
 export default function TestDevices() {
   const [count, setCount] = useState(0)
   const [status, setStatus] = useState("Starting...")
+  const [time, setTime] = useState("")
 
   useEffect(() => {
+    setTime(new Date().toISOString())
     setStatus("useEffect ran!")
     
     // Simple test without fetch
@@ -21,7 +23,7 @@ export default function TestDevices() {
       <h1>Simple Test</h1>
       <p>Count: {count}</p>
       <p>Status: {status}</p>
-      <p>Time: {new Date().toISOString()}</p>
+      <p>Time: {time}</p>
     </div>
   )
 }

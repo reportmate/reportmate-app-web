@@ -128,19 +128,18 @@ class MemoryManager {
 
 // Hook for component tracking
 export function useComponentTracker(componentName: string) {
-  const instanceId = React.useRef(`${componentName}-${Date.now()}-${Math.random()}`)
+  const instanceId = React.useId()
   const manager = MemoryManager.getInstance()
 
   React.useEffect(() => {
-    const id = instanceId.current
-    manager.trackComponent(componentName, id, true)
+    manager.trackComponent(componentName, instanceId, true)
     
     return () => {
-      manager.trackComponent(componentName, id, false)
+      manager.trackComponent(componentName, instanceId, false)
     }
-  }, [componentName, manager])
+  }, [componentName, instanceId, manager])
 
-  return instanceId.current
+  return instanceId
 }
 
 // Hook for managed intervals
@@ -150,7 +149,8 @@ export function useManagedInterval(
   key?: string
 ) {
   const manager = MemoryManager.getInstance()
-  const keyRef = React.useRef(key || `interval-${Date.now()}-${Math.random()}`)
+  const generatedId = React.useId()
+  const keyRef = React.useRef(key || generatedId)
 
   React.useEffect(() => {
     const intervalKey = keyRef.current
