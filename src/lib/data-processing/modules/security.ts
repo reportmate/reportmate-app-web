@@ -10,6 +10,7 @@ export interface SecurityInfo {
   lastScan?: string
   threats: ThreatInfo[]
   vulnerabilities: VulnerabilityInfo[]
+  detections: DetectionAlert[]
   compliance: ComplianceInfo
   firewall: FirewallInfo
   antivirus: AntivirusInfo
@@ -17,6 +18,22 @@ export interface SecurityInfo {
   secureShell?: SecureShellInfo
   policies: PolicyInfo[]
   summary: SecuritySummary
+}
+
+export interface DetectionAlert {
+  threatId?: string
+  threatName: string
+  severity: string // Severe, High, Moderate, Low, Unknown
+  category: string
+  status: string // Detected, Cleaned, Quarantined, Removed, Allowed, Blocked
+  actionTaken: string
+  source: string // WindowsDefender, CrowdStrike, ArcticWolf, Sophos, etc.
+  filePath?: string
+  processName?: string
+  user?: string
+  detectedAt?: string
+  resolvedAt?: string
+  eventId?: number
 }
 
 export interface SecureShellInfo {
@@ -134,6 +151,9 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     // Read pre-processed vulnerability data  
     vulnerabilities: security.vulnerabilities ? security.vulnerabilities.map(mapVulnerability) : [],
     
+    // Read threat detection alerts from AV/EDR products
+    detections: security.detections ? security.detections.map(mapDetection) : [],
+    
     // Read compliance data (device should calculate compliance scores)
     compliance: security.compliance || createEmptyCompliance(),
     
@@ -180,6 +200,24 @@ function mapVulnerability(vuln: any): VulnerabilityInfo {
   }
 }
 
+function mapDetection(detection: any): DetectionAlert {
+  return {
+    threatId: detection.threatId || detection.threat_id,
+    threatName: detection.threatName || detection.threat_name || '',
+    severity: detection.severity || 'Unknown',
+    category: detection.category || '',
+    status: detection.status || 'Detected',
+    actionTaken: detection.actionTaken || detection.action_taken || '',
+    source: detection.source || 'Unknown',
+    filePath: detection.filePath || detection.file_path,
+    processName: detection.processName || detection.process_name,
+    user: detection.user,
+    detectedAt: detection.detectedAt || detection.detected_at,
+    resolvedAt: detection.resolvedAt || detection.resolved_at,
+    eventId: detection.eventId || detection.event_id
+  }
+}
+
 function mapPolicy(policy: any): PolicyInfo {
   return {
     name: policy.name || '',
@@ -205,6 +243,7 @@ function createEmptySecurityInfo(): SecurityInfo {
     riskLevel: 'critical',
     threats: [],
     vulnerabilities: [],
+    detections: [],
     compliance: createEmptyCompliance(),
     firewall: createEmptyFirewall(),
     antivirus: createEmptyAntivirus(),
