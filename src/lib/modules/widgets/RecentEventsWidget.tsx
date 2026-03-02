@@ -230,8 +230,8 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
   // Info hidden by default (too noisy) — treated as the "no filter" baseline
-  const DEFAULT_HIDDEN = useMemo(() => new Set(['info']), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
@@ -606,7 +606,15 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
               <div className="overflow-y-auto overlay-scrollbar" style={{ height: 'calc(100% - 48px)' }}>
                 <table className="w-full table-fixed min-w-full">
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filteredEvents.map((bundledEvent: BundledEvent) => {
+                    {filteredEvents.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="px-6 py-12 text-center">
+                          <p className="text-sm text-gray-500 dark:text-gray-400">
+                            No events match the current filter
+                          </p>
+                        </td>
+                      </tr>
+                    ) : filteredEvents.map((bundledEvent: BundledEvent) => {
                       // TODO: Accordion expand/collapse functionality disabled for now
                       // const isExpanded = expandedEvents.has(bundledEvent.id)
                       // const hasDetails = bundledEvent.hasExpandableDetails
