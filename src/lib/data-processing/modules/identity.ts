@@ -366,7 +366,24 @@ function mapBTMDBHealth(btmdb: any): BTMDBHealth {
 function mapDirectoryServices(ds: any): DirectoryServicesInfo {
   // Handle Windows structure (active_directory, azure_ad)
   const ad = ds.activeDirectory || ds.active_directory || {}
-  
+
+  // Handle all Entra ID key variations:
+  // Client sends "entraId" -> normalizeKeys converts to "entra_id"
+  // Legacy field names: "azureAd" -> "azure_ad"
+  const entra = ds.azure_ad || ds.azureAd || ds.entra_id || ds.entraId
+
+  let azureAD: AzureADInfo | undefined = undefined
+  if (entra) {
+    azureAD = {
+      joined: entra.joined || entra.is_aad_joined || entra.isAadJoined ||
+              entra.is_entra_joined || entra.isEntraJoined || false,
+      registered: entra.registered || entra.is_aad_registered || entra.isAadRegistered ||
+                  entra.is_entra_registered || entra.isEntraRegistered || false,
+      tenantId: entra.tenant_id || entra.tenantId,
+      tenantName: entra.tenant_name || entra.tenantName
+    }
+  }
+
   return {
     activeDirectory: {
       bound: ad.bound || ad.is_domain_joined || ad.isDomainJoined || false,
@@ -377,16 +394,7 @@ function mapDirectoryServices(ds: any): DirectoryServicesInfo {
       server: ds.ldap?.server
     },
     directoryNodes: ds.directoryNodes || ds.directory_nodes,
-    // Windows-specific: Entra ID info
-    ...(ds.azure_ad || ds.azureAd ? {
-      azureAD: {
-        joined: ds.azure_ad?.is_aad_joined || ds.azureAd?.isAadJoined || false,
-        registered: ds.azure_ad?.is_aad_registered || ds.azureAd?.isAadRegistered || false,
-        tenantId: ds.azure_ad?.tenant_id || ds.azureAd?.tenantId,
-        tenantName: ds.azure_ad?.tenant_name || ds.azureAd?.tenantName
-      }
-    } : {}),
-    // Windows-specific: Workgroup
+    ...(azureAD ? { azureAD } : {}),
     ...(ds.workgroup ? { workgroup: ds.workgroup } : {})
   }
 }

@@ -243,8 +243,57 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   
   // Extract Windows Hello data from identity module (Windows only) - migrated from security
   const windowsHello = normalizedIdentity?.windowsHello || security?.windowsHello
-  
+
+  // Extract management data as fallback for Windows enrollment info (older clients)
+  const rawManagement = device?.modules?.management || device?.management
+  const management = rawManagement ? normalizeKeys(convertPowerShellObjects(rawManagement)) as any : null
+
   const isMac = isMacOS(device)
+
+  // Build Windows enrollment info: prefer identity.directoryServices, fall back to management
+  const windowsEnrollment = !isMac ? (() => {
+    // Primary: use data from identity.directoryServices (new clients)
+    if (identity.directoryServices?.azureAD || identity.directoryServices?.activeDirectory?.bound || identity.directoryServices?.workgroup) {
+      const ds = identity.directoryServices
+      const enrollment = identity.enrollmentInfo
+      return {
+        entraJoined: ds.azureAD?.joined || false,
+        entraRegistered: ds.azureAD?.registered || false,
+        domainJoined: ds.activeDirectory?.bound || false,
+        domainName: ds.activeDirectory?.domain || '',
+        workgroup: ds.workgroup || '',
+        enrollmentType: enrollment?.enrollmentType || 'Unknown',
+        tenantName: ds.azureAD?.tenantName || '',
+        mdmProvider: null as string | null,
+        mdmEnrolled: false
+      }
+    }
+    // Fallback: read from management module (older clients without directoryServices)
+    if (management) {
+      const deviceState = management.device_state || management.deviceState
+      const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment
+      const domainTrust = management.domain_trust || management.domainTrust
+      const entraJoined = deviceState?.entra_joined || deviceState?.entraJoined || false
+      const domainJoined = deviceState?.domain_joined || deviceState?.domainJoined || (domainTrust?.secure_channel_valid || domainTrust?.secureChannelValid ? true : false)
+      let enrollmentType = 'Unknown'
+      if (entraJoined && domainJoined) enrollmentType = 'Hybrid Entra Join'
+      else if (entraJoined) enrollmentType = 'Entra Joined'
+      else if (domainJoined) enrollmentType = 'Domain Joined'
+      else enrollmentType = 'Standalone'
+      return {
+        entraJoined,
+        entraRegistered: deviceState?.enterprise_joined || deviceState?.enterpriseJoined || false,
+        domainJoined,
+        domainName: domainTrust?.domain_name || domainTrust?.domainName || '',
+        workgroup: '',
+        enrollmentType,
+        tenantName: management.tenant_details?.tenant_name || management.tenantDetails?.tenantName || '',
+        mdmProvider: mdmEnrollment?.provider || null as string | null,
+        mdmEnrolled: mdmEnrollment?.is_enrolled || mdmEnrollment?.isEnrolled || false
+      }
+    }
+    return null
+  })() : null
 
   // Windows built-in system accounts to hide (noise, not useful)
   const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount', 'defaultaccount', 'guest', 'administrator']
@@ -401,7 +450,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
       </div>
 
       {/* Summary Cards Grid */}
-      <div className={`grid gap-4 ${isMac ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
         {/* Users Summary Card */}
         <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
           <div className="flex items-center gap-2 mb-3">
@@ -459,45 +508,45 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
-        {/* Windows Directory Join Status Card - Entra/Domain join info (migrated from Management) */}
-        {!isMac && directoryServices && (
-          directoryServices.azureAD || 
-          directoryServices.activeDirectory?.bound ||
-          directoryServices.workgroup
-        ) && (
+        {/* Windows Enrollment Card - always shown on Windows */}
+        {!isMac && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 mb-3">
               <Network className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Directory Status</h3>
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Enrollment</h3>
             </div>
             <div className="space-y-1">
-              {/* Entra ID (Azure AD) */}
-              {directoryServices.azureAD && (
+              {windowsEnrollment ? (
                 <>
-                  <DetailRow 
-                    label="Entra ID" 
-                    value={directoryServices.azureAD.joined ? 'Joined' : 
-                           directoryServices.azureAD.registered ? 'Registered' : 'Not Connected'}
-                    variant={directoryServices.azureAD.joined ? 'success' : 
-                             directoryServices.azureAD.registered ? 'neutral' : 'warning'}
+                  {/* Enrollment type as the authoritative single label */}
+                  <DetailRow
+                    label="Type"
+                    value={windowsEnrollment.enrollmentType}
+                    variant={
+                      windowsEnrollment.enrollmentType === 'Entra Joined' ||
+                      windowsEnrollment.enrollmentType === 'Hybrid Entra Join'
+                        ? 'success'
+                        : windowsEnrollment.enrollmentType === 'Domain Joined'
+                        ? 'neutral'
+                        : 'neutral'
+                    }
                   />
-                  {directoryServices.azureAD.tenantName && (
-                    <DetailRow label="Tenant" value={directoryServices.azureAD.tenantName} />
+                  {/* Domain name only shown when actually domain/hybrid joined */}
+                  {windowsEnrollment.domainJoined && windowsEnrollment.domainName && (
+                    <DetailRow label="Domain" value={windowsEnrollment.domainName} />
+                  )}
+                  {windowsEnrollment.workgroup && !windowsEnrollment.domainJoined && (
+                    <DetailRow label="Workgroup" value={windowsEnrollment.workgroup} />
+                  )}
+                  {windowsEnrollment.tenantName && (
+                    <DetailRow label="Tenant" value={windowsEnrollment.tenantName} />
+                  )}
+                  {windowsEnrollment.mdmProvider && (
+                    <DetailRow label="MDM" value={windowsEnrollment.mdmProvider} />
                   )}
                 </>
-              )}
-              {/* Active Directory / Domain Joined */}
-              <DetailRow 
-                label="Domain Joined" 
-                value={directoryServices.activeDirectory?.bound ? 'Yes' : 'No'}
-                variant={directoryServices.activeDirectory?.bound ? 'success' : 'neutral'}
-              />
-              {directoryServices.activeDirectory?.domain && (
-                <DetailRow label="Domain" value={directoryServices.activeDirectory.domain} />
-              )}
-              {/* Workgroup (standalone) */}
-              {directoryServices.workgroup && !directoryServices.activeDirectory?.bound && (
-                <DetailRow label="Workgroup" value={directoryServices.workgroup} />
+              ) : (
+                <DetailRow label="Status" value="No data" variant="neutral" />
               )}
             </div>
           </div>
@@ -578,9 +627,9 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                 label="Status" 
                 value={windowsHello.statusDisplay || 'Unknown'}
                 variant={
-                  windowsHello.statusDisplay === 'Enabled' || windowsHello.statusDisplay === 'Business' 
+                  windowsHello.statusDisplay?.includes('Enabled')
                     ? 'success' 
-                    : windowsHello.statusDisplay === 'Partially Configured' 
+                    : windowsHello.statusDisplay?.includes('Partially')
                     ? 'warning' 
                     : 'neutral'
                 }
