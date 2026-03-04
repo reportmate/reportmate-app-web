@@ -36,7 +36,6 @@ import {
   ChevronDown,
   Fingerprint,
   Key,
-  Scan
 } from 'lucide-react'
 import { extractIdentity, type IdentityInfo } from '../../lib/data-processing/modules/identity'
 
@@ -264,6 +263,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
         workgroup: ds.workgroup || '',
         enrollmentType: enrollment?.enrollmentType || 'Unknown',
         tenantName: ds.azureAD?.tenantName || '',
+        entraDeviceId: ds.azureAD?.deviceId || '',
         mdmProvider: null as string | null,
         mdmEnrolled: false
       }
@@ -288,6 +288,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
         workgroup: '',
         enrollmentType,
         tenantName: management.tenant_details?.tenant_name || management.tenantDetails?.tenantName || '',
+        entraDeviceId: '',
         mdmProvider: mdmEnrollment?.provider || null as string | null,
         mdmEnrolled: mdmEnrollment?.is_enrolled || mdmEnrollment?.isEnrolled || false
       }
@@ -295,8 +296,8 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
     return null
   })() : null
 
-  // Windows built-in system accounts to hide (noise, not useful)
-  const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount', 'defaultaccount', 'guest', 'administrator']
+  // Windows system service accounts to hide (pure noise, not real user accounts)
+  const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount']
 
   // Filter logged in sessions to only show actual user sessions (not orphaned TTYs)
   const activeUserSessions = identity.loggedInUsers.filter(session => 
@@ -508,17 +509,80 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
-        {/* Windows Enrollment Card - always shown on Windows */}
+        {/* Authentication Card - Windows Hello (Windows Only) */}
         {!isMac && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 mb-3">
-              <Network className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Enrollment</h3>
+              <Fingerprint className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Authentication</h3>
+            </div>
+            <div className="space-y-1">
+              {windowsHello ? (
+                <>
+                  <DetailRow
+                    label="Windows Hello"
+                    value={
+                      windowsHello.statusDisplay?.includes('Enabled') ? 'Enabled'
+                      : windowsHello.statusDisplay?.includes('Partially') ? 'Partial'
+                      : 'Disabled'
+                    }
+                    variant={
+                      windowsHello.statusDisplay?.includes('Enabled')
+                        ? 'success'
+                        : windowsHello.statusDisplay?.includes('Partially')
+                        ? 'warning'
+                        : 'neutral'
+                    }
+                  />
+                  {windowsHello.credentialProviders && (
+                    <>
+                      <DetailRow
+                        label="PIN"
+                        value={windowsHello.credentialProviders.pinEnabled ? 'Enabled' : 'Disabled'}
+                        variant={windowsHello.credentialProviders.pinEnabled ? 'success' : 'neutral'}
+                      />
+                      <DetailRow
+                        label="Fingerprint"
+                        value={windowsHello.credentialProviders.fingerprintEnabled ? 'Enabled' : 'Disabled'}
+                        variant={windowsHello.credentialProviders.fingerprintEnabled ? 'success' : 'neutral'}
+                      />
+                      <DetailRow
+                        label="Face Recognition"
+                        value={windowsHello.credentialProviders.faceRecognitionEnabled ? 'Enabled' : 'Disabled'}
+                        variant={windowsHello.credentialProviders.faceRecognitionEnabled ? 'success' : 'neutral'}
+                      />
+                    </>
+                  )}
+                  {windowsHello.credentialGuard && (
+                    <DetailRow
+                      label="Credential Guard"
+                      value={windowsHello.credentialGuard.isEnabled ? 'Enabled' : 'Disabled'}
+                      variant={windowsHello.credentialGuard.isEnabled ? 'success' : 'neutral'}
+                    />
+                  )}
+                </>
+              ) : (
+                <DetailRow label="Windows Hello" value="Not configured" variant="neutral" />
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Domains & Tokens Card - Windows Only */}
+        {!isMac && (() => {
+          // SSO state from identity module (authoritative source for Cloud TGT, Entra PRT)
+          const sso = identity.ssoState
+          const trust = identity.domainTrust
+          const hasSsoData = sso !== null
+          return (
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Key className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Domains &amp; Tokens</h3>
             </div>
             <div className="space-y-1">
               {windowsEnrollment ? (
                 <>
-                  {/* Enrollment type as the authoritative single label */}
                   <DetailRow
                     label="Type"
                     value={windowsEnrollment.enrollmentType}
@@ -526,33 +590,106 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                       windowsEnrollment.enrollmentType === 'Entra Joined' ||
                       windowsEnrollment.enrollmentType === 'Hybrid Entra Join'
                         ? 'success'
-                        : windowsEnrollment.enrollmentType === 'Domain Joined'
-                        ? 'neutral'
                         : 'neutral'
                     }
                   />
-                  {/* Domain name only shown when actually domain/hybrid joined */}
                   {windowsEnrollment.domainJoined && windowsEnrollment.domainName && (
                     <DetailRow label="Domain" value={windowsEnrollment.domainName} />
                   )}
-                  {windowsEnrollment.workgroup && !windowsEnrollment.domainJoined && (
+                  {windowsEnrollment.workgroup &&
+                   windowsEnrollment.workgroup.toUpperCase() !== 'WORKGROUP' &&
+                   !windowsEnrollment.entraJoined &&
+                   !windowsEnrollment.domainJoined && (
                     <DetailRow label="Workgroup" value={windowsEnrollment.workgroup} />
                   )}
                   {windowsEnrollment.tenantName && (
                     <DetailRow label="Tenant" value={windowsEnrollment.tenantName} />
                   )}
+                  {windowsEnrollment.entraDeviceId && (
+                    <DetailRow label="Device ID" value={windowsEnrollment.entraDeviceId} />
+                  )}
+                  {identity.directoryServices?.azureAD?.deviceAuthStatus && (
+                    <DetailRow
+                      label="Device Auth"
+                      value={identity.directoryServices.azureAD.deviceAuthStatus}
+                      variant={identity.directoryServices.azureAD.deviceAuthStatus === 'SUCCESS' ? 'success' : 'warning'}
+                    />
+                  )}
+                  {windowsEnrollment.entraRegistered && !windowsEnrollment.entraJoined && (
+                    <DetailRow label="Registration" value="Registered (BYOD)" variant="neutral" />
+                  )}
                   {windowsEnrollment.mdmProvider && (
                     <DetailRow label="MDM" value={windowsEnrollment.mdmProvider} />
+                  )}
+                  {/* SSO State from identity module */}
+                  {hasSsoData && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                      <DetailRow
+                        label="Entra PRT"
+                        value={sso.entraPrt ? 'Active' : 'Not Present'}
+                        variant={sso.entraPrt ? 'success' : 'warning'}
+                      />
+                      {sso.entraPrtExpiryTime && (
+                        <DetailRow
+                          label="PRT Expiry"
+                          value={new Date(sso.entraPrtExpiryTime).toLocaleDateString()}
+                        />
+                      )}
+                      <DetailRow
+                        label="Cloud TGT"
+                        value={sso.cloudTgt ? 'Present' : 'Not Present'}
+                        variant={sso.cloudTgt ? 'success' : 'neutral'}
+                      />
+                      <DetailRow
+                        label="On-Prem TGT"
+                        value={sso.onPremTgt ? 'Present' : 'Not Present'}
+                        variant={sso.onPremTgt ? 'success' : 'neutral'}
+                      />
+                    </div>
+                  )}
+                  {/* Domain Trust - only show if domain joined */}
+                  {trust && trust.trustStatus !== 'Not Applicable' && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                      <DetailRow
+                        label="Domain Trust"
+                        value={trust.trustStatus}
+                        variant={trust.trustStatus === 'Healthy' ? 'success' : trust.trustStatus === 'Broken' ? 'error' : 'warning'}
+                      />
+                      {trust.domainController && trust.domainController !== 'Unknown' && (
+                        <DetailRow label="DC" value={trust.domainController} />
+                      )}
+                    </div>
                   )}
                 </>
               ) : (
                 <DetailRow label="Status" value="No data" variant="neutral" />
               )}
+              {/* NGC Key Storage */}
+              {windowsHello?.ngcKeyStorage?.isConfigured && (
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow
+                    label="NGC Key Storage"
+                    value="Configured"
+                    variant="success"
+                  />
+                  {windowsHello.ngcKeyStorage.providers?.length > 0 && (
+                    <DetailRow
+                      label="Providers"
+                      value={windowsHello.ngcKeyStorage.providers.map((p: any) => p.name || p.type).slice(0, 2).join(', ') + (windowsHello.ngcKeyStorage.providers.length > 2 ? ` +${windowsHello.ngcKeyStorage.providers.length - 2} more` : '')}
+                    />
+                  )}
+                </div>
+              )}
+              {/* WebAuthN / FIDO2 */}
+              {windowsHello?.webAuthN?.isEnabled && (
+                <DetailRow label="WebAuthN / FIDO2" value="Enabled" variant="success" />
+              )}
             </div>
           </div>
-        )}
+          )
+        })()}
 
-        {/* Authentication Card - Platform SSO (Mac) / Device Lock (Windows) - Moved here from below */}
+        {/* Authentication Card - Platform SSO (Mac only) */}
         {isMac && (platformSSO || activationLock) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
             <div className="flex items-center gap-2 mb-3">
@@ -615,77 +752,6 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
-        {/* Windows Hello Card - Windows Only */}
-        {!isMac && windowsHello && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <Scan className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Windows Hello</h3>
-            </div>
-            <div className="space-y-1">
-              <DetailRow 
-                label="Status" 
-                value={windowsHello.statusDisplay || 'Unknown'}
-                variant={
-                  windowsHello.statusDisplay?.includes('Enabled')
-                    ? 'success' 
-                    : windowsHello.statusDisplay?.includes('Partially')
-                    ? 'warning' 
-                    : 'neutral'
-                }
-              />
-              {windowsHello.credentialProviders && (
-                <>
-                  <DetailRow 
-                    label="PIN" 
-                    value={windowsHello.credentialProviders.pinEnabled ? 'Enabled' : 'Disabled'}
-                    variant={windowsHello.credentialProviders.pinEnabled ? 'success' : 'neutral'}
-                  />
-                  <DetailRow 
-                    label="Fingerprint" 
-                    value={windowsHello.credentialProviders.fingerprintEnabled ? 'Enabled' : 'Disabled'}
-                    variant={windowsHello.credentialProviders.fingerprintEnabled ? 'success' : 'neutral'}
-                  />
-                  <DetailRow 
-                    label="Face Recognition" 
-                    value={windowsHello.credentialProviders.faceRecognitionEnabled ? 'Enabled' : 'Disabled'}
-                    variant={windowsHello.credentialProviders.faceRecognitionEnabled ? 'success' : 'neutral'}
-                  />
-                </>
-              )}
-              {windowsHello.credentialGuard && (
-                <DetailRow 
-                  label="Credential Guard" 
-                  value={windowsHello.credentialGuard.isEnabled ? 'Enabled' : 'Disabled'}
-                  variant={windowsHello.credentialGuard.isEnabled ? 'success' : 'neutral'}
-                />
-              )}
-            </div>
-            {/* NGC Key Storage Info */}
-            {windowsHello.ngcKeyStorage?.isConfigured && (
-              <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
-                <div className="flex items-center gap-1 text-blue-700 dark:text-blue-300 mb-1">
-                  <Key className="w-3 h-3" />
-                  <span className="font-medium">NGC Key Storage Configured</span>
-                </div>
-                {windowsHello.ngcKeyStorage.providers?.length > 0 && (
-                  <div className="text-blue-600 dark:text-blue-400">
-                    {windowsHello.ngcKeyStorage.providers.map((p: any) => p.name || p.type).slice(0, 2).join(', ')}
-                    {windowsHello.ngcKeyStorage.providers.length > 2 && ` +${windowsHello.ngcKeyStorage.providers.length - 2} more`}
-                  </div>
-                )}
-              </div>
-            )}
-            {/* WebAuthN Info */}
-            {windowsHello.webAuthN?.isEnabled && (
-              <div className="mt-2 text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" />
-                WebAuthN/FIDO2 Enabled
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Tokens Card - macOS Only (Bootstrap Token + Secure Token combined) */}
         {isMac && (secureTokenUsers || bootstrapToken) && (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
@@ -738,8 +804,6 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             )}
           </div>
         )}
-
-        {/* Authentication Card has been moved above - near Platform SSO position */}
 
         {/* Failed Logins Card - Windows Only */}
         {!isMac && summary.failedLoginsLast7Days !== undefined && (
@@ -1012,7 +1076,12 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                           )}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="font-medium font-mono text-gray-900 dark:text-white">{user.username}</span>
+                          <span className={`font-medium font-mono ${user.isDisabled ? 'text-gray-400 dark:text-gray-500' : 'text-gray-900 dark:text-white'}`}>{user.username}</span>
+                          {user.isDisabled && (
+                            <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                              Disabled
+                            </span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
                           {lastLoginInfo?.text || 'Never'}
