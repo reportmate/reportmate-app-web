@@ -35,13 +35,20 @@ export async function GET(
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     
-    // Get query parameters for pagination
+    // Get query parameters for pagination and filtering
     const url = new URL(request.url)
     const limit = url.searchParams.get('limit') || '100'
+    const type = url.searchParams.get('type')
+    
+    // Validate type parameter
+    const VALID_TYPES = ['success', 'warning', 'error', 'info', 'system']
+    const validType = type && VALID_TYPES.includes(type.toLowerCase()) ? type.toLowerCase() : null
         
     // Special handling for events module (events are stored separately)
     if (moduleName === 'events') {
-      const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events?limit=${limit}`
+      const eventsParams = new URLSearchParams({ limit })
+      if (validType) eventsParams.append('type', validType)
+      const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events?${eventsParams.toString()}`
             
       const eventsResponse = await fetch(eventsUrl, {
         cache: 'no-store',

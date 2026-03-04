@@ -45,12 +45,17 @@ export async function GET(request: Request) {
     const offsetParam = searchParams.get('offset')
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
+    const typeParam = searchParams.get('type')
     const limit = limitParam ? parseInt(limitParam, 10) : 1000
     const offset = offsetParam ? parseInt(offsetParam, 10) : 0
     
     // Validate parameters  
     const validLimit = Math.min(Math.max(limit, 1), 1000) // Between 1 and 1000 events
     const validOffset = Math.max(offset, 0) // Non-negative offset
+    
+    // Validate type parameter
+    const VALID_TYPES = ['success', 'warning', 'error', 'info', 'system']
+    const validType = typeParam && VALID_TYPES.includes(typeParam.toLowerCase()) ? typeParam.toLowerCase() : null
     
     // Validate and format date parameters
     let validStartDate = null
@@ -91,8 +96,8 @@ export async function GET(request: Request) {
     headers['Content-Type'] = 'application/json'
 
     // For pagination with date filters, we need fresh data each time
-    // Only use cache for limit<=200 and offset=0 with no date filters (dashboard requests)
-    const shouldCache = validLimit <= 1000 && validOffset === 0 && !validStartDate && !validEndDate
+    // Only use cache for unfiltered, first-page requests (dashboard)
+    const shouldCache = validLimit <= 1000 && validOffset === 0 && !validStartDate && !validEndDate && !validType
     
     if (shouldCache) {
       // Check cache first - but only for dashboard requests
@@ -130,6 +135,7 @@ export async function GET(request: Request) {
       queryParams.append('offset', validOffset.toString())
       if (validStartDate) queryParams.append('startDate', validStartDate)
       if (validEndDate) queryParams.append('endDate', validEndDate)
+      if (validType) queryParams.append('type', validType)
       
       const queryString = queryParams.toString()
       const apiUrl = `${apiBaseUrl}/api/events?${queryString}`
