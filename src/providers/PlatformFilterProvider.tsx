@@ -117,27 +117,7 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
       localStorage.setItem(STORAGE_KEY, 'Windows')
     }
     // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
-  }, [searchParams, isInitialized, platformFilter])
-
-  // Sync URL parameter when pathname or filter changes (for persistent filter across navigation)
-  useEffect(() => {
-    if (!isInitialized || platformFilter === 'all') return
-    
-    const currentUrlPlatform = searchParams.get('platform')
-    const expectedParam = platformFilter === 'macOS' ? 'mac' : platformFilter === 'Windows' ? 'win' : null
-    
-    // Only update if URL doesn't match current filter state
-    if (currentUrlPlatform !== expectedParam) {
-      const params = new URLSearchParams(window.location.search)
-      if (expectedParam) {
-        params.set('platform', expectedParam)
-      } else {
-        params.delete('platform')
-      }
-      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
-      router.replace(newUrl)
-    }
-  }, [pathname, isInitialized, platformFilter, router, searchParams])
+  }, [searchParams, isInitialized])
 
   const setPlatformFilter = useCallback((platform: Platform) => {
     setPlatformFilterState(platform)
@@ -164,16 +144,16 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   }, [pathname, router, searchParams])
 
   const showOnlyMac = useCallback(() => {
-    setPlatformFilterState('macOS')
-  }, [])
+    setPlatformFilter('macOS')
+  }, [setPlatformFilter])
 
   const showOnlyWindows = useCallback(() => {
-    setPlatformFilterState('Windows')
-  }, [])
+    setPlatformFilter('Windows')
+  }, [setPlatformFilter])
 
   const showAll = useCallback(() => {
-    setPlatformFilterState('all')
-  }, [])
+    setPlatformFilter('all')
+  }, [setPlatformFilter])
 
   const isPlatformVisible = useCallback((platform: string): boolean => {
     if (platformFilter === 'all') return true
