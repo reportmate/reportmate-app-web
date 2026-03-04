@@ -260,20 +260,9 @@ function ManagementPageContent() {
             provider = 'Microsoft Intune'
           }
           
-          // BUGFIX: Determine enrollmentType from deviceState (source of truth)
-          // The mdmEnrollment.enrollmentType was incorrectly set in older client versions
-          const deviceState = mgmt.raw?.deviceState
-          let enrollmentType = mgmt.enrollmentType || 'Unknown'
-          if (deviceState) {
-            // Use deviceState flags as the authoritative source
-            if (deviceState.domainJoined && deviceState.entraJoined) {
-              enrollmentType = 'Hybrid Entra Join'
-            } else if (deviceState.entraJoined) {
-              enrollmentType = 'Entra Joined'
-            } else if (deviceState.domainJoined) {
-              enrollmentType = 'Domain Joined'
-            }
-          }
+          // enrollmentType is the MDM enrollment method (ADE, User Approved, etc.)
+          // Directory service types (Cloud Joined, Domain Joined) are on /devices/identity
+          const enrollmentType = mgmt.enrollmentType || 'Unknown'
           
           return {
             id: mgmt.serialNumber || mgmt.deviceId,
@@ -288,11 +277,14 @@ function ManagementPageContent() {
             intuneId: mgmt.intuneId || 'N/A',
             tenantName: mgmt.tenantName || '',
             isEnrolled: mgmt.isEnrolled || false,
-            // Detect platform from multiple sources (provider, OS name, raw data)
+            // Detect platform from multiple sources (API field > OS name > provider heuristic)
             platform: mgmt.platform || 
               mgmt.raw?.system?.operatingSystem?.name ||
               mgmt.raw?.system?.operating_system?.name ||
-              (provider === 'Apple' ? 'macOS' : provider === 'Microsoft Intune' ? 'Windows' : undefined),
+              (provider === 'Apple' || provider === 'MicroMDM' || provider === 'NanoMDM' ||
+                provider === 'Mosyle' || provider === 'Kandji' ||
+                (provider && provider.toLowerCase().includes('jamf')) ? 'macOS' :
+               provider === 'Microsoft Intune' ? 'Windows' : undefined),
             // Inventory fields from consolidated response
             usage: mgmt.usage,
             catalog: mgmt.catalog,
@@ -316,8 +308,14 @@ function ManagementPageContent() {
     fetchManagement()
   }, [])
 
+  // Subset of management filtered by the global platform filter only — used by widgets
+  // so that widget counts respond to the ?platform= URL param (and the platform nav toggle)
+  const platformFilteredManagement = globalPlatformFilter === 'all'
+    ? management
+    : management.filter(m => isPlatformVisible(normalizePlatform(m.platform)))
+
   // Calculate stats for widgets (filter out Unknown and N/A)
-  const enrollmentStatusCounts = management.reduce((acc, curr) => {
+  const enrollmentStatusCounts = platformFilteredManagement.reduce((acc, curr) => {
     const status = curr.enrollmentStatus || 'Unknown'
     if (status !== 'Unknown' && status !== 'N/A') {
       acc[status] = (acc[status] || 0) + 1
@@ -325,35 +323,20 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  // MDM Bootstrap Type counts - how devices were enrolled into MDM
-  // NOTE: Entra Joined / Domain Joined moved to Identity dashboard
-  const mdmBootstrapCounts = management.reduce((acc, curr) => {
-    // macOS: check enrollmentType directly
-    const enrollmentType = curr.enrollmentType || ''
-    const platform = curr.raw?.system?.operatingSystem?.name || ''
-    const isMac = platform.toLowerCase().includes('macos') || platform.toLowerCase().includes('mac os')
+  // MDM Bootstrap Method counts - HOW devices were enrolled into MDM
+  // Matches table column logic exactly (no platform detection needed)
+  const mdmBootstrapCounts = platformFilteredManagement.reduce((acc, curr) => {
+    const et = curr.enrollmentType || ''
     const autopilot = curr.raw?.autopilot_config || curr.raw?.autopilotConfig
     
-    if (isMac) {
-      // macOS enrollment bootstrap types
-      if (enrollmentType === 'Automated Device Enrollment') {
-        acc['ADE'] = (acc['ADE'] || 0) + 1
-      } else if (enrollmentType === 'User Approved Enrollment') {
-        acc['User Approved'] = (acc['User Approved'] || 0) + 1
-      } else if (enrollmentType === 'MDM Enrolled') {
-        acc['Manual'] = (acc['Manual'] || 0) + 1
-      } else if (enrollmentType !== 'Unknown' && enrollmentType !== 'N/A' && enrollmentType) {
-        // Other Mac enrollment types
-        acc['Other'] = (acc['Other'] || 0) + 1
-      }
-    } else {
-      // Windows enrollment bootstrap types
-      if (autopilot?.activated === true || autopilot?.activated === 'true') {
-        acc['AutoPilot'] = (acc['AutoPilot'] || 0) + 1
-      } else if (curr.enrollmentStatus && curr.enrollmentStatus !== 'Not Enrolled') {
-        // Enrolled but not via AutoPilot
-        acc['Manual'] = (acc['Manual'] || 0) + 1
-      }
+    if (autopilot?.activated === true || autopilot?.activated === 'true') {
+      acc['Automated'] = (acc['Automated'] || 0) + 1
+    } else if (et === 'Automated Device Enrollment') {
+      acc['Automated'] = (acc['Automated'] || 0) + 1
+    } else if (et === 'User Approved Enrollment') {
+      acc['User Approved'] = (acc['User Approved'] || 0) + 1
+    } else if (et === 'MDM Enrolled' || (curr.enrollmentStatus === 'Enrolled' && et !== 'N/A' && et !== 'Unknown')) {
+      acc['Manual'] = (acc['Manual'] || 0) + 1
     }
     return acc
   }, {} as Record<string, number>)
@@ -369,45 +352,14 @@ function ManagementPageContent() {
     usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
   }
 
-  // Count Broken Trust - Domain-joined devices with trustStatus === 'Broken'
-  // Use deviceState.domainJoined as source of truth (not enrollmentType)
-  const _brokenTrustCount = management.filter(m => {
-    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
-    const trustStatus = m.raw?.domainTrust?.trustStatus
-    return isDomainJoined && trustStatus === 'Broken'
-  }).length
-
-  // Count Unconfirmed Trust - Domain Joined devices without domainTrust data yet
-  // Use deviceState.domainJoined as source of truth
-  const _unconfirmedTrustCount = management.filter(m => {
-    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
-    const hasDomainTrust = m.raw?.domainTrust != null
-    return isDomainJoined && !hasDomainTrust
-  }).length
-
-  // Count Valid Trust - Domain Joined devices with healthy/valid trust status
-  const _trustValidCount = management.filter(m => {
-    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
-    const trustStatus = m.raw?.domainTrust?.trustStatus
-    const hasDomainTrust = m.raw?.domainTrust != null
-    return isDomainJoined && hasDomainTrust && trustStatus !== 'Broken'
-  }).length
-
-  // Count Unmanaged - Domain Joined devices without MDM enrollment
-  const _unmanagedCount = management.filter(m => {
-    const isDomainJoined = m.raw?.deviceState?.domainJoined === true
-    const isEnrolled = m.isEnrolled === true
-    return isDomainJoined && !isEnrolled
-  }).length
-
   // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
-    management.map(m => m.provider).filter(p => p && p !== 'Unknown')
+    platformFilteredManagement.map(m => m.provider).filter(p => p && p !== 'Unknown')
   )).sort()
 
   // Calculate provider counts (exclude Unknown)
   const providerCounts = providers.reduce((acc, provider) => {
-    acc[provider] = management.filter(m => m.provider === provider).length
+    acc[provider] = platformFilteredManagement.filter(m => m.provider === provider).length
     return acc
   }, {} as Record<string, number>)
 
@@ -437,47 +389,32 @@ function ManagementPageContent() {
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
 
-    // Type filter - map display names back to raw values
+    // Type filter - Automated vs Manual enrollment method
     if (typeFilter !== 'all') {
-      const deviceState = m.raw?.deviceState
-      const isDomainJoined = deviceState?.domainJoined === true
+      const autopilot = m.raw?.autopilot_config || m.raw?.autopilotConfig
+      const platform = m.raw?.system?.operatingSystem?.name || ''
+      const isMac = platform.toLowerCase().includes('macos') || platform.toLowerCase().includes('mac os')
       
-      // Special handling for Broken Trust filter - must be domain-joined with broken trust
-      if (typeFilter === 'Broken Trust') {
-        const trustStatus = m.raw?.domainTrust?.trustStatus
-        // Only show as Broken Trust if device is domain-joined AND trust is broken
-        if (!isDomainJoined || trustStatus !== 'Broken') return false
-      } else if (typeFilter === 'Unmanaged') {
-        // Unmanaged filter - devices with enrollmentType='Unmanaged' from the client
+      if (typeFilter === 'Unmanaged') {
         if (m.enrollmentType !== 'Unmanaged') return false
-      } else if (typeFilter === 'Unconfirmed') {
-        // Unconfirmed filter - Domain Joined devices without domainTrust data
-        const hasDomainTrust = m.raw?.domainTrust != null
-        if (!isDomainJoined || hasDomainTrust) return false
-      } else if (typeFilter === 'Trust Valid') {
-        // Trust Valid filter - Domain Joined devices with healthy/valid trust status
-        const hasDomainTrust = m.raw?.domainTrust != null
-        const trustStatus = m.raw?.domainTrust?.trustStatus
-        if (!isDomainJoined || !hasDomainTrust || trustStatus === 'Broken') return false
-      } else if (typeFilter === 'Domain Joined') {
-        // Domain Joined filter shows ALL domain-joined devices (use deviceState as source of truth)
-        if (!isDomainJoined) return false
-      } else if (typeFilter === 'Entra Joined') {
-        // Entra Joined filter - cloud-only devices (Entra but NOT domain-joined)
-        const isEntraOnly = deviceState?.entraJoined === true && !isDomainJoined
-        if (!isEntraOnly) return false
-      } else if (typeFilter === 'Automated Device Enrollment' || typeFilter === 'ADE') {
-        // Mac ADE filter
-        if (m.enrollmentType !== 'Automated Device Enrollment') return false
-      } else if (typeFilter === 'User Approved Enrollment' || typeFilter === 'User Approved') {
-        // Mac User Approved filter
+      } else if (typeFilter === 'Automated') {
+        if (isMac) {
+          if (m.enrollmentType !== 'Automated Device Enrollment') return false
+        } else {
+          if (!(autopilot?.activated === true || autopilot?.activated === 'true')) return false
+        }
+      } else if (typeFilter === 'User Approved') {
         if (m.enrollmentType !== 'User Approved Enrollment') return false
-      } else if (typeFilter === 'MDM Enrolled') {
-        // Mac generic MDM filter
-        if (m.enrollmentType !== 'MDM Enrolled') return false
+      } else if (typeFilter === 'Manual') {
+        if (isMac) {
+          if (m.enrollmentType !== 'MDM Enrolled') return false
+        } else {
+          if (autopilot?.activated === true || autopilot?.activated === 'true') return false
+          if (!m.enrollmentStatus || m.enrollmentStatus === 'Not Enrolled') return false
+        }
       } else {
-        // Other filters - match the enrollmentType directly
-        if (m.enrollmentType !== typeFilter) return false
+        // Other filter value
+        return false
       }
     }
 
@@ -1062,26 +999,23 @@ function ManagementPageContent() {
                   selectedFilter={enrollmentStatusFilter}
                 />
 
-                {/* Widget 3: MDM Bootstrap Type - How devices were enrolled into MDM */}
-                {/* NOTE: Entra Joined / Domain Joined moved to /devices/identity */}
+                {/* Widget 3: Enrollment Type - How devices were enrolled into MDM */}
+                {/* Directory service types (Entra Joined, Domain Joined) are on /devices/identity */}
                 <DonutChart 
-                  title="MDM Bootstrap"
+                  title="Enrollment Type"
                   data={[
-                    // Show MDM bootstrap types: AutoPilot (Win), ADE (Mac), User Approved (Mac), Manual
                     ...Object.entries(mdmBootstrapCounts)
                       .sort(([a], [b]) => {
-                        // AutoPilot first, ADE second, User Approved third, Manual last
-                        const order = ['AutoPilot', 'ADE', 'User Approved', 'Manual', 'Other']
-                        return order.indexOf(a) - order.indexOf(b)
+                        const order = ['Automated', 'User Approved', 'Manual', 'Other']
+                        return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b))
                       })
                       .map(([label, value]) => ({ label, value }))
                   ]}
                   colors={{
-                    'AutoPilot': '#3b82f6', // blue-500 - Windows AutoPilot
-                    'ADE': '#10b981', // emerald-500 - Mac Automated Device Enrollment
+                    'Automated': '#10b981', // emerald-500 - AutoPilot / ADE
                     'User Approved': '#06b6d4', // cyan-500 - Mac User Approved
-                    'Manual': '#f59e0b', // amber-500 - Manual enrollment
-                    'Other': '#8b5cf6', // violet-500 - Other types
+                    'Manual': '#ef4444', // red-500 - Manual enrollment
+                    'Other': '#94a3b8', // slate-400
                     'default': '#94a3b8' // slate-400
                   }}
                   onFilter={setTypeFilter}
@@ -1251,83 +1185,42 @@ function ManagementPageContent() {
                       <td className="px-3 py-1.5 text-sm text-gray-900 dark:text-white">
                         <div className="flex flex-col gap-1 items-start">
                           {(() => {
-                            let displayType = mgmt.enrollmentType || '-'
-                            if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
-                            if (displayType === 'Entra Join') displayType = 'Entra Joined'
-                            // Shorten Mac enrollment types for table display
-                            if (displayType === 'Automated Device Enrollment') displayType = 'ADE'
-                            if (displayType === 'User Approved Enrollment') displayType = 'User Approved'
+                            // Determine enrollment bootstrap method from the enrollmentType field
+                            // which the API already maps correctly for both Mac and Windows.
+                            // Do NOT use mgmt.raw?.system?.... - raw here is management data, not system data.
+                            const autopilot = mgmt.raw?.autopilotConfig || mgmt.raw?.autopilot_config
+                            const et = mgmt.enrollmentType || ''
+
+                            let displayType = '-'
+                            let platformHint = ''
+                            if (autopilot?.activated === true || autopilot?.activated === 'true') {
+                              displayType = 'Automated'
+                              platformHint = 'AutoPilot'
+                            } else if (et === 'Automated Device Enrollment') {
+                              displayType = 'Automated'
+                              platformHint = 'ADE'
+                            } else if (et === 'User Approved Enrollment') {
+                              displayType = 'User Approved'
+                            } else if (et === 'MDM Enrolled' || (mgmt.enrollmentStatus === 'Enrolled' && et !== 'N/A' && et !== 'Unknown')) {
+                              displayType = 'Manual'
+                            }
+                            
                             return (
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
-                                displayType === 'Entra Joined' || displayType === 'AxM Assigned'
-                                  ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                  : displayType === 'Domain Joined'
-                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                  : displayType === 'Unmanaged'
-                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                  : displayType === 'ADE' || displayType === 'User Approved' || displayType === 'MDM Enrolled'
-                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                                  : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                              }`}>
+                              <span 
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium w-fit ${
+                                  displayType === 'Automated'
+                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200'
+                                    : displayType === 'User Approved'
+                                    ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
+                                    : displayType === 'Manual'
+                                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                    : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
+                                }`}
+                                title={platformHint || undefined}
+                              >
                                 {displayType}
                               </span>
                             )
-                          })()}
-                          {/* Show trust status indicator for Domain Joined (Hybrid Entra Join) devices */}
-                          {(mgmt.enrollmentType === 'Hybrid Entra Join' || mgmt.enrollmentType === 'Domain Joined') && (() => {
-                            // Check if device is unmanaged (domain-joined without MDM enrollment) - CRITICAL
-                            const isEnrolled = mgmt.isEnrolled === true
-                            if (!isEnrolled) {
-                              return (
-                                <span 
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
-                                  title="Domain-joined device without MDM enrollment - Critical security risk"
-                                >
-                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                                  </svg>
-                                  Unmanaged
-                                </span>
-                              )
-                            }
-                            
-                            // Check domainTrust.trustStatus - API returns 'Healthy' or 'Broken'
-                            const domainTrust = mgmt.raw?.domainTrust
-                            
-                            // No domainTrust data yet = Unconfirmed (orange)
-                            if (!domainTrust) {
-                              return (
-                                <span 
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200" 
-                                  title="Trust status not yet reported by client"
-                                >
-                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                  Unconfirmed
-                                </span>
-                              )
-                            }
-                            
-                            const trustStatus = domainTrust?.trustStatus
-                            const secureChannelValid = domainTrust?.secureChannelValid
-                            const hasTrustIssue = trustStatus === 'Broken' || secureChannelValid === false
-                            
-                            // Broken trust = red pill
-                            if (hasTrustIssue) {
-                              return (
-                                <span 
-                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium w-fit bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" 
-                                  title={`Trust: ${trustStatus || 'Unknown'}, Secure Channel: ${secureChannelValid === true ? 'Valid' : secureChannelValid === false ? 'Invalid' : 'Unknown'}`}
-                                >
-                                  <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                                  </svg>
-                                  Broken
-                                </span>
-                              )
-                            }
-                            return null
                           })()}
                         </div>
                       </td>

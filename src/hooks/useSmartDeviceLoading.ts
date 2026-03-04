@@ -53,7 +53,7 @@ export function useSmartDeviceLoading(deviceId: string) {
   // Fetch helper - simple and direct
   const fetchModuleData = useCallback(async (moduleName: string): Promise<any> => {
     const url = moduleName === 'events' 
-      ? `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}?limit=5`
+      ? `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}?limit=50`
       : `/api/device/${encodeURIComponent(deviceId)}/modules/${moduleName}`
       
     const response = await fetch(url)

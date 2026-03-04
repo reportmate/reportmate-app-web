@@ -105,10 +105,12 @@ export function useInstallStats() {
 
 /**
  * Hook for fetching events (used when WebSocket is not available)
+ * Supports server-side type filtering for fast per-type queries
  */
-export function useEvents(limit: number = 1000) {
+export function useEvents(limit: number = 1000, type?: string) {
+  const typeParam = type && type !== 'all' ? `&type=${type}` : ''
   const { data, error, isLoading, mutate } = useSWR(
-    `/api/events?limit=${limit}`,
+    `/api/events?limit=${limit}${typeParam}`,
     fetcher,
     {
       ...swrOptions,
