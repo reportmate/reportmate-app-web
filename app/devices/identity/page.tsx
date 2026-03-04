@@ -42,6 +42,10 @@ interface IdentityDevice {
   domainJoined?: boolean
   tenantId?: string
   tenantName?: string
+  // Domain trust status (Healthy, Broken, Unknown, Not Applicable)
+  trustStatus?: string | null
+  // Auth method: "Platform SSO" (Mac) or "Hello for Business" (Windows)
+  authMethod?: string | null
 }
 
 function LoadingSkeleton() {
@@ -116,9 +120,23 @@ function IdentityPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [identityDevices, setIdentityDevices] = useState<IdentityDevice[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [platformFilter, setPlatformFilter] = useState('all')
   const [adminFilter, setAdminFilter] = useState('all')
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  // Widget click filters
+  const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
+  const [authFilter, setAuthFilter] = useState<string | null>(null)
+  // Expandable legend categories
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
+  const toggleCategory = (label: string) => {
+    setExpandedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(label)) next.delete(label)
+      else next.add(label)
+      return next
+    })
+  }
+  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null
+  const clearWidgetFilters = () => { setDirectoryFilter(null); setAuthFilter(null) }
 
   const { tableContainerRef, effectiveWidgetsExpanded } = useScrollCollapse(
     { widgets: widgetsExpanded },
@@ -126,7 +144,7 @@ function IdentityPageContent() {
   )
   
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<'device' | 'users' | 'admins' | 'loggedIn' | 'lastSeen'>('device')
+  const [sortColumn, setSortColumn] = useState<'device' | 'directory' | 'auth' | 'users' | 'loggedIn' | 'lastSeen'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
   const handleSort = (column: typeof sortColumn) => {
@@ -167,25 +185,46 @@ function IdentityPageContent() {
     fetchIdentity()
   }, [])
 
-  // Get unique platforms for filtering
-  const platforms = Array.from(new Set(
-    identityDevices.map(d => d.platform).filter(Boolean)
-  )).sort()
-
-  // Filter devices
-  const filteredDevices = identityDevices.filter(d => {
-    // Global platform filter first
+  // Platform-filtered devices (for widgets — no search/admin filter)
+  const platformFilteredDevices = identityDevices.filter(d => {
     if (globalPlatformFilter) {
       const platform = normalizePlatform(d.platform)
-      if (!isPlatformVisible(platform)) {
-        return false
-      }
+      if (!isPlatformVisible(platform)) return false
     }
-    if (platformFilter !== 'all' && d.platform !== platformFilter) return false
-    
+    return true
+  })
+
+  // Filter devices (for table — includes search + admin filter + widget click filters)
+  const filteredDevices = platformFilteredDevices.filter(d => {
     if (adminFilter === 'has-admins' && d.adminUsers === 0) return false
     if (adminFilter === 'no-admins' && d.adminUsers > 0) return false
     if (adminFilter === 'multiple-admins' && d.adminUsers <= 1) return false
+    
+    // Widget click: directory filter
+    if (directoryFilter) {
+      // Trust sub-statuses for domain joined / hybrid
+      if (directoryFilter === 'Broken') {
+        if (d.trustStatus !== 'Broken') return false
+      } else if (directoryFilter === 'Unconfirmed') {
+        const isDomainOrHybrid = d.enrollmentType === 'Domain Joined'
+        if (!isDomainOrHybrid || (d.trustStatus && d.trustStatus !== 'Unknown')) return false
+      } else if (directoryFilter === 'Trusted') {
+        if (d.trustStatus !== 'Healthy') return false
+      } else {
+        if (d.enrollmentType !== directoryFilter) return false
+      }
+    }
+    
+    // Widget click: auth filter
+    if (authFilter) {
+      if (authFilter === 'Modern') {
+        if (!d.authMethod) return false
+      } else if (authFilter === 'Legacy') {
+        if (d.authMethod || !(d.adBound || d.ldapBound)) return false
+      } else if (authFilter === 'Standard') {
+        if (d.authMethod || d.adBound || d.ldapBound) return false
+      }
+    }
     
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
@@ -207,13 +246,17 @@ function IdentityPageContent() {
         aValue = a.deviceName?.toLowerCase() || ''
         bValue = b.deviceName?.toLowerCase() || ''
         break
+      case 'directory':
+        aValue = a.enrollmentType?.toLowerCase() || ''
+        bValue = b.enrollmentType?.toLowerCase() || ''
+        break
+      case 'auth':
+        aValue = a.authMethod?.toLowerCase() || ''
+        bValue = b.authMethod?.toLowerCase() || ''
+        break
       case 'users':
         aValue = a.totalUsers
         bValue = b.totalUsers
-        break
-      case 'admins':
-        aValue = a.adminUsers
-        bValue = b.adminUsers
         break
       case 'loggedIn':
         aValue = a.currentlyLoggedIn
@@ -237,14 +280,11 @@ function IdentityPageContent() {
   })
 
   // Calculate summary stats
-  const totalUsers = filteredDevices.reduce((sum, d) => sum + d.totalUsers, 0)
-  const totalAdmins = filteredDevices.reduce((sum, d) => sum + d.adminUsers, 0)
   const totalLoggedIn = filteredDevices.reduce((sum, d) => sum + d.currentlyLoggedIn, 0)
 
-  // Calculate identity widget stats
+  // Calculate identity widget stats (from platform-filtered set)
   const identityStats = {
-    // Admin usernames and counts across all devices
-    adminNames: identityDevices.reduce((acc, d) => {
+    adminNames: platformFilteredDevices.reduce((acc, d) => {
       if (d.users) {
         d.users.filter(u => u.isAdmin).forEach(u => {
           const name = u.username || 'Unknown'
@@ -254,28 +294,23 @@ function IdentityPageContent() {
       return acc
     }, {} as Record<string, number>),
     
-    // PSSO status counts
-    pssoRegistered: identityDevices.filter(d => d.platformSSORegistered).length,
-    pssoNotRegistered: identityDevices.filter(d => !d.platformSSORegistered && d.platform === 'macOS').length,
-    
-    // Windows Hello status (for Windows devices) - inferred from platform
-    helloEnabled: identityDevices.filter(d => d.platform === 'Windows').length,
-    helloNotEnabled: 0,
-    
-    // Directory binding stats  
-    adBound: identityDevices.filter(d => d.adBound).length,
-    ldapBound: identityDevices.filter(d => d.ldapBound).length,
-    notBound: identityDevices.filter(d => !d.adBound && !d.ldapBound).length,
-    
-    // Enrollment type counts (Windows devices - migrated from Management)
-    enrollmentTypes: identityDevices.reduce((acc, d) => {
+    enrollmentTypes: platformFilteredDevices.reduce((acc, d) => {
       const type = d.enrollmentType || 'Unknown'
-      // Only count non-Unknown types
       if (type !== 'Unknown') {
         acc[type] = (acc[type] || 0) + 1
       }
       return acc
-    }, {} as Record<string, number>)
+    }, {} as Record<string, number>),
+    
+    // Trust status counts for domain-joined / hybrid devices
+    trustCounts: platformFilteredDevices.reduce((acc, d) => {
+      if (d.enrollmentType === 'Domain Joined') {
+        if (d.trustStatus === 'Healthy') acc.trusted++
+        else if (d.trustStatus === 'Broken') acc.broken++
+        else acc.unconfirmed++ // Unknown, null, or no data
+      }
+      return acc
+    }, { trusted: 0, broken: 0, unconfirmed: 0 })
   }
 
   if (loading) {
@@ -313,14 +348,6 @@ function IdentityPageContent() {
               </div>
               <div className="flex items-center gap-6 text-sm">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalUsers}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Total Users</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{totalAdmins}</div>
-                  <div className="text-gray-500 dark:text-gray-400">Admin Users</div>
-                </div>
-                <div className="text-center">
                   <div className="text-2xl font-bold text-green-600 dark:text-green-400">{totalLoggedIn}</div>
                   <div className="text-gray-500 dark:text-gray-400">Logged In</div>
                 </div>
@@ -331,45 +358,24 @@ function IdentityPageContent() {
           {/* Filters */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center gap-4">
-              {/* Platform Filter */}
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value)}
-                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
+              {/* No Admin Users toggle - only shown when there are devices with no admins */}
+              {platformFilteredDevices.some(d => d.adminUsers === 0) && (
+              <button
+                onClick={() => setAdminFilter(adminFilter === 'no-admins' ? 'all' : 'no-admins')}
+                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                  adminFilter === 'no-admins'
+                    ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
               >
-                <option value="all">All Platforms</option>
-                {platforms.map(platform => (
-                  <option key={platform} value={platform}>{platform}</option>
-                ))}
-              </select>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                No Admin Users
+              </button>
+              )}
 
-              {/* Admin Filter */}
-              <select
-                value={adminFilter}
-                onChange={(e) => setAdminFilter(e.target.value)}
-                className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-              >
-                <option value="all">All Devices</option>
-                <option value="has-admins">Has Admin Users</option>
-                <option value="multiple-admins">Multiple Admins</option>
-                <option value="no-admins">No Admin Users</option>
-              </select>
-
-              {/* Search */}
-              <div className="relative flex-1 max-w-md">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search devices or users..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                />
-              </div>
+              <div className="flex-1" />
 
               {/* Export CSV */}
               <button
@@ -404,8 +410,45 @@ function IdentityPageContent() {
                 </svg>
                 Export CSV
               </button>
+
+              {/* Search */}
+              <div className="relative max-w-md">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search devices or users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
           </div>
+
+          {/* Yellow Clear Filters Bar */}
+          {hasActiveWidgetFilter && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="font-medium">Filters Active</span>
+                <span className="text-yellow-600 dark:text-yellow-300">
+                  {[directoryFilter, authFilter].filter(Boolean).join(', ')}
+                </span>
+              </div>
+              <button
+                onClick={clearWidgetFilters}
+                className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
@@ -425,112 +468,244 @@ function IdentityPageContent() {
             </button>
             
             <CollapsibleSection expanded={effectiveWidgetsExpanded}>
-              <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Administrator Accounts Widget */}
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Administrator Accounts</h4>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
-                      {Object.entries(identityStats.adminNames).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, count]) => (
-                        <div key={name} className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={name}>{name}</span>
+              <div className="px-6 py-6 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Widget 1: Directory Services Donut with Expandable Legend */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Directory Services</h3>
+                    {(() => {
+                      const entries = Object.entries(identityStats.enrollmentTypes)
+                        .sort(([a], [b]) => {
+                          const order = ['Cloud Joined', 'Domain Joined', 'Standard', 'Unjoined']
+                          return (order.indexOf(a) === -1 ? 99 : order.indexOf(a)) - (order.indexOf(b) === -1 ? 99 : order.indexOf(b))
+                        })
+                      const total = entries.reduce((sum, [, v]) => sum + v, 0)
+                      
+                      if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
+                      
+                      const colorMap: Record<string, string> = {
+                        'Cloud Joined': '#10b981',
+                        'Domain Joined': '#f59e0b',
+                        'Standard': '#3b82f6',
+                        'Unjoined': '#ef4444',
+                      }
+
+                      // Trust sub-counts for domain/hybrid
+                      const { trusted, broken, unconfirmed } = identityStats.trustCounts
+                      const trustColors: Record<string, string> = {
+                        'Trusted': '#eab308',
+                        'Unconfirmed': '#f97316',
+                        'Broken': '#ef4444',
+                      }
+                      // Categories that can expand to show trust sub-items
+                      const expandableCategories = ['Domain Joined']
+                      // Always show all 3 trust sub-items when expanded (even if count 0)
+                      const trustItems = [
+                        { label: 'Trusted', value: trusted },
+                        { label: 'Unconfirmed', value: unconfirmed },
+                        { label: 'Broken', value: broken },
+                      ]
+                      const hasTrustData = trusted + broken + unconfirmed > 0
+
+                      // Build donut data - if a category is expanded, replace its segment with trust sub-segments
+                      const donutSegments: { label: string; value: number; color: string }[] = []
+                      for (const [label, value] of entries) {
+                        if (expandableCategories.includes(label) && expandedCategories.has(label) && hasTrustData) {
+                          for (const t of trustItems.filter(t => t.value > 0)) {
+                            donutSegments.push({ label: `${label}:${t.label}`, value: t.value, color: trustColors[t.label] || '#94a3b8' })
+                          }
+                        } else {
+                          donutSegments.push({ label, value, color: colorMap[label] || '#94a3b8' })
+                        }
+                      }
+                      const donutTotal = donutSegments.reduce((sum, s) => sum + s.value, 0)
+                      const radius = 32
+                      const circumference = 2 * Math.PI * radius
+                      let cumulativePercent = 0
+                      
+                      return (
+                        <div className="flex items-start gap-3">
+                          <div className="relative w-28 h-28 flex-shrink-0">
+                            <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                              {donutSegments.map((seg) => {
+                                const percent = donutTotal > 0 ? seg.value / donutTotal : 0
+                                const strokeDasharray = `${percent * circumference} ${circumference}`
+                                const strokeDashoffset = -cumulativePercent * circumference
+                                cumulativePercent += percent
+                                const filterLabel = seg.label.includes(':') ? seg.label.split(':')[1] : seg.label
+                                return (
+                                  <circle
+                                    key={seg.label}
+                                    cx="50"
+                                    cy="50"
+                                    r={radius}
+                                    fill="transparent"
+                                    stroke={seg.color}
+                                    strokeWidth="16"
+                                    strokeDasharray={strokeDasharray}
+                                    strokeDashoffset={strokeDashoffset}
+                                    className="transition-all duration-300 cursor-pointer hover:opacity-80"
+                                    onClick={() => setDirectoryFilter(directoryFilter === filterLabel ? null : filterLabel)}
+                                  />
+                                )
+                              })}
+                            </svg>
                           </div>
-                          <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
+                          <div className="flex-1 space-y-2">
+                            {entries.map(([label, value]) => {
+                              const isExpandable = expandableCategories.includes(label) && hasTrustData
+                              const isExpanded = expandedCategories.has(label)
+                              return (
+                                <div key={label}>
+                                  <div className={`flex items-center gap-2 text-sm w-full rounded px-1 py-0.5 transition-colors ${
+                                    directoryFilter === label ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                  }`}>
+                                    {isExpandable && (
+                                      <button onClick={() => toggleCategory(label)} className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-600">
+                                        <svg className={`w-3 h-3 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </button>
+                                    )}
+                                    {!isExpandable && <div className="w-4 flex-shrink-0" />}
+                                    <button
+                                      onClick={() => setDirectoryFilter(directoryFilter === label ? null : label)}
+                                      className="flex items-center justify-between gap-3 flex-1 cursor-pointer min-w-0"
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: colorMap[label] || '#94a3b8' }} />
+                                        <span className="text-gray-600 dark:text-gray-300 whitespace-nowrap">{label}</span>
+                                      </div>
+                                      <span className="font-medium text-gray-900 dark:text-white tabular-nums shrink-0 min-w-[2.5rem] text-right">{value.toLocaleString()}</span>
+                                    </button>
+                                  </div>
+                                  {isExpandable && isExpanded && (
+                                    <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-2">
+                                      {trustItems.map((t) => (
+                                        <button
+                                          key={t.label}
+                                          onClick={() => setDirectoryFilter(directoryFilter === t.label ? null : t.label)}
+                                          className={`flex items-center justify-between text-xs w-full rounded px-1 py-0.5 transition-colors ${
+                                            directoryFilter === t.label ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: trustColors[t.label] }} />
+                                            <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{t.label}</span>
+                                          </div>
+                                          <span className="font-medium text-gray-700 dark:text-gray-300 tabular-nums shrink-0 min-w-[2rem] text-right">{t.value.toLocaleString()}</span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )
+                            })}
+                          </div>
                         </div>
-                      ))}
+                      )
+                    })()}
+                  </div>
+
+                  {/* Widget 2: Authentication Donut - Modern / Legacy / Standard */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Authentication</h3>
+                    {(() => {
+                      // Modern = has authMethod (Platform SSO or Hello for Business)
+                      const modernCount = platformFilteredDevices.filter(d => d.authMethod).length
+                      // Legacy = AD or LDAP bound without modern auth
+                      const legacyCount = platformFilteredDevices.filter(d => 
+                        !d.authMethod && (d.adBound || d.ldapBound)
+                      ).length
+                      // Standard = everything else
+                      const standardCount = platformFilteredDevices.length - modernCount - legacyCount
+
+                      const authData = [
+                        { label: 'Modern', value: modernCount, color: '#10b981' },
+                        { label: 'Legacy', value: legacyCount, color: '#f59e0b' },
+                        { label: 'Standard', value: standardCount, color: '#3b82f6' },
+                      ].filter(d => d.value > 0)
+                      const total = authData.reduce((sum, d) => sum + d.value, 0)
+                      
+                      if (total === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
+                      
+                      const radius = 32
+                      const circumference = 2 * Math.PI * radius
+                      let cumulativePercent = 0
+                      
+                      return (
+                        <div className="flex items-start gap-3">
+                          <div className="relative w-28 h-28 flex-shrink-0">
+                            <svg viewBox="0 0 100 100" className="transform -rotate-90 w-full h-full">
+                              {authData.map((item) => {
+                                const percent = item.value / total
+                                const strokeDasharray = `${percent * circumference} ${circumference}`
+                                const strokeDashoffset = -cumulativePercent * circumference
+                                cumulativePercent += percent
+                                return (
+                                  <circle
+                                    key={item.label}
+                                    cx="50"
+                                    cy="50"
+                                    r={radius}
+                                    fill="transparent"
+                                    stroke={item.color}
+                                    strokeWidth="16"
+                                    strokeDasharray={strokeDasharray}
+                                    strokeDashoffset={strokeDashoffset}
+                                    className="transition-all duration-300 cursor-pointer hover:opacity-80"
+                                    onClick={() => setAuthFilter(authFilter === item.label ? null : item.label)}
+                                  />
+                                )
+                              })}
+                            </svg>
+                          </div>
+                          <div className="flex-1 space-y-2">
+                            {authData.map((item) => (
+                              <button
+                                key={item.label}
+                                onClick={() => setAuthFilter(authFilter === item.label ? null : item.label)}
+                                className={`flex items-center justify-between text-sm w-full rounded px-1 py-0.5 transition-colors ${
+                                  authFilter === item.label ? 'bg-blue-50 dark:bg-blue-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
+                                  <span className="text-gray-600 dark:text-gray-300 whitespace-nowrap">{item.label}</span>
+                                </div>
+                                <span className="font-medium text-gray-900 dark:text-white tabular-nums shrink-0 min-w-[2.5rem] text-right">{item.value.toLocaleString()}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+
+                  {/* Widget 3: Administrator Accounts */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Administrator Accounts</h3>
+                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                      {Object.entries(identityStats.adminNames).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => {
+                        const total = Object.values(identityStats.adminNames).reduce((sum, v) => sum + v, 0)
+                        const percentage = total > 0 ? Math.round((count / total) * 100) : 0
+                        return (
+                          <div key={name}>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={name}>{name}</span>
+                              <span className="text-sm text-gray-500 dark:text-gray-400">{count}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                              <div className="h-2 rounded-full bg-yellow-500 transition-all duration-300" style={{ width: `${percentage}%` }} />
+                            </div>
+                          </div>
+                        )
+                      })}
                       {Object.keys(identityStats.adminNames).length === 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No admin accounts found</span>
+                        <div className="text-center text-gray-500 py-4">No admin accounts found</div>
                       )}
                     </div>
                   </div>
-
-                  {/* Authentication Widget */}
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Authentication</h4>
-                    <div className="space-y-2">
-                      {/* macOS - Platform SSO */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-purple-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">PSSO Registered (macOS)</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.pssoRegistered}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">PSSO Not Registered (macOS)</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.pssoNotRegistered}</span>
-                      </div>
-                      {/* Windows - Hello for Business */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Windows Devices</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.helloEnabled}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Directory Binding Widget */}
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Directory Binding</h4>
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Active Directory</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.adBound}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">LDAP</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.ldapBound}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Standalone</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{identityStats.notBound}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Enrollment Type Widget (Windows) - Migrated from Management */}
-                  {Object.keys(identityStats.enrollmentTypes).length > 0 && (
-                    <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                      <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Enrollment Type</h4>
-                      <div className="space-y-2">
-                        {Object.entries(identityStats.enrollmentTypes)
-                          .sort((a, b) => b[1] - a[1])
-                          .map(([type, count]) => {
-                            const colorMap: Record<string, string> = {
-                              'Entra Joined': 'bg-blue-500',
-                              'Domain Joined': 'bg-green-500',
-                              'Hybrid': 'bg-purple-500',
-                              'Workgroup': 'bg-gray-400'
-                            }
-                            return (
-                              <div key={type} className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <div className={`w-2.5 h-2.5 rounded-full ${colorMap[type] || 'bg-gray-400'}`}></div>
-                                  <span className="text-sm text-gray-600 dark:text-gray-400">{type}</span>
-                                </div>
-                                <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
-                              </div>
-                            )
-                          })}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </CollapsibleSection>
@@ -554,6 +729,32 @@ function IdentityPageContent() {
                     </div>
                   </th>
                   <th 
+                    onClick={() => handleSort('directory')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Directory
+                      {sortColumn === 'directory' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('auth')}
+                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Auth
+                      {sortColumn === 'auth' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
                     onClick={() => handleSort('users')}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
@@ -567,24 +768,11 @@ function IdentityPageContent() {
                     </div>
                   </th>
                   <th 
-                    onClick={() => handleSort('admins')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                  >
-                    <div className="flex items-center gap-1">
-                      Admins
-                      {sortColumn === 'admins' && (
-                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </th>
-                  <th 
                     onClick={() => handleSort('loggedIn')}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
-                      Active Sessions
+                      Current
                       {sortColumn === 'loggedIn' && (
                         <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -592,7 +780,6 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Status</th>
                   <th 
                     onClick={() => handleSort('lastSeen')}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
@@ -642,114 +829,93 @@ function IdentityPageContent() {
                     </td>
                   </tr>
                 ) : (
-                  filteredDevices.map((device) => (
-                    <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 max-w-56">
-                        <Link 
-                          href={`/device/${device.deviceId}#identity`}
-                          className="group block min-w-0"
-                          title={device.deviceName || 'Unknown Device'}
-                        >
-                          <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{device.deviceName}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
-                            {device.serialNumber}
-                            <span className="ml-2 text-gray-400">|</span>
-                            <span className="ml-2">{device.platform}</span>
-                          </div>
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="font-medium text-gray-900 dark:text-white">{device.totalUsers}</div>
-                          {device.users && device.users.length > 0 && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[150px]" title={device.users.map(u => u.username).join(', ')}>
-                              {device.users.slice(0, 2).map(u => u.username).join(', ')}
-                              {device.users.length > 2 && ` +${device.users.length - 2}`}
+                  filteredDevices.map((device) => {
+                    // Directory type badge colors
+                    const dirColorMap: Record<string, string> = {
+                      'Cloud Joined': 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/40 dark:text-purple-200 dark:border-purple-700',
+                      'Domain Joined': 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/40 dark:text-amber-200 dark:border-amber-700',
+                      'Standard': 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700',
+                      'Unjoined': 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700',
+                    }
+                    // Trust status badge — only for Domain Joined devices
+                    const trustBadge = (() => {
+                      if (device.enrollmentType !== 'Domain Joined') return null
+                      if (device.trustStatus === 'Broken') return { label: 'Broken', cls: 'bg-red-100 text-red-800 border border-red-300 dark:bg-red-900/40 dark:text-red-200 dark:border-red-700', icon: '\u26A0' }
+                      if (!device.trustStatus || device.trustStatus === 'Unknown') return { label: 'Unconfirmed', cls: 'bg-orange-100 text-orange-800 border border-orange-300 dark:bg-orange-900/40 dark:text-orange-200 dark:border-orange-700', icon: '\u24D8' }
+                      return null // Healthy = no badge needed
+                    })()
+                    return (
+                      <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                        <td className="px-6 py-4 max-w-56">
+                          <Link 
+                            href={`/device/${device.serialNumber}#identity`}
+                            className="group block min-w-0"
+                            title={device.deviceName || 'Unknown Device'}
+                          >
+                            <div className="text-sm font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 truncate">{device.deviceName}</div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                              {device.serialNumber}
+                              <span className="ml-2 text-gray-400">|</span>
+                              <span className="ml-2">{device.platform}</span>
                             </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          device.adminUsers > 1 
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : device.adminUsers === 1
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
-                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'
-                        }`}>
-                          {device.adminUsers}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {device.currentlyLoggedIn > 0 ? (
-                            <>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                                {device.currentlyLoggedIn}
+                          </Link>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1 items-start">
+                            <span className={`inline-flex items-center w-fit px-2 py-0.5 rounded-full text-xs font-medium border ${dirColorMap[device.enrollmentType || ''] || 'bg-gray-100 text-gray-600 border-gray-300 dark:bg-gray-700 dark:text-gray-400 dark:border-gray-600'}`}>
+                              {device.enrollmentType || 'Unknown'}
+                            </span>
+                            {trustBadge && (
+                              <span className={`inline-flex items-center gap-1 w-fit px-2 py-0.5 rounded-full text-xs font-medium ${trustBadge.cls}`}>
+                                {trustBadge.icon} {trustBadge.label}
                               </span>
-                              {device.loggedInUsernames && device.loggedInUsernames.length > 0 && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[100px]" title={device.loggedInUsernames.join(', ')}>
-                                  {device.loggedInUsernames[0]}
-                                  {device.loggedInUsernames.length > 1 && ` +${device.loggedInUsernames.length - 1}`}
-                                </span>
-                              )}
-                            </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          {device.authMethod ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200">
+                              {device.authMethod}
+                            </span>
+                          ) : (device.adBound || device.ldapBound) ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200">
+                              Legacy
+                            </span>
                           ) : (
-                            <span className="text-sm text-gray-400 dark:text-gray-500">None</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {/* macOS specific badges */}
-                          {device.platform === 'macOS' && (
-                            <>
-                              {device.btmdbStatus && device.btmdbStatus !== 'healthy' && (
-                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                                  device.btmdbStatus === 'critical' 
-                                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                                }`} title="Background Task Management DB health">
-                                  BTMDB {device.btmdbStatus}
-                                </span>
-                              )}
-                              {device.secureTokenMissing !== null && device.secureTokenMissing > 0 && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200" title="Users missing Secure Token">
-                                  {device.secureTokenMissing} no token
-                                </span>
-                              )}
-                              {device.platformSSORegistered && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200" title="Platform SSO registered">
-                                  PSSO
-                                </span>
-                              )}
-                            </>
-                          )}
-                          {/* Directory binding */}
-                          {device.adBound && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" title={device.adDomain || 'Active Directory bound'}>
-                              AD
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/40 dark:text-blue-200 dark:border-blue-700">
+                              Standard
                             </span>
                           )}
-                          {device.ldapBound && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              LDAP
-                            </span>
-                          )}
-                          {/* Windows specific */}
-                          {device.failedLoginsLast7Days !== undefined && device.failedLoginsLast7Days > 10 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" title={`${device.failedLoginsLast7Days} failed logins in last 7 days`}>
-                              {device.failedLoginsLast7Days} failed
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {device.lastSeen ? formatRelativeTime(device.lastSeen) : '-'}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900 dark:text-white">{device.totalUsers}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            {device.currentlyLoggedIn > 0 ? (
+                              <>
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
+                                  {device.currentlyLoggedIn}
+                                </span>
+                                {device.loggedInUsernames && device.loggedInUsernames.length > 0 && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[100px]" title={device.loggedInUsernames.join(', ')}>
+                                    {device.loggedInUsernames[0]}
+                                    {device.loggedInUsernames.length > 1 && ` +${device.loggedInUsernames.length - 1}`}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                          {device.lastSeen ? formatRelativeTime(device.lastSeen) : '-'}
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>

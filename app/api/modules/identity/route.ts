@@ -41,18 +41,23 @@ export async function GET(request: Request) {
       
       const identityData = await response.json()
             
-      // Map the raw API data to the frontend Identity interface
+      // Map the API data to the frontend Identity interface
+      // FastAPI now returns pre-extracted summary fields (no raw blob)
       const mappedData = Array.isArray(identityData) ? identityData.map((item: any) => {
-        const raw = item.raw || {};
-        const summary = raw.summary || {};
-        const users = raw.users || [];
-        const loggedInUsers = raw.loggedInUsers || [];
+        const summary = item.summary || {};
+        const users = item.users || [];
+        const ds = item.directoryServices || {};
+        const ad = ds.activeDirectory || {};
+        const entra = ds.azureAd || {};
+        const domainJoined = ad.bound || ad.isDomainJoined || false;
+        const entraJoined = entra.joined || item.platformSSOUsers?.deviceRegistered || false;
         
-        // Count admins
-        const adminCount = users.filter((u: any) => u.isAdmin).length;
-        
-        // Get unique logged in users
-        const uniqueLoggedIn = [...new Set(loggedInUsers.map((s: any) => s.user).filter(Boolean))];
+        let enrollmentType = 'Unknown';
+        if (domainJoined && entraJoined) enrollmentType = 'Domain Joined';
+        else if (entraJoined) enrollmentType = 'Cloud Joined';
+        else if (domainJoined) enrollmentType = 'Domain Joined';
+        else if (ds.workgroup) enrollmentType = 'Unjoined';
+        else enrollmentType = 'Standard';
         
         return {
           id: item.id,
@@ -63,40 +68,53 @@ export async function GET(request: Request) {
           collectedAt: item.collectedAt,
           platform: item.platform || 'Unknown',
           
-          // Summary fields
-          totalUsers: summary.totalUsers || users.length || 0,
-          adminUsers: summary.adminUsers || adminCount || 0,
+          // Summary fields (pre-extracted by API)
+          totalUsers: summary.totalUsers || 0,
+          adminUsers: summary.adminUsers || 0,
           disabledUsers: summary.disabledUsers || 0,
-          localUsers: summary.localUsers,
-          domainUsers: summary.domainUsers,
-          currentlyLoggedIn: summary.currentlyLoggedIn || uniqueLoggedIn.length || 0,
-          failedLoginsLast7Days: summary.failedLoginsLast7Days,
+          currentlyLoggedIn: summary.currentlyLoggedIn || 0,
           
           // macOS specific
-          btmdbStatus: raw.btmdbHealth?.status || null,
-          btmdbSizeMB: raw.btmdbHealth?.sizeMB || null,
-          secureTokenUsers: raw.secureTokenUsers?.tokenGrantedCount || null,
-          secureTokenMissing: raw.secureTokenUsers?.tokenMissingCount || null,
+          btmdbStatus: item.btmdbHealth?.status || null,
+          btmdbSizeMB: item.btmdbHealth?.sizeMB || null,
+          secureTokenUsers: item.secureTokenUsers?.tokenGrantedCount || null,
+          secureTokenMissing: item.secureTokenUsers?.tokenMissingCount || null,
           
-          // Platform SSO (macOS 13+)
-          platformSSORegistered: raw.platformSSOUsers?.deviceRegistered || false,
-          platformSSOUserCount: raw.platformSSOUsers?.registeredUserCount || 0,
+          // Platform SSO
+          platformSSORegistered: item.platformSSOUsers?.deviceRegistered || false,
+          platformSSOUserCount: item.platformSSOUsers?.registeredUserCount || 0,
           
           // Directory Services
-          adBound: raw.directoryServices?.activeDirectory?.bound || false,
-          adDomain: raw.directoryServices?.activeDirectory?.domain || null,
-          ldapBound: raw.directoryServices?.ldap?.bound || false,
+          adBound: ad.bound || false,
+          adDomain: ad.domain || null,
+          ldapBound: ds.ldap?.bound || false,
           
-          // User list for detailed view
-          users: users.slice(0, 5).map((u: any) => ({
+          // Enrollment 
+          enrollmentType,
+          entraJoined,
+          domainJoined,
+          tenantId: entra.tenantId || null,
+          tenantName: entra.tenantName || null,
+          
+          // Domain trust
+          trustStatus: item.domainTrust?.trustStatus || null,
+          
+          // Auth method
+          authMethod: (() => {
+            if (item.platformSSOUsers?.deviceRegistered) return 'Platform SSO';
+            if (item.windowsHello?.statusDisplay && !item.windowsHello.statusDisplay.startsWith('Disabled')) return 'Hello for Business';
+            return null;
+          })(),
+          
+          // User previews (top 5, pre-sliced by API)
+          users: users.map((u: any) => ({
             username: u.username,
             realName: u.realName,
             isAdmin: u.isAdmin,
             lastLogon: u.lastLogon
           })),
           
-          // Logged in users
-          loggedInUsernames: uniqueLoggedIn.slice(0, 3)
+          loggedInUsernames: item.loggedInUsernames || []
         };
       }) : [];
       

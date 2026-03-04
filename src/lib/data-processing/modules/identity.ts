@@ -22,6 +22,8 @@ export interface IdentityInfo {
   loginHistory: LoginHistoryEntry[]
   btmdbHealth: BTMDBHealth | null  // macOS only
   directoryServices: DirectoryServicesInfo | null
+  ssoState: SsoStateInfo | null  // Windows: Entra PRT, Cloud TGT, On-Prem TGT
+  domainTrust: DomainTrustInfo | null  // Windows: Domain trust relationship
   secureTokenUsers: SecureTokenInfo | null  // macOS only
   platformSSOUsers: PlatformSSOUsersInfo | null  // macOS 13+ only
   enrollmentInfo: EnrollmentInfo | null  // Enrollment type (Entra/Domain/Hybrid)
@@ -138,6 +140,35 @@ export interface AzureADInfo {
   registered: boolean
   tenantId?: string
   tenantName?: string
+  deviceId?: string
+  thumbprint?: string
+  deviceCertificateValidity?: string
+  deviceAuthStatus?: string
+}
+
+// SSO State (from dsregcmd SSO State section)
+export interface SsoStateInfo {
+  entraPrt: boolean
+  entraPrtUpdateTime?: string
+  entraPrtExpiryTime?: string
+  entraPrtAuthority?: string
+  enterprisePrt: boolean
+  enterprisePrtAuthority?: string
+  onPremTgt: boolean
+  cloudTgt: boolean
+  kerbTopLevelNames?: string
+}
+
+// Domain Trust relationship status
+export interface DomainTrustInfo {
+  secureChannelValid: boolean
+  domainName?: string
+  domainController?: string
+  trustStatus: string
+  lastChecked?: string
+  errorMessage?: string
+  computerAccountExists: boolean
+  machinePasswordAgeDays?: number
 }
 
 // MARK: - Secure Token (macOS MDM)
@@ -224,6 +255,8 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
     loginHistory: identity.loginHistory ? identity.loginHistory.map(mapLoginHistory) : [],
     btmdbHealth: identity.btmdbHealth ? mapBTMDBHealth(identity.btmdbHealth) : null,
     directoryServices: identity.directoryServices ? mapDirectoryServices(identity.directoryServices) : null,
+    ssoState: mapSsoState(identity.ssoState || identity.sso_state),
+    domainTrust: mapDomainTrust(identity.domainTrust || identity.domain_trust),
     secureTokenUsers: identity.secureTokenUsers ? mapSecureTokenInfo(identity.secureTokenUsers) : null,
     platformSSOUsers: identity.platformSSOUsers ? mapPlatformSSOUsers(identity.platformSSOUsers) : null,
     enrollmentInfo: enrollmentInfo,
@@ -380,7 +413,11 @@ function mapDirectoryServices(ds: any): DirectoryServicesInfo {
       registered: entra.registered || entra.is_aad_registered || entra.isAadRegistered ||
                   entra.is_entra_registered || entra.isEntraRegistered || false,
       tenantId: entra.tenant_id || entra.tenantId,
-      tenantName: entra.tenant_name || entra.tenantName
+      tenantName: entra.tenant_name || entra.tenantName,
+      deviceId: entra.device_id || entra.deviceId,
+      thumbprint: entra.thumbprint,
+      deviceCertificateValidity: entra.device_certificate_validity || entra.deviceCertificateValidity,
+      deviceAuthStatus: entra.device_auth_status || entra.deviceAuthStatus
     }
   }
 
@@ -396,6 +433,35 @@ function mapDirectoryServices(ds: any): DirectoryServicesInfo {
     directoryNodes: ds.directoryNodes || ds.directory_nodes,
     ...(azureAD ? { azureAD } : {}),
     ...(ds.workgroup ? { workgroup: ds.workgroup } : {})
+  }
+}
+
+function mapSsoState(sso: any): SsoStateInfo | null {
+  if (!sso) return null
+  return {
+    entraPrt: sso.entra_prt ?? sso.entraPrt ?? false,
+    entraPrtUpdateTime: sso.entra_prt_update_time || sso.entraPrtUpdateTime,
+    entraPrtExpiryTime: sso.entra_prt_expiry_time || sso.entraPrtExpiryTime,
+    entraPrtAuthority: sso.entra_prt_authority || sso.entraPrtAuthority,
+    enterprisePrt: sso.enterprise_prt ?? sso.enterprisePrt ?? false,
+    enterprisePrtAuthority: sso.enterprise_prt_authority || sso.enterprisePrtAuthority,
+    onPremTgt: sso.on_prem_tgt ?? sso.onPremTgt ?? false,
+    cloudTgt: sso.cloud_tgt ?? sso.cloudTgt ?? false,
+    kerbTopLevelNames: sso.kerb_top_level_names || sso.kerbTopLevelNames
+  }
+}
+
+function mapDomainTrust(trust: any): DomainTrustInfo | null {
+  if (!trust) return null
+  return {
+    secureChannelValid: trust.secure_channel_valid ?? trust.secureChannelValid ?? false,
+    domainName: trust.domain_name || trust.domainName,
+    domainController: trust.domain_controller || trust.domainController,
+    trustStatus: trust.trust_status || trust.trustStatus || 'Unknown',
+    lastChecked: trust.last_checked || trust.lastChecked,
+    errorMessage: trust.error_message || trust.errorMessage,
+    computerAccountExists: trust.computer_account_exists ?? trust.computerAccountExists ?? false,
+    machinePasswordAgeDays: trust.machine_password_age_days ?? trust.machinePasswordAgeDays
   }
 }
 
@@ -446,6 +512,8 @@ function createEmptyIdentityInfo(): IdentityInfo {
     loginHistory: [],
     btmdbHealth: null,
     directoryServices: null,
+    ssoState: null,
+    domainTrust: null,
     secureTokenUsers: null,
     platformSSOUsers: null,
     enrollmentInfo: null,
