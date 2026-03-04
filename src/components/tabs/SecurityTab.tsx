@@ -21,11 +21,12 @@ interface SecurityTabProps {
   device: any
 }
 
-const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled', neutral }: { 
+const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled', neutral, danger }: { 
   enabled: boolean | undefined, 
   activeLabel?: string, 
   inactiveLabel?: string,
-  neutral?: boolean
+  neutral?: boolean,
+  danger?: boolean
 }) => {
   if (enabled === undefined) {
     return (
@@ -35,11 +36,26 @@ const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabl
     )
   }
   
-  // All statuses now use simple text - green for positive, black/white for negative/neutral
-  if (neutral || !enabled) {
+  if (!enabled) {
+    if (danger) {
+      return (
+        <span className="text-sm font-medium text-red-600 dark:text-red-400">
+          {inactiveLabel}
+        </span>
+      )
+    }
     return (
       <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-        {enabled ? activeLabel : inactiveLabel}
+        {inactiveLabel}
+      </span>
+    )
+  }
+
+  // All statuses now use simple text - green for positive, black/white for negative/neutral
+  if (neutral) {
+    return (
+      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+        {activeLabel}
       </span>
     )
   }
@@ -51,19 +67,22 @@ const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabl
   )
 }
 
-const DetailRow = ({ label, value, isStatus, enabled, mono, neutral, tooltip }: { 
+const DetailRow = ({ label, value, activeLabel, inactiveLabel, isStatus, enabled, mono, neutral, danger, tooltip }: { 
   label: string, 
   value?: string, 
+  activeLabel?: string,
+  inactiveLabel?: string,
   isStatus?: boolean, 
   enabled?: boolean,
   mono?: boolean,
   neutral?: boolean,
+  danger?: boolean,
   tooltip?: string
 }) => (
   <div className="flex items-center justify-between py-1">
     <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
     {isStatus ? (
-      <StatusBadge enabled={enabled} activeLabel={value || 'Yes'} inactiveLabel={value || 'No'} neutral={neutral} />
+      <StatusBadge enabled={enabled} activeLabel={activeLabel || value || 'Yes'} inactiveLabel={inactiveLabel || value || 'No'} neutral={neutral} danger={danger} />
     ) : (
       <span 
         className={`text-sm font-medium text-gray-900 dark:text-white ${mono ? 'font-mono' : ''} ${tooltip ? 'cursor-help' : ''}`}
@@ -585,7 +604,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             {isMac ? (
               // macOS: SIP + Secure Enclave + Root User + Secure Boot
               <>
-                <DetailRow label="System Integrity Protection" isStatus neutral enabled={sipEnabled} value={sipEnabled ? 'Enabled' : 'Disabled'} />
+                <DetailRow label="System Integrity Protection" isStatus danger enabled={sipEnabled} activeLabel="Enabled" inactiveLabel="Disabled" />
                 {/* Secure Enclave - no divider */}
                 <DetailRow 
                   label="Secure Enclave" 
