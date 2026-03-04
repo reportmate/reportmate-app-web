@@ -119,6 +119,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const [selfSignedFilter, setSelfSignedFilter] = React.useState<boolean>(false)
   const [expandedStores, setExpandedStores] = React.useState<Set<string>>(new Set())
   const [certSearch, setCertSearch] = React.useState('')
+  const [showOsRoots, setShowOsRoots] = React.useState(false)
+  const [cveFilter, setCveFilter] = React.useState<'all' | 'unpatched' | 'patched'>('all')
   
   // Get remote management data from Management module (Mac collects screen sharing there)
   const rawManagement = device?.modules?.management || device?.management
@@ -331,18 +333,30 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     value={security?.deviceGuard?.smartAppControlState || security?.smartAppControl?.state || (security?.smartAppControl?.enabled ? 'On' : 'Off')}
                   />
                 )}
-                {/* Core Isolation / Memory Integrity */}
-                <DetailRow 
-                  label="Core Isolation" 
-                  isStatus 
-                  enabled={security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.memoryIntegrity || security?.coreIsolation?.enabled}
-                  value={(security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.memoryIntegrity || security?.coreIsolation?.enabled) ? 'Enabled' : 'Disabled'}
-                />
-                {(security?.deviceGuard?.memoryIntegrityEnabled !== undefined || security?.coreIsolation?.memoryIntegrity !== undefined) && (
+                {/* Core Isolation / Memory Integrity - use status strings when available */}
+                {(security?.deviceGuard?.coreIsolationStatus !== 'Not supported') && (
+                  <DetailRow 
+                    label="Core Isolation" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.memoryIntegrity || security?.coreIsolation?.enabled}
+                    value={security?.deviceGuard?.coreIsolationStatus || (security?.deviceGuard?.coreIsolationEnabled || security?.coreIsolation?.enabled ? 'Enabled' : 'Disabled')}
+                    inactiveLabel={security?.deviceGuard?.coreIsolationStatus || 'Disabled'}
+                  />
+                )}
+                {(security?.deviceGuard?.memoryIntegrityStatus !== 'Not supported') && (security?.deviceGuard?.memoryIntegrityEnabled !== undefined || security?.deviceGuard?.memoryIntegrityStatus || security?.coreIsolation?.memoryIntegrity !== undefined) && (
                   <DetailRow 
                     label="Memory Integrity (HVCI)" 
                     isStatus 
                     enabled={security?.deviceGuard?.memoryIntegrityEnabled || security?.coreIsolation?.memoryIntegrity}
+                    inactiveLabel={security?.deviceGuard?.memoryIntegrityStatus || 'Disabled'}
+                  />
+                )}
+                {/* Kernel DMA Protection - only show if detected */}
+                {security?.deviceGuard?.kernelDmaProtectionEnabled !== undefined && (
+                  <DetailRow 
+                    label="Kernel DMA Protection" 
+                    isStatus 
+                    enabled={security?.deviceGuard?.kernelDmaProtectionEnabled}
                   />
                 )}
                 {/* Virtualization-based Security */}
@@ -351,8 +365,18 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     label="VBS (Virtualization-based Security)" 
                     isStatus 
                     enabled={security?.deviceGuard?.vbsEnabled || security?.vbs?.enabled || security?.virtualizationBasedSecurity?.enabled}
-                    value={security?.deviceGuard?.vbsStatus || (security?.vbs?.enabled || security?.virtualizationBasedSecurity?.enabled) ? 'Running' : 'Disabled'}
+                    value={security?.deviceGuard?.vbsStatus || (security?.vbs?.enabled || security?.virtualizationBasedSecurity?.enabled) ? 'Running' : 'Not configured'}
+                    inactiveLabel={security?.deviceGuard?.vbsStatus || 'Not configured'}
                   />
+                  {security?.deviceGuard?.vbsSupported !== undefined && !security?.deviceGuard?.vbsEnabled && (
+                    <DetailRow 
+                      label="VBS Hardware Support" 
+                      isStatus 
+                      enabled={security?.deviceGuard?.vbsSupported}
+                      activeLabel="Supported"
+                      inactiveLabel="Not supported"
+                    />
+                  )}
                   {(security?.deviceGuard?.vbsServices?.length > 0 || security?.vbs?.securityServicesRunning || security?.virtualizationBasedSecurity?.services) && (
                     <DetailRow 
                       label="VBS Services" 
@@ -902,14 +926,31 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           )
         }
         
-        // Count by status
-        const expiredCount = certificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length
-        const expiringCount = certificates.filter((c: any) => c.status === 'ExpiringSoon' || c.isExpiringSoon).length
-        const validCount = certificates.filter((c: any) => c.status === 'Valid' || (!c.isExpired && !c.isExpiringSoon)).length
+        // Use certificateSummary from collection if available, otherwise compute locally
+        const certSummary = security?.certificateSummary
+        
+        // Pre-filter: exclude expired OS root certs when toggle is off
+        const visibleCertificates = showOsRoots
+          ? certificates
+          : certificates.filter((c: any) => {
+              const isOsRoot = c.isOsTrustedRoot || c.is_os_trusted_root
+              const isExpired = c.status === 'Expired' || c.isExpired
+              return !(isOsRoot && isExpired)
+            })
+        
+        // Count by status (from visible certificates)
+        const expiredCount = certSummary && !showOsRoots
+          ? (certSummary.userExpiredCount ?? certSummary.user_expired_count ?? visibleCertificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length)
+          : visibleCertificates.filter((c: any) => c.status === 'Expired' || c.isExpired).length
+        const expiringCount = visibleCertificates.filter((c: any) => c.status === 'ExpiringSoon' || c.isExpiringSoon).length
+        const validCount = visibleCertificates.filter((c: any) => c.status === 'Valid' || (!c.isExpired && !c.isExpiringSoon)).length
+        const osRootExpiredCount = certSummary
+          ? (certSummary.osRootExpiredCount ?? certSummary.os_root_expired_count ?? 0)
+          : certificates.filter((c: any) => (c.isOsTrustedRoot || c.is_os_trusted_root) && (c.status === 'Expired' || c.isExpired)).length
         
         // Get unique stores
         const stores = Array.from(new Set(
-          certificates.map((c: any) => {
+          visibleCertificates.map((c: any) => {
             const storeLocation = c.storeLocation || c.store_location || ''
             return storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
           })
@@ -922,7 +963,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         }
         
         // Filter certificates
-        const filteredCertificates = certificates.filter((cert: any) => {
+        const filteredCertificates = visibleCertificates.filter((cert: any) => {
           const status = cert.status || (cert.isExpired ? 'Expired' : (cert.isExpiringSoon ? 'ExpiringSoon' : 'Valid'))
           const statusMatch = certFilter === 'all' || 
             (certFilter === 'expired' && status === 'Expired') ||
@@ -982,7 +1023,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Certificates</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {certificates.length} total certificates
+                      {visibleCertificates.length} certificates{!showOsRoots && osRootExpiredCount > 0 ? ` (${osRootExpiredCount} expired OS roots hidden)` : ''}
                     </p>
                   </div>
                 </div>
@@ -1008,7 +1049,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Store Filter Pills - toggle on/off (LEFT SIDE) */}
                     {stores.length > 1 && (stores as string[]).map((store: string) => {
-                      const storeCount = certificates.filter((c: any) => {
+                      const storeCount = visibleCertificates.filter((c: any) => {
                         const storeLocation = c.storeLocation || c.store_location || ''
                         const certStore = storeLocation === 'LocalMachine' || storeLocation === 'System' ? 'System' : 'User'
                         return certStore === store
@@ -1090,17 +1131,38 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                           : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 hover:bg-blue-200 dark:hover:bg-blue-800'
                       }`}
                     >
-                      Self-signed ({certificates.filter((c: any) => c.isSelfSigned || c.is_self_signed || c.self_signed === '1' || c.self_signed === 1).length})
+                      Self-signed ({visibleCertificates.filter((c: any) => c.isSelfSigned || c.is_self_signed || c.self_signed === '1' || c.self_signed === 1).length})
                     </button>
+                    
+                    {/* OS Root Certs Toggle - only show when there are hidden OS roots */}
+                    {osRootExpiredCount > 0 && (
+                      <>
+                        <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
+                        <button
+                          onClick={() => {
+                            setShowOsRoots(!showOsRoots)
+                            expandAllStores()
+                          }}
+                          className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                            showOsRoots
+                              ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                              : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          {showOsRoots ? 'Hide' : 'Show'} expired OS roots ({osRootExpiredCount})
+                        </button>
+                      </>
+                    )}
                   </div>
                   
                   {/* Clear Filters Button - shown when any filter is active */}
-                  {(certFilter !== 'all' || storeFilter !== 'all' || selfSignedFilter || certSearch.trim()) && (
+                  {(certFilter !== 'all' || storeFilter !== 'all' || selfSignedFilter || showOsRoots || certSearch.trim()) && (
                     <button
                       onClick={() => {
                         setCertFilter('all')
                         setStoreFilter('all')
                         setSelfSignedFilter(false)
+                        setShowOsRoots(false)
                         setCertSearch('')
                       }}
                       className="px-3 py-1.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-800 transition-colors flex items-center gap-1.5"
@@ -1265,7 +1327,8 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
       {/* Threat Detections Table - Alerts from all AV/EDR products */}
       {(() => {
         const detections = security?.detections || []
-        if (detections.length === 0) return null
+        const detectionSummary = security?.detectionSummary
+        const hasDetections = Array.isArray(detections) && detections.length > 0
 
         const severityColor = (severity: string) => {
           switch (severity?.toLowerCase()) {
@@ -1296,36 +1359,88 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               return <AlertTriangle className="w-3.5 h-3.5 text-gray-400" />
           }
         }
+        
+        // Summary stats from collection or computed locally
+        const total30d = detectionSummary?.totalDetections30d ?? detectionSummary?.total_detections_30d ?? detections.length
+        const blocked30d = detectionSummary?.totalBlocked30d ?? detectionSummary?.total_blocked_30d ?? 0
+        const cleaned30d = detectionSummary?.totalCleaned30d ?? detectionSummary?.total_cleaned_30d ?? 0
+        const allowed30d = detectionSummary?.totalAllowed30d ?? detectionSummary?.total_allowed_30d ?? 0
+        const hasActiveThreats = detectionSummary?.hasActiveThreats ?? detectionSummary?.has_active_threats ?? false
 
         return (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Threat Detections</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {detections.length} detection{detections.length !== 1 ? 's' : ''} from AV/EDR products (last 30 days)
-                  </p>
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                    hasActiveThreats
+                      ? 'bg-red-100 dark:bg-red-900'
+                      : hasDetections
+                        ? 'bg-amber-100 dark:bg-amber-900'
+                        : 'bg-green-100 dark:bg-green-900'
+                  }`}>
+                    {hasActiveThreats
+                      ? <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      : hasDetections
+                        ? <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        : <ShieldCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    }
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Threat Detections</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {hasDetections
+                        ? `${detections.length} detection${detections.length !== 1 ? 's' : ''} from AV/EDR products (last 30 days)`
+                        : 'No threats detected in the last 30 days'
+                      }
+                    </p>
+                  </div>
                 </div>
               </div>
+              
+              {/* Summary bar when there are detections */}
+              {hasDetections && (total30d > 0 || blocked30d > 0 || cleaned30d > 0) && (
+                <div className="mt-3 flex items-center gap-4 text-xs">
+                  <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                    {total30d} total
+                  </span>
+                  {blocked30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <Shield className="w-3 h-3" />
+                      {blocked30d} blocked
+                    </span>
+                  )}
+                  {cleaned30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                      <CheckCircle className="w-3 h-3" />
+                      {cleaned30d} cleaned
+                    </span>
+                  )}
+                  {allowed30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                      <XCircle className="w-3 h-3" />
+                      {allowed30d} allowed
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Threat</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Severity</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Category</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Detected</th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Path / Process</th>
-                  </tr>
-                </thead>
-                <tbody>
+            
+            {hasDetections ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Threat</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Severity</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Category</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Detected</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Path / Process</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                   {detections.map((d: any, idx: number) => (
                     <tr 
                       key={`${d.threatId || d.threatName || idx}-${idx}`}
@@ -1364,6 +1479,15 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 </tbody>
               </table>
             </div>
+            ) : (
+              <div className="px-5 py-8 text-center">
+                <ShieldCheck className="w-10 h-10 mx-auto text-green-500 dark:text-green-400 mb-3" />
+                <p className="text-sm font-medium text-gray-900 dark:text-white">No Threats Detected</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  No malware, PUA, or security alerts in the last 30 days
+                </p>
+              </div>
+            )}
           </div>
         )
       })()}
@@ -1372,9 +1496,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
       {(() => {
         // Get CVE data from security - support both SOFA (Mac) and Windows Update formats
         // Mac: sofaUnpatchedCves, sofaSecurityReleaseInfo
-        // Windows: securityUpdates (to be implemented)
+        // Windows: securityCves (new format with status), securityUpdates (legacy)
         const sofaCves = security?.sofaUnpatchedCves || security?.sofa_unpatched_cves || []
         const sofaReleaseInfo = security?.sofaSecurityReleaseInfo || security?.sofa_security_release_info || {}
+        const windowsCves = security?.securityCves || security?.security_cves || []
         const windowsUpdates = security?.securityUpdates || security?.security_updates || []
         
         // Combine Mac and Windows CVE sources
@@ -1386,6 +1511,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           severity?: string
           url?: string
           source: 'sofa' | 'windows'
+          status: 'Patched' | 'Unpatched' | 'Pending'
+          installedDate?: string
+          kbArticle?: string
         }> = []
         
         // Add SOFA CVEs (Mac)
@@ -1397,15 +1525,33 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               patchedVersion: cve.patched_version || cve.patchedVersion || '',
               activelyExploited: cve.actively_exploited === 'true' || cve.actively_exploited === true || cve.activelyExploited === true,
               url: cve.url || '',
-              source: 'sofa'
+              source: 'sofa',
+              status: 'Unpatched'
             })
           })
         }
         
-        // Add Windows Security Updates (Windows)
-        if (Array.isArray(windowsUpdates)) {
+        // Add Windows CVEs (new format with status field)
+        if (Array.isArray(windowsCves) && windowsCves.length > 0) {
+          windowsCves.forEach((cve: any) => {
+            const cveId = cve.cveId || cve.cve_id || cve.cve || ''
+            if (!cveId) return
+            allCves.push({
+              cve: cveId,
+              osVersion: cve.osVersion || cve.os_version || '',
+              patchedVersion: cve.kbArticle || cve.kb_article || cve.patchedVersion || '',
+              activelyExploited: cve.activelyExploited === true || cve.actively_exploited === true,
+              severity: cve.severity || '',
+              url: cveId.startsWith('CVE-') ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : '',
+              source: 'windows',
+              status: (cve.status || 'Unpatched') as 'Patched' | 'Unpatched' | 'Pending',
+              installedDate: cve.installedDate || cve.installed_date || '',
+              kbArticle: cve.kbArticle || cve.kb_article || ''
+            })
+          })
+        } else if (Array.isArray(windowsUpdates) && windowsUpdates.length > 0) {
+          // Legacy format fallback
           windowsUpdates.forEach((update: any) => {
-            // Windows updates may have multiple CVEs per update
             const cves = update.cves || update.cve_ids || (update.cve ? [update.cve] : [])
             cves.forEach((cveId: string) => {
               allCves.push({
@@ -1414,16 +1560,31 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 patchedVersion: update.kb_article || update.kbArticle || update.update_id || '',
                 activelyExploited: update.actively_exploited === true || update.exploited === true,
                 severity: update.severity || update.msrc_severity || '',
-                url: update.url || update.support_url || (cveId ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : ''),
-                source: 'windows'
+                url: cveId ? `https://msrc.microsoft.com/update-guide/vulnerability/${cveId}` : '',
+                source: 'windows',
+                status: 'Unpatched'
               })
             })
           })
         }
         
         const hasCves = allCves.length > 0
-        const exploitedCount = allCves.filter(c => c.activelyExploited).length
+        const unpatchedCves = allCves.filter(c => c.status === 'Unpatched')
+        const patchedCves = allCves.filter(c => c.status === 'Patched')
+        const exploitedCount = unpatchedCves.filter(c => c.activelyExploited).length
         const totalCveCount = sofaReleaseInfo?.unique_cves_count || sofaReleaseInfo?.uniqueCvesCount || allCves.length
+        
+        // Filter CVEs based on selected filter
+        const filteredCves = cveFilter === 'all' ? allCves
+          : cveFilter === 'unpatched' ? unpatchedCves
+          : patchedCves
+        
+        // Sort: unpatched first, then by CVE ID
+        const sortedCves = [...filteredCves].sort((a, b) => {
+          if (a.status !== b.status) return a.status === 'Unpatched' ? -1 : 1
+          if (a.activelyExploited !== b.activelyExploited) return a.activelyExploited ? -1 : 1
+          return a.cve.localeCompare(b.cve)
+        })
         
         return (
           <div className="mt-6 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
@@ -1431,15 +1592,18 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                  <div className={`p-2 rounded-lg ${unpatchedCves.length > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                    {unpatchedCves.length > 0 
+                      ? <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      : <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    }
                   </div>
                   <div>
                     <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                       Common Vulnerabilities and Exposures
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {isMac ? 'SOFA Security Intelligence' : 'Windows Security Updates'} • {hasCves ? `${allCves.length} unpatched` : 'Up to date'}
+                      {isMac ? 'SOFA Security Intelligence' : 'Windows Security Updates'} • {unpatchedCves.length > 0 ? `${unpatchedCves.length} unpatched` : 'All patched'}{patchedCves.length > 0 ? ` • ${patchedCves.length} patched` : ''}
                     </p>
                   </div>
                 </div>
@@ -1452,11 +1616,47 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       </span>
                     )}
                     <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {totalCveCount} total CVEs in current release
+                      {totalCveCount} total CVEs
                     </span>
                   </div>
                 )}
               </div>
+              
+              {/* Filter pills for Patched/Unpatched */}
+              {hasCves && (patchedCves.length > 0 && unpatchedCves.length > 0) && (
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    onClick={() => setCveFilter(cveFilter === 'all' ? 'all' : 'all')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                      cveFilter === 'all'
+                        ? 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    All ({allCves.length})
+                  </button>
+                  <button
+                    onClick={() => setCveFilter(cveFilter === 'unpatched' ? 'all' : 'unpatched')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                      cveFilter === 'unpatched'
+                        ? 'bg-red-200 dark:bg-red-800 text-red-900 dark:text-red-100'
+                        : 'bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-800'
+                    }`}
+                  >
+                    Unpatched ({unpatchedCves.length})
+                  </button>
+                  <button
+                    onClick={() => setCveFilter(cveFilter === 'patched' ? 'all' : 'patched')}
+                    className={`px-2.5 py-1 text-xs font-medium rounded-full transition-colors ${
+                      cveFilter === 'patched'
+                        ? 'bg-green-200 dark:bg-green-800 text-green-900 dark:text-green-100'
+                        : 'bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-800'
+                    }`}
+                  >
+                    Patched ({patchedCves.length})
+                  </button>
+                </div>
+              )}
               
               {/* SOFA Release Info Summary (Mac only) */}
               {isMac && sofaReleaseInfo && (sofaReleaseInfo.update_name || sofaReleaseInfo.updateName) && (
@@ -1489,7 +1689,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             </div>
             
             {/* CVE Table */}
-            {hasCves ? (
+            {sortedCves.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -1498,11 +1698,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">OS Version</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Patched In</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                      {!isMac && <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Installed</th>}
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {allCves.map((cve, idx) => (
+                    {sortedCves.map((cve, idx) => (
                       <tr 
                         key={`${cve.cve}-${idx}`}
                         className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30"
@@ -1525,10 +1726,15 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                           {cve.osVersion || '—'}
                         </td>
                         <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                          {cve.patchedVersion || '—'}
+                          {cve.patchedVersion || cve.kbArticle || '—'}
                         </td>
                         <td className="px-4 py-3">
-                          {cve.activelyExploited ? (
+                          {cve.status === 'Patched' ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                              <CheckCircle className="w-3 h-3" />
+                              Patched
+                            </span>
+                          ) : cve.activelyExploited ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
                               <XCircle className="w-3 h-3" />
                               Exploited
@@ -1540,6 +1746,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                             </span>
                           )}
                         </td>
+                        {!isMac && (
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {cve.installedDate ? formatDate(cve.installedDate) : '—'}
+                          </td>
+                        )}
                         <td className="px-4 py-3">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                             cve.source === 'sofa' 
@@ -1557,7 +1768,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             ) : (
               <div className="px-5 py-8 text-center">
                 <CheckCircle className="w-10 h-10 mx-auto text-green-500 dark:text-green-400 mb-3" />
-                <p className="text-sm font-medium text-gray-900 dark:text-white">No Unpatched Vulnerabilities</p>
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  {cveFilter === 'unpatched' ? 'No Unpatched Vulnerabilities' : cveFilter === 'patched' ? 'No Patched CVEs Found' : 'No Unpatched Vulnerabilities'}
+                </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                   {isMac 
                     ? 'This device is running a fully patched version of macOS'
