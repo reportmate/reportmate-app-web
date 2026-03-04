@@ -3,7 +3,7 @@
  * Device activity and event history with intelligent event bundling
  */
 
-import React, { useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import DeviceEventsSimple from '../DeviceEventsSimple'
 import { bundleEvents, type FleetEvent } from '../../lib/eventBundling'
 import { CheckCircle2, XCircle, AlertTriangle, Info, Server } from 'lucide-react'
@@ -68,9 +68,44 @@ interface EventsTabProps {
   data?: Record<string, unknown>
 }
 
-export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
+export const EventsTab: React.FC<EventsTabProps> = ({ device, events, data }) => {
   // Filter state - 'all' shows everything, otherwise filter by kind
   const [filterType, setFilterType] = useState<string>('all')
+  // Server-fetched events for the active filter type
+  const [filteredTypeEvents, setFilteredTypeEvents] = useState<EventData[]>([])
+  const [filterLoading, setFilterLoading] = useState(false)
+  
+  // Extract device serial for API calls
+  const deviceSerial = (device as any)?.serialNumber || (device as any)?.id || ''
+  
+  // Fetch events from server when a specific type filter is selected
+  const fetchFilteredEvents = useCallback(async (type: string) => {
+    if (!deviceSerial || type === 'all') {
+      setFilteredTypeEvents([])
+      return
+    }
+    setFilterLoading(true)
+    try {
+      const response = await fetch(
+        `/api/device/${encodeURIComponent(deviceSerial)}/modules/events?limit=50&type=${type}`
+      )
+      if (response.ok) {
+        const result = await response.json()
+        const evts = result?.data || result?.events || []
+        setFilteredTypeEvents(Array.isArray(evts) ? evts : [])
+      }
+    } catch {
+      // Fall back to client-side filtering
+      setFilteredTypeEvents([])
+    } finally {
+      setFilterLoading(false)
+    }
+  }, [deviceSerial])
+  
+  // Re-fetch when filter type changes
+  useEffect(() => {
+    fetchFilteredEvents(filterType)
+  }, [filterType, fetchFilteredEvents])
   
   // Filter events to only include valid categories
   const validEvents = useMemo(() => {
@@ -100,10 +135,18 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
   
   // Apply intelligent event bundling
   const bundledEvents = useMemo(() => {
-    if (!validEvents.length) return []
+    // Use server-fetched events when a type filter is active
+    const sourceEvents = (filterType !== 'all' && filteredTypeEvents.length > 0) 
+      ? filteredTypeEvents.filter((event: any) =>
+          event && (event.kind || event.type) &&
+          VALID_EVENT_KINDS.includes((event.kind || event.type).toLowerCase())
+        )
+      : validEvents
+    
+    if (!sourceEvents.length) return []
     
     // Convert to FleetEvent format
-    const fleetEvents: FleetEvent[] = validEvents.map(event => ({
+    const fleetEvents: FleetEvent[] = sourceEvents.map(event => ({
       id: event.id || `event-${Math.random()}`,
       device: 'current-device',
       kind: event.kind || 'info',
@@ -113,26 +156,29 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
     }))
     
     return bundleEvents(fleetEvents)
-  }, [validEvents])
+  }, [validEvents, filterType, filteredTypeEvents])
   
-  // Apply filter to bundled events
+  // Apply filter to bundled events (secondary client-side filter as safety net)
   const filteredEvents = useMemo(() => {
     if (filterType === 'all') return bundledEvents
+    // When server-side filtered, bundledEvents already contains only the right type
+    // but apply client-side filter as well for bundled events
     return bundledEvents.filter(event => 
       event.kind.toLowerCase() === filterType.toLowerCase() ||
       event.bundledKinds.some(k => k.toLowerCase() === filterType.toLowerCase())
     )
   }, [bundledEvents, filterType])
   
-  // Count events by kind for filter badges
+  // Count events by kind for filter badges (always based on original prop events)
   const eventCounts = useMemo(() => {
     const counts: Record<string, number> = {}
-    bundledEvents.forEach(event => {
-      const kind = event.kind.toLowerCase()
-      counts[kind] = (counts[kind] || 0) + 1
+    // Use validEvents (from props) for badge counts so they reflect total, not filtered
+    validEvents.forEach((event: any) => {
+      const kind = (event.kind || event.type || '').toLowerCase()
+      if (kind) counts[kind] = (counts[kind] || 0) + 1
     })
     return counts
-  }, [bundledEvents])
+  }, [validEvents])
 
   if (!bundledEvents || bundledEvents.length === 0) {
     return (
@@ -235,7 +281,12 @@ export const EventsTab: React.FC<EventsTabProps> = ({ events, data }) => {
       {/* Events List */}
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
         <div className="p-6">
-          {filteredEvents.length > 0 ? (
+          {filterLoading ? (
+            <div className="text-center py-8">
+              <div className="inline-block w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
+              <p className="text-gray-600 dark:text-gray-400">Loading {filterType} events...</p>
+            </div>
+          ) : filteredEvents.length > 0 ? (
             <DeviceEventsSimple events={filteredEvents.map(event => ({
               id: event.id,
               name: event.message ?? event.kind ?? 'Event',
