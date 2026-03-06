@@ -36,6 +36,8 @@ interface DeviceFiltersProps {
   expanded?: boolean
   /** Optional callback when expanded state is toggled from within */
   onToggle?: () => void
+  /** Optional device count per location for proportional sizing */
+  locationCounts?: Record<string, number>
 }
 
 export default function DeviceFilters({
@@ -55,7 +57,8 @@ export default function DeviceFilters({
   onPlatformToggle,
   onUsageToggle,
   expanded: externalExpanded,
-  onToggle
+  onToggle,
+  locationCounts
 }: DeviceFiltersProps) {
   const [internalExpanded, setInternalExpanded] = useState(false)
   const filtersExpanded = externalExpanded !== undefined ? externalExpanded : internalExpanded
@@ -229,20 +232,32 @@ export default function DeviceFilters({
           {filterOptions.locations.length > 0 && (
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-              <div className="flex flex-wrap gap-2">
-                {filterOptions.locations.map(location => (
-                  <button
-                    key={location}
-                    onClick={() => onLocationToggle(location)}
-                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                      selectedLocations.includes(location)
-                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {location}
-                  </button>
-                ))}
+              <div className="flex flex-wrap gap-2 items-center">
+                {filterOptions.locations.map(location => {
+                  const count = locationCounts?.[location] ?? 0
+                  const maxCount = locationCounts ? Math.max(...Object.values(locationCounts), 1) : 1
+                  // Scale from 0-1 based on device count relative to max
+                  const scale = locationCounts ? count / maxCount : 0
+                  // Map to size classes: text-xs (base), text-sm, text-base, text-lg
+                  const sizeClass = !locationCounts ? 'px-3 py-1 text-xs'
+                    : scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold'
+                    : scale > 0.3 ? 'px-3 py-1 text-xs font-medium'
+                    : 'px-2.5 py-0.5 text-[11px]'
+                  return (
+                    <button
+                      key={location}
+                      onClick={() => onLocationToggle(location)}
+                      className={`rounded-full border transition-colors ${sizeClass} ${
+                        selectedLocations.includes(location)
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
+                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                      title={locationCounts ? `${location} (${count} device${count !== 1 ? 's' : ''})` : location}
+                    >
+                      {location}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
