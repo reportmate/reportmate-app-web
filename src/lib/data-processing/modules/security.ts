@@ -34,6 +34,7 @@ export interface DetectionAlert {
   detectedAt?: string
   resolvedAt?: string
   eventId?: number
+  description?: string
 }
 
 export interface SecureShellInfo {
@@ -214,7 +215,8 @@ function mapDetection(detection: any): DetectionAlert {
     user: detection.user,
     detectedAt: detection.detectedAt || detection.detected_at,
     resolvedAt: detection.resolvedAt || detection.resolved_at,
-    eventId: detection.eventId || detection.event_id
+    eventId: detection.eventId || detection.event_id,
+    description: detection.description
   }
 }
 
