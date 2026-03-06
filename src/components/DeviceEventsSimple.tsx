@@ -37,6 +37,7 @@ const getEventTypeConfig = (kind?: string) => {
     case 'warning': dotColor = 'bg-yellow-500'; break
     case 'error': dotColor = 'bg-red-500'; break
     case 'info': dotColor = 'bg-blue-500'; break
+    case 'system': dotColor = 'bg-purple-500'; break
   }
   
   return { bg: badgeClass, dot: dotColor }
