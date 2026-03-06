@@ -15,7 +15,7 @@
 import React from 'react'
 import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
-import { Lock, BrickWall, HardDrive, Cpu, Terminal, Shield, ShieldCheck, Search, Award, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
+import { Lock, BrickWall, HardDrive, Cpu, Terminal, Shield, ShieldCheck, Search, Award, AlertTriangle, CheckCircle, XCircle, ChevronDown } from 'lucide-react'
 
 interface SecurityTabProps {
   device: any
@@ -121,6 +121,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const [certSearch, setCertSearch] = React.useState('')
   const [showOsRoots, setShowOsRoots] = React.useState(false)
   const [cveFilter, setCveFilter] = React.useState<'all' | 'unpatched' | 'patched'>('all')
+  const [expandedDetections, setExpandedDetections] = React.useState<Set<number>>(new Set())
   
   // Get remote management data from Management module (Mac collects screen sharing there)
   const rawManagement = device?.modules?.management || device?.management
@@ -1324,174 +1325,6 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         )
       })()}
 
-      {/* Threat Detections Table - Alerts from all AV/EDR products */}
-      {(() => {
-        const detections = security?.detections || []
-        const detectionSummary = security?.detectionSummary
-        const hasDetections = Array.isArray(detections) && detections.length > 0
-
-        const severityColor = (severity: string) => {
-          switch (severity?.toLowerCase()) {
-            case 'severe': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-            case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
-            case 'moderate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-            case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-          }
-        }
-
-        const statusIcon = (status: string) => {
-          switch (status?.toLowerCase()) {
-            case 'cleaned':
-            case 'removed':
-            case 'quarantined':
-            case 'blocked':
-            case 'remediated':
-              return <CheckCircle className="w-3.5 h-3.5 text-green-500" />
-            case 'detected':
-            case 'actiontaken':
-              return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
-            case 'allowed':
-            case 'missed':
-            case 'remediationfailed':
-              return <XCircle className="w-3.5 h-3.5 text-red-500" />
-            default:
-              return <AlertTriangle className="w-3.5 h-3.5 text-gray-400" />
-          }
-        }
-        
-        // Summary stats from collection or computed locally
-        const total30d = detectionSummary?.totalDetections30d ?? detectionSummary?.total_detections_30d ?? detections.length
-        const blocked30d = detectionSummary?.totalBlocked30d ?? detectionSummary?.total_blocked_30d ?? 0
-        const cleaned30d = detectionSummary?.totalCleaned30d ?? detectionSummary?.total_cleaned_30d ?? 0
-        const allowed30d = detectionSummary?.totalAllowed30d ?? detectionSummary?.total_allowed_30d ?? 0
-        const hasActiveThreats = detectionSummary?.hasActiveThreats ?? detectionSummary?.has_active_threats ?? false
-
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
-                    hasActiveThreats
-                      ? 'bg-red-100 dark:bg-red-900'
-                      : hasDetections
-                        ? 'bg-amber-100 dark:bg-amber-900'
-                        : 'bg-green-100 dark:bg-green-900'
-                  }`}>
-                    {hasActiveThreats
-                      ? <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                      : hasDetections
-                        ? <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                        : <ShieldCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    }
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Threat Detections</h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {hasDetections
-                        ? `${detections.length} detection${detections.length !== 1 ? 's' : ''} from AV/EDR products (last 30 days)`
-                        : 'No threats detected in the last 30 days'
-                      }
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Summary bar when there are detections */}
-              {hasDetections && (total30d > 0 || blocked30d > 0 || cleaned30d > 0) && (
-                <div className="mt-3 flex items-center gap-4 text-xs">
-                  <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
-                    {total30d} total
-                  </span>
-                  {blocked30d > 0 && (
-                    <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
-                      <Shield className="w-3 h-3" />
-                      {blocked30d} blocked
-                    </span>
-                  )}
-                  {cleaned30d > 0 && (
-                    <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
-                      <CheckCircle className="w-3 h-3" />
-                      {cleaned30d} cleaned
-                    </span>
-                  )}
-                  {allowed30d > 0 && (
-                    <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
-                      <XCircle className="w-3 h-3" />
-                      {allowed30d} allowed
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
-            
-            {hasDetections ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Threat</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Severity</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Category</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Detected</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Path / Process</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                  {detections.map((d: any, idx: number) => (
-                    <tr 
-                      key={`${d.threatId || d.threatName || idx}-${idx}`}
-                      className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30"
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                        {d.threatName || 'Unknown Threat'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${severityColor(d.severity)}`}>
-                          {d.severity || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
-                        {d.category || '—'}
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center gap-1 text-gray-700 dark:text-gray-300">
-                          {statusIcon(d.status)}
-                          {d.status || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
-                          {d.source || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {d.detectedAt ? formatDate(d.detectedAt) : '—'}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs max-w-xs truncate" title={d.filePath || d.processName || ''}>
-                        {d.filePath || d.processName || '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            ) : (
-              <div className="px-5 py-8 text-center">
-                <ShieldCheck className="w-10 h-10 mx-auto text-green-500 dark:text-green-400 mb-3" />
-                <p className="text-sm font-medium text-gray-900 dark:text-white">No Threats Detected</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  No malware, PUA, or security alerts in the last 30 days
-                </p>
-              </div>
-            )}
-          </div>
-        )
-      })()}
-
       {/* Common Vulnerabilities and Exposures (CVE) Table */}
       {(() => {
         // Get CVE data from security - support both SOFA (Mac) and Windows Update formats
@@ -1587,21 +1420,19 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         })
         
         return (
-          <div className="mt-6 bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* CVE Table Header */}
-            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-800">
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg ${unpatchedCves.length > 0 ? 'bg-red-100 dark:bg-red-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${unpatchedCves.length > 0 ? 'bg-red-100 dark:bg-red-900' : 'bg-green-100 dark:bg-green-900'}`}>
                     {unpatchedCves.length > 0 
                       ? <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
                       : <CheckCircle className="w-5 h-5 text-green-600 dark:text-green-400" />
                     }
                   </div>
                   <div>
-                    <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-                      Common Vulnerabilities and Exposures
-                    </h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Common Vulnerabilities and Exposures</h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {isMac ? 'SOFA Security Intelligence' : 'Windows Security Updates'} • {unpatchedCves.length > 0 ? `${unpatchedCves.length} unpatched` : 'All patched'}{patchedCves.length > 0 ? ` • ${patchedCves.length} patched` : ''}
                     </p>
@@ -1776,6 +1607,243 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     ? 'This device is running a fully patched version of macOS'
                     : 'This device has all available security updates installed'
                   }
+                </p>
+              </div>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Threat Detections Table - Alerts from all AV/EDR products */}
+      {(() => {
+        const detections = security?.detections || []
+        const detectionSummary = security?.detectionSummary
+        const hasDetections = Array.isArray(detections) && detections.length > 0
+
+        const severityColor = (severity: string) => {
+          switch (severity?.toLowerCase()) {
+            case 'severe': return 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+            case 'high': return 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400'
+            case 'moderate': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+            case 'low': return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+            default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
+          }
+        }
+
+        const statusIcon = (status: string) => {
+          switch (status?.toLowerCase()) {
+            case 'cleaned':
+            case 'removed':
+            case 'quarantined':
+            case 'blocked':
+            case 'remediated':
+              return <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+            case 'detected':
+            case 'actiontaken':
+              return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />
+            case 'allowed':
+            case 'missed':
+            case 'remediationfailed':
+              return <XCircle className="w-3.5 h-3.5 text-red-500" />
+            default:
+              return <AlertTriangle className="w-3.5 h-3.5 text-gray-400" />
+          }
+        }
+        
+        // Summary stats from collection or computed locally
+        const total30d = detectionSummary?.totalDetections30d ?? detectionSummary?.total_detections_30d ?? detections.length
+        const blocked30d = detectionSummary?.totalBlocked30d ?? detectionSummary?.total_blocked_30d ?? 0
+        const cleaned30d = detectionSummary?.totalCleaned30d ?? detectionSummary?.total_cleaned_30d ?? 0
+        const allowed30d = detectionSummary?.totalAllowed30d ?? detectionSummary?.total_allowed_30d ?? 0
+        const hasActiveThreats = detectionSummary?.hasActiveThreats ?? detectionSummary?.has_active_threats ?? false
+
+        return (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                    hasActiveThreats
+                      ? 'bg-red-100 dark:bg-red-900'
+                      : hasDetections
+                        ? 'bg-amber-100 dark:bg-amber-900'
+                        : 'bg-green-100 dark:bg-green-900'
+                  }`}>
+                    {hasActiveThreats
+                      ? <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                      : hasDetections
+                        ? <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                        : <ShieldCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+                    }
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Threat Detections</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {hasDetections
+                        ? `${detections.length} detection${detections.length !== 1 ? 's' : ''} from AV/EDR products (last 30 days)`
+                        : 'No threats detected in the last 30 days'
+                      }
+                    </p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Summary bar when there are detections */}
+              {hasDetections && (total30d > 0 || blocked30d > 0 || cleaned30d > 0) && (
+                <div className="mt-3 flex items-center gap-4 text-xs">
+                  <span className="inline-flex items-center gap-1 text-gray-600 dark:text-gray-400">
+                    {total30d} total
+                  </span>
+                  {blocked30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                      <Shield className="w-3 h-3" />
+                      {blocked30d} blocked
+                    </span>
+                  )}
+                  {cleaned30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-green-600 dark:text-green-400">
+                      <CheckCircle className="w-3 h-3" />
+                      {cleaned30d} cleaned
+                    </span>
+                  )}
+                  {allowed30d > 0 && (
+                    <span className="inline-flex items-center gap-1 text-red-600 dark:text-red-400">
+                      <XCircle className="w-3 h-3" />
+                      {allowed30d} allowed
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {hasDetections ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Threat</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Severity</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Category</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Detected</th>
+                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Path / Process</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                  {detections.map((d: any, idx: number) => {
+                    const isExpanded = expandedDetections.has(idx)
+                    const hasDetails = d.filePath || d.processName || d.user || d.description || d.threatId
+                    const toggleExpand = () => {
+                      setExpandedDetections(prev => {
+                        const next = new Set(prev)
+                        if (next.has(idx)) next.delete(idx)
+                        else next.add(idx)
+                        return next
+                      })
+                    }
+                    return (
+                      <React.Fragment key={`${d.threatId || d.threatName || idx}-${idx}`}>
+                        <tr 
+                          className={`border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-900/30 ${hasDetails ? 'cursor-pointer' : ''}`}
+                          onClick={hasDetails ? toggleExpand : undefined}
+                        >
+                          <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+                            <div className="flex items-center gap-2">
+                              {hasDetails && (
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                              )}
+                              <span className="truncate">{d.threatName || 'Unknown Threat'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${severityColor(d.severity)}`}>
+                              {d.severity || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
+                            {d.category || '\u2014'}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1 text-gray-700 dark:text-gray-300">
+                              {statusIcon(d.status)}
+                              {d.status || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-400">
+                              {d.source || 'Unknown'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                            {d.detectedAt ? formatDate(d.detectedAt) : '\u2014'}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs max-w-xs truncate" title={d.filePath || d.processName || ''}>
+                            {d.filePath || d.processName || '\u2014'}
+                          </td>
+                        </tr>
+                        {isExpanded && hasDetails && (
+                          <tr className="bg-gray-50 dark:bg-gray-900/40">
+                            <td colSpan={7} className="px-6 py-3">
+                              <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm max-w-3xl">
+                                {d.threatId && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Rule ID</span>
+                                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{d.threatId}</span>
+                                  </>
+                                )}
+                                {d.filePath && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Path</span>
+                                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300 break-all">{d.filePath}</span>
+                                  </>
+                                )}
+                                {d.processName && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Process</span>
+                                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300 break-all">{d.processName}</span>
+                                  </>
+                                )}
+                                {d.user && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">User</span>
+                                    <span className="text-gray-700 dark:text-gray-300">{d.user}</span>
+                                  </>
+                                )}
+                                {d.actionTaken && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Action</span>
+                                    <span className="text-gray-700 dark:text-gray-300">{d.actionTaken}</span>
+                                  </>
+                                )}
+                                {d.description && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Details</span>
+                                    <span className="text-gray-700 dark:text-gray-300 break-all">{d.description}</span>
+                                  </>
+                                )}
+                                {d.eventId && (
+                                  <>
+                                    <span className="text-gray-500 dark:text-gray-400">Event ID</span>
+                                    <span className="font-mono text-xs text-gray-700 dark:text-gray-300">{d.eventId}</span>
+                                  </>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            ) : (
+              <div className="px-5 py-8 text-center">
+                <ShieldCheck className="w-10 h-10 mx-auto text-green-500 dark:text-green-400 mb-3" />
+                <p className="text-sm font-medium text-gray-900 dark:text-white">No Threats Detected</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  No malware, PUA, or security alerts in the last 30 days
                 </p>
               </div>
             )}
