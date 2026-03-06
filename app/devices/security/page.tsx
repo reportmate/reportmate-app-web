@@ -299,6 +299,19 @@ function SecurityPageContent() {
   const [certSearchPerformed, setCertSearchPerformed] = useState(false)
   const [selectedCertName, setSelectedCertName] = useState<string | null>(null)
 
+  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter)
+
+  const clearWidgetFilters = () => {
+    setEncryptionFilter('')
+    setProtectionFilter('')
+    setDetectionFilter('')
+    setFirewallFilter('')
+    setTamperingFilter('')
+    setRemoteFilter('')
+    setCertFilter('')
+    setCveFilter('')
+  }
+
   // ============ DATA FETCHING ============
 
   useEffect(() => {
@@ -490,6 +503,14 @@ function SecurityPageContent() {
     usages: [...new Set(devices.map(d => d.usage).filter(Boolean))].sort() as string[],
   }
 
+  // Compute device count per location for proportional pill sizing
+  const locationCounts = devices.reduce((acc, d) => {
+    if (d.location) {
+      acc[d.location] = (acc[d.location] || 0) + 1
+    }
+    return acc
+  }, {} as Record<string, number>)
+
   // ============ FILTERED + SORTED DATA ============
 
   const filteredDevices = devices.filter(d => {
@@ -564,6 +585,8 @@ function SecurityPageContent() {
   // ============ CHART COLORS ============
 
   const greenRed: Record<string, string> = { 'Encrypted': '#22c55e', 'Not Encrypted': '#ef4444', 'Enabled': '#22c55e', 'Disabled': '#ef4444', 'Active': '#22c55e', 'Inactive': '#ef4444', 'Secured': '#22c55e', 'Unsecured': '#ef4444' }
+  const detectionColors: Record<string, string> = { 'Clean': '#22c55e', 'Threats Detected': '#ef4444' }
+  const firewallColors: Record<string, string> = { 'Enabled': '#22c55e', 'Disabled': '#94a3b8' }
   const protColors: Record<string, string> = { 'Current': '#22c55e', 'Out of Date': '#f59e0b', 'Disabled': '#ef4444' }
   const remoteColors: Record<string, string> = { 'SSH + RDP': '#3b82f6', 'SSH Only': '#22c55e', 'RDP Only': '#f59e0b', 'SSH Enabled': '#22c55e', 'Disabled': '#94a3b8' }
   const certColors: Record<string, string> = { 'Valid': '#22c55e', 'Expiring Soon': '#f59e0b', 'Has Expired': '#ef4444' }
@@ -648,7 +671,29 @@ function SecurityPageContent() {
             onSearchChange={setSearchQuery}
             expanded={effectiveFiltersExpanded}
             onToggle={() => setFiltersExpanded(!effectiveFiltersExpanded)}
+            locationCounts={locationCounts}
           />
+
+          {/* Yellow Clear Filters Bar */}
+          {hasActiveWidgetFilter && (
+            <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                </svg>
+                <span className="font-medium">Filters Active</span>
+                <span className="text-yellow-600 dark:text-yellow-300">
+                  {[encryptionFilter, protectionFilter, detectionFilter, firewallFilter, tamperingFilter, remoteFilter, certFilter, cveFilter].filter(Boolean).join(', ')}
+                </span>
+              </div>
+              <button
+                onClick={clearWidgetFilters}
+                className="px-3 py-1 text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 rounded-lg transition-colors"
+              >
+                Clear Filters
+              </button>
+            </div>
+          )}
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
@@ -666,8 +711,8 @@ function SecurityPageContent() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <MiniDonut title="Encryption" data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setEncryptionFilter} activeFilter={encryptionFilter} />
                   <MiniDonut title="Protection" data={Object.entries(protectionCounts).map(([label, value]) => ({ label, value }))} colors={protColors} onFilter={setProtectionFilter} activeFilter={protectionFilter} />
-                  <MiniDonut title="Detection" data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setDetectionFilter} activeFilter={detectionFilter} />
-                  <MiniDonut title="Firewall" data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setFirewallFilter} activeFilter={firewallFilter} />
+                  <MiniDonut title="Detection" data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={detectionColors} onFilter={setDetectionFilter} activeFilter={detectionFilter} />
+                  <MiniDonut title="Firewall" data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={firewallColors} onFilter={setFirewallFilter} activeFilter={firewallFilter} />
                   <MiniDonut title="Tampering" data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />
                   <MiniDonut title="Access" data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />
                   <MiniDonut title="Certificates" data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />
@@ -684,7 +729,7 @@ function SecurityPageContent() {
               className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Certificate Search</span>
+                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Certificates</span>
                 {selectedCertName && (
                   <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                     Filtering: {selectedCertName}

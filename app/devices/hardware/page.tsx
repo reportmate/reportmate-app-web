@@ -38,9 +38,7 @@ interface HardwareRecord {
   motherboard?: any
   architecture?: string
   assetTag?: string
-  raw?: any
   gpu?: any[] | object | string | any
-  cpu?: string | object | any
   model?: string
   manufacturer?: string
   inventory?: {
@@ -94,7 +92,8 @@ function HardwarePageContent() {
     usages: string[]
     catalogs: string[]
     locations: string[]
-  }>({ usages: [], catalogs: [], locations: [] })
+    locationCounts: Record<string, number>
+  }>({ usages: [], catalogs: [], locations: [], locationCounts: {} })
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -210,8 +209,7 @@ function HardwarePageContent() {
         if (Array.isArray(hardwareData)) {
           // Process hardware data to include inventory and status
           const processedData = hardwareData.map((h: any) => {
-            // Extract inventory from modules or raw
-            const inventory = h.modules?.inventory || h.raw?.inventory || h.inventory || {}
+            const inventory = h.inventory || {}
             // Calculate device status from lastSeen
             const now = new Date()
             const lastSeen = h.lastSeen ? new Date(h.lastSeen) : null
@@ -243,10 +241,17 @@ function HardwarePageContent() {
             if (h.inventory?.location) locations.add(h.inventory.location)
           })
           
+          // Build location counts for proportional sizing
+          const locCounts: Record<string, number> = {}
+          processedData.forEach((h: any) => {
+            const loc = h.inventory?.location
+            if (loc) locCounts[loc] = (locCounts[loc] || 0) + 1
+          })
           setFilterOptions({
             usages: Array.from(usages).sort(),
             catalogs: Array.from(catalogs).sort(),
-            locations: Array.from(locations).sort()
+            locations: Array.from(locations).sort(),
+            locationCounts: locCounts
           })
         } else {
           throw new Error('Invalid hardware API response format')
@@ -267,10 +272,8 @@ function HardwarePageContent() {
     
     if (hardwareRecord.architecture) {
       architecture = hardwareRecord.architecture
-    } else if (hardwareRecord.raw?.processor?.architecture) {
-      architecture = hardwareRecord.raw.processor.architecture
-    } else if (hardwareRecord.raw?.architecture) {
-      architecture = hardwareRecord.raw.architecture
+    } else if (typeof hardwareRecord.processor === 'object' && hardwareRecord.processor?.architecture) {
+      architecture = hardwareRecord.processor.architecture
     }
     
     const processorText = (hardwareRecord.processor || '').toString().toLowerCase()
@@ -293,30 +296,17 @@ function HardwarePageContent() {
       }
     }
     
-    const modules = hardwareRecord.raw?.modules || {}
     let memory = hardwareRecord.memory
-    if (!memory || memory === 'Unknown') {
-      memory = modules?.hardware?.memory || hardwareRecord.raw?.memory || modules?.system?.hardwareInfo?.memory
-    }
 
     let graphics = hardwareRecord.graphics || hardwareRecord.gpu
-    if (!graphics || graphics === 'Unknown') {
-      graphics = modules?.hardware?.graphics || hardwareRecord.raw?.graphics
-    }
 
     let processor = hardwareRecord.processor || hardwareRecord.cpu
     let processorCores = hardwareRecord.processorCores
     let processorSpeed = hardwareRecord.processorSpeed
 
-    if (!processor || processor === 'Unknown') {
-      const sourceProcessor = modules?.hardware?.processor || hardwareRecord.raw?.processor || modules?.system?.hardwareInfo?.processor
-      if (sourceProcessor) {
-        processor = sourceProcessor
-        if (typeof sourceProcessor === 'object') {
-          if (!processorCores) processorCores = sourceProcessor.cores || sourceProcessor.core_count || sourceProcessor.logicalCores
-          if (!processorSpeed) processorSpeed = sourceProcessor.speed || sourceProcessor.frequency || sourceProcessor.currentSpeed
-        }
-      }
+    if (typeof processor === 'object' && processor !== null) {
+      if (!processorCores) processorCores = (processor as any).cores || (processor as any).core_count || (processor as any).logicalCores
+      if (!processorSpeed) processorSpeed = (processor as any).speed || (processor as any).frequency || (processor as any).currentSpeed
     }
 
     return {
@@ -324,7 +314,6 @@ function HardwarePageContent() {
       deviceName: hardwareRecord.deviceName || hardwareRecord.serialNumber,
       assetTag: hardwareRecord.assetTag,
       architecture,
-      modules,
       memory,
       graphics,
       processor,
@@ -361,7 +350,7 @@ function HardwarePageContent() {
   }
 
   const getDeviceModel = (h: any): string => {
-    return h.model || h.raw?.model || h.raw?.system?.hardwareInfo?.model || h.raw?.hardware?.model || 'Unknown Model'
+    return h.model || 'Unknown Model'
   }
 
   const categorizeDeviceType = (model: string): string => {
@@ -379,8 +368,8 @@ function HardwarePageContent() {
   }
 
   const getDeviceType = (h: any): string => {
-    const model = h?.model || h?.modules?.hardware?.model || h?.modules?.system?.hardwareInfo?.model ||
-                 h?.raw?.model || h?.raw?.system?.hardwareInfo?.model || h?.raw?.hardware?.model || 'Unknown Model'
+    const model = h?.model ||
+                 'Unknown Model'
     return categorizeDeviceType(model)
   }
 
@@ -389,7 +378,7 @@ function HardwarePageContent() {
   }
 
   const getStorageRange = (device: any): string => {
-    const storage = device.modules?.hardware?.storage || device.storage
+    const storage = device.storage
     if (!Array.isArray(storage)) return 'Unknown'
     const totalBytes = storage.reduce((sum, drive) => sum + (typeof (drive.size || drive.capacity) === 'number' ? (drive.size || drive.capacity) : 0), 0)
     const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))
@@ -404,7 +393,7 @@ function HardwarePageContent() {
   }
 
   const getProcessorName = (device: any): string => {
-    const processor = device.processor || device.modules?.hardware?.processor || device.raw?.processor || 'Unknown Processor'
+    const processor = device.processor || 'Unknown Processor'
     let name = ''
     if (typeof processor === 'string') name = processor
     else if (typeof processor === 'object' && processor !== null) name = processor.name || processor.model || processor.brand || 'Unknown Processor'
@@ -443,7 +432,7 @@ function HardwarePageContent() {
   }
 
   const getGraphicsName = (device: any): string => {
-    const graphics = device.modules?.hardware?.graphics || device.graphics
+    const graphics = device.graphics
     let name = ''
     if (typeof graphics === 'string') name = graphics
     else if (Array.isArray(graphics) && graphics.length > 0) {
@@ -505,7 +494,7 @@ function HardwarePageContent() {
   }
 
   // Helper to get inventory data
-  const getInventory = (device: any) => device.raw?.inventory || device.inventory || {}
+  const getInventory = (device: any) => device.inventory || {}
 
   const filteredHardware = processedHardware.filter(h => {
     if (globalPlatformFilter) {
@@ -695,9 +684,12 @@ function HardwarePageContent() {
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
                     <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                      {filterOptions.locations.map(location => (
-                        <button key={location} onClick={() => toggleLocation(location)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedLocations.includes(location) ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{location}</button>
-                      ))}
+                      {(() => { const maxCount = Math.max(...Object.values(filterOptions.locationCounts).map(Number), 1); return filterOptions.locations.map(location => {
+                        const count = filterOptions.locationCounts[location] || 0
+                        const scale = count / maxCount
+                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
+                        return <button key={location} onClick={() => toggleLocation(location)} title={`${location} (${count} devices)`} className={`${sizeClass} rounded-full border transition-colors ${selectedLocations.includes(location) ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{location}</button>
+                      })})()}
                     </div>
                   </div>
                 )}
@@ -761,7 +753,7 @@ function HardwarePageContent() {
                     <tr key={hw.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 w-56"><div className="flex flex-col justify-center min-w-0"><Link href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`} className="group block min-w-0" title={hw.deviceName || hw.serialNumber || 'Unknown Device'}><span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-sm leading-tight block truncate">{hw.deviceName || hw.serialNumber || 'Unknown Device'}</span></Link><div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight"><span className="truncate max-w-32">{hw.serialNumber}</span><button onClick={() => copyToClipboard(hw.serialNumber)} className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0" title="Copy serial number"><Copy size={10} /></button>{hw.assetTag && <><span>|</span><span className="truncate max-w-20">{hw.assetTag}</span></>}</div></div></td>
                       <td className="px-4 py-3 w-40" style={{ maxWidth: '160px' }}>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{hw.manufacturer || hw.raw?.manufacturer || ''}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{hw.manufacturer || ''}</div>
                         <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">
                           {getDeviceModel(hw)}
                         </FitText>
@@ -772,7 +764,7 @@ function HardwarePageContent() {
                         </FitText>
                         {hw.processorCores && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.processorCores} cores{hw.processorSpeed && ` ${hw.processorSpeed}`}</div>}
                       </td>
-                      <td className="px-4 py-3 w-32" style={{ maxWidth: '128px' }}>{(() => { const g = hw.gpu || hw.graphics || hw.raw?.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
+                      <td className="px-4 py-3 w-32" style={{ maxWidth: '128px' }}>{(() => { const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
                       <td className="px-4 py-3 w-24"><div className="text-sm text-gray-900 dark:text-white">{formatMemory(hw.memory)}</div>{hw.memoryModules?.length > 0 && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.memoryModules.length} modules</div>}</td>
                       <td className="px-4 py-3 w-24">{(() => { const s = formatStorage(hw.storage); return <div><div className="text-sm text-gray-900 dark:text-white">{s.total}</div>{s.free && <div className="text-xs text-gray-500 dark:text-gray-400">{s.free} free</div>}</div>; })()}</td>
                       <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>

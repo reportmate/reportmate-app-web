@@ -19,6 +19,8 @@ export const dynamic = 'force-dynamic'
 interface FilterOptions {
   managedInstalls: string[]
   otherInstalls: string[]
+  cimianInstalls?: string[]
+  munkiInstalls?: string[]
   totalManagedInstalls: number
   totalOtherInstalls: number
   usages: string[]
@@ -496,24 +498,38 @@ function InstallsPageContent() {
         const config = cimianConfig || munkiConfig
         const isCimian = !!cimianConfig
         
-        // Get items and count by status
-        const items = config?.items || []
+        // Use pre-computed item counts from API (falls back to counting items if available)
+        const counts = config?.itemCounts
         let installedCount = 0
         let pendingCount = 0
         let errorCount = 0
         let warningCount = 0
         let removedCount = 0
+        let totalPackages = 0
         
-        items.forEach((item: any) => {
-          const classification = classifyItemStatus(item)
-          switch (classification) {
-            case 'installed': installedCount++; break
-            case 'pending': pendingCount++; break
-            case 'error': errorCount++; break
-            case 'warning': warningCount++; break
-            case 'removed': removedCount++; break
-          }
-        })
+        if (counts) {
+          // Use server-side pre-computed counts
+          installedCount = counts.installed || 0
+          pendingCount = counts.pending || 0
+          errorCount = counts.error || 0
+          warningCount = counts.warning || 0
+          removedCount = counts.removed || 0
+          totalPackages = counts.total || 0
+        } else if (config?.items) {
+          // Fallback: count from items array (legacy responses)
+          const items = config.items || []
+          totalPackages = items.length
+          items.forEach((item: any) => {
+            const classification = classifyItemStatus(item)
+            switch (classification) {
+              case 'installed': installedCount++; break
+              case 'pending': pendingCount++; break
+              case 'error': errorCount++; break
+              case 'warning': warningCount++; break
+              case 'removed': removedCount++; break
+            }
+          })
+        }
         
         // Get most recent session
         const sessions = config?.sessions || []
@@ -538,7 +554,7 @@ function InstallsPageContent() {
           softwareRepoUrl: cimianConfig?.config?.SoftwareRepoURL || munkiConfig?.softwareRepoURL || 'N/A',
           version: config?.version || 'N/A',
           lastSessionStatus: latestSession?.status || 'N/A',
-          totalPackagesManaged: items.length,
+          totalPackagesManaged: totalPackages,
           // Item counts by status
           installedCount,
           pendingCount,
@@ -1289,6 +1305,20 @@ function InstallsPageContent() {
       rooms: Array.from(rooms).sort()
     }
   }, [installs])
+
+  // Compute room counts for proportional pill sizing
+  const roomCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    if (installs.length > 0) {
+      installs.forEach(install => { if (install.room) counts[install.room] = (counts[install.room] || 0) + 1 })
+    } else {
+      platformFilteredDevices.forEach((d: any) => {
+        const loc = d?.modules?.inventory?.location
+        if (loc) counts[loc] = (counts[loc] || 0) + 1
+      })
+    }
+    return counts
+  }, [installs, platformFilteredDevices])
 
   // Check if we have any Munki or Cimian installations
   const hasMunkiInstalls = useMemo(() => {
@@ -3137,10 +3167,20 @@ function InstallsPageContent() {
                     )}
                   </div>
                   <div className="flex flex-wrap gap-1.5">
-                    {[...(filterOptions.managedInstalls || []), ...(filterOptions.otherInstalls || [])]
-                      .filter(install => install.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
-                      .map(install => (
+                    {(() => {
+                      // Scope items list based on platform filter
+                      let items: string[]
+                      if (platformFilter === 'Windows' && filterOptions.cimianInstalls?.length) {
+                        items = filterOptions.cimianInstalls
+                      } else if (platformFilter === 'macOS' && filterOptions.munkiInstalls?.length) {
+                        items = filterOptions.munkiInstalls
+                      } else {
+                        items = [...(filterOptions.managedInstalls || []), ...(filterOptions.otherInstalls || [])]
+                      }
+                      return items
+                        .filter(install => install.toLowerCase().includes(searchQuery.toLowerCase()))
+                        .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
+                        .map(install => (
                         <button
                           key={install}
                           onClick={() => toggleInstall(install)}
@@ -3152,7 +3192,7 @@ function InstallsPageContent() {
                         >
                           {install}
                         </button>
-                      ))}
+                      ))})()}
                   </div>
                 </div>
                 )}
@@ -3292,11 +3332,16 @@ function InstallsPageContent() {
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                      {filteredRooms.map((room: string) => (
+                      {(() => { const maxCount = Math.max(...filteredRooms.map((r: string) => roomCounts[r] || 0), 1); return filteredRooms.map((room: string) => {
+                        const count = roomCounts[room] || 0
+                        const scale = count / maxCount
+                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
+                        return (
                         <button
                           key={room}
                           onClick={() => toggleRoom(room)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                          title={`${room} (${count} devices)`}
+                          className={`${sizeClass} rounded-full border transition-colors ${
                             selectedRooms.includes(room)
                               ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -3304,7 +3349,8 @@ function InstallsPageContent() {
                         >
                           {room}
                         </button>
-                      ))}
+                        )
+                      })})()}
                   </div>
                 </div>
                   )
@@ -3979,9 +4025,9 @@ function InstallsPageContent() {
                                         ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
                                         : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
                                   }`}
-                                  title={`${pkg.itemName}: ${pkg.currentStatus}`}
+                                  title={`${pkg.itemName || pkg.name || pkg.displayName}: ${pkg.currentStatus || pkg.status}`}
                                 >
-                                  {pkg.itemName}
+                                  {pkg.itemName || pkg.name || pkg.displayName}
                                 </span>
                               ))}
                               {affectedPackages.length > 5 && (

@@ -167,6 +167,14 @@ function NetworkPageContent() {
     )).sort() as string[]
   }
 
+  // Compute location counts for proportional pill sizing
+  const locationCounts = devices.reduce((acc: Record<string, number>, d: any) => {
+    const loc = d.modules?.inventory?.location
+    if (loc) acc[loc] = (acc[loc] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+  const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
+
   // Calculate wireless statistics for widgets
   const wirelessStats = {
     // Wireless State counts
@@ -641,11 +649,16 @@ function NetworkPageContent() {
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
                     <div className="flex flex-wrap gap-2">
-                      {filterOptions.locations.map(location => (
+                      {filterOptions.locations.map(location => {
+                        const count = locationCounts[location] || 0
+                        const scale = count / maxLocationCount
+                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
+                        return (
                         <button
                           key={location}
                           onClick={() => toggleLocation(location)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          title={`${location} (${count} devices)`}
+                          className={`${sizeClass} rounded-full border transition-colors ${
                             selectedLocations.includes(location)
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
                               : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
@@ -653,7 +666,8 @@ function NetworkPageContent() {
                         >
                           {location}
                         </button>
-                      ))}
+                        )
+                      })}
                     </div>
                   </div>
                 )}

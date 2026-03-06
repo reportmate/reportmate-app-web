@@ -131,6 +131,8 @@ interface UtilizationData {
 
 interface FilterOptions {
   applicationNames: string[]
+  windowsApplicationNames?: string[]
+  macApplicationNames?: string[]
   usages: string[]
   catalogs: string[]
   rooms: string[]
@@ -502,6 +504,8 @@ function ApplicationsPageContent() {
             
             setFilterOptions({
               applicationNames: data.applicationNames || [],
+              windowsApplicationNames: data.windowsApplicationNames,
+              macApplicationNames: data.macApplicationNames,
               usages: data.usages || [],
               catalogs: data.catalogs || [],
               locations: data.locations || [],
@@ -656,6 +660,8 @@ function ApplicationsPageContent() {
         
         setFilterOptions({
           applicationNames: data.applicationNames || [],
+          windowsApplicationNames: data.windowsApplicationNames,
+          macApplicationNames: data.macApplicationNames,
           usages,
           catalogs,
           locations,
@@ -1227,12 +1233,20 @@ function ApplicationsPageContent() {
 
   // Filter applications dropdown based on search and sort by popularity
   const filteredApplicationNames = useMemo(() => {
-    // Since filterOptions.applicationNames are already normalized, just filter by search
-    const result = filterOptions.applicationNames
+    // Scope application names based on platform filter
+    let names: string[]
+    if (platformFilter === 'Windows' && filterOptions.windowsApplicationNames?.length) {
+      names = filterOptions.windowsApplicationNames
+    } else if (platformFilter === 'macOS' && filterOptions.macApplicationNames?.length) {
+      names = filterOptions.macApplicationNames
+    } else {
+      names = filterOptions.applicationNames
+    }
+    const result = names
       .filter(name => name.toLowerCase().includes(searchQuery.toLowerCase()))
-      .sort() // Alphabetical sort since we don't have counts without applications data
+      .sort()
     return result
-  }, [filterOptions.applicationNames, searchQuery])
+  }, [filterOptions.applicationNames, filterOptions.windowsApplicationNames, filterOptions.macApplicationNames, platformFilter, searchQuery])
 
   // Compute devices that are MISSING the selected applications
   // Filters: Apply same catalog/usage/location filters to find devices that SHOULD have the app but DON'T
@@ -1901,13 +1915,21 @@ function ApplicationsPageContent() {
                     </h3>
                   </div>
                   <div className="flex flex-wrap gap-1">
-                      {filterOptions.rooms
-                        .filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
-                        .map(room => (
+                      {(() => {
+                        const roomCountsMap: Record<string, number> = {}
+                        allDevices.forEach(d => { if (d.room) roomCountsMap[d.room] = (roomCountsMap[d.room] || 0) + 1 })
+                        const filteredRooms = filterOptions.rooms.filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
+                        const maxCount = Math.max(...filteredRooms.map(r => roomCountsMap[r] || 0), 1)
+                        return filteredRooms.map(room => {
+                          const count = roomCountsMap[room] || 0
+                          const scale = count / maxCount
+                          const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
+                          return (
                         <button
                           key={room}
                           onClick={() => toggleRoom(room)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                          title={`${room} (${count} devices)`}
+                          className={`${sizeClass} rounded-full border transition-colors ${
                             selectedRooms.includes(room)
                               ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
@@ -1915,7 +1937,9 @@ function ApplicationsPageContent() {
                         >
                           {room}
                         </button>
-                      ))}
+                          )
+                        })
+                      })()}
                       {filterOptions.rooms.length === 0 && (
                         <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
                           No location data available
