@@ -10,6 +10,11 @@
     "lint": "eslint --max-warnings=0 --cache --cache-location .eslintcache --ext .js,.jsx,.ts,.tsx .",
     "test": "jest",
     "test:e2e": "playwright test",
+    "test:api-health": "playwright test --project=api-health",
+    "test:api-endpoints": "playwright test --project=api-endpoints",
+    "test:routes": "playwright test --project=frontend-routes",
+    "test:api-prod": "cross-env TEST_ENV=production playwright test --project=api-health",
+    "test:all-prod": "cross-env TEST_ENV=production playwright test",
     "generate-icons": "node scripts/generate-icons.js"
   },
   "dependencies": {
