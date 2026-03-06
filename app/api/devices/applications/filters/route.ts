@@ -143,188 +143,60 @@ const CONTAINER_APPS_API_BASE = process.env.API_BASE_URL || 'http://reportmate-f
 export async function GET(request: Request) {
   try {
     const timestamp = new Date().toISOString()
-    const { headers: requestHeaders } = request
-    const host = requestHeaders.get('host') || ''
-    const _isLocalDev = host.includes('localhost')
     
-    
-    // PERFORMANCE FIX: Use FastAPI bulk applications endpoint instead of fetching each device individually
-    // This reduces 234 sequential API calls to just 2 calls (devices + applications)
-    
-    // Use internal API URL for container-to-container communication
+    // Use FastAPI server-side filters endpoint (SQL DISTINCT queries)
+    // This returns ~100KB instead of downloading 131MB of all application records
     const baseUrl = CONTAINER_APPS_API_BASE
     const headers = getInternalApiHeaders()
     
-    // 1. Fetch devices for inventory metadata
-    const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
+    const response = await fetch(`${baseUrl}/api/devices/applications/filters`, {
       method: 'GET',
       headers,
     })
 
-    if (!devicesResponse.ok) {
-      console.error('[APPLICATIONS FILTERS API] Failed to fetch devices:', devicesResponse.status, devicesResponse.statusText)
-      throw new Error(`Failed to fetch devices: ${devicesResponse.status}`)
+    if (!response.ok) {
+      console.error('[APPLICATIONS FILTERS API] Failed to fetch filters:', response.status, response.statusText)
+      throw new Error(`Failed to fetch application filters: ${response.status}`)
     }
 
-    const devicesData = await devicesResponse.json()
+    const data = await response.json()
     
-    if (!Array.isArray(devicesData.devices)) {
-      console.error('[APPLICATIONS FILTERS API] Invalid devices response:', devicesData)
-      throw new Error('Invalid devices response format')
-    }
-
-    
-    // 2. Fetch ALL applications using bulk endpoint (much faster than 234 individual calls)
-    const applicationsResponse = await fetch(`${baseUrl}/api/devices/applications?loadAll=true`, {
-      method: 'GET',
-      headers,
-    })
-
-    if (!applicationsResponse.ok) {
-      console.error('[APPLICATIONS FILTERS API] Failed to fetch applications:', applicationsResponse.status, applicationsResponse.statusText)
-      throw new Error(`Failed to fetch applications: ${applicationsResponse.status}`)
-    }
-
-    const applicationsData = await applicationsResponse.json()
-    
-    if (!Array.isArray(applicationsData)) {
-      console.error('[APPLICATIONS FILTERS API] Invalid applications response:', applicationsData)
-      throw new Error('Invalid applications response format')
-    }
-
-    
-    // Build devices array with inventory metadata AND group applications by device
-    const devicesMap = new Map()
-    const deviceAppsCount = new Map() // Track app count per device
-    
-    // Collect inventory filters from both devices and applications data
-    const usagesSet = new Set<string>()
-    const catalogsSet = new Set<string>()
-    const locationsSet = new Set<string>()
-    const roomsSet = new Set<string>()
-    const fleetsSet = new Set<string>()
-    
-    for (const device of devicesData.devices) {
-      if (!device.serialNumber || device.serialNumber.includes('TEST-') || device.serialNumber === 'localhost') {
-        continue
-      }
-
-      // Extract location from device inventory or direct device fields
-      const deviceLocation = device.location || device.inventory?.location || ''
-      const deviceUsage = device.usage || device.inventory?.usage || ''
-      const deviceCatalog = device.catalog || device.inventory?.catalog || ''
-      
-      // Add device-level inventory values to filter sets
-      if (deviceLocation) {
-        locationsSet.add(deviceLocation)
-        roomsSet.add(deviceLocation)
-      }
-      if (deviceUsage) usagesSet.add(deviceUsage)
-      if (deviceCatalog) catalogsSet.add(deviceCatalog)
-
-      devicesMap.set(device.serialNumber, {
-        id: device.deviceId || device.serial_number,
-        name: device.deviceName || device.name || device.serialNumber,
-        serialNumber: device.serialNumber,
-        usage: deviceUsage,
-        catalog: deviceCatalog,
-        location: deviceLocation,
-        room: deviceLocation,
-        fleet: '',
-        modules: {
-          applications: { installedApplications: [] }, // Will populate from bulk data
-          inventory: device.inventory || null
-        }
-      })
-      deviceAppsCount.set(device.serialNumber, 0)
-    }
-
-    // Process bulk applications and group by device
-    const applicationNames = new Set<string>()
+    // Normalize and filter application names (same logic as before)
     const normalizedAppNames = new Set<string>()
-    const publishers = new Set<string>()
-    const categories = new Set<string>()
-
-    for (const app of applicationsData) {
-      const deviceSerial = app.serialNumber
-      if (!deviceSerial) continue
-      
-      // Extract inventory filters from application data
-      if (app.usage) usagesSet.add(app.usage)
-      if (app.catalog) catalogsSet.add(app.catalog)
-      if (app.location) locationsSet.add(app.location)
-      if (app.location) roomsSet.add(app.location) // Room is typically stored in location field
-
-      // Add to device's applications array (reconstruct raw format from bulk data)
-      const device = devicesMap.get(deviceSerial)
-      if (device) {
-        // Convert bulk app format back to raw module format for consistency
-        const rawApp = app.raw || {
-          name: app.name,
-          displayName: app.name,
-          version: app.version,
-          publisher: app.publisher,
-          vendor: app.vendor,
-          category: app.category,
-          installDate: app.installDate,
-          size: app.size,
-          path: app.path,
-          architecture: app.architecture,
-          bundleId: app.bundleId
-        }
-        device.modules.applications.installedApplications.push(rawApp)
-        deviceAppsCount.set(deviceSerial, deviceAppsCount.get(deviceSerial)! + 1)
-      }
-
-      // Extract filter values
-      const appName = app.name || app.displayName
+    const rawNames: string[] = data.applicationNames || []
+    
+    for (const appName of rawNames) {
       if (appName && shouldIncludeApplication(appName)) {
-        applicationNames.add(appName)
         const normalized = normalizeAppName(appName)
         if (normalized) {
           normalizedAppNames.add(normalized)
         }
       }
-
-      if (app.publisher) publishers.add(app.publisher)
-      if (app.vendor) publishers.add(app.vendor)
-      if (app.category) categories.add(app.category)
     }
-
-    // Only include devices that have applications
-    const devices = Array.from(devicesMap.values()).filter(d => {
-      const appCount = deviceAppsCount.get(d.serialNumber) || 0
-      return appCount > 0
-    })
-
-    // Convert sets to sorted arrays
-    const usages = Array.from(usagesSet).filter(Boolean).sort()
-    const catalogs = Array.from(catalogsSet).filter(Boolean).sort()
-    const locations = Array.from(locationsSet).filter(Boolean).sort()
-    const rooms = Array.from(roomsSet).filter(Boolean).sort()
-    const fleets = Array.from(fleetsSet).filter(Boolean).sort()
     
-    const filterOptions = {
-      devices,
-      applicationNames: Array.from(normalizedAppNames).sort(),
-      publishers: Array.from(publishers).filter(p => p && p.trim()).sort(),
-      categories: Array.from(categories).filter(c => c && c.trim()).sort(),
-      versions: [],
-      // Inventory filters extracted from applications data
-      usages,
-      catalogs,
-      locations,
-      rooms,
-      fleets
-    }
+    // Filter publishers 
+    const filteredPublishers = (data.publishers || []).filter((p: string) => p && p.trim())
 
-        
+    const filterOptions = {
+      devices: data.devices || [],
+      applicationNames: Array.from(normalizedAppNames).sort(),
+      publishers: filteredPublishers.sort(),
+      categories: (data.categories || []).filter((c: string) => c && c.trim()).sort(),
+      versions: [],
+      usages: data.usages || [],
+      catalogs: data.catalogs || [],
+      locations: data.locations || [],
+      rooms: data.rooms || [],
+      fleets: data.fleets || [],
+      devicesWithData: data.devicesWithData || 0
+    }
+    
     return NextResponse.json(filterOptions, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',
         'Pragma': 'no-cache',
         'X-Fetched-At': timestamp,
-        'X-Data-Source': 'fastapi-bulk-endpoint'
+        'X-Data-Source': 'fastapi-filters-endpoint'
       }
     })
 
