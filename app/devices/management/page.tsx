@@ -33,7 +33,8 @@ interface Management {
   assetTag?: string
   location?: string
   department?: string
-  raw: any
+  autopilotConfig?: any
+  osName?: string
 }
 
 function LoadingSkeleton() {
@@ -279,8 +280,7 @@ function ManagementPageContent() {
             isEnrolled: mgmt.isEnrolled || false,
             // Detect platform from multiple sources (API field > OS name > provider heuristic)
             platform: mgmt.platform || 
-              mgmt.raw?.system?.operatingSystem?.name ||
-              mgmt.raw?.system?.operating_system?.name ||
+              mgmt.osName ||
               (provider === 'Apple' || provider === 'MicroMDM' || provider === 'NanoMDM' ||
                 provider === 'Mosyle' || provider === 'Kandji' ||
                 (provider && provider.toLowerCase().includes('jamf')) ? 'macOS' :
@@ -292,7 +292,8 @@ function ManagementPageContent() {
             assetTag: mgmt.assetTag,
             location: mgmt.location,
             department: mgmt.department,
-            raw: mgmt.raw || mgmt
+            autopilotConfig: mgmt.autopilotConfig,
+            osName: mgmt.osName
           }
         })
         
@@ -327,7 +328,7 @@ function ManagementPageContent() {
   // Matches table column logic exactly (no platform detection needed)
   const mdmBootstrapCounts = platformFilteredManagement.reduce((acc, curr) => {
     const et = curr.enrollmentType || ''
-    const autopilot = curr.raw?.autopilot_config || curr.raw?.autopilotConfig
+    const autopilot = curr.autopilotConfig
     
     if (autopilot?.activated === true || autopilot?.activated === 'true') {
       acc['Automated'] = (acc['Automated'] || 0) + 1
@@ -348,9 +349,17 @@ function ManagementPageContent() {
     areas: [], // Add areas when available in data
     locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
     fleets: [], // Add fleets when available in data  
-    platforms: [...new Set(management.map(m => m.raw?.system?.operatingSystem?.name || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
+    platforms: [...new Set(management.map(m => m.osName || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
     usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
   }
+
+  // Compute device count per location for proportional pill sizing
+  const locationCounts = management.reduce((acc, m) => {
+    if (m.location) {
+      acc[m.location] = (acc[m.location] || 0) + 1
+    }
+    return acc
+  }, {} as Record<string, number>)
 
   // Get unique providers with counts (filter out Unknown)
   const providers = Array.from(new Set(
@@ -391,8 +400,8 @@ function ManagementPageContent() {
 
     // Type filter - Automated vs Manual enrollment method
     if (typeFilter !== 'all') {
-      const autopilot = m.raw?.autopilot_config || m.raw?.autopilotConfig
-      const platform = m.raw?.system?.operatingSystem?.name || ''
+      const autopilot = m.autopilotConfig
+      const platform = m.osName || ''
       const isMac = platform.toLowerCase().includes('macos') || platform.toLowerCase().includes('mac os')
       
       if (typeFilter === 'Unmanaged') {
@@ -448,7 +457,7 @@ function ManagementPageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(m.usage || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(m.location || '')) return false
     if (selectedPlatforms.length > 0) {
-      const platform = m.raw?.system?.operatingSystem?.name || ''
+      const platform = m.osName || ''
       if (!selectedPlatforms.includes(platform)) return false
     }
     return true
@@ -944,6 +953,7 @@ function ManagementPageContent() {
             onSearchChange={setSearchQuery}
             expanded={effectiveFiltersExpanded}
             onToggle={() => setFiltersExpanded(!filtersExpanded)}
+            locationCounts={locationCounts}
           />
           
           {/* Widgets Accordion */}
@@ -1187,8 +1197,7 @@ function ManagementPageContent() {
                           {(() => {
                             // Determine enrollment bootstrap method from the enrollmentType field
                             // which the API already maps correctly for both Mac and Windows.
-                            // Do NOT use mgmt.raw?.system?.... - raw here is management data, not system data.
-                            const autopilot = mgmt.raw?.autopilotConfig || mgmt.raw?.autopilot_config
+                            const autopilot = mgmt.autopilotConfig
                             const et = mgmt.enrollmentType || ''
 
                             let displayType = '-'
