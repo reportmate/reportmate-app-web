@@ -20,6 +20,11 @@ export interface NetworkInfo {
   interfaceName?: string
   vpnName?: string
   vpnActive?: boolean
+  wirelessState?: string
+  wirelessSecurity?: string
+  securityType?: string
+  networkName?: string
+  localHostname?: string
   // Enhanced DNS and NETBIOS for active connection
   activeDnsServers?: string[]
   activeNetbiosName?: string

@@ -1,4 +1,4 @@
-export type EventSeverity = 'success' | 'warning' | 'error' | 'info'
+export type EventSeverity = 'success' | 'warning' | 'error' | 'info' | 'system'
 
 export function normalizeEventKind(kind: string): EventSeverity {
   const k = (kind || '').toLowerCase()
@@ -7,6 +7,7 @@ export function normalizeEventKind(kind: string): EventSeverity {
   if (k === 'success') return 'success'
   if (k === 'warning') return 'warning'
   if (k === 'error') return 'error'
+  if (k === 'system') return 'system'
   
   // Check for install-specific patterns
   if (k === 'install_success' || k === 'package_install_success') return 'success'
@@ -25,5 +26,6 @@ export function severityToBadgeClasses(sev: EventSeverity): string {
   if (sev === 'success') return 'bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-200 border border-green-200 dark:border-green-800'
   if (sev === 'warning') return 'bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-800'
   if (sev === 'error') return 'bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 border border-red-200 dark:border-red-800'
+  if (sev === 'system') return 'bg-purple-50 dark:bg-purple-900/20 text-purple-800 dark:text-purple-200 border border-purple-200 dark:border-purple-800'
   return 'bg-gray-50 dark:bg-gray-900/20 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-800'
 }
