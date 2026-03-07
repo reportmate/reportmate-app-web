@@ -264,6 +264,9 @@ export default function ClientDashboard() {
         
         setLastUpdateTime(new Date())
         
+        // Recover from transient error state on successful fetch
+        setConnectionStatus(prev => prev === 'error' ? 'polling' : prev)
+        
         // Prefetch installs data in background for faster navigation to /devices/installs
         // This starts loading the data that will be needed if user clicks on Errors/Warnings
         if (isInitialLoad) {
@@ -276,8 +279,10 @@ export default function ClientDashboard() {
             setDevices([])
             setInstallStats(null)
             setEvents([])
+            setConnectionStatus('error')
           }
-          setConnectionStatus('error')
+          // Non-initial refresh failures are transient — don't change
+          // connectionStatus since we still have valid data displaying
         }
       } finally {
         if (!aborted && isInitialLoad) {
