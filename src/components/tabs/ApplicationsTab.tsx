@@ -35,17 +35,6 @@ interface ActiveSession {
   durationSeconds: number
 }
 
-// macOS applicationUsage structure
-interface _MacApplicationUsage {
-  status?: string
-  captureMethod?: string
-  totalLaunches?: number
-  totalUsageSeconds?: number
-  activeSessions?: ActiveSession[]
-  windowStart?: string
-  windowEnd?: string
-  generatedAt?: string
-}
 
 interface ApplicationInfo {
   id: string;
@@ -138,11 +127,7 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
   const normalizedUsageData = normalizedApplicationsModule?.applicationUsage || normalizedApplicationsModule?.usage
   const usageData = rawUsageData || normalizedUsageData
   
-  // For macOS SQLiteWatcher, check captureMethod instead of isCaptureEnabled
-  const captureMethod = usageData?.captureMethod || usageData?.CaptureMethod
-  const isUsageAvailable = captureMethod === 'SQLiteWatcher' || usageData?.isCaptureEnabled || usageData?.IsCaptureEnabled || false
-  const _usageStatus = isUsageAvailable ? 'available' : (usageData?.status || usageData?.Status || 'unavailable')
-  
+
   // Get active sessions from macOS data — wrapped in useMemo for stable reference
   const activeSessions: ActiveSession[] = useMemo(
     () => usageData?.activeSessions || usageData?.ActiveSessions || [],
@@ -307,26 +292,6 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     return installDate > thirtyDaysAgo
   }).length
-
-  // Usage statistics
-  const _appsWithUsage = processedApps.filter((app: ApplicationInfo) => app.usage?.launchCount && app.usage.launchCount > 0).length
-  const _unusedApps = processedApps.filter((app: ApplicationInfo) => {
-    if (!app.usage?.lastUsed) return true
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    return new Date(app.usage.lastUsed) < thirtyDaysAgo
-  }).length
-  const _singleUserApps = processedApps.filter((app: ApplicationInfo) => app.usage?.uniqueUserCount === 1).length
-  const _totalUsageHours = processedApps.reduce((sum: number, app: ApplicationInfo) => 
-    sum + (app.usage?.totalSeconds || 0) / 3600, 0
-  )
-  
-  // Top apps by usage
-  const _topAppsByUsage = useMemo(() => {
-    return [...processedApps]
-      .filter((app: ApplicationInfo) => app.usage?.totalSeconds && app.usage.totalSeconds > 0)
-      .sort((a: ApplicationInfo, b: ApplicationInfo) => (b.usage?.totalSeconds || 0) - (a.usage?.totalSeconds || 0))
-      .slice(0, 5)
-  }, [processedApps])
 
   const applicationsData = useMemo(() => ({
     totalApps: filteredApps.length,
