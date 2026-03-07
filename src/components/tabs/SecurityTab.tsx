@@ -1717,8 +1717,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             </div>
             
             {hasDetections ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div>
+                <table className="w-full text-sm table-fixed">
+                  <colgroup>
+                    <col className="w-[40%]" />
+                    <col className="w-[10%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[12%]" />
+                    <col className="w-[13%]" />
+                    <col className="w-[13%]" />
+                  </colgroup>
                   <thead>
                     <tr className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-800">
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Threat</th>
@@ -1727,7 +1735,6 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Status</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Source</th>
                       <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Detected</th>
-                      <th className="px-4 py-3 text-left font-medium text-gray-600 dark:text-gray-400">Path / Process</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1749,11 +1756,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                           onClick={hasDetails ? toggleExpand : undefined}
                         >
                           <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-start gap-2 min-w-0">
                               {hasDetails && (
-                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
+                                <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 mt-0.5 ${isExpanded ? 'rotate-0' : '-rotate-90'}`} />
                               )}
-                              <span className="truncate">{d.threatName || 'Unknown Threat'}</span>
+                              <span className="break-words min-w-0">{d.threatName || 'Unknown Threat'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3">
@@ -1778,13 +1785,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                           <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
                             {d.detectedAt ? formatDate(d.detectedAt) : '\u2014'}
                           </td>
-                          <td className="px-4 py-3 text-gray-500 dark:text-gray-400 font-mono text-xs max-w-xs truncate" title={d.filePath || d.processName || ''}>
-                            {d.filePath || d.processName || '\u2014'}
-                          </td>
                         </tr>
                         {isExpanded && hasDetails && (
                           <tr className="bg-gray-50 dark:bg-gray-900/40">
-                            <td colSpan={7} className="px-6 py-3">
+                            <td colSpan={6} className="px-6 py-3">
                               <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 text-sm max-w-3xl">
                                 {d.threatId && (
                                   <>
