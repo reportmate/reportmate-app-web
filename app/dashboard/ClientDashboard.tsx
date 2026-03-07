@@ -167,7 +167,7 @@ export default function ClientDashboard() {
         }
         
         // Single consolidated API call
-        const response = await fetch('/api/dashboard?eventsLimit=200', { cache: 'no-store' })
+        const response = await fetch('/api/dashboard?eventsLimit=50', { cache: 'no-store' })
 
         if (!response.ok) {
           throw new Error(`Failed to load dashboard data: ${response.status}`)
@@ -177,6 +177,48 @@ export default function ClientDashboard() {
         
         // Process devices from consolidated response
         const rawDevices: any[] = Array.isArray(data?.devices) ? data.devices : []
+
+        // On background refresh, only update lastSeen/status (device metadata doesn't change often)
+        if (!isInitialLoad && rawDevices.length > 0) {
+          setDevices(prev => {
+            if (prev.length === 0) return prev // Will be populated by initial load
+            const lookup = new Map(rawDevices.map((d: any) => [d.serialNumber, d]))
+            let changed = false
+            const updated = prev.map(device => {
+              const fresh = lookup.get(device.serialNumber)
+              if (!fresh) return device
+              const newStatus = calculateDeviceStatus(fresh.lastSeen)
+              if (device.lastSeen !== fresh.lastSeen || device.status !== newStatus) {
+                changed = true
+                return { ...device, lastSeen: fresh.lastSeen, status: newStatus }
+              }
+              return device
+            })
+            // Check for new devices not in prev
+            if (rawDevices.length !== prev.length) {
+              changed = true
+            }
+            return changed ? updated : prev
+          })
+          
+          if (data.installStats) {
+            setInstallStats(data.installStats)
+          }
+          
+          // Merge new events
+          if (data.events && Array.isArray(data.events)) {
+            setEvents(prev => {
+              const existingIds = new Set(prev.map(e => e.id))
+              const newEvents = data.events.filter((e: FleetEvent) => !existingIds.has(e.id))
+              if (newEvents.length === 0) return prev
+              return [...newEvents, ...prev].slice(0, 200)
+            })
+          }
+          
+          setLastUpdateTime(new Date())
+          setConnectionStatus(prev => prev === 'error' ? 'polling' : prev)
+          return
+        }
 
         const transformedDevices: Device[] = rawDevices.map((apiDevice: any) => {
           const inventory = apiDevice.inventory || apiDevice.modules?.inventory || {}

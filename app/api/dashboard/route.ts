@@ -50,8 +50,12 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
     
-        
-    return NextResponse.json(data)
+    // Allow CDN/browser to serve stale data for 10s while revalidating in background
+    return NextResponse.json(data, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=20',
+      }
+    })
     
   } catch (error) {
     console.error('[DASHBOARD API] Error fetching dashboard data:', error)
