@@ -630,6 +630,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       installCount: item.install_count ?? item.installCount ?? 0,
       updateCount: item.update_count ?? item.updateCount ?? 0,
       itemSize: item.item_size || item.itemSize || '',
+      category: item.category || item.Category || '',
+      developer: item.developer || item.Developer || '',
       recentAttempts: item.recent_attempts || item.recentAttempts || []
     }))
       } 
