@@ -332,7 +332,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       enrollmentType = 'User Approved Enrollment'
       enrollmentTypeDetail = 'User manually approved MDM enrollment in System Settings'
     } else if (isEnrolled) {
-      enrollmentType = 'MDM Enrolled'
+      enrollmentType = 'Manual Enrollment'
     }
   } else if (isEnrolled) {
     if (autopilotConfig && parseBool(autopilotConfig.registered)) {
@@ -343,7 +343,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       const method = mdmEnrollment.enrollment_method || mdmEnrollment.enrollmentMethod
       enrollmentType = method || 'MDM Enrolled'
       const detailMap: Record<string, string> = {
-        'Auto-Enrolled':     'Entra join automatically triggered MDM enrollment',
+        'Auto-Enrolled':     'Entra join automatically triggered enrollment',
         'User-Enrolled':     'User manually enrolled via Windows Settings',
         'Bulk Enrolled':     'Enrolled via provisioning package or bulk token',
         'Co-Managed':        'Jointly managed by ConfigMgr and Microsoft Intune',
