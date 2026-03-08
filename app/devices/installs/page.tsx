@@ -218,27 +218,8 @@ function InstallsPageContent() {
       // Show loading state without specific numbers initially
       setLoadingProgress({ current: 0, total: 0 })
       
-      // Get estimated device count from a quick API call
-      let estimatedTotal = 0
-      try {
-        const countResponse = await fetch('/api/devices', { 
-          cache: 'no-store',
-          credentials: 'include',
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-        if (countResponse.ok) {
-          const countData = await countResponse.json()
-          if (countData.devices?.length) {
-            estimatedTotal = countData.devices.length
-                      }
-        }
-} catch {
-              }
-      
-      // Fallback if all else fails
-      if (estimatedTotal === 0) {
-        estimatedTotal = 100 // Conservative fallback
-      }
+      // Use a simple indeterminate progress while filters endpoint loads
+      let estimatedTotal = 100  // placeholder for progress bar
       
       // Start fetching - we'll simulate progress with the actual device count
       let progress = 0

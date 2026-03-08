@@ -133,8 +133,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(processedData, {
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
+        'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
       }
     })
     

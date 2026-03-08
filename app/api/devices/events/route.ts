@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         
     return NextResponse.json(data.events || [], {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Cache-Control': 'private, max-age=15, stale-while-revalidate=30',
         'X-Fetched-At': timestamp,
         'X-Data-Source': 'fastapi-proxy'
       }

@@ -527,28 +527,10 @@ function ApplicationsPageContent() {
         
         // Show loading state without specific numbers initially
         setLoadingProgress({ current: 0, total: 0 })
-        setLoadingMessage('Fetching device count...')
+        setLoadingMessage('Loading application data...')
         
-        // Fetch actual device count - no hardcoded fallbacks
-        let estimatedTotal = 0
-        const countResponse = await fetch('/api/devices', {
-          cache: 'no-store',
-          credentials: 'include',
-          headers: { 'Cache-Control': 'no-cache' }
-        })
-        if (countResponse.ok) {
-          const countData = await countResponse.json()
-          estimatedTotal = countData.devices?.length || 0
-        }
-        
-        if (estimatedTotal === 0) {
-          setError('Unable to fetch device count. Please refresh the page.')
-          setLoading(false)
-          setFiltersLoading(false)
-          return
-        }
-        
-        // Start fetching - progress with actual device count
+        // Use a simple indeterminate progress while filters endpoint loads
+        let estimatedTotal = 100  // placeholder for progress bar
         let progress = 0
         
         // Sample device serial numbers with realistic app counts for progress messages
