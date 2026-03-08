@@ -42,8 +42,7 @@ export async function GET(_request: NextRequest) {
 
     return NextResponse.json(stats, {
       headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache',
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
       },
     })
   } catch (error) {

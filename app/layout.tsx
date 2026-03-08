@@ -61,12 +61,8 @@ async function getDevices() {
     const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
     
     const response = await fetch(`${apiUrl}/api/devices`, {
-      cache: 'no-store',
+      next: { revalidate: 30 },
       signal: controller.signal,
-      headers: {
-        'Cache-Control': 'no-cache',
-        'Pragma': 'no-cache'
-      }
     })
     
     clearTimeout(timeout)
