@@ -9,12 +9,12 @@ type Props = {
 }
 
 async function getDevice(deviceId: string) {
-  // Use env var for API URL
-  const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+  // Use internal API URL for server-side fetch (avoids Front Door round trip)
+  const baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
   
   try {
     const res = await fetch(`${baseUrl}/api/device/${deviceId}`, {
-      next: { revalidate: 60 } // Cache for 60s
+      next: { revalidate: 30 }
     })
     
     if (!res.ok) return null

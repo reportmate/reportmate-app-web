@@ -193,8 +193,7 @@ export async function GET(request: Request) {
     
     return NextResponse.json(filterOptions, {
       headers: {
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
-        'Pragma': 'no-cache',
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
         'X-Fetched-At': timestamp,
         'X-Data-Source': 'fastapi-filters-endpoint'
       }

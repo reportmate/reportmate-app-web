@@ -38,7 +38,11 @@ export async function GET(_request: Request) {
       timestamp: Date.now()
     };
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(responseData, {
+      headers: {
+        'Cache-Control': 'private, max-age=30, stale-while-revalidate=60',
+      }
+    });
   } catch (error) {
     console.error('[INSTALLS FILTERS] Failed to build filter payload', error);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
