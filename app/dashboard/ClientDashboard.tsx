@@ -26,11 +26,13 @@ interface WebPubSubMessage {
   message?: string
 }
 
-// FleetEvent interface for events from consolidated API
+// FleetEvent interface for events from /api/events
 interface FleetEvent {
   id: string
   device: string
   deviceName?: string
+  assetTag?: string
+  platform?: string
   kind: string
   ts: string
   message?: string
@@ -109,6 +111,7 @@ export default function ClientDashboard() {
   const _fetchAbortRef = useRef(false)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectAttemptsRef = useRef(0)
+  const connectionStatusRef = useRef(connectionStatus)
   const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
@@ -118,16 +121,11 @@ export default function ClientDashboard() {
     return devices.filter(device => isPlatformVisible(getDevicePlatform(device)))
   }, [devices, platformFilter, isPlatformVisible])
   
-  // Filter events by platform - only show events from devices that match the platform filter
+  // Filter events by platform using the event's own platform field (populated by /api/events)
   const filteredEvents = useMemo(() => {
     if (platformFilter === 'all') return events
-    
-    // Create a Set of serial numbers from filtered devices for fast lookup
-    const visibleSerialNumbers = new Set(filteredDevices.map(d => d.serialNumber))
-    
-    // Filter events to only include those from visible devices
-    return events.filter(event => visibleSerialNumbers.has(event.device))
-  }, [events, filteredDevices, platformFilter])
+    return events.filter(event => isPlatformVisible(event.platform || 'Unknown'))
+  }, [events, platformFilter, isPlatformVisible])
   
   // Mark as mounted
   useEffect(() => {
@@ -154,8 +152,11 @@ export default function ClientDashboard() {
     return nameMap
   }, [devices])
   
-  // CONSOLIDATED API FETCH: Single /api/dashboard call for devices + installStats
-  // Events come via SignalR WebSocket for real-time updates
+  // Keep connectionStatusRef in sync so the polling interval can read it without a dependency
+  useEffect(() => { connectionStatusRef.current = connectionStatus }, [connectionStatus])
+
+  // CONSOLIDATED API FETCH: Single /api/dashboard call for devices + installStats + events
+  // Events use a per-type window function on the backend so all types are represented
   useEffect(() => {
     let aborted = false
 
@@ -167,7 +168,7 @@ export default function ClientDashboard() {
         }
         
         // Single consolidated API call
-        const response = await fetch('/api/dashboard?eventsLimit=50', { cache: 'no-store' })
+        const response = await fetch('/api/dashboard', { cache: 'no-store' })
 
         if (!response.ok) {
           throw new Error(`Failed to load dashboard data: ${response.status}`)
@@ -178,43 +179,44 @@ export default function ClientDashboard() {
         // Process devices from consolidated response
         const rawDevices: any[] = Array.isArray(data?.devices) ? data.devices : []
 
-        // On background refresh, only update lastSeen/status (device metadata doesn't change often)
-        if (!isInitialLoad && rawDevices.length > 0) {
-          setDevices(prev => {
-            if (prev.length === 0) return prev // Will be populated by initial load
-            const lookup = new Map(rawDevices.map((d: any) => [d.serialNumber, d]))
-            let changed = false
-            const updated = prev.map(device => {
-              const fresh = lookup.get(device.serialNumber)
-              if (!fresh) return device
-              const newStatus = calculateDeviceStatus(fresh.lastSeen)
-              if (device.lastSeen !== fresh.lastSeen || device.status !== newStatus) {
+        if (!isInitialLoad) {
+          // Background refresh — guard against empty rawDevices clearing device state
+          if (rawDevices.length > 0) {
+            setDevices(prev => {
+              if (prev.length === 0) return prev
+              const lookup = new Map(rawDevices.map((d: any) => [d.serialNumber, d]))
+              let changed = false
+              const updated = prev.map(device => {
+                const fresh = lookup.get(device.serialNumber)
+                if (!fresh) return device
+                const newStatus = calculateDeviceStatus(fresh.lastSeen)
+                if (device.lastSeen !== fresh.lastSeen || device.status !== newStatus) {
+                  changed = true
+                  return { ...device, lastSeen: fresh.lastSeen, status: newStatus }
+                }
+                return device
+              })
+              if (rawDevices.length !== prev.length) {
                 changed = true
-                return { ...device, lastSeen: fresh.lastSeen, status: newStatus }
               }
-              return device
+              return changed ? updated : prev
             })
-            // Check for new devices not in prev
-            if (rawDevices.length !== prev.length) {
-              changed = true
+            if (data.installStats) {
+              setInstallStats(data.installStats)
             }
-            return changed ? updated : prev
-          })
-          
-          if (data.installStats) {
-            setInstallStats(data.installStats)
           }
-          
-          // Merge new events
-          if (data.events && Array.isArray(data.events)) {
+          // Merge new events from background refresh
+          if (Array.isArray(data.events) && data.events.length > 0) {
+            const freshEvents = data.events as FleetEvent[]
             setEvents(prev => {
               const existingIds = new Set(prev.map(e => e.id))
-              const newEvents = data.events.filter((e: FleetEvent) => !existingIds.has(e.id))
+              const newEvents = freshEvents.filter(e => !existingIds.has(e.id))
               if (newEvents.length === 0) return prev
-              return [...newEvents, ...prev].slice(0, 200)
+              return [...newEvents, ...prev]
+                .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+                .slice(0, 1000)
             })
           }
-          
           setLastUpdateTime(new Date())
           setConnectionStatus(prev => prev === 'error' ? 'polling' : prev)
           return
@@ -287,21 +289,10 @@ export default function ClientDashboard() {
         if (data.installStats) {
           setInstallStats(data.installStats)
         }
-        
-        // Set events from consolidated response (initial load or fallback)
-        // Deduplicate events by ID before setting state
-        if (isInitialLoad && data.events && Array.isArray(data.events)) {
-          const seenIds = new Set<string>()
-          const uniqueEvents = data.events.filter((event: FleetEvent) => {
-            if (seenIds.has(event.id)) {
-              return false // Skip duplicate
-            }
-            seenIds.add(event.id)
-            return true
-          })
-          setEvents(uniqueEvents)
-          setLoadingProgress({ current: uniqueEvents.length, total: uniqueEvents.length })
-          setLoadingMessage('Events loaded')
+
+        // Set events from consolidated response (per-type diverse, pre-sorted by backend)
+        if (Array.isArray(data.events) && data.events.length > 0) {
+          setEvents(data.events as FleetEvent[])
         }
         
         setLastUpdateTime(new Date())
@@ -320,7 +311,6 @@ export default function ClientDashboard() {
           if (isInitialLoad) {
             setDevices([])
             setInstallStats(null)
-            setEvents([])
             setConnectionStatus('error')
           }
           // Non-initial refresh failures are transient — don't change
@@ -337,9 +327,11 @@ export default function ClientDashboard() {
     // Initial load
     fetchDashboardData(true)
     
-    // Refresh devices/installStats every 30 seconds
-    // Events come via SignalR WebSocket for real-time
-    const interval = setInterval(() => fetchDashboardData(false), 30000)
+    // Refresh devices + installStats + events every 30 seconds
+    // Skip tick when WebSocket is connected (WS delivers real-time events)
+    const interval = setInterval(() => {
+      if (connectionStatusRef.current !== 'connected') fetchDashboardData(false)
+    }, 30000)
 
     return () => {
       aborted = true
@@ -413,8 +405,8 @@ export default function ClientDashboard() {
                   // Avoid duplicates
                   const exists = prev.some(e => e.id === eventData.id)
                   if (exists) return prev
-                  // Add new event at the beginning, keep last 50
-                  return [eventData, ...prev].slice(0, 50)
+                  // Add new event at the beginning, keep last 300
+                  return [eventData, ...prev].slice(0, 1000)
                 })
                 setLastUpdateTime(new Date())
               }
@@ -498,15 +490,13 @@ export default function ClientDashboard() {
               <StatusWidget devices={filteredDevices as any} loading={devicesLoading} />
             </ErrorBoundary>
 
-            {/* Error and Warning Stats Cards - Side by Side (only show when viewing all platforms) */}
-            {platformFilter === 'all' && (
-              <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
-                <div className="grid grid-cols-2 gap-4">
-                  <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} />
-                  <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} />
-                </div>
-              </ErrorBoundary>
-            )}
+            {/* Error and Warning Stats Cards - Side by Side */}
+            <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading stats</div>}>
+              <div className="grid grid-cols-2 gap-4">
+                <ErrorStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
+                <WarningStatsWidget installStats={installStats} isLoading={installStatsLoading} platformFilter={platformFilter} />
+              </div>
+            </ErrorBoundary>
 
             {/* New Clients Table */}
             <ErrorBoundary fallback={<div className="p-4 bg-red-50 dark:bg-red-900 text-red-700 dark:text-red-300 rounded">Error loading devices list</div>}>

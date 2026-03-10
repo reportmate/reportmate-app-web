@@ -15,6 +15,10 @@ export interface InstallStatsData {
   devicesWithWarnings?: number
   totalErrorItems: number      // Total error items across all devices (Cimian + Munki)
   totalWarningItems: number    // Total warning items across all devices (Cimian + Munki)
+  winErrorItems?: number       // Windows (Cimian) error items
+  winWarningItems?: number     // Windows (Cimian) warning items
+  macErrorItems?: number       // macOS (Munki) error items
+  macWarningItems?: number     // macOS (Munki) warning items
   hasInstallData: boolean      // Whether any install data exists
 }
 
@@ -108,13 +112,20 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
 }
 
 // Warning Events Widget - uses pre-calculated stats from API
-// Displays total WARNING ITEMS across all devices (not device count)
+// Displays WARNING ITEMS scoped to the active platform filter
 export const WarningStatsWidget: React.FC<{ 
   installStats?: InstallStatsData | null
   isLoading?: boolean
-}> = ({ installStats, isLoading = false }) => {
-  // Use pre-calculated stats from API - no client-side iteration needed
-  const warningCount = installStats?.hasInstallData ? installStats.totalWarningItems : null
+  platformFilter?: string
+}> = ({ installStats, isLoading = false, platformFilter = 'all' }) => {
+  // Pick the right count based on current platform filter
+  const warningCount = installStats?.hasInstallData
+    ? platformFilter === 'macOS'
+      ? (installStats.macWarningItems ?? installStats.totalWarningItems)
+      : platformFilter === 'Windows'
+        ? (installStats.winWarningItems ?? installStats.totalWarningItems)
+        : installStats.totalWarningItems
+    : null
 
   if (isLoading || warningCount === null) {
     return (
@@ -152,13 +163,20 @@ export const WarningStatsWidget: React.FC<{
 }
 
 // Error Events Widget - uses pre-calculated stats from API
-// Displays total ERROR ITEMS across all devices (not device count)
+// Displays ERROR ITEMS scoped to the active platform filter
 export const ErrorStatsWidget: React.FC<{ 
   installStats?: InstallStatsData | null
   isLoading?: boolean
-}> = ({ installStats, isLoading = false }) => {
-  // Use pre-calculated stats from API - no client-side iteration needed
-  const errorCount = installStats?.hasInstallData ? installStats.totalErrorItems : null
+  platformFilter?: string
+}> = ({ installStats, isLoading = false, platformFilter = 'all' }) => {
+  // Pick the right count based on current platform filter
+  const errorCount = installStats?.hasInstallData
+    ? platformFilter === 'macOS'
+      ? (installStats.macErrorItems ?? installStats.totalErrorItems)
+      : platformFilter === 'Windows'
+        ? (installStats.winErrorItems ?? installStats.totalErrorItems)
+        : installStats.totalErrorItems
+    : null
 
   if (isLoading || errorCount === null) {
     return (
