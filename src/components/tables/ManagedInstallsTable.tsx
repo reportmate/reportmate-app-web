@@ -80,6 +80,14 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
       newFilters.delete(filter);
     } else {
       newFilters.add(filter);
+      // Last Run and status filters are mutually exclusive
+      if (filter === 'last_run') {
+        // Activating Last Run clears all status filters
+        newFilters.forEach(f => { if (f !== 'last_run') newFilters.delete(f) });
+      } else {
+        // Activating a status filter clears Last Run
+        newFilters.delete('last_run');
+      }
     }
     setStatusFilter(newFilters);
   };
@@ -96,11 +104,17 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     
     let filtered = data.packages;
 
-    // Apply status filter (multi-select)
-    if (statusFilter.size > 0) {
+    // Apply "Last Run" filter first — only items processed in latest session
+    if (statusFilter.has('last_run')) {
+      filtered = filtered.filter((pkg: any) => pkg.lastUpdate && pkg.lastUpdate !== '');
+    }
+
+    // Apply status filters (multi-select), excluding the pseudo-filter 'last_run'
+    const statusOnly = new Set([...statusFilter].filter(f => f !== 'last_run'));
+    if (statusOnly.size > 0) {
       filtered = filtered.filter((pkg: any) => {
         const status = pkg.status?.toLowerCase() || '';
-        return statusFilter.has(status);
+        return statusOnly.has(status);
       });
     }
 
@@ -232,6 +246,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   // Calculate counts for each status (handle empty packages array)
   const packages = data?.packages && Array.isArray(data.packages) ? data.packages : [];
+  const lastRunCount = packages.filter((pkg: any) => pkg.lastUpdate && pkg.lastUpdate !== '').length;
   const installedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
   const pendingCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length;
   const warningCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length;
@@ -270,8 +285,8 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                       Clear Filters
                     </button>
                   )}
-                  {/* Expand/Collapse All Categories Button */}
-                  {hasCategories && groupedPackages && groupedPackages.sortedCategories.length > 0 && (
+                  {/* Expand/Collapse All Categories Button — hidden when Last Run filter is active */}
+                  {hasCategories && groupedPackages && groupedPackages.sortedCategories.length > 0 && !statusFilter.has('last_run') && (
                     <button
                       onClick={toggleAllCategories}
                       className="px-3 py-1.5 text-xs font-medium rounded-full transition-colors flex items-center gap-1 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
@@ -299,6 +314,19 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                 <div className="flex items-center gap-4">
                   {/* Status Filters */}
                   <div className="flex items-center gap-2">
+                  {/* Last Run pseudo-filter — hidden when any status filter is active */}
+                  {lastRunCount > 0 && ![...statusFilter].some(f => f !== 'last_run') && (
+                    <button
+                      onClick={() => toggleFilter('last_run')}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                        statusFilter.has('last_run')
+                          ? 'bg-gray-700 text-white dark:bg-gray-300 dark:text-gray-900'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      Last Run - {lastRunCount}
+                    </button>
+                  )}
                   <button
                     onClick={() => toggleFilter('installed')}
                     className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
@@ -375,7 +403,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                   <div className="text-xs text-gray-600 dark:text-gray-400">
                     Showing {filteredPackages.length} of {packages.length} packages
                     <span className="ml-2">
-                      filtered by: <span className="font-medium capitalize">{Array.from(statusFilter).join(', ')}</span>
+                      filtered by: <span className="font-medium capitalize">{Array.from(statusFilter).map(f => f === 'last_run' ? 'Last Run' : f).join(', ')}</span>
                     </span>
                   </div>
                 </div>
@@ -457,7 +485,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                             </svg>
                           </div>
                           <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                            No items with {Array.from(statusFilter).map(f => f.toLowerCase()).join(' or ')}
+                            No items with {Array.from(statusFilter).map(f => f === 'last_run' ? 'last run' : f.toLowerCase()).join(' or ')}
                           </h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
                             No packages match the selected filter{statusFilter.size > 1 ? 's' : ''}.

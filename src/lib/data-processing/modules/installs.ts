@@ -342,6 +342,7 @@ export function standardizeInstallStatus(rawStatus: string): StandardInstallStat
     case 'uptodate':
     case 'current':
     case 'ok':
+    case 'install_succeeded':
       return 'Installed'
 
     // Pending variants - includes "pending update" status from Cimian
@@ -580,6 +581,16 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   // Declared here to avoid TDZ — used inside the package processing loop below
   let latestSessionStartTime = ''
 
+  // Determine the latest session's start_time BEFORE the package loop so lastUpdate IIFE can use it
+  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
+    latestSessionStartTime = installs.cimian.sessions[0].start_time || installs.cimian.sessions[0].startTime || ''
+  } else if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
+    latestSessionStartTime = installs.recentSessions[0].start_time || installs.recentSessions[0].startTime || ''
+  } else if (installs.munki?.startTime || installs.munki?.endTime) {
+    // Use startTime (run begin) so items installed during the run fall within the window
+    latestSessionStartTime = installs.munki.startTime || installs.munki.endTime
+  }
+
   // Determine which managed software system to use
   const hasCimianData = installs.cimian?.items && Array.isArray(installs.cimian.items) && installs.cimian.items.length > 0
   const hasMunkiData = installs.munki?.items && Array.isArray(installs.munki.items) && installs.munki.items.length > 0
@@ -637,6 +648,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       } 
   // Process Munki items if available (macOS)
   else if (hasMunkiData) {
+    // Statuses that indicate the item was ACTUALLY processed in this Munki run
+    // Mac client sets endTime to global run time for ALL items (InstallsModuleProcessor.swift line 717)
+    // Only items in installResults/removalResults have action statuses
+    const munkiProcessedStatuses = new Set(['install_succeeded', 'install_failed', 'removed'])
     packagesToProcess = installs.munki.items.map((item: any) => ({
       ...item,
       name: item.name || item.displayName || 'Unknown',
@@ -646,7 +661,9 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       installedVersion: item.installedVersion || '',
       id: item.id || item.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown',
       type: 'munki',
-      lastSeenInSession: item.endTime || installs.munki.endTime || ''
+      // Only set lastSeenInSession for items whose raw status proves they were processed
+      // installed/pending_install/pending_removal items were NOT touched and must NOT match
+      lastSeenInSession: munkiProcessedStatuses.has(item.status) ? (item.endTime || '') : ''
     }))
       }
   else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
@@ -718,7 +735,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         // DATE PROCESSED: Only show for items processed in the LATEST session
         // Items from older sessions get empty (they weren't touched in this run)
         lastUpdate: (() => {
-          const itemTimestamp = item.lastSeenInSession || item.lastUpdate || ''
+          // Use lastSeenInSession as the authoritative timestamp
+          // Do NOT fall back to item.lastUpdate — for Munki items, the ...item spread
+          // carries raw fields that may have stale or global timestamps
+          const itemTimestamp = item.lastSeenInSession || ''
           if (!itemTimestamp || !latestSessionStartTime) return ''
           // Check if this item was processed in the latest session
           // Compare the item's lastSeenInSession with the latest session's start_time
@@ -967,15 +987,6 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     const latestSession = installs.recentSessions[0]
     cacheSizeMb = latestSession.cacheSizeMb
       }
-
-  // Determine the latest session's start_time to identify which items were processed in this session
-  // Items processed in the latest session get their lastSeenInSession shown as DATE PROCESSED
-  // Items from older sessions show empty (they weren't touched in this run)
-  if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    latestSessionStartTime = installs.cimian.sessions[0].start_time || installs.cimian.sessions[0].startTime || ''
-  } else if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
-    latestSessionStartTime = installs.recentSessions[0].start_time || installs.recentSessions[0].startTime || ''
-  }
 
   // Extract session-level errors and warnings - ONLY FROM LATEST COMPLETED SESSION
   const sessionErrors: ErrorMessage[] = []
