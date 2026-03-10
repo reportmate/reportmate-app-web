@@ -467,7 +467,7 @@ function IdentityPageContent() {
               </svg>
             </button>
             
-            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+            <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-6 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Widget 1: Directory Services Donut with Expandable Legend */}
