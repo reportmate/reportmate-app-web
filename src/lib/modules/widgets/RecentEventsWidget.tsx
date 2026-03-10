@@ -229,9 +229,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // Info hidden by default (too noisy) — treated as the "no filter" baseline
-  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set())
+  // Info hidden by default — dashboard shows success, warning, error, system
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info']), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
@@ -635,15 +635,10 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                             <td className="w-56 px-3 py-2.5">
                               <Link
                                 href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
-                                  const kind = bundledEvent.kind.toLowerCase()
-                                  const filterMap: Record<string, string> = {
-                                    error: 'error,warning,success',
-                                    warning: 'warning,success',
-                                    success: 'success',
-                                  }
-                                  const filter = filterMap[kind]
-                                  if (filter) return `?filter=${filter}#installs`
+                                  // For installs events, always navigate to the "Last Run" filter
+                                  // so users can see exactly which packages were processed
                                   const moduleId = getEventModuleId(bundledEvent)
+                                  if (moduleId === 'installs') return '?filter=last_run#installs'
                                   return moduleId ? `#${moduleId}` : ''
                                 })()}`}
                                 className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
