@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { normalizeEventKind, severityToBadgeClasses } from '../lib/events/normalize';
 import { CopyButton } from './ui/CopyButton';
+import { LastRunSummary } from './LastRunSummary';
+import { Search, X } from 'lucide-react';
 
 interface EventDto {
   id: string;
@@ -78,6 +80,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
+  const [payloadSearches, setPayloadSearches] = useState<Record<string, string>>({});
   const [visibleCount, setVisibleCount] = useState(15);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreRef = useRef<HTMLDivElement>(null);
@@ -354,6 +357,55 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
     }
   }
 
+  // Render payload text: filter to matching lines with context, highlight matches
+  const renderHighlightedPayload = (text: string, search: string) => {
+    if (!search || search.length < 2) return text
+    try {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(escaped, 'gi')
+      const lines = text.split('\n')
+      const matchingIndices = new Set<number>()
+      lines.forEach((line, i) => {
+        if (regex.test(line)) {
+          // Add matching line plus 1 line of context above and below
+          if (i > 0) matchingIndices.add(i - 1)
+          matchingIndices.add(i)
+          if (i < lines.length - 1) matchingIndices.add(i + 1)
+        }
+      })
+      if (matchingIndices.size === 0) {
+        return <span className="text-gray-500 italic">No matches for &ldquo;{search}&rdquo;</span>
+      }
+      const sorted = Array.from(matchingIndices).sort((a, b) => a - b)
+      const elements: React.ReactNode[] = []
+      let lastIdx = -2
+      sorted.forEach((idx) => {
+        if (idx > lastIdx + 1) {
+          if (elements.length > 0) {
+            elements.push(<span key={`sep-${idx}`} className="text-gray-500">{'\n  ...\n'}</span>)
+          }
+        }
+        const line = lines[idx]
+        const highlightRegex = new RegExp(`(${escaped})`, 'gi')
+        const parts = line.split(highlightRegex)
+        elements.push(
+          <span key={`line-${idx}`}>
+            {parts.map((part, pi) =>
+              highlightRegex.test(part)
+                ? <mark key={pi} className="bg-yellow-400/80 text-gray-900 rounded-sm px-0.5">{part}</mark>
+                : part
+            )}
+            {'\n'}
+          </span>
+        )
+        lastIdx = idx
+      })
+      return <>{elements}</>
+    } catch {
+      return text
+    }
+  }
+
   // Helper function to extract message from event data - using simplified logic
   const getEventMessage = (ev: EventDto): string => {
     try {
@@ -530,21 +582,6 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     {normalizeEventKind(ev.kind || '')}
                   </span>
                   
-                  {/* Event ID Badges - Show individual IDs for bundles */}
-                  {ev.isBundle && bundledEventIds.length > 0 ? (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {bundledEventIds.map((eventId: string) => (
-                        <span key={eventId} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
-                          #{eventId}
-                        </span>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono flex-shrink-0">
-                      #{ev.id}
-                    </span>
-                  )}
-                  
                   {/* Event Message - Hidden on mobile (sm and below) */}
                   <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
                     {getEventMessage(ev)}
@@ -582,6 +619,10 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   id={`payload-${ev.id}`}
                   className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
                 >
+                  {/* Last Run Summary for installs events */}
+                  {fullPayloads[ev.id] && !loadingPayloads.has(ev.id) && (
+                    <LastRunSummary payload={fullPayloads[ev.id]} />
+                  )}
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -595,7 +636,26 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                       <CopyButton 
                         value={formatFullPayload(fullPayloads[ev.id] || ev.raw)}
                         size="md"
+                        className="px-2.5 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
                       />
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Search payload..."
+                          value={payloadSearches[ev.id] || ''}
+                          onChange={(e) => setPayloadSearches(prev => ({ ...prev, [ev.id]: e.target.value }))}
+                          className="w-44 pl-8 pr-7 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        />
+                        {payloadSearches[ev.id] && (
+                          <button
+                            onClick={() => setPayloadSearches(prev => ({ ...prev, [ev.id]: '' }))}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="relative bg-gray-900 dark:bg-gray-950 rounded-lg border border-gray-700 overflow-hidden">
@@ -611,7 +671,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     ) : (
                       <pre className="overflow-x-auto overflow-y-auto max-h-96 overlay-scrollbar p-4 text-sm text-gray-100 whitespace-pre-wrap w-full min-w-0" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
                         <code className="block whitespace-pre-wrap break-all" style={{ wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                          {formatFullPayload(fullPayloads[ev.id] || ev.raw)}
+                          {renderHighlightedPayload(formatFullPayload(fullPayloads[ev.id] || ev.raw), payloadSearches[ev.id] || '')}
                         </code>
                       </pre>
                     )}

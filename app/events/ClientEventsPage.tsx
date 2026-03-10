@@ -10,7 +10,9 @@ import { formatRelativeTime, formatExactTime } from "../../src/lib/time"
 import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkeleton"
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
+import { LastRunSummary } from "../../src/components/LastRunSummary"
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
+import { Search, X } from 'lucide-react'
 
 const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
@@ -146,6 +148,7 @@ function EventsPageContent() {
   // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
+  const [payloadSearches, setPayloadSearches] = useState<Record<string, string>>({})
   const [, setTotalEvents] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
@@ -153,6 +156,13 @@ function EventsPageContent() {
   
   // Ref for infinite scroll sentinel
   const loadMoreRef = useRef<HTMLDivElement>(null)
+
+  // Refs to track live scroll-fetch state without recreating the observer on every render
+  const hasMoreRef = useRef(true)
+  const loadingRef = useRef(true)
+  const loadingMoreRef = useRef(false)
+  const offsetRef = useRef(0)
+  const fetchEventsRef = useRef<typeof fetchEvents | null>(null)
   
   // Pre-fetch caches for instant filter switching
   const allEventsCache = useRef<Event[]>([])
@@ -375,12 +385,25 @@ function EventsPageContent() {
   // eslint-disable-next-line react-hooks-exhaustive-deps
   }, [filterType])
 
-  // Intersection Observer for infinite scroll
+  // Keep refs in sync with state so the observer callback always sees fresh values
+  useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
+  useEffect(() => { loadingRef.current = loading }, [loading])
+  useEffect(() => { loadingMoreRef.current = loadingMore }, [loadingMore])
+  useEffect(() => { offsetRef.current = offset }, [offset])
+  useEffect(() => { fetchEventsRef.current = fetchEvents }, [fetchEvents])
+
+  // Intersection Observer for infinite scroll — created once, reads state via refs
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
-          fetchEvents(offset, true)
+        if (
+          entries[0].isIntersecting &&
+          hasMoreRef.current &&
+          !loadingRef.current &&
+          !loadingMoreRef.current &&
+          fetchEventsRef.current
+        ) {
+          fetchEventsRef.current(offsetRef.current, true)
         }
       },
       { threshold: 0.1 }
@@ -391,7 +414,8 @@ function EventsPageContent() {
     }
 
     return () => observer.disconnect()
-  }, [hasMore, loading, loadingMore, offset, fetchEvents])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // stable — reads live values through refs
 
   // Filter events based on platform, selected type and search query (client-side)
   const filteredEvents = bundledEvents.filter(event => {
@@ -426,6 +450,28 @@ function EventsPageContent() {
 
   // currentEvents is just filteredEvents for infinite scroll (no client-side pagination)
   const currentEvents = filteredEvents
+
+  // Returns the appropriate device link for an event.
+  // Installs events go to /device/[serial]?filter=last_run#installs so the
+  // Last Run filter is pre-applied. All other events go to #events.
+  const getDeviceHref = (event: any): string => {
+    const serial = encodeURIComponent(event.device)
+    // Check loaded payload first (definitive)
+    const payload = fullPayloads[event.id] as any
+    if (payload && typeof payload === 'object') {
+      if (payload.full_installs_data || payload.module_status ||
+          (payload.session_id && (payload.success_count !== undefined || payload.error_count !== undefined))) {
+        return `/device/${serial}?filter=last_run#installs`
+      }
+    }
+    // Fall back to message-based detection (works before payload loads)
+    const msg = (event.message || '').toLowerCase()
+    if (msg.endsWith(' installed') || msg.endsWith(' install failed') ||
+        msg.endsWith(' removed') || msg.includes('munki') || msg.includes('cimian')) {
+      return `/device/${serial}?filter=last_run#installs`
+    }
+    return `/device/${serial}#events`
+  }
 
   // Helper function to format full payload for display
   const formatFullPayload = (payload: any): string => {
@@ -497,6 +543,54 @@ function EventsPageContent() {
     } catch (error) {
       console.error('Failed to format payload for display:', error)
       return 'Error formatting payload: ' + String(payload)
+    }
+  }
+
+  // Render payload text: filter to matching lines with context, highlight matches
+  const renderHighlightedPayload = (text: string, search: string): React.ReactNode => {
+    if (!search || search.length < 2) return text
+    try {
+      const escaped = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const regex = new RegExp(escaped, 'gi')
+      const lines = text.split('\n')
+      const matchingIndices = new Set<number>()
+      lines.forEach((line, i) => {
+        if (regex.test(line)) {
+          if (i > 0) matchingIndices.add(i - 1)
+          matchingIndices.add(i)
+          if (i < lines.length - 1) matchingIndices.add(i + 1)
+        }
+      })
+      if (matchingIndices.size === 0) {
+        return <span className="text-gray-500 italic">No matches for &ldquo;{search}&rdquo;</span>
+      }
+      const sorted = Array.from(matchingIndices).sort((a, b) => a - b)
+      const elements: React.ReactNode[] = []
+      let lastIdx = -2
+      sorted.forEach((idx) => {
+        if (idx > lastIdx + 1) {
+          if (elements.length > 0) {
+            elements.push(<span key={`sep-${idx}`} className="text-gray-500">{'\n  ...\n'}</span>)
+          }
+        }
+        const line = lines[idx]
+        const highlightRegex = new RegExp(`(${escaped})`, 'gi')
+        const parts = line.split(highlightRegex)
+        elements.push(
+          <span key={`line-${idx}`}>
+            {parts.map((part, pi) =>
+              highlightRegex.test(part)
+                ? <mark key={pi} className="bg-yellow-400/80 text-gray-900 rounded-sm px-0.5">{part}</mark>
+                : part
+            )}
+            {'\n'}
+          </span>
+        )
+        lastIdx = idx
+      })
+      return <>{elements}</>
+    } catch {
+      return text
     }
   }
 
@@ -972,7 +1066,7 @@ function EventsPageContent() {
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <div>
                                 <Link
-                                  href={`/device/${encodeURIComponent(event.device)}#events`}
+                                  href={getDeviceHref(event)}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
@@ -1045,18 +1139,43 @@ function EventsPageContent() {
                                         </div>
                                       </div>
                                     </div>
+                                    {/* Last Run Summary for installs events */}
+                                    {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
+                                      <LastRunSummary payload={fullPayloads[event.id]} />
+                                    )}
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                                           {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
                                         </h4>
                                       </div>
-                                      <CopyButton 
-                                        value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
-                                          { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                          'No payload available'))}
-                                        size="md"
-                                      />
+                                      <div className="flex items-center gap-2">
+                                        <CopyButton 
+                                          value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                            'No payload available'))}
+                                          size="md"
+                                          className="px-2.5 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                        />
+                                        <div className="relative">
+                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                          <input
+                                            type="text"
+                                            placeholder="Search payload..."
+                                            value={payloadSearches[event.id] || ''}
+                                            onChange={(e) => setPayloadSearches(prev => ({ ...prev, [event.id]: e.target.value }))}
+                                            className="w-44 pl-8 pr-7 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                          />
+                                          {payloadSearches[event.id] && (
+                                            <button
+                                              onClick={() => setPayloadSearches(prev => ({ ...prev, [event.id]: '' }))}
+                                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                     {loadingPayloads.has(event.id) ? (
                                       <div className="flex items-center justify-center py-8">
@@ -1071,9 +1190,9 @@ function EventsPageContent() {
                                       <div className="bg-gray-900 dark:bg-gray-950 rounded-lg overflow-hidden">
                                         <div className="overflow-auto max-h-96">
                                           <pre className="p-4 text-sm text-gray-100 whitespace-pre-wrap break-all min-w-0">
-                                            <code className="block break-all min-w-0">{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                            <code className="block break-all min-w-0">{renderHighlightedPayload(formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
                                               { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                              'No payload available'))}</code>
+                                              'No payload available')), payloadSearches[event.id] || '')}</code>
                                           </pre>
                                         </div>
                                       </div>
@@ -1329,7 +1448,7 @@ function EventsPageContent() {
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <div>
                                 <Link
-                                  href={`/device/${encodeURIComponent(event.device)}#events`}
+                                  href={getDeviceHref(event)}
                                   className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
@@ -1389,6 +1508,10 @@ function EventsPageContent() {
                               <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-4 py-3">
                                   <div className="space-y-2">
+                                    {/* Last Run Summary for installs events */}
+                                    {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
+                                      <LastRunSummary payload={fullPayloads[event.id]} />
+                                    )}
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1398,18 +1521,39 @@ function EventsPageContent() {
                                           #{event.id}
                                         </span>
                                       </div>
-                                      <CopyButton 
-                                        value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
-                                          { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                          'No payload available'))}
-                                        size="md"
-                                      />
+                                      <div className="flex items-center gap-2">
+                                        <CopyButton 
+                                          value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                            { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                            'No payload available'))}
+                                          size="md"
+                                          className="px-2.5 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+                                        />
+                                        <div className="relative">
+                                          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                                          <input
+                                            type="text"
+                                            placeholder="Search payload..."
+                                            value={payloadSearches[event.id] || ''}
+                                            onChange={(e) => setPayloadSearches(prev => ({ ...prev, [event.id]: e.target.value }))}
+                                            className="w-40 pl-8 pr-7 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                          />
+                                          {payloadSearches[event.id] && (
+                                            <button
+                                              onClick={() => setPayloadSearches(prev => ({ ...prev, [event.id]: '' }))}
+                                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
                                     <div className="bg-gray-100 dark:bg-gray-800 rounded p-3 overflow-auto">
                                       <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
-                                        <code>{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                        <code>{renderHighlightedPayload(formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
                                           { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                                          'No payload available'))}</code>
+                                          'No payload available')), payloadSearches[event.id] || '')}</code>
                                       </pre>
                                     </div>
                                   </div>
@@ -1541,7 +1685,7 @@ function EventsPageContent() {
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Device</div>
                       <div>
                         <Link
-                          href={`/device/${encodeURIComponent(event.device)}#events`}
+                          href={getDeviceHref(event)}
                           className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -1616,24 +1760,49 @@ function EventsPageContent() {
                             </div>
                           </div>
                         </div>
+                        {/* Last Run Summary for installs events */}
+                        {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
+                          <LastRunSummary payload={fullPayloads[event.id]} />
+                        )}
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-medium text-gray-900 dark:text-white">
                               Raw Payload
                             </h4>
                           </div>
-                          <CopyButton 
-                            value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
-                              { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                              'No payload available'))}
-                            size="md"
-                          />
+                          <div className="flex items-center gap-2">
+                            <CopyButton 
+                              value={formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                                { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
+                                'No payload available'))}
+                              size="md"
+                              className="px-2.5 py-1.5 border border-gray-200 dark:border-gray-600 rounded-md bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600"
+                            />
+                            <div className="relative">
+                              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                              <input
+                                type="text"
+                                placeholder="Search..."
+                                value={payloadSearches[event.id] || ''}
+                                onChange={(e) => setPayloadSearches(prev => ({ ...prev, [event.id]: e.target.value }))}
+                                className="w-32 pl-8 pr-7 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                              />
+                              {payloadSearches[event.id] && (
+                                <button
+                                  onClick={() => setPayloadSearches(prev => ({ ...prev, [event.id]: '' }))}
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </div>
                         <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 overflow-auto max-h-64">
                           <pre className="text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-all">
-                            <code>{formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
+                            <code>{renderHighlightedPayload(formatFullPayload(fullPayloads[event.id] || (event.isBundle ? 
                               { message: event.message, eventIds: event.eventIds, count: event.count, isBundle: true } : 
-                              'No payload available'))}</code>
+                              'No payload available')), payloadSearches[event.id] || '')}</code>
                           </pre>
                         </div>
                       </div>

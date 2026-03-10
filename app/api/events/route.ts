@@ -53,9 +53,15 @@ export async function GET(request: Request) {
     const validLimit = Math.min(Math.max(limit, 1), 1000) // Between 1 and 1000 events
     const validOffset = Math.max(offset, 0) // Non-negative offset
     
-    // Validate type parameter
+    // Validate type parameter — supports single value or comma-separated list
     const VALID_TYPES = ['success', 'warning', 'error', 'info', 'system']
-    const validType = typeParam && VALID_TYPES.includes(typeParam.toLowerCase()) ? typeParam.toLowerCase() : null
+    let validType: string | null = null
+    if (typeParam) {
+      const parts = typeParam.split(',').map(t => t.trim().toLowerCase()).filter(t => VALID_TYPES.includes(t))
+      if (parts.length > 0) {
+        validType = parts.join(',')
+      }
+    }
     
     // Validate and format date parameters
     let validStartDate = null
