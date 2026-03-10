@@ -706,7 +706,7 @@ function SecurityPageContent() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+            <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                   <MiniDonut title="Encryption" data={Object.entries(encryptionCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setEncryptionFilter} activeFilter={encryptionFilter} />

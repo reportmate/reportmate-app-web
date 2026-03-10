@@ -2132,7 +2132,7 @@ function InstallsPageContent() {
               </button>
 
               {/* Widgets Content - Collapsible */}
-              <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+              <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="bg-white dark:bg-gray-800">
             {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show in config report mode */}
             {itemsStatusFilter === 'all' && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
