@@ -977,7 +977,7 @@ function ManagementPageContent() {
           </div>
           
           {/* Widgets Content - Collapsible */}
-          <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+          <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
             <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Widget 1: Provider Collection (Swapped) */}

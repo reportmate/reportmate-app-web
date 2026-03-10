@@ -692,7 +692,7 @@ function NetworkPageContent() {
               </svg>
             </button>
             
-            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+            <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Wireless State Widget */}

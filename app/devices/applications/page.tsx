@@ -2252,7 +2252,7 @@ function ApplicationsPageContent() {
               )}
 
               {/* Widgets Content - Collapsible */}
-              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)}>
+              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)} maxHeight="60vh">
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
               {/* Summary Cards - Inside Widgets Accordion */}

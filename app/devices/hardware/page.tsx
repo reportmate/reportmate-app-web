@@ -703,7 +703,7 @@ function HardwarePageContent() {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
               <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveWidgetsExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
-            <CollapsibleSection expanded={effectiveWidgetsExpanded}>
+            <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="pb-4">
                 {/* Horizontal scrollable row */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
