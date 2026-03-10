@@ -565,7 +565,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Restart</th>
                   </tr>
                 </thead>
@@ -575,7 +575,10 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     <td className="px-6 py-4">
                       <div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{update.name}</div>
-                        {update.productKey && (
+                        {update.buildVersion && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.buildVersion}</div>
+                        )}
+                        {!update.buildVersion && update.productKey && (
                           <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.productKey}</div>
                         )}
                       </div>
@@ -583,33 +586,56 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       {update.version || 'Unknown'}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-1">
-                        {update.isSecurity && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                            Security
-                          </span>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex gap-1 flex-wrap">
+                          {update.deferred && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                              Deferred
+                            </span>
+                          )}
+                          {update.isSecurity && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              Security
+                            </span>
+                          )}
+                          {update.recommended && !update.deferred && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                              Recommended
+                            </span>
+                          )}
+                          {!update.isSecurity && !update.recommended && !update.deferred && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                              Optional
+                            </span>
+                          )}
+                        </div>
+                        {update.deferred && update.deferredUntil && (
+                          <div className="text-xs text-orange-600 dark:text-orange-400">
+                            Available {new Date(update.deferredUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
                         )}
-                        {update.recommended && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                            Recommended
-                          </span>
-                        )}
-                        {!update.isSecurity && !update.recommended && (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                            Optional
-                          </span>
+                        {update.deferred && !update.deferredUntil && update.firstOfferedAt && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            Offered {new Date(update.firstOfferedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </div>
                         )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        update.restartRequired 
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                          : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      }`}>
-                        {update.restartRequired ? 'Required' : 'No'}
-                      </span>
+                      {update.deferred ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
+                          —
+                        </span>
+                      ) : (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          update.restartRequired
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        }`}>
+                          {update.restartRequired ? 'Required' : 'No'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}

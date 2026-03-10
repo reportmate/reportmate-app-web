@@ -39,6 +39,7 @@ interface OSVersionPieChartProps {
   devices: Device[]
   loading: boolean
   osType: 'macOS' | 'Windows'
+  onFilterApplied?: () => void
 }
 
 interface VersionDataPoint {
@@ -252,7 +253,7 @@ const CustomTooltip = ({ active, payload, total }: any) => {
   return null
 }
 
-export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType }) => {
+export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType, onFilterApplied }) => {
   const router = useRouter()
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
@@ -294,8 +295,9 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
     } else {
       // Navigate to filtered view for leaf nodes
       router.push(`/devices/system?osVersion=${encodeURIComponent(entry.name)}`)
+      onFilterApplied?.()
     }
-  }, [selectedGroup, router])
+  }, [selectedGroup, router, onFilterApplied])
 
   const handleBarClick = useCallback((entry: VersionDataPoint) => {
     // If clicking a group bar (top level), drill down
@@ -304,8 +306,9 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
     } else {
       // Navigate to filtered view for leaf nodes or groups with no children
       router.push(`/devices/system?osVersion=${encodeURIComponent(entry.name)}`)
+      onFilterApplied?.()
     }
-  }, [selectedGroup, router])
+  }, [selectedGroup, router, onFilterApplied])
 
   const handleBack = useCallback(() => {
     setSelectedGroup(null)
@@ -345,15 +348,15 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
       {/* Combined layout: Donut on left, Bars on right */}
       <div className="flex gap-4 items-start">
         {/* Donut Chart - larger */}
-        <div className="w-36 h-36 flex-shrink-0">
+        <div className="w-44 h-44 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={donutData}
                 cx="50%"
                 cy="50%"
-                innerRadius={36}
-                outerRadius={58}
+                innerRadius={44}
+                outerRadius={68}
                 paddingAngle={2}
                 dataKey="value"
                 onClick={(_, index) => handleDonutClick(donutData[index])}
@@ -382,7 +385,7 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
         </div>
 
         {/* Bar Chart - fills remaining space */}
-        <div className="flex-1 overflow-y-auto max-h-40 space-y-1 no-scrollbar">
+        <div className="flex-1 overflow-y-auto max-h-48 space-y-1 no-scrollbar">
           {barData.map((item) => {
             const itemTotal = selectedGroup ? total : versionData.reduce((s, v) => s + v.value, 0)
             const percentage = itemTotal > 0 ? Math.round((item.value / itemTotal) * 100) : 0
@@ -399,10 +402,10 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
                 onMouseEnter={() => setHoveredItem(item.name)}
                 onMouseLeave={() => setHoveredItem(null)}
               >
-                <div className="w-28 text-xs font-medium text-gray-700 dark:text-gray-300 truncate tabular-nums" title={item.displayName}>
+                <div className="shrink-0 text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap tabular-nums" title={item.displayName}>
                   {item.displayName}
                 </div>
-                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-5 relative overflow-hidden">
+                <div className="flex-1 min-w-0 bg-gray-200 dark:bg-gray-700 rounded h-5 relative overflow-hidden">
                   <div 
                     className="h-full rounded transition-all duration-300 flex items-center justify-end pr-1"
                     style={{ 
@@ -416,7 +419,7 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
                     </span>
                   </div>
                 </div>
-                <div className="w-10 text-xs text-gray-500 dark:text-gray-400 text-right tabular-nums">
+                <div className="shrink-0 text-xs text-gray-500 dark:text-gray-400 text-right tabular-nums">
                   {percentage}%
                 </div>
               </div>

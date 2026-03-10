@@ -44,11 +44,16 @@ export interface MacUpdate {
   name: string
   productKey?: string
   version?: string
+  buildVersion?: string
   installDate?: string
   recommended?: boolean
   isSecurity?: boolean
   restartRequired?: boolean
   size?: string
+  deferred?: boolean
+  updateType?: string
+  firstOfferedAt?: string
+  deferredUntil?: string
 }
 
 // Mac-specific: Install History from package_receipts
@@ -307,11 +312,16 @@ export function extractSystem(deviceModules: any): SystemInfo {
       name: update.name || update.display_name || '',
       productKey: update.productKey || update.product_key || '',
       version: update.version || '',
+      buildVersion: update.buildVersion || update.build_version || '',
       installDate: update.installDate || update.install_date || '',
-      recommended: update.recommended ?? update.is_recommended ?? false,
-      isSecurity: update.isSecurity ?? update.is_security ?? false,
-      restartRequired: update.restartRequired ?? update.restart_required ?? update.reboot_required ?? false,
-      size: update.size || ''
+      recommended: !!(update.recommended ?? update.is_recommended ?? false),
+      isSecurity: !!(update.isSecurity ?? update.is_security ?? false),
+      restartRequired: !!(update.restartRequired ?? update.restart_required ?? update.reboot_required ?? false),
+      size: update.size || '',
+      deferred: !!(update.deferred),
+      updateType: update.updateType || update.update_type || '',
+      firstOfferedAt: update.firstOfferedAt || update.first_offered_at || '',
+      deferredUntil: update.deferredUntil || update.deferred_until || ''
     }))
   }
 

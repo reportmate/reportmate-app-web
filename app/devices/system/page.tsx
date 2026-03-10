@@ -7,6 +7,11 @@ import Link from "next/link"
 import { useSearchParams, useRouter } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { OSVersionPieChart } from "../../../src/lib/modules/graphs/OSVersionPieChart"
+import { EditionDonutChart } from "../../../src/lib/modules/graphs/EditionDonutChart"
+import { ActivationComplianceChart } from "../../../src/lib/modules/graphs/ActivationComplianceChart"
+import { UptimeDistributionChart, getUptimeBucketKey } from "../../../src/lib/modules/graphs/UptimeDistributionChart"
+import { PendingUpdatesChart, getPendingUpdatesBucketKey } from "../../../src/lib/modules/graphs/PendingUpdatesChart"
+import { LicenseSourceChart } from "../../../src/lib/modules/graphs/LicenseSourceChart"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
@@ -31,141 +36,155 @@ interface SystemDevice {
   servicesCount: number
   updatesCount: number
   tasksCount: number
+  // Enriched fields from backend
+  platform?: string
+  architecture?: string
+  edition?: string
+  displayVersion?: string
+  locale?: string
+  timeZone?: string
+  keyboardLayout?: string
+  installDate?: string
+  featureUpdate?: string
+  activationStatus?: boolean | null
+  licenseType?: string
+  licenseSource?: string
+  hasFirmwareLicense?: boolean | null
+  uptimeString?: string
+  pendingUpdatesCount?: number
+  loginItemsCount?: number
+  extensionsCount?: number
+  kernelExtensionsCount?: number
 }
 
 function LoadingSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      {/* Main Content Skeleton */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+    <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col min-h-0">
+        <div className="flex-1 bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700 rounded-lg flex flex-col min-h-0 overflow-hidden animate-pulse">
           {/* Title Section Skeleton */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between">
-              <div className="animate-pulse">
-                <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
-                <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+              <div>
+                <div className="h-5 w-56 bg-gray-200 dark:bg-gray-700 rounded mb-2"></div>
+                <div className="h-4 w-72 bg-gray-200 dark:bg-gray-700 rounded"></div>
               </div>
-              <div className="animate-pulse">
-                <div className="h-8 w-48 bg-gray-200 dark:bg-gray-700 rounded"></div>
-              </div>
+              <div className="h-8 w-28 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
             </div>
           </div>
 
-          {/* Analytics Charts Skeleton */}
-          <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700">
-            <div className="space-y-6">
-              {/* OS Version Charts Skeleton */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Windows Chart Skeleton */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-3 animate-pulse">
-                      <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg"></div>
-                      <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          {/* Skeleton Selections Accordion Header */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <div className="w-full px-6 py-3 flex items-center justify-between">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
+              <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+
+          {/* Skeleton Widgets Accordion Header */}
+          <div className="border-b border-gray-200 dark:border-gray-700">
+            <div className="w-full px-6 py-3 flex items-center justify-between">
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-16"></div>
+              <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            </div>
+          </div>
+
+          {/* Skeleton Widgets Content */}
+          <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 space-y-6">
+            {/* Row 1: OS Version Charts (2-up) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[0, 1].map(i => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-8 h-8 ${i === 0 ? 'bg-blue-100 dark:bg-blue-900' : 'bg-red-100 dark:bg-red-900'} rounded-lg`}></div>
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
                     </div>
                   </div>
-                  <div className="p-6">
-                    <div className="max-h-64 space-y-3">
-                      {/* Show 4 bar skeletons to match new height */}
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <div key={index} className="flex items-center gap-3 p-2 rounded-lg animate-pulse">
-                          <div className="w-32 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                          <div className="flex-1 flex items-center gap-3">
-                            <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6"></div>
-                            <div className="w-12 h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* macOS Chart Skeleton */}
-                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                    <div className="flex items-center gap-3 animate-pulse">
-                      <div className="w-10 h-10 bg-red-100 dark:bg-red-900 rounded-lg"></div>
-                      <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="text-center py-8">
-                      <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded mx-auto animate-pulse"></div>
-                    </div>
+                  <div className="p-4 space-y-3">
+                    {[...Array(3)].map((_, j) => (
+                      <div key={j} className="flex items-center gap-3">
+                        <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                        <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-5"></div>
+                        <div className="w-8 h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                      </div>
+                    ))}
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Row 2: Edition + Activation + License Source (3-up) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
+                      <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    </div>
+                  </div>
+                  <div className="p-4 flex items-center justify-center">
+                    <div className="w-28 h-28 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Row 3: Uptime (full width) */}
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg"></div>
+                  <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                </div>
+              </div>
+              <div className="p-4 space-y-3">
+                {[...Array(4)].map((_, j) => (
+                  <div key={j} className="flex items-center gap-3">
+                    <div className="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-5"></div>
+                    <div className="w-8 h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           {/* Search Section Skeleton */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="animate-pulse">
-              <div className="h-10 w-full bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
-            </div>
+            <div className="h-9 w-full bg-gray-200 dark:bg-gray-700 rounded-lg"></div>
           </div>
 
           {/* Table Skeleton */}
-          <div className="overflow-x-auto">
+          <div className="flex-1 overflow-hidden">
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
-                  <th className="px-6 py-3">
-                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
-                  </th>
+                  {['Device', 'OS', 'Version', 'Edition', 'Arch', 'Activation', 'Uptime', 'Last Seen'].map(h => (
+                    <th key={h} className="px-4 py-3">
+                      <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded" style={{ width: h === 'Device' ? '3rem' : h === 'Activation' ? '4rem' : '2.5rem' }}></div>
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {[...Array(8)].map((_, i) => (
+                {[...Array(10)].map((_, i) => (
                   <tr key={i}>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
-                        <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
+                    <td className="px-4 py-4">
+                      <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                      <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
-                        <div className="h-3 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
+                    <td className="px-4 py-4">
+                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
+                      <div className="h-3 w-14 bg-gray-200 dark:bg-gray-700 rounded"></div>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="animate-pulse">
-                        <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                      </div>
-                    </td>
+                    <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                    <td className="px-4 py-4"><div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                    <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                   </tr>
                 ))}
               </tbody>
@@ -200,7 +219,6 @@ function SystemPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const osVersionFilter = searchParams.get('osVersion') // Get OS version filter from URL
 
-  const [platformFilter, setPlatformFilter] = useState('all')
   const [activationFilter, setActivationFilter] = useState('all')
   const [firmwareLicenseFilter, setFirmwareLicenseFilter] = useState('all')
   
@@ -217,6 +235,11 @@ function SystemPageContent() {
   const [selectedEditions, setSelectedEditions] = useState<string[]>([])
   const [selectedActivationStatus, setSelectedActivationStatus] = useState<string[]>([])
   const [selectedLicenseType, setSelectedLicenseType] = useState<string[]>([])
+  const [selectedArchitectures, setSelectedArchitectures] = useState<string[]>([])
+  const [selectedTimeZones, setSelectedTimeZones] = useState<string[]>([])
+  const [selectedUptimeBuckets, setSelectedUptimeBuckets] = useState<string[]>([])
+  const [selectedLicenseSources, setSelectedLicenseSources] = useState<string[]>([])
+  const [selectedPendingBuckets, setSelectedPendingBuckets] = useState<string[]>([])
   
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
@@ -227,7 +250,7 @@ function SystemPageContent() {
   )
   
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'uptime' | 'lastSeen'>('device')
+  const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'edition' | 'architecture' | 'activation' | 'uptime' | 'lastSeen'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
   const handleSort = (column: typeof sortColumn) => {
@@ -262,18 +285,56 @@ function SystemPageContent() {
     setSelectedEditions(prev => 
       prev.includes(edition) ? prev.filter(e => e !== edition) : [...prev, edition]
     )
+    setWidgetsExpanded(false)
   }
   
   const toggleActivationStatus = (status: string) => {
     setSelectedActivationStatus(prev => 
       prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
     )
+    setWidgetsExpanded(false)
   }
   
   const toggleLicenseType = (type: string) => {
     setSelectedLicenseType(prev => 
       prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
     )
+    setWidgetsExpanded(false)
+  }
+  
+  const toggleArchitecture = (arch: string) => {
+    setSelectedArchitectures(prev =>
+      prev.includes(arch) ? prev.filter(a => a !== arch) : [...prev, arch]
+    )
+    setWidgetsExpanded(false)
+  }
+  
+  const toggleTimeZone = (tz: string) => {
+    setSelectedTimeZones(prev =>
+      prev.includes(tz) ? prev.filter(t => t !== tz) : [...prev, tz]
+    )
+    setWidgetsExpanded(false)
+  }
+  
+  const toggleUptimeBucket = (bucket: string) => {
+    setSelectedUptimeBuckets(prev =>
+      prev.includes(bucket) ? prev.filter(b => b !== bucket) : [...prev, bucket]
+    )
+    setWidgetsExpanded(false)
+  }
+  
+  const toggleLicenseSource = (source: string) => {
+    setSelectedLicenseSources(prev =>
+      prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]
+    )
+    setWidgetsExpanded(false)
+  }
+  
+  const togglePendingBucket = (bucket: string) => {
+    setSelectedPendingBuckets(prev =>
+      prev.includes(bucket) ? prev.filter(b => b !== bucket) : [...prev, bucket]
+    )
+    setWidgetsExpanded(false)
   }
   
   const clearAllFilters = () => {
@@ -283,16 +344,23 @@ function SystemPageContent() {
     setSelectedEditions([])
     setSelectedActivationStatus([])
     setSelectedLicenseType([])
-    setPlatformFilter('all')
+    setSelectedArchitectures([])
+    setSelectedTimeZones([])
+    setSelectedUptimeBuckets([])
+    setSelectedLicenseSources([])
+    setSelectedPendingBuckets([])
     setActivationFilter('all')
     setFirmwareLicenseFilter('all')
     setSearchQuery('')
+    setWidgetsExpanded(true)
     if (osVersionFilter) router.push('/devices/system')
   }
   
   const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
     selectedEditions.length + selectedActivationStatus.length + selectedLicenseType.length +
-    (platformFilter !== 'all' ? 1 : 0) + (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0) +
+    selectedArchitectures.length + selectedTimeZones.length + selectedUptimeBuckets.length + selectedLicenseSources.length +
+    selectedPendingBuckets.length +
+    (activationFilter !== 'all' ? 1 : 0) + (firmwareLicenseFilter !== 'all' ? 1 : 0) +
     (osVersionFilter ? 1 : 0)
 
   // Use the new hook to get both devices data (with inventory) and system module data
@@ -364,11 +432,6 @@ function SystemPageContent() {
     }
   }, [moduleLoading])
 
-  // Get unique operating systems for filtering
-  const operatingSystems = Array.from(new Set(
-    systems.map(s => s.operatingSystem).filter(Boolean)
-  )).sort()
-
   // Extract unique filter options from devices (inventory data)
   const filterOptions = {
     usages: Array.from(new Set(
@@ -381,22 +444,17 @@ function SystemPageContent() {
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
     )).sort() as string[],
     editions: Array.from(new Set(
-      systems.map(s => {
-        // Parse edition from operatingSystem string (e.g., "Windows 11 Enterprise 24H2" -> "Enterprise")
-        const parts = (s.operatingSystem || '').split(' ')
-        if (parts.length >= 3 && parts[0] === 'Windows') {
-          // Find the edition part (skip "Windows 11" and the last part if it's a version like "24H2")
-          const lastPart = parts[parts.length - 1]
-          const isVersion = /^\d{2}H\d$/.test(lastPart) // matches "24H2", "23H1", etc.
-          if (isVersion && parts.length >= 4) {
-            return parts.slice(2, -1).join(' ') // "Enterprise", "Pro", etc.
-          } else if (!isVersion && parts.length >= 3) {
-            return parts.slice(2).join(' ')
-          }
-        }
-        return null
-      }).filter(Boolean)
-    )).sort() as string[]
+      systems.map(s => s.edition).filter(Boolean)
+    )).sort() as string[],
+    architectures: Array.from(new Set(
+      systems.map(s => s.architecture).filter(Boolean)
+    )).sort() as string[],
+    timeZones: Array.from(new Set(
+      systems.map(s => s.timeZone).filter(Boolean)
+    )).sort() as string[],
+    licenseSources: Array.from(new Set(
+      systems.map(s => s.licenseSource).filter(Boolean)
+    )).sort() as string[],
   }
 
   // Compute location counts for proportional pill sizing
@@ -416,45 +474,60 @@ function SystemPageContent() {
     )
     const inventory = deviceFromMainAPI?.modules?.inventory
     
-    if (platformFilter !== 'all') {
-      if (s.operatingSystem !== platformFilter) return false
-    }
-    
-    // Filter by activation status (dropdown) - NOT AVAILABLE in lean bulk endpoint
-    // Activation data only available on individual device API calls
+    // Filter by activation status (dropdown)
     if (activationFilter !== 'all') {
-      // Skip filter - data not available in lean endpoint
+      if (activationFilter === 'activated' && s.activationStatus !== true) return false
+      if (activationFilter === 'not-activated' && s.activationStatus !== false) return false
     }
     
-    // Filter by activation status (chips) - NOT AVAILABLE in lean bulk endpoint
+    // Filter by activation status (chips)
     if (selectedActivationStatus.length > 0) {
-      // Skip filter - data not available in lean endpoint
+      const status = s.activationStatus === true ? 'Activated' : s.activationStatus === false ? 'Not Activated' : null
+      if (!status || !selectedActivationStatus.includes(status)) return false
     }
     
-    // Filter by firmware license (dropdown) - NOT AVAILABLE in lean bulk endpoint
+    // Filter by firmware license (dropdown)
     if (firmwareLicenseFilter !== 'all') {
-      // Skip filter - data not available in lean endpoint
+      if (firmwareLicenseFilter === 'has-oem' && s.hasFirmwareLicense !== true) return false
+      if (firmwareLicenseFilter === 'no-oem' && s.hasFirmwareLicense !== false) return false
     }
     
-    // Filter by license type (chips) - NOT AVAILABLE in lean bulk endpoint
+    // Filter by license type (chips)
     if (selectedLicenseType.length > 0) {
-      // Skip filter - data not available in lean endpoint
+      const type = s.hasFirmwareLicense === true ? 'Has OEM License' : 'No OEM License'
+      if (!selectedLicenseType.includes(type)) return false
     }
     
-    // Filter by edition (chips) - parse from operatingSystem string
+    // Filter by edition (chips) - use enriched field
     if (selectedEditions.length > 0) {
-      const parts = (s.operatingSystem || '').split(' ')
-      let edition = ''
-      if (parts.length >= 3 && parts[0] === 'Windows') {
-        const lastPart = parts[parts.length - 1]
-        const isVersion = /^\d{2}H\d$/.test(lastPart)
-        if (isVersion && parts.length >= 4) {
-          edition = parts.slice(2, -1).join(' ')
-        } else if (!isVersion && parts.length >= 3) {
-          edition = parts.slice(2).join(' ')
-        }
-      }
-      if (!selectedEditions.includes(edition)) return false
+      if (!s.edition || !selectedEditions.includes(s.edition)) return false
+    }
+    
+    // Filter by architecture
+    if (selectedArchitectures.length > 0) {
+      if (!s.architecture || !selectedArchitectures.includes(s.architecture)) return false
+    }
+    
+    // Filter by time zone
+    if (selectedTimeZones.length > 0) {
+      if (!s.timeZone || !selectedTimeZones.includes(s.timeZone)) return false
+    }
+    
+    // Filter by uptime bucket
+    if (selectedUptimeBuckets.length > 0) {
+      const bucket = getUptimeBucketKey(s.uptime)
+      if (!bucket || !selectedUptimeBuckets.includes(bucket)) return false
+    }
+    
+    // Filter by license source
+    if (selectedLicenseSources.length > 0) {
+      if (!s.licenseSource || !selectedLicenseSources.includes(s.licenseSource)) return false
+    }
+    
+    // Filter by pending updates bucket
+    if (selectedPendingBuckets.length > 0) {
+      const bucket = getPendingUpdatesBucketKey(s.pendingUpdatesCount)
+      if (!bucket || !selectedPendingBuckets.includes(bucket)) return false
     }
     
     // URL-based OS Version filter
@@ -543,19 +616,12 @@ function SystemPageContent() {
   // Create devices formatted for OS Version Widget from systems data
   // Uses flat fields from lean API response (no raw needed)
   const devicesForOSWidget = systems.map(sys => {
-    // Detect platform from OS name
-    const osName = sys.operatingSystem?.toLowerCase() || ''
-    let platform = 'Unknown'
-    if (osName.includes('windows') || osName.includes('microsoft')) {
-      platform = 'Windows'
-    } else if (osName.includes('macos') || osName.includes('mac os') || osName.includes('darwin')) {
-      platform = 'macOS'
-    }
-    
-    // Parse OS name to extract edition (e.g., "Windows 11 Enterprise 24H2" -> "Enterprise")
-    const nameParts = sys.operatingSystem?.split(' ') || []
-    const edition = nameParts.length > 2 ? nameParts.slice(2, -1).join(' ') : undefined
-    const displayVersion = nameParts.length > 2 ? nameParts[nameParts.length - 1] : undefined
+    const platform = sys.platform || (() => {
+      const osName = sys.operatingSystem?.toLowerCase() || ''
+      if (osName.includes('windows') || osName.includes('microsoft')) return 'Windows'
+      if (osName.includes('macos') || osName.includes('mac os') || osName.includes('darwin')) return 'macOS'
+      return 'Unknown'
+    })()
     
     return {
       deviceId: sys.deviceId,
@@ -565,14 +631,21 @@ function SystemPageContent() {
       status: 'active',
       totalEvents: 0,
       lastEventTime: sys.lastSeen,
-      platform: platform,
-      // Map flat OS data to the format expected by OSVersionBarChart
+      platform,
+      edition: sys.edition,
+      architecture: sys.architecture,
+      activationStatus: sys.activationStatus,
+      licenseSource: sys.licenseSource,
+      hasFirmwareLicense: sys.hasFirmwareLicense,
+      timeZone: sys.timeZone,
+      uptime: sys.uptime,
+      pendingUpdatesCount: sys.pendingUpdatesCount,
       osVersion: {
         name: sys.operatingSystem,
         version: sys.osVersion,
         build: sys.buildNumber,
-        edition: edition,
-        displayVersion: displayVersion
+        edition: sys.edition || undefined,
+        displayVersion: sys.displayVersion || undefined
       },
       modules: {
         system: {
@@ -580,8 +653,8 @@ function SystemPageContent() {
             name: sys.operatingSystem,
             version: sys.osVersion,
             build: sys.buildNumber,
-            edition: edition,
-            displayVersion: displayVersion
+            edition: sys.edition || undefined,
+            displayVersion: sys.displayVersion || undefined
           }
         }
       }
@@ -621,6 +694,18 @@ function SystemPageContent() {
         aValue = a.osVersion?.toLowerCase() || ''
         bValue = b.osVersion?.toLowerCase() || ''
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'edition':
+        aValue = a.edition?.toLowerCase() || ''
+        bValue = b.edition?.toLowerCase() || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'architecture':
+        aValue = a.architecture?.toLowerCase() || ''
+        bValue = b.architecture?.toLowerCase() || ''
+        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'activation':
+        aValue = a.activationStatus === true ? 0 : a.activationStatus === false ? 1 : 2
+        bValue = b.activationStatus === true ? 0 : b.activationStatus === false ? 1 : 2
+        return sortDirection === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue)
       case 'uptime':
         aValue = a.uptime || 0
         bValue = b.uptime || 0
@@ -651,23 +736,11 @@ function SystemPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Platform Filter */}
-                <select
-                  value={platformFilter}
-                  onChange={(e) => setPlatformFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                >
-                  <option value="all">All Operating Systems</option>
-                  {operatingSystems.map(os => (
-                    <option key={os} value={os}>{os}</option>
-                  ))}
-                </select>
-                
                 {/* Export to CSV Button */}
                 <button
                   onClick={() => {
                     // Build CSV from filtered data only
-                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Operating System', 'Version', 'Build', 'Edition', 'Uptime', 'Boot Time', 'Last Seen']
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Operating System', 'Version', 'Build', 'Edition', 'Architecture', 'Activation', 'License Source', 'Time Zone', 'Locale', 'Uptime', 'Boot Time', 'Last Seen']
                     const rows = searchFilteredSystems.map(s => {
                       const uptimeStr = s.uptime ? `${Math.floor(s.uptime / 86400)}d ${Math.floor((s.uptime % 86400) / 3600)}h` : ''
                       return [
@@ -677,16 +750,12 @@ function SystemPageContent() {
                         s.operatingSystem || '',
                         s.osVersion || '',
                         s.buildNumber || '',
-                        (() => {
-                          const parts = (s.operatingSystem || '').split(' ')
-                          if (parts.length >= 3 && parts[0] === 'Windows') {
-                            const lastPart = parts[parts.length - 1]
-                            const isVersion = /^\d{2}H\d$/.test(lastPart)
-                            if (isVersion && parts.length >= 4) return parts.slice(2, -1).join(' ')
-                            return parts.slice(2).join(' ')
-                          }
-                          return ''
-                        })(),
+                        s.edition || '',
+                        s.architecture || '',
+                        s.activationStatus === true ? 'Activated' : s.activationStatus === false ? 'Not Activated' : '',
+                        s.licenseSource || '',
+                        s.timeZone || '',
+                        s.locale || '',
                         uptimeStr,
                         s.bootTime || '',
                         s.lastSeen || ''
@@ -774,6 +843,77 @@ function SystemPageContent() {
                           }`}
                         >
                           {edition}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Architecture Filter */}
+                {filterOptions.architectures.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Architecture</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.architectures.map(arch => (
+                        <button
+                          key={arch}
+                          onClick={() => toggleArchitecture(arch)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedArchitectures.includes(arch)
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {arch}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Pending Updates Filter */}
+                {systems.some(s => s.pendingUpdatesCount != null) && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Pending Updates</div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { key: 'up-to-date', label: 'Up to date' },
+                        { key: '1-5', label: '1-5 pending' },
+                        { key: '6-10', label: '6-10 pending' },
+                        { key: '10+', label: '10+ pending' },
+                      ].map(bucket => (
+                        <button
+                          key={bucket.key}
+                          onClick={() => togglePendingBucket(bucket.key)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedPendingBuckets.includes(bucket.key)
+                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {bucket.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* License Source Filter */}
+                {filterOptions.licenseSources.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">License Source</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.licenseSources.map(src => (
+                        <button
+                          key={src}
+                          onClick={() => toggleLicenseSource(src)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedLicenseSources.includes(src)
+                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {src}
                         </button>
                       ))}
                     </div>
@@ -936,11 +1076,12 @@ function SystemPageContent() {
           </div>
           
           {/* Widgets Content - Collapsible */}
-          <CollapsibleSection expanded={effectiveWidgetsExpanded}>
-            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-              {/* OS Version Charts - Side by Side with Pie Charts */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
+            <div className="px-6 py-6 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 space-y-6">
+              {/* Row 1: OS Version Charts */}
+              <div className={`grid grid-cols-1 ${globalPlatformFilter === 'all' ? 'md:grid-cols-2' : ''} gap-6`}>
                 {/* Windows OS Version Pie Chart */}
+                {globalPlatformFilter !== 'macOS' && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2">
@@ -953,11 +1094,13 @@ function SystemPageContent() {
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" />
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" onFilterApplied={() => setWidgetsExpanded(false)} />
                   </div>
                 </div>
+                )}
                 
                 {/* macOS OS Version Pie Chart */}
+                {globalPlatformFilter !== 'Windows' && (
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
                   <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
                     <div className="flex items-center gap-2">
@@ -970,7 +1113,126 @@ function SystemPageContent() {
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" />
+                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" onFilterApplied={() => setWidgetsExpanded(false)} />
+                  </div>
+                </div>
+                )}
+              </div>
+
+              {/* Row 2: Edition + Activation + License Source (Windows-only) */}
+              {globalPlatformFilter === 'Windows' && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Edition Distribution */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-indigo-100 dark:bg-indigo-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Edition</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <EditionDonutChart
+                      devices={devicesForOSWidget}
+                      loading={loading || moduleLoading}
+                      selectedEditions={selectedEditions}
+                      onEditionToggle={toggleEdition}
+                    />
+                  </div>
+                </div>
+
+                {/* Activation Compliance */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-emerald-100 dark:bg-emerald-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Activation</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <ActivationComplianceChart
+                      devices={devicesForOSWidget}
+                      loading={loading || moduleLoading}
+                      selectedStatuses={selectedActivationStatus}
+                      onStatusToggle={toggleActivationStatus}
+                    />
+                  </div>
+                </div>
+
+                {/* License Source */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-amber-100 dark:bg-amber-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">License Source</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <LicenseSourceChart
+                      devices={devicesForOSWidget}
+                      loading={loading || moduleLoading}
+                      selectedSources={selectedLicenseSources}
+                      onSourceToggle={toggleLicenseSource}
+                    />
+                  </div>
+                </div>
+              </div>
+              )}
+
+              {/* Row 3: Uptime + Pending Updates (2-up) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Uptime Distribution */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Uptime Distribution</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <UptimeDistributionChart
+                      devices={devicesForOSWidget}
+                      loading={loading || moduleLoading}
+                      selectedBuckets={selectedUptimeBuckets}
+                      onBucketToggle={toggleUptimeBucket}
+                    />
+                  </div>
+                </div>
+
+                {/* Pending Updates Distribution */}
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+                  <div className="px-4 py-2.5 border-b border-gray-200 dark:border-gray-700">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                        <svg className="w-5 h-5 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                      </div>
+                      <h2 className="text-sm font-semibold text-gray-900 dark:text-white">Pending Updates</h2>
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <PendingUpdatesChart
+                      devices={devicesForOSWidget}
+                      loading={loading || moduleLoading}
+                      selectedBuckets={selectedPendingBuckets}
+                      onBucketToggle={togglePendingBucket}
+                    />
                   </div>
                 </div>
               </div>
@@ -1011,7 +1273,7 @@ function SystemPageContent() {
                 <tr>
                   <th 
                     onClick={() => handleSort('device')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Device
@@ -1024,10 +1286,10 @@ function SystemPageContent() {
                   </th>
                   <th 
                     onClick={() => handleSort('os')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
-                      Operating System
+                      OS
                       {sortColumn === 'os' && (
                         <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -1037,7 +1299,7 @@ function SystemPageContent() {
                   </th>
                   <th 
                     onClick={() => handleSort('version')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Version
@@ -1049,8 +1311,47 @@ function SystemPageContent() {
                     </div>
                   </th>
                   <th 
+                    onClick={() => handleSort('edition')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Edition
+                      {sortColumn === 'edition' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('architecture')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Arch
+                      {sortColumn === 'architecture' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
+                    onClick={() => handleSort('activation')}
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      Activation
+                      {sortColumn === 'activation' && (
+                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </div>
+                  </th>
+                  <th 
                     onClick={() => handleSort('uptime')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Uptime
@@ -1063,7 +1364,7 @@ function SystemPageContent() {
                   </th>
                   <th 
                     onClick={() => handleSort('lastSeen')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Last Seen
@@ -1079,7 +1380,7 @@ function SystemPageContent() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1099,7 +1400,7 @@ function SystemPageContent() {
                   </tr>
                 ) : searchFilteredSystems.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={9} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.50 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1112,7 +1413,7 @@ function SystemPageContent() {
                 ) : (
                   searchFilteredSystems.map((sys) => (
                     <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 max-w-56">
+                      <td className="px-4 py-4 max-w-56">
                         <Link 
                           href={`/device/${sys.deviceId}#system`}
                           className="group block min-w-0"
@@ -1125,7 +1426,7 @@ function SystemPageContent() {
                           </div>
                         </Link>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
                         <div className="text-sm">
                           <div className="flex items-center gap-2">
                             <span className="text-gray-900 dark:text-white font-medium">
@@ -1137,27 +1438,46 @@ function SystemPageContent() {
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm space-y-1">
-                          {sys.buildNumber ? (
-                            <div className="text-gray-900 dark:text-white">
-                              {sys.buildNumber}
-                            </div>
-                          ) : null}
+                      <td className="px-4 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {sys.buildNumber || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {sys.edition || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm text-gray-900 dark:text-white">
+                          {sys.architecture || '-'}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {sys.activationStatus != null ? (
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                            sys.activationStatus === true
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                          }`}>
+                            {sys.activationStatus ? 'Activated' : 'Not Activated'}
+                          </span>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-4">
                         <div className="text-sm">
                           {sys.uptime ? (
                             <div className="text-gray-900 dark:text-white">
                               {formatUptime(sys.uptime)}
                             </div>
                           ) : (
-                            <div className="text-gray-500 dark:text-gray-400">Unknown</div>
+                            <div className="text-gray-500 dark:text-gray-400">-</div>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                      <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
                         {sys.lastSeen ? formatRelativeTime(sys.lastSeen) : '-'}
                       </td>
                     </tr>

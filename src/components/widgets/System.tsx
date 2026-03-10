@@ -177,8 +177,14 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
   }
 
   // Software Update status logic - matching SystemTab.tsx
-  const pendingAppleUpdates = system?.updates?.pending || []
-  const hasUpdates = isMac ? pendingAppleUpdates.length > 0 : false
+  const pendingAppleUpdates = system?.pendingAppleUpdates || system?.pending_apple_updates || []
+  const deferredUpdates = isMac ? pendingAppleUpdates.filter((u: any) => u.deferred || u.deferredUntil) : []
+  const activeUpdates = isMac ? pendingAppleUpdates.filter((u: any) => !u.deferred && !u.deferredUntil) : []
+  const hasDeferredUpdates = deferredUpdates.length > 0
+  const hasActiveUpdates = activeUpdates.length > 0
+  const soonestDeferral = (deferredUpdates as any[])
+    .filter((u: any) => u.deferredUntil)
+    .sort((a: any, b: any) => new Date(a.deferredUntil).getTime() - new Date(b.deferredUntil).getTime())[0]
 
   return (
     <StatBlock 
@@ -228,14 +234,42 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
         {/* Software Update - Full width row */}
         <div>
           <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Software Update</div>
-          {hasUpdates ? (
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
-                {isMac ? `${pendingAppleUpdates.length} Pending Update${pendingAppleUpdates.length !== 1 ? 's' : ''}` : 'Pending Updates'}
-              </span>
+          {hasActiveUpdates ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                  {activeUpdates.length} Pending Update{activeUpdates.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {hasDeferredUpdates && soonestDeferral && (
+                <div className="text-xs text-orange-600 dark:text-orange-400 ml-6">
+                  +{deferredUpdates.length} deferred · available {new Date(soonestDeferral.deferredUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              )}
+              {hasDeferredUpdates && !soonestDeferral && (
+                <div className="text-xs text-orange-600 dark:text-orange-400 ml-6">
+                  +{deferredUpdates.length} deferred
+                </div>
+              )}
+            </div>
+          ) : hasDeferredUpdates ? (
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-orange-500 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-sm font-medium text-orange-600 dark:text-orange-400">
+                  {deferredUpdates.length} Update{deferredUpdates.length !== 1 ? 's' : ''} Deferred
+                </span>
+              </div>
+              {soonestDeferral && (
+                <div className="text-xs text-orange-500 dark:text-orange-400 ml-6">
+                  Available {new Date(soonestDeferral.deferredUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-2">

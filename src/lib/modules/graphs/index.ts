@@ -20,3 +20,11 @@ export { HardwareTypeChart } from './HardwareTypeChart'
 export { ProcessorDistributionChart } from './ProcessorDistributionChart'
 export { GraphicsDistributionChart } from './GraphicsDistributionChart'
 export { DeviceTypeDonutChart } from './DeviceTypeDonutChart'
+
+// System Fleet Charts
+export { EditionDonutChart } from './EditionDonutChart'
+export { ActivationComplianceChart } from './ActivationComplianceChart'
+export { UptimeDistributionChart } from './UptimeDistributionChart'
+export { TimeZoneDistributionChart } from './TimeZoneDistributionChart'
+export { LicenseSourceChart } from './LicenseSourceChart'
+export { PendingUpdatesChart } from './PendingUpdatesChart'
