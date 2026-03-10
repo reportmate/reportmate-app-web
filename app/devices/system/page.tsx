@@ -52,6 +52,7 @@ interface SystemDevice {
   hasFirmwareLicense?: boolean | null
   uptimeString?: string
   pendingUpdatesCount?: number
+  deferredUpdatesCount?: number
   loginItemsCount?: number
   extensionsCount?: number
   kernelExtensionsCount?: number
@@ -161,9 +162,9 @@ function LoadingSkeleton() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  {['Device', 'OS', 'Version', 'Edition', 'Arch', 'Activation', 'Uptime', 'Last Seen'].map(h => (
+                  {['Device', 'OS', 'Version', 'Uptime', 'Last Seen'].map(h => (
                     <th key={h} className="px-4 py-3">
-                      <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded" style={{ width: h === 'Device' ? '3rem' : h === 'Activation' ? '4rem' : '2.5rem' }}></div>
+                      <div className="h-3 bg-gray-200 dark:bg-gray-600 rounded" style={{ width: h === 'Device' ? '3rem' : '2.5rem' }}></div>
                     </th>
                   ))}
                 </tr>
@@ -175,14 +176,8 @@ function LoadingSkeleton() {
                       <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
                       <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded"></div>
                     </td>
-                    <td className="px-4 py-4">
-                      <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded mb-1"></div>
-                      <div className="h-3 w-14 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    </td>
+                    <td className="px-4 py-4"><div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                     <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                    <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                    <td className="px-4 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                    <td className="px-4 py-4"><div className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div></td>
                     <td className="px-4 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                     <td className="px-4 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                   </tr>
@@ -208,6 +203,30 @@ function formatUptime(seconds: number): string {
   } else {
     return `${mins}m`
   }
+}
+
+const macOSNames: Record<number, string> = {
+  26: 'Tahoe', 15: 'Sequoia', 14: 'Sonoma', 13: 'Ventura',
+  12: 'Monterey', 11: 'Big Sur',
+}
+
+function getOSDisplayName(sys: SystemDevice): string {
+  const platform = sys.platform || ''
+  const osName = sys.operatingSystem || ''
+  
+  if (platform === 'macOS' || osName.toLowerCase().includes('mac')) {
+    const major = parseInt((sys.osVersion || '').split('.')[0], 10)
+    const codename = macOSNames[major]
+    return codename ? `macOS ${major} ${codename}` : `macOS ${major || ''}`
+  }
+  
+  // Windows: extract major version (10, 11) and displayVersion (25H2, 24H2)
+  const winMatch = osName.match(/Windows\s+(\d+)/)
+  const winVer = winMatch ? winMatch[1] : ''
+  const displayVer = sys.displayVersion || ''
+  if (winVer && displayVer) return `Windows ${winVer} ${displayVer}`
+  if (winVer) return `Windows ${winVer}`
+  return osName || 'Unknown'
 }
 
 function SystemPageContent() {
@@ -250,7 +269,8 @@ function SystemPageContent() {
   )
   
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'edition' | 'architecture' | 'activation' | 'uptime' | 'lastSeen'>('device')
+  const [sortColumn, setSortColumn] = useState<'device' | 'os' | 'version' | 'updates' | 'edition' | 'activation' | 'uptime' | 'lastSeen'>('device')
+  const isWindowsOnly = globalPlatformFilter === 'Windows'
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
   const handleSort = (column: typeof sortColumn) => {
@@ -615,7 +635,19 @@ function SystemPageContent() {
 
   // Create devices formatted for OS Version Widget from systems data
   // Uses flat fields from lean API response (no raw needed)
-  const devicesForOSWidget = systems.map(sys => {
+  // Apply global platform filter so charts respect ?platform= URL param
+  const platformFilteredSystems = systems.filter(sys => {
+    if (!globalPlatformFilter || globalPlatformFilter === 'all') return true
+    const p = sys.platform || (() => {
+      const osName = sys.operatingSystem?.toLowerCase() || ''
+      if (osName.includes('windows') || osName.includes('microsoft')) return 'Windows'
+      if (osName.includes('macos') || osName.includes('mac os') || osName.includes('darwin')) return 'macOS'
+      return 'Unknown'
+    })()
+    return isPlatformVisible(p)
+  })
+
+  const devicesForOSWidget = platformFilteredSystems.map(sys => {
     const platform = sys.platform || (() => {
       const osName = sys.operatingSystem?.toLowerCase() || ''
       if (osName.includes('windows') || osName.includes('microsoft')) return 'Windows'
@@ -640,6 +672,7 @@ function SystemPageContent() {
       timeZone: sys.timeZone,
       uptime: sys.uptime,
       pendingUpdatesCount: sys.pendingUpdatesCount,
+      deferredUpdatesCount: sys.deferredUpdatesCount,
       osVersion: {
         name: sys.operatingSystem,
         version: sys.osVersion,
@@ -687,20 +720,20 @@ function SystemPageContent() {
         bValue = b.deviceName?.toLowerCase() || ''
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
       case 'os':
-        aValue = a.operatingSystem?.toLowerCase() || ''
-        bValue = b.operatingSystem?.toLowerCase() || ''
+        aValue = getOSDisplayName(a).toLowerCase()
+        bValue = getOSDisplayName(b).toLowerCase()
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
       case 'version':
         aValue = a.osVersion?.toLowerCase() || ''
         bValue = b.osVersion?.toLowerCase() || ''
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
+      case 'updates':
+        aValue = a.pendingUpdatesCount ?? 0
+        bValue = b.pendingUpdatesCount ?? 0
+        return sortDirection === 'asc' ? Number(aValue) - Number(bValue) : Number(bValue) - Number(aValue)
       case 'edition':
         aValue = a.edition?.toLowerCase() || ''
         bValue = b.edition?.toLowerCase() || ''
-        return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
-      case 'architecture':
-        aValue = a.architecture?.toLowerCase() || ''
-        bValue = b.architecture?.toLowerCase() || ''
         return sortDirection === 'asc' ? String(aValue).localeCompare(String(bValue)) : String(bValue).localeCompare(String(aValue))
       case 'activation':
         aValue = a.activationStatus === true ? 0 : a.activationStatus === false ? 1 : 2
@@ -740,18 +773,17 @@ function SystemPageContent() {
                 <button
                   onClick={() => {
                     // Build CSV from filtered data only
-                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Operating System', 'Version', 'Build', 'Edition', 'Architecture', 'Activation', 'License Source', 'Time Zone', 'Locale', 'Uptime', 'Boot Time', 'Last Seen']
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'OS', 'Version', 'Build', 'Edition', 'Activation', 'License Source', 'Time Zone', 'Locale', 'Uptime', 'Boot Time', 'Last Seen']
                     const rows = searchFilteredSystems.map(s => {
                       const uptimeStr = s.uptime ? `${Math.floor(s.uptime / 86400)}d ${Math.floor((s.uptime % 86400) / 3600)}h` : ''
                       return [
                         s.deviceName || '',
                         s.serialNumber || '',
                         s.assetTag || '',
-                        s.operatingSystem || '',
+                        getOSDisplayName(s),
                         s.osVersion || '',
                         s.buildNumber || '',
                         s.edition || '',
-                        s.architecture || '',
                         s.activationStatus === true ? 'Activated' : s.activationStatus === false ? 'Not Activated' : '',
                         s.licenseSource || '',
                         s.timeZone || '',
@@ -1311,44 +1343,48 @@ function SystemPageContent() {
                     </div>
                   </th>
                   <th 
-                    onClick={() => handleSort('edition')}
+                    onClick={() => handleSort('updates')}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
-                      Edition
-                      {sortColumn === 'edition' && (
+                      Updates
+                      {sortColumn === 'updates' && (
                         <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
                         </svg>
                       )}
                     </div>
                   </th>
-                  <th 
-                    onClick={() => handleSort('architecture')}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                  >
-                    <div className="flex items-center gap-1">
-                      Arch
-                      {sortColumn === 'architecture' && (
-                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </th>
-                  <th 
-                    onClick={() => handleSort('activation')}
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
-                  >
-                    <div className="flex items-center gap-1">
-                      Activation
-                      {sortColumn === 'activation' && (
-                        <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      )}
-                    </div>
-                  </th>
+                  {isWindowsOnly && (
+                    <th 
+                      onClick={() => handleSort('edition')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    >
+                      <div className="flex items-center gap-1">
+                        Edition
+                        {sortColumn === 'edition' && (
+                          <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </th>
+                  )}
+                  {isWindowsOnly && (
+                    <th 
+                      onClick={() => handleSort('activation')}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    >
+                      <div className="flex items-center gap-1">
+                        Activation
+                        {sortColumn === 'activation' && (
+                          <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </th>
+                  )}
                   <th 
                     onClick={() => handleSort('uptime')}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
@@ -1380,7 +1416,7 @@ function SystemPageContent() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={isWindowsOnly ? 7 : 5} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1400,7 +1436,7 @@ function SystemPageContent() {
                   </tr>
                 ) : searchFilteredSystems.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={isWindowsOnly ? 7 : 5} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.50 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1427,45 +1463,46 @@ function SystemPageContent() {
                         </Link>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="text-sm">
-                          <div className="flex items-center gap-2">
-                            <span className="text-gray-900 dark:text-white font-medium">
-                              {sys.systemInfo?.operatingSystem || sys.operatingSystem || 'Unknown'}
-                            </span>
-                          </div>
-                          <div className="text-gray-500 dark:text-gray-400">
-                            {sys.osVersion || null}
-                          </div>
-                        </div>
+                        <span className="text-sm text-gray-900 dark:text-white font-medium">
+                          {getOSDisplayName(sys)}
+                        </span>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {sys.buildNumber || '-'}
-                        </div>
+                        <span className="text-sm text-gray-900 dark:text-white">
+                          {sys.osVersion || '-'}
+                        </span>
                       </td>
                       <td className="px-4 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {sys.edition || '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm text-gray-900 dark:text-white">
-                          {sys.architecture || '-'}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        {sys.activationStatus != null ? (
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                            sys.activationStatus === true
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
-                          }`}>
-                            {sys.activationStatus ? 'Activated' : 'Not Activated'}
+                        {(sys.pendingUpdatesCount ?? 0) > 0 ? (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 whitespace-nowrap">
+                            {sys.pendingUpdatesCount} pending
                           </span>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )}
                       </td>
+                      {isWindowsOnly && (
+                        <td className="px-4 py-4">
+                          <div className="text-sm text-gray-900 dark:text-white">
+                            {sys.edition || '-'}
+                          </div>
+                        </td>
+                      )}
+                      {isWindowsOnly && (
+                        <td className="px-4 py-4">
+                          {sys.activationStatus != null ? (
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                              sys.activationStatus === true
+                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400'
+                            }`}>
+                              {sys.activationStatus ? 'Activated' : 'Not Activated'}
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400">-</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-4">
                         <div className="text-sm">
                           {sys.uptime ? (
