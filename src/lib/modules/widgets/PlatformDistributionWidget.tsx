@@ -13,9 +13,14 @@ interface Device {
   name: string
   model?: string
   os?: string
-  platform?: string  // API platform detection
+  platform?: string
   lastSeen: string
-  status: string  // Made flexible to handle API response variations
+  status: string
+  createdAt?: string
+  department?: string
+  location?: string
+  catalog?: string
+  usage?: string
   modules?: {
     system?: {
       operatingSystem?: {
@@ -37,6 +42,8 @@ interface Device {
     inventory?: {
       catalog?: string
       usage?: string
+      department?: string
+      location?: string
     }
   }
 }
@@ -75,9 +82,6 @@ export const PlatformDistributionWidget: React.FC<PlatformDistributionWidgetProp
                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
                   Platform Distribution
                 </h2>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Windows vs macOS breakdown
-                </p>
               </div>
             </div>
             <div className="text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">
