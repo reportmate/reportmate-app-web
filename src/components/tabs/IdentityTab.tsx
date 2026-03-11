@@ -298,7 +298,7 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   })() : null
 
   // Windows system service accounts to hide (pure noise, not real user accounts)
-  const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount']
+  const HIDDEN_WINDOWS_ACCOUNTS = ['wdagutilityaccount', 'administrator', 'defaultaccount', 'guest']
 
   // Filter logged in sessions to only show actual user sessions (not orphaned TTYs)
   const activeUserSessions = identity.loggedInUsers.filter(session => 
