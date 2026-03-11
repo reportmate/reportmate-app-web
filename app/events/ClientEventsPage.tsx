@@ -140,9 +140,11 @@ function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [filterLoading, setFilterLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filterType, setFilterType] = useState<string>('all')
+  // Multi-select filters: success, warning, error, system active by default; info off
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(
+    () => new Set(['success', 'warning', 'error', 'system'])
+  )
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   // Device name map removed - events API now includes deviceName and assetTag directly
@@ -164,10 +166,8 @@ function EventsPageContent() {
   const offsetRef = useRef(0)
   const fetchEventsRef = useRef<typeof fetchEvents | null>(null)
   
-  // Pre-fetch caches for instant filter switching
+  // Cache all fetched events for instant client-side filter switching
   const allEventsCache = useRef<Event[]>([])
-  const typeCache = useRef<Record<string, Event[]>>({})
-  const prefetchDone = useRef(false)
   
   // Date range state (default to last 48 hours)
   const [startDate, setStartDate] = useState(() => {
@@ -207,24 +207,22 @@ function EventsPageContent() {
     return bundleEvents(fleetEvents)
   }, [events])
 
-  // Initialize filter from URL parameters
+  // Initialize filter from URL parameters — single ?filter=type shows only that type
   useEffect(() => {
     const urlFilter = searchParams.get('filter')
-    if (urlFilter && ['success', 'warning', 'error', 'info', 'data_collection'].includes(urlFilter)) {
-      setFilterType(urlFilter)
+    if (urlFilter && ['success', 'warning', 'error', 'info', 'system', 'data_collection'].includes(urlFilter)) {
+      setActiveFilters(new Set([urlFilter]))
     }
   }, [searchParams])
 
   // Device names fetch removed - events API now includes deviceName and assetTag directly
 
   // Fetch events function for infinite scroll
-  const fetchEvents = useCallback(async (currentOffset: number, isLoadMore: boolean = false, isFilterChange: boolean = false) => {
+  // Passes active filter types to the server so each page batch is always full
+  const fetchEvents = useCallback(async (currentOffset: number, isLoadMore: boolean = false, filtersOverride?: Set<string>) => {
     try {
       if (isLoadMore) {
         setLoadingMore(true)
-      } else if (isFilterChange) {
-        // Filter change: keep the page visible, show inline indicator only
-        setFilterLoading(true)
       } else {
         setLoading(true)
       }
@@ -243,10 +241,10 @@ function EventsPageContent() {
         const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString()
         queryParams.append('endDate', endDateTime)
       }
-      // Server-side type filtering: when a specific type is selected,
-      // the DB returns only that type so we always get a full page of results
-      if (filterType && filterType !== 'all') {
-        queryParams.append('type', filterType)
+      // Send active types to the server so the page batch is always dense
+      const filters = filtersOverride ?? activeFilters
+      if (filters.size > 0) {
+        queryParams.append('type', [...filters].join(','))
       }
       
       // Use Next.js API route with pagination and date filtering parameters
@@ -270,14 +268,9 @@ function EventsPageContent() {
           // Append to existing events
           setEvents(prev => [...prev, ...newEvents])
         } else {
-          // Replace events (initial load or filter change)
+          // Replace events (initial load)
           setEvents(newEvents)
-          // Cache results for instant filter switching
-          if (!isFilterChange) {
-            allEventsCache.current = newEvents
-          } else if (filterType && filterType !== 'all') {
-            typeCache.current[filterType] = newEvents
-          }
+          allEventsCache.current = newEvents
         }
         
         // Check if there are more events to load
@@ -300,90 +293,32 @@ function EventsPageContent() {
     } finally {
       setLoading(false)
       setLoadingMore(false)
-      setFilterLoading(false)
     }
-  }, [startDate, endDate, filterType, EVENTS_PER_PAGE])
-
-  // Background pre-fetch all event types for instant filter switching
-  const prefetchTypes = useCallback(async () => {
-    if (prefetchDone.current) return
-    prefetchDone.current = true
-    
-    const types = ['success', 'warning', 'error', 'info', 'system']
-    const baseParams = new URLSearchParams()
-    baseParams.append('limit', EVENTS_PER_PAGE.toString())
-    baseParams.append('offset', '0')
-    if (startDate) baseParams.append('startDate', new Date(startDate + 'T00:00:00.000Z').toISOString())
-    if (endDate) baseParams.append('endDate', new Date(endDate + 'T23:59:59.999Z').toISOString())
-    
-    const results = await Promise.allSettled(types.map(async (type) => {
-      const params = new URLSearchParams(baseParams)
-      params.append('type', type)
-      const res = await fetch(`/api/events?${params.toString()}`)
-      if (!res.ok) return { type, events: [] as Event[] }
-      const data = await res.json()
-      const events = (data.success && Array.isArray(data.events))
-        ? data.events.filter((e: Event) => VALID_EVENT_KINDS.includes(e.kind?.toLowerCase()))
-        : [] as Event[]
-      return { type, events }
-    }))
-    
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        typeCache.current[result.value.type] = result.value.events
-      }
-    })
-  }, [startDate, endDate, EVENTS_PER_PAGE])
+  }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE])
 
   // Initial fetch on mount or date range change (full skeleton)
   useEffect(() => {
-    // Invalidate caches when date range changes
     allEventsCache.current = []
-    typeCache.current = {}
-    prefetchDone.current = false
     setEvents([])
     setOffset(0)
     setHasMore(true)
-    fetchEvents(0, false, false)
+    fetchEvents(0, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate])
 
-  // Trigger background prefetch after initial load completes
+  // Re-fetch when active filters change (pass new filters explicitly to avoid stale closure)
+  const prevActiveFilters = useRef(activeFilters)
   useEffect(() => {
-    if (!loading && allEventsCache.current.length > 0 && !prefetchDone.current) {
-      prefetchTypes()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
-
-  // Filter type changes: use cache for instant switch, fallback to server fetch
-  const prevFilterType = useRef(filterType)
-  useEffect(() => {
-    if (prevFilterType.current !== filterType) {
-      prevFilterType.current = filterType
-      
-      // Try instant switch from cache
-      if (filterType === 'all' && allEventsCache.current.length > 0) {
-        setEvents(allEventsCache.current)
-        setOffset(allEventsCache.current.length)
-        setHasMore(allEventsCache.current.length >= EVENTS_PER_PAGE)
-        return
-      }
-      if (filterType !== 'all' && typeCache.current[filterType]?.length > 0) {
-        setEvents(typeCache.current[filterType])
-        setOffset(typeCache.current[filterType].length)
-        setHasMore(typeCache.current[filterType].length >= EVENTS_PER_PAGE)
-        return
-      }
-      
-      // No cache hit: fetch from server with inline loading indicator
+    if (prevActiveFilters.current !== activeFilters) {
+      prevActiveFilters.current = activeFilters
+      allEventsCache.current = []
       setEvents([])
       setOffset(0)
       setHasMore(true)
-      fetchEvents(0, false, true)
+      fetchEvents(0, false, activeFilters)
     }
-  // eslint-disable-next-line react-hooks-exhaustive-deps
-  }, [filterType])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilters])
 
   // Keep refs in sync with state so the observer callback always sees fresh values
   useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
@@ -427,8 +362,8 @@ function EventsPageContent() {
       }
     }
     
-    // Filter by type
-    const typeMatch = filterType === 'all' || (event.bundledKinds || []).some(kind => kind.toLowerCase() === filterType.toLowerCase())
+    // Type filter is now handled server-side; always pass (for search + platform)
+    const typeMatch = true
     
     // Then filter by search query if provided
     if (!searchQuery.trim()) {
@@ -942,15 +877,20 @@ function EventsPageContent() {
                             { key: 'success', label: 'Success' },
                             { key: 'warning', label: 'Warnings' },
                             { key: 'error', label: 'Errors' },
-                            { key: 'info', label: 'Info' },
                             { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
                           ].map((filter) => {
-                            const isActive = filterType === filter.key
+                            const isActive = activeFilters.has(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
                                 className={`flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -959,33 +899,32 @@ function EventsPageContent() {
                             )
                           })}
                         </nav>
-                        {/* Mobile filter dropdown */}
-                        <div className="sm:hidden">
-                          <div className="relative">
-                            <select
-                              value={filterType}
-                              onChange={(e) => setFilterType(e.target.value)}
-                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                            >
-                              {[
-                                { key: 'all', label: 'All Events' },
-                                { key: 'success', label: 'Success Events' },
-                                { key: 'warning', label: 'Warning Events' },
-                                { key: 'error', label: 'Error Events' },
-                                { key: 'info', label: 'Info Events' },
-                                { key: 'system', label: 'System Events' },
-                              ].map((filter) => (
-                                <option key={filter.key} value={filter.key}>
-                                  {filter.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
+                        {/* Mobile filter buttons */}
+                        <div className="sm:hidden flex flex-wrap gap-1.5">
+                          {[
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
+                          ].map((filter) => {
+                            const isActive = activeFilters.has(filter.key)
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
+                                className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
+                              >
+                                {getStatusIcon(filter.key)}
+                                <span>{filter.label}</span>
+                              </button>
+                            )
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -1012,16 +951,7 @@ function EventsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filterLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                            <p className="text-sm">Loading {filterType} events...</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : currentEvents.length === 0 ? (
+                    {currentEvents.length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
@@ -1294,16 +1224,21 @@ function EventsPageContent() {
                             { key: 'success', label: 'Success' },
                             { key: 'warning', label: 'Warnings' },
                             { key: 'error', label: 'Errors' },
-                            { key: 'info', label: 'Info' },
                             { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
                           ].map((filter) => {
-                            const isActive = filterType === filter.key
+                            const isActive = activeFilters.has(filter.key)
                             const statusConfig = getStatusConfig(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1321,33 +1256,35 @@ function EventsPageContent() {
                             )
                           })}
                         </nav>
-                        {/* Mobile filter dropdown */}
-                        <div className="sm:hidden">
-                          <div className="relative">
-                            <select
-                              value={filterType}
-                              onChange={(e) => setFilterType(e.target.value)}
-                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                            >
-                              {[
-                                { key: 'all', label: 'All Events' },
-                                { key: 'success', label: 'Success Events' },
-                                { key: 'warning', label: 'Warning Events' },
-                                { key: 'error', label: 'Error Events' },
-                                { key: 'info', label: 'Info Events' },
-                                { key: 'system', label: 'System Events' },
-                              ].map((filter) => (
-                                <option key={filter.key} value={filter.key}>
-                                  {filter.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
+                        {/* Mobile filter buttons */}
+                        <div className="sm:hidden flex flex-wrap gap-1.5">
+                          {[
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
+                          ].map((filter) => {
+                            const isActive = activeFilters.has(filter.key)
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
+                                className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${
+                                  isActive
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                                    : 'bg-white text-gray-500 border-gray-300 dark:bg-gray-600 dark:text-gray-400 dark:border-gray-500'
+                                }`}
+                              >
+                                <span>{filter.label}</span>
+                              </button>
+                            )
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -1391,15 +1328,6 @@ function EventsPageContent() {
                             >
                               Try Again
                             </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : filterLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                            <p className="text-sm">Loading {filterType} events...</p>
                           </div>
                         </td>
                       </tr>
@@ -1633,14 +1561,7 @@ function EventsPageContent() {
                 </div>
               </div>
               
-              {filterLoading ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading {filterType} events...</p>
-                  </div>
-                </div>
-              ) : currentEvents.length === 0 ? (
+              {currentEvents.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                   <div className="flex flex-col items-center justify-center text-center">
                     <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
