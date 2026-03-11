@@ -58,6 +58,30 @@ export function parseInstallsEventPayload(payload: any): LastRunSummaryData | nu
 
   const lastRunItems: LastRunItem[] = []
 
+  // Strategy 0: Event-specific filtering — if the payload has explicit package
+  // references (failed_items for errors, packages for installs/updates/removals),
+  // filter to only those. This prevents showing all 122 Cimian items for a single error.
+  const failedItemsList: string[] = Array.isArray(effectivePayload.failed_items) ? effectivePayload.failed_items : []
+  const eventPackagesList: string[] = Array.isArray(effectivePayload.packages) ? effectivePayload.packages : []
+  const specificPackages = [...failedItemsList, ...eventPackagesList]
+
+  if (specificPackages.length > 0 && rawItems.length > 0) {
+    const packageSet = new Set(specificPackages.map(p => p.toLowerCase()))
+    for (const item of rawItems) {
+      const itemName = (item.itemName || item.name || item.displayName || '').toLowerCase()
+      if (packageSet.has(itemName)) {
+        lastRunItems.push({
+          name: item.displayName || item.name || item.itemName || 'Unknown',
+          version: item.version || item.installedVersion || item.latestVersion || '',
+          status: item.status || item.currentStatus || (failedItemsList.length > 0 ? 'Error' : 'Installed'),
+        })
+      }
+    }
+    if (lastRunItems.length > 0) {
+      return { runType, successCount, errorCount, items: lastRunItems }
+    }
+  }
+
   // Strategy 1: Session-based filtering (Cimian with session timestamps)
   let sessionStartTime = ''
   if (installsData.cimian?.sessions?.[0]) {
