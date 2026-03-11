@@ -2,10 +2,10 @@ import React from 'react'
 
 export const EventsPageSkeleton: React.FC = () => {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+    <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
+      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
         {/* Mobile Card View */}
-        <div className="md:hidden">
+        <div className="md:hidden flex-1 overflow-auto">
           <div className="space-y-3">
             {Array.from({ length: 8 }).map((_, index) => (
               <div key={index} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
@@ -29,10 +29,10 @@ export const EventsPageSkeleton: React.FC = () => {
           </div>
         </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden md:block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Tablet/Desktop Table View */}
+        <div className="hidden md:flex md:flex-col md:flex-1 md:min-h-0 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700 overflow-hidden">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Events Feed</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">Real-time activity from fleet</p>
@@ -52,38 +52,28 @@ export const EventsPageSkeleton: React.FC = () => {
             </div>
           </div>
 
-          <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+          <div className="flex-1 overflow-auto min-h-0">
             <table className="w-full table-fixed relative border-collapse">
               <colgroup>
-                <col style={{width: '6%'}} />
-                <col style={{width: '24%'}} />
-                <col style={{width: '43%'}} />
+                <col style={{width: '5%'}} />
+                <col style={{width: '22%'}} />
+                <col style={{width: '49%'}} />
                 <col style={{width: '14%'}} />
-                <col style={{width: '13%'}} />
+                <col style={{width: '10%'}} />
               </colgroup>
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
-                {/* Filter Row */}
                 <tr className="border-b border-gray-200 dark:border-gray-600">
                   <td colSpan={5} className="px-6 py-2 h-14">
                     <nav className="hidden sm:grid grid-cols-5 gap-2 w-full">
                       {Array.from({ length: 5 }).map((_, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg transition-colors"
-                        >
+                        <div key={index} className="flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg">
                           <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-shrink-0"></div>
                           <div className="w-14 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                         </div>
                       ))}
                     </nav>
-                    <div className="sm:hidden">
-                      <select disabled className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm">
-                        <option>Loading event filters...</option>
-                      </select>
-                    </div>
                   </td>
                 </tr>
-                {/* Header Row */}
                 <tr>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
                   <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
@@ -93,12 +83,11 @@ export const EventsPageSkeleton: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {Array.from({ length: 12 }).map((_, index) => (
+                {Array.from({ length: 20 }).map((_, index) => (
                   <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     <td className="px-4 lg:px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                        <div className="w-14 h-5 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
                       </div>
                     </td>
                     <td className="px-4 lg:px-6 py-4">
@@ -106,16 +95,14 @@ export const EventsPageSkeleton: React.FC = () => {
                       <div className="w-20 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                     </td>
                     <td className="px-4 lg:px-6 py-4">
-                      <div className="w-48 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className={`h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse`} style={{width: `${50 + (index * 17) % 40}%`}}></div>
                     </td>
                     <td className="px-4 lg:px-6 py-4">
-                      <div className="space-y-1">
-                        <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                        <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                      </div>
+                      <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
+                      <div className="w-16 h-3 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                     </td>
                     <td className="px-4 lg:px-6 py-4">
-                      <div className="w-20 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                      <div className="w-16 h-6 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                     </td>
                   </tr>
                 ))}
@@ -127,3 +114,4 @@ export const EventsPageSkeleton: React.FC = () => {
     </div>
   )
 }
+
