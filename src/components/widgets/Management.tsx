@@ -336,6 +336,9 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
   const tenantDetails = management.tenant_details || management.tenantDetails || {}
   const _organization = adeConfiguration.organization || tenantDetails.tenant_name || tenantDetails.tenantName
+
+  // Mac MDM client info (from mdmclient dumpManagementStatus)
+  const mdmInfo = management.mdm_info || management.mdmInfo || {}
   
   // Hardware UUID - from top-level device data
   const hardwareUuid = (device as any).deviceId
@@ -413,6 +416,15 @@ export const ManagementWidget: React.FC<ManagementWidgetProps> = ({ device }) =>
           label="Enrollment Type"
           status={enrollmentType}
           type={enrollmentType.includes('Automated') || enrollmentType.includes('Entra Joined') ? 'success' : enrollmentType.includes('User Approved') ? 'warning' : 'info'}
+        />
+      )}
+
+      {/* Mac: Supervised status from mdmclient */}
+      {isMac && (mdmInfo.is_supervised !== undefined || mdmInfo.isSupervised !== undefined) && (
+        <StatusBadge
+          label="Supervised"
+          status={parseBool(mdmInfo.is_supervised ?? mdmInfo.isSupervised) ? 'Yes' : 'No'}
+          type={parseBool(mdmInfo.is_supervised ?? mdmInfo.isSupervised) ? 'success' : 'warning'}
         />
       )}
 

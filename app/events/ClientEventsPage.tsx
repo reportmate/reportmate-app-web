@@ -140,9 +140,11 @@ function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [filterLoading, setFilterLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [filterType, setFilterType] = useState<string>('all')
+  // Multi-select filters: success, warning, error, system active by default; info off
+  const [activeFilters, setActiveFilters] = useState<Set<string>>(
+    () => new Set(['success', 'warning', 'error', 'system'])
+  )
   const [searchQuery, setSearchQuery] = useState('')
   const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
   // Device name map removed - events API now includes deviceName and assetTag directly
@@ -156,6 +158,9 @@ function EventsPageContent() {
   
   // Ref for infinite scroll sentinel
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  // Refs for scroll containers (used by scroll-based infinite scroll)
+  const desktopScrollRef = useRef<HTMLDivElement>(null)
+  const tabletScrollRef = useRef<HTMLDivElement>(null)
 
   // Refs to track live scroll-fetch state without recreating the observer on every render
   const hasMoreRef = useRef(true)
@@ -164,10 +169,8 @@ function EventsPageContent() {
   const offsetRef = useRef(0)
   const fetchEventsRef = useRef<typeof fetchEvents | null>(null)
   
-  // Pre-fetch caches for instant filter switching
+  // Cache all fetched events for instant client-side filter switching
   const allEventsCache = useRef<Event[]>([])
-  const typeCache = useRef<Record<string, Event[]>>({})
-  const prefetchDone = useRef(false)
   
   // Date range state (default to last 48 hours)
   const [startDate, setStartDate] = useState(() => {
@@ -207,25 +210,24 @@ function EventsPageContent() {
     return bundleEvents(fleetEvents)
   }, [events])
 
-  // Initialize filter from URL parameters
+  // Initialize filter from URL parameters — single ?filter=type shows only that type
   useEffect(() => {
     const urlFilter = searchParams.get('filter')
-    if (urlFilter && ['success', 'warning', 'error', 'info', 'data_collection'].includes(urlFilter)) {
-      setFilterType(urlFilter)
+    if (urlFilter && ['success', 'warning', 'error', 'info', 'system', 'data_collection'].includes(urlFilter)) {
+      setActiveFilters(new Set([urlFilter]))
     }
   }, [searchParams])
 
   // Device names fetch removed - events API now includes deviceName and assetTag directly
 
   // Fetch events function for infinite scroll
-  const fetchEvents = useCallback(async (currentOffset: number, isLoadMore: boolean = false, isFilterChange: boolean = false) => {
+  // Passes active filter types to the server so each page batch is always full
+  const fetchEvents = useCallback(async (currentOffset: number, isLoadMore: boolean = false, filtersOverride?: Set<string>, isFilterChange: boolean = false) => {
     try {
       if (isLoadMore) {
         setLoadingMore(true)
-      } else if (isFilterChange) {
-        // Filter change: keep the page visible, show inline indicator only
-        setFilterLoading(true)
-      } else {
+      } else if (!isFilterChange) {
+        // For filter changes keep old events visible; only show full skeleton on date/mount resets
         setLoading(true)
       }
       
@@ -243,10 +245,10 @@ function EventsPageContent() {
         const endDateTime = new Date(endDate + 'T23:59:59.999Z').toISOString()
         queryParams.append('endDate', endDateTime)
       }
-      // Server-side type filtering: when a specific type is selected,
-      // the DB returns only that type so we always get a full page of results
-      if (filterType && filterType !== 'all') {
-        queryParams.append('type', filterType)
+      // Send active types to the server so the page batch is always dense
+      const filters = filtersOverride ?? activeFilters
+      if (filters.size > 0) {
+        queryParams.append('type', [...filters].join(','))
       }
       
       // Use Next.js API route with pagination and date filtering parameters
@@ -272,12 +274,7 @@ function EventsPageContent() {
         } else {
           // Replace events (initial load or filter change)
           setEvents(newEvents)
-          // Cache results for instant filter switching
-          if (!isFilterChange) {
-            allEventsCache.current = newEvents
-          } else if (filterType && filterType !== 'all') {
-            typeCache.current[filterType] = newEvents
-          }
+          allEventsCache.current = newEvents
         }
         
         // Check if there are more events to load
@@ -300,90 +297,31 @@ function EventsPageContent() {
     } finally {
       setLoading(false)
       setLoadingMore(false)
-      setFilterLoading(false)
     }
-  }, [startDate, endDate, filterType, EVENTS_PER_PAGE])
-
-  // Background pre-fetch all event types for instant filter switching
-  const prefetchTypes = useCallback(async () => {
-    if (prefetchDone.current) return
-    prefetchDone.current = true
-    
-    const types = ['success', 'warning', 'error', 'info', 'system']
-    const baseParams = new URLSearchParams()
-    baseParams.append('limit', EVENTS_PER_PAGE.toString())
-    baseParams.append('offset', '0')
-    if (startDate) baseParams.append('startDate', new Date(startDate + 'T00:00:00.000Z').toISOString())
-    if (endDate) baseParams.append('endDate', new Date(endDate + 'T23:59:59.999Z').toISOString())
-    
-    const results = await Promise.allSettled(types.map(async (type) => {
-      const params = new URLSearchParams(baseParams)
-      params.append('type', type)
-      const res = await fetch(`/api/events?${params.toString()}`)
-      if (!res.ok) return { type, events: [] as Event[] }
-      const data = await res.json()
-      const events = (data.success && Array.isArray(data.events))
-        ? data.events.filter((e: Event) => VALID_EVENT_KINDS.includes(e.kind?.toLowerCase()))
-        : [] as Event[]
-      return { type, events }
-    }))
-    
-    results.forEach((result) => {
-      if (result.status === 'fulfilled') {
-        typeCache.current[result.value.type] = result.value.events
-      }
-    })
-  }, [startDate, endDate, EVENTS_PER_PAGE])
+  }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE])
 
   // Initial fetch on mount or date range change (full skeleton)
   useEffect(() => {
-    // Invalidate caches when date range changes
     allEventsCache.current = []
-    typeCache.current = {}
-    prefetchDone.current = false
     setEvents([])
     setOffset(0)
     setHasMore(true)
-    fetchEvents(0, false, false)
+    fetchEvents(0, false)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate])
 
-  // Trigger background prefetch after initial load completes
+  // Re-fetch when active filters change — keep old events visible until new results arrive
+  const prevActiveFilters = useRef(activeFilters)
   useEffect(() => {
-    if (!loading && allEventsCache.current.length > 0 && !prefetchDone.current) {
-      prefetchTypes()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
-
-  // Filter type changes: use cache for instant switch, fallback to server fetch
-  const prevFilterType = useRef(filterType)
-  useEffect(() => {
-    if (prevFilterType.current !== filterType) {
-      prevFilterType.current = filterType
-      
-      // Try instant switch from cache
-      if (filterType === 'all' && allEventsCache.current.length > 0) {
-        setEvents(allEventsCache.current)
-        setOffset(allEventsCache.current.length)
-        setHasMore(allEventsCache.current.length >= EVENTS_PER_PAGE)
-        return
-      }
-      if (filterType !== 'all' && typeCache.current[filterType]?.length > 0) {
-        setEvents(typeCache.current[filterType])
-        setOffset(typeCache.current[filterType].length)
-        setHasMore(typeCache.current[filterType].length >= EVENTS_PER_PAGE)
-        return
-      }
-      
-      // No cache hit: fetch from server with inline loading indicator
-      setEvents([])
+    if (prevActiveFilters.current !== activeFilters) {
+      prevActiveFilters.current = activeFilters
+      // Don't blank the table; swap events in once the first page of new results arrives
       setOffset(0)
       setHasMore(true)
-      fetchEvents(0, false, true)
+      fetchEvents(0, false, activeFilters, true)
     }
-  // eslint-disable-next-line react-hooks-exhaustive-deps
-  }, [filterType])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeFilters])
 
   // Keep refs in sync with state so the observer callback always sees fresh values
   useEffect(() => { hasMoreRef.current = hasMore }, [hasMore])
@@ -392,28 +330,30 @@ function EventsPageContent() {
   useEffect(() => { offsetRef.current = offset }, [offset])
   useEffect(() => { fetchEventsRef.current = fetchEvents }, [fetchEvents])
 
-  // Intersection Observer for infinite scroll — created once, reads state via refs
+  // Scroll-based infinite scroll — fires when user nears the bottom of a scroll container
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (
-          entries[0].isIntersecting &&
-          hasMoreRef.current &&
-          !loadingRef.current &&
-          !loadingMoreRef.current &&
-          fetchEventsRef.current
-        ) {
-          fetchEventsRef.current(offsetRef.current, true)
-        }
-      },
-      { threshold: 0.1 }
-    )
-
-    if (loadMoreRef.current) {
-      observer.observe(loadMoreRef.current)
+    const handleDesktopScroll = () => {
+      const el = desktopScrollRef.current
+      if (!el || !hasMoreRef.current || loadingRef.current || loadingMoreRef.current) return
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
+        fetchEventsRef.current?.(offsetRef.current, true)
+      }
     }
-
-    return () => observer.disconnect()
+    const handleTabletScroll = () => {
+      const el = tabletScrollRef.current
+      if (!el || !hasMoreRef.current || loadingRef.current || loadingMoreRef.current) return
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 300) {
+        fetchEventsRef.current?.(offsetRef.current, true)
+      }
+    }
+    const desktop = desktopScrollRef.current
+    const tablet = tabletScrollRef.current
+    desktop?.addEventListener('scroll', handleDesktopScroll)
+    tablet?.addEventListener('scroll', handleTabletScroll)
+    return () => {
+      desktop?.removeEventListener('scroll', handleDesktopScroll)
+      tablet?.removeEventListener('scroll', handleTabletScroll)
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable — reads live values through refs
 
@@ -427,8 +367,8 @@ function EventsPageContent() {
       }
     }
     
-    // Filter by type
-    const typeMatch = filterType === 'all' || (event.bundledKinds || []).some(kind => kind.toLowerCase() === filterType.toLowerCase())
+    // Type filter is now handled server-side; always pass (for search + platform)
+    const typeMatch = true
     
     // Then filter by search query if provided
     if (!searchQuery.trim()) {
@@ -853,15 +793,15 @@ function EventsPageContent() {
   */
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-black">
+    <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+      <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
 
 
         {/* Events Table */}
         <>
           {/* Desktop Table View (lg and up) */}
-          <div className="hidden lg:block bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div className="hidden lg:flex flex-col flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700 overflow-hidden">
               {/* Table Header with Search */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
                 <div>
@@ -922,35 +862,39 @@ function EventsPageContent() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-auto max-h-[calc(100vh-16rem)]">
+              <div className="flex-1 overflow-auto min-h-0" ref={desktopScrollRef}>
                 <table className="w-full table-fixed relative border-collapse">
                   <colgroup>
-                    <col style={{width: '6%'}} />
-                    <col style={{width: '9%'}} />
-                    <col style={{width: '18%'}} />
-                    <col style={{width: '40%'}} />
+                    <col style={{width: '5%'}} />
+                    <col style={{width: '22%'}} />
+                    <col style={{width: '49%'}} />
                     <col style={{width: '14%'}} />
-                    <col style={{width: '13%'}} />
+                    <col style={{width: '10%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-6 py-2 h-14">
+                      <td colSpan={5} className="px-6 py-2 h-14">
                         {/* Desktop filter tabs - full width */}
                         <nav className="hidden sm:grid grid-cols-5 gap-2 w-full">
                           {[
                             { key: 'success', label: 'Success' },
                             { key: 'warning', label: 'Warnings' },
                             { key: 'error', label: 'Errors' },
-                            { key: 'info', label: 'Info' },
                             { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
                           ].map((filter) => {
-                            const isActive = filterType === filter.key
+                            const isActive = activeFilters.has(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
                                 className={`flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -959,43 +903,39 @@ function EventsPageContent() {
                             )
                           })}
                         </nav>
-                        {/* Mobile filter dropdown */}
-                        <div className="sm:hidden">
-                          <div className="relative">
-                            <select
-                              value={filterType}
-                              onChange={(e) => setFilterType(e.target.value)}
-                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                            >
-                              {[
-                                { key: 'all', label: 'All Events' },
-                                { key: 'success', label: 'Success Events' },
-                                { key: 'warning', label: 'Warning Events' },
-                                { key: 'error', label: 'Error Events' },
-                                { key: 'info', label: 'Info Events' },
-                                { key: 'system', label: 'System Events' },
-                              ].map((filter) => (
-                                <option key={filter.key} value={filter.key}>
-                                  {filter.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
+                        {/* Mobile filter buttons */}
+                        <div className="sm:hidden flex flex-wrap gap-1.5">
+                          {[
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
+                          ].map((filter) => {
+                            const isActive = activeFilters.has(filter.key)
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
+                                className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
+                              >
+                                {getStatusIcon(filter.key)}
+                                <span>{filter.label}</span>
+                              </button>
+                            )
+                          })}
                         </div>
                       </td>
                     </tr>
-                    {/* Header Row */}
+                    {/* Header Row - desktop */}
                     <tr>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
-                      </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        ID
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
@@ -1012,18 +952,9 @@ function EventsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {filterLoading ? (
+                    {currentEvents.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                            <p className="text-sm">Loading {filterType} events...</p>
-                          </div>
-                        </td>
-                      </tr>
-                    ) : currentEvents.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1054,14 +985,6 @@ function EventsPageContent() {
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
                               </div>
-                            </td>
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
-                              <span 
-                                className="text-sm text-gray-900 dark:text-gray-100 font-mono" 
-                                title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
-                              >
-                                {formatEventId(event.id, event.eventIds)}
-                              </span>
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
                               <div>
@@ -1124,7 +1047,7 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-6 py-4">
                                   <div className="space-y-3">
                                     {/* Event Details */}
@@ -1206,14 +1129,31 @@ function EventsPageContent() {
                       )
                     }))}
                   </tbody>
+                  {(loadingMore || (!hasMore && events.length > 0)) && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={5} className="px-6 py-4 text-center">
+                          {loadingMore ? (
+                            <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+                              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              <span className="text-sm">Loading more events...</span>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Showing all {events.length.toLocaleString()} events</p>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
-              {/* Bottom border for desktop table */}
-              <div className="border-b border-gray-200 dark:border-gray-700"></div>
             </div>
 
             {/* Tablet Table View (md to lg) - Horizontally scrollable */}
-            <div className="hidden md:block lg:hidden bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700">
+            <div className="hidden md:flex md:flex-col md:flex-1 md:min-h-0 lg:hidden bg-white dark:bg-gray-800 rounded-t-xl shadow-sm border-l border-r border-t border-gray-200 dark:border-gray-700">
               {/* Table Header with Search */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
                 <div>
@@ -1274,36 +1214,40 @@ function EventsPageContent() {
                   </div>
                 </div>
               </div>
-              <div className="overflow-x-auto">
+              <div className="flex-1 overflow-auto min-h-0" ref={tabletScrollRef}>
                 <table className="w-full table-fixed border-collapse">
                   <colgroup>
-                    <col style={{width: '6%'}} />
-                    <col style={{width: '9%'}} />
-                    <col style={{width: '18%'}} />
-                    <col style={{width: '40%'}} />
+                    <col style={{width: '5%'}} />
+                    <col style={{width: '22%'}} />
+                    <col style={{width: '49%'}} />
                     <col style={{width: '14%'}} />
-                    <col style={{width: '13%'}} />
+                    <col style={{width: '10%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
                     <tr className="border-b border-gray-200 dark:border-gray-600">
-                      <td colSpan={6} className="px-4 py-2 h-14">
+                      <td colSpan={5} className="px-4 py-2 h-14">
                         {/* Desktop filter tabs */}
                         <nav className="hidden sm:flex flex-wrap gap-2">
                           {[
                             { key: 'success', label: 'Success' },
                             { key: 'warning', label: 'Warnings' },
                             { key: 'error', label: 'Errors' },
-                            { key: 'info', label: 'Info' },
                             { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
                           ].map((filter) => {
-                            const isActive = filterType === filter.key
+                            const isActive = activeFilters.has(filter.key)
                             const statusConfig = getStatusConfig(filter.key)
                             
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setFilterType(isActive ? 'all' : filter.key)}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1321,33 +1265,35 @@ function EventsPageContent() {
                             )
                           })}
                         </nav>
-                        {/* Mobile filter dropdown */}
-                        <div className="sm:hidden">
-                          <div className="relative">
-                            <select
-                              value={filterType}
-                              onChange={(e) => setFilterType(e.target.value)}
-                              className="appearance-none block w-full pl-3 pr-10 py-2 text-sm border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm cursor-pointer"
-                            >
-                              {[
-                                { key: 'all', label: 'All Events' },
-                                { key: 'success', label: 'Success Events' },
-                                { key: 'warning', label: 'Warning Events' },
-                                { key: 'error', label: 'Error Events' },
-                                { key: 'info', label: 'Info Events' },
-                                { key: 'system', label: 'System Events' },
-                              ].map((filter) => (
-                                <option key={filter.key} value={filter.key}>
-                                  {filter.label}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 dark:text-gray-500">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </div>
-                          </div>
+                        {/* Mobile filter buttons */}
+                        <div className="sm:hidden flex flex-wrap gap-1.5">
+                          {[
+                            { key: 'success', label: 'Success' },
+                            { key: 'warning', label: 'Warnings' },
+                            { key: 'error', label: 'Errors' },
+                            { key: 'system', label: 'System' },
+                            { key: 'info', label: 'Info' },
+                          ].map((filter) => {
+                            const isActive = activeFilters.has(filter.key)
+                            return (
+                              <button
+                                key={filter.key}
+                                onClick={() => setActiveFilters(prev => {
+                                  const next = new Set(prev)
+                                  if (next.has(filter.key)) next.delete(filter.key)
+                                  else next.add(filter.key)
+                                  return next
+                                })}
+                                className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${
+                                  isActive
+                                    ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
+                                    : 'bg-white text-gray-500 border-gray-300 dark:bg-gray-600 dark:text-gray-400 dark:border-gray-500'
+                                }`}
+                              >
+                                <span>{filter.label}</span>
+                              </button>
+                            )
+                          })}
                         </div>
                       </td>
                     </tr>
@@ -1355,9 +1301,6 @@ function EventsPageContent() {
                     <tr>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
-                      </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        ID
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
@@ -1376,7 +1319,7 @@ function EventsPageContent() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {error ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center">
+                        <td colSpan={5} className="px-4 py-12 text-center">
                           <div className="flex flex-col items-center justify-center">
                             <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                               <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1394,18 +1337,9 @@ function EventsPageContent() {
                           </div>
                         </td>
                       </tr>
-                    ) : filterLoading ? (
-                      <tr>
-                        <td colSpan={6} className="px-4 py-12 text-center text-gray-500 dark:text-gray-400">
-                          <div className="flex flex-col items-center justify-center">
-                            <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                            <p className="text-sm">Loading {filterType} events...</p>
-                          </div>
-                        </td>
-                      </tr>
                     ) : currentEvents.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={5} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1436,14 +1370,6 @@ function EventsPageContent() {
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
                               </div>
-                            </td>
-                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
-                              <span 
-                                className="text-sm text-gray-900 dark:text-gray-100 font-mono"
-                                title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
-                              >
-                                {formatEventId(event.id, event.eventIds)}
-                              </span>
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
                               <div>
@@ -1505,7 +1431,7 @@ function EventsPageContent() {
                           </tr>
                           {isExpanded && (
                             <tr>
-                              <td colSpan={6} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
+                              <td colSpan={5} className="px-0 py-0 bg-gray-50 dark:bg-gray-900">
                                 <div className="px-4 py-3">
                                   <div className="space-y-2">
                                     {/* Last Run Summary for installs events */}
@@ -1565,10 +1491,27 @@ function EventsPageContent() {
                       )
                     }))}
                   </tbody>
+                  {(loadingMore || (!hasMore && events.length > 0)) && (
+                    <tfoot>
+                      <tr>
+                        <td colSpan={5} className="px-4 py-4 text-center">
+                          {loadingMore ? (
+                            <div className="flex items-center justify-center gap-2 text-gray-500 dark:text-gray-400">
+                              <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg>
+                              <span className="text-sm">Loading more events...</span>
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400">Showing all {events.length.toLocaleString()} events</p>
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
-              {/* Bottom border for tablet table */}
-              <div className="border-b border-gray-200 dark:border-gray-700"></div>
             </div>
 
             {/* Mobile Card View (sm and below) */}
@@ -1633,14 +1576,7 @@ function EventsPageContent() {
                 </div>
               </div>
               
-              {filterLoading ? (
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
-                  <div className="flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 border-2 border-gray-300 dark:border-gray-600 border-t-blue-500 rounded-full animate-spin mb-3" />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Loading {filterType} events...</p>
-                  </div>
-                </div>
-              ) : currentEvents.length === 0 ? (
+              {currentEvents.length === 0 ? (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-8">
                   <div className="flex flex-col items-center justify-center text-center">
                     <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1812,26 +1748,25 @@ function EventsPageContent() {
               }))}
             </div>
 
-            {/* Infinite scroll sentinel and loading indicator */}
-            <div 
-              ref={loadMoreRef}
-              className="flex items-center justify-center py-6"
-            >
-              {loadingMore && (
-                <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
-                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  <span className="text-sm">Loading more events...</span>
-                </div>
-              )}
-              {!hasMore && events.length > 0 && (
-                <p className="text-sm text-gray-500 dark:text-gray-400">
-                  Showing all {events.length.toLocaleString()} events
-                </p>
-              )}
-            </div>
+            {/* Infinite scroll loading indicator — mobile only; desktop/tablet use scroll listeners */}
+            {(loadingMore || (!hasMore && events.length > 0)) && (
+              <div className="flex items-center justify-center py-4 md:hidden">
+                {loadingMore && (
+                  <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+                    <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="text-sm">Loading more events...</span>
+                  </div>
+                )}
+                {!hasMore && events.length > 0 && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Showing all {events.length.toLocaleString()} events
+                  </p>
+                )}
+              </div>
+            )}
           </>
       </div>
     </div>
