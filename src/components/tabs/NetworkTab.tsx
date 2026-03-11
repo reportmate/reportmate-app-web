@@ -285,28 +285,22 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
         )}
       </div>
 
-      {/* Local Hostname - Prominent display for Mac */}
-      {(networkData.localHostname || rawNetworkModule?.localHostname) && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6">
-          <div className="flex items-center">
-            <div>
+      {/* Main Layout: 70% left / 30% right */}
+      <div className="flex flex-col lg:flex-row gap-6">
+        {/* Left Column - 70% - Local Hostname + Active Connections */}
+        <div className="lg:w-[70%] space-y-4">
+          {(networkData.localHostname || rawNetworkModule?.localHostname) && (
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6">
               <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Local Hostname</div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
-                <CopyableValue 
-                  value={networkData.localHostname || rawNetworkModule?.localHostname} 
+                <CopyableValue
+                  value={networkData.localHostname || rawNetworkModule?.localHostname}
                   className="text-lg"
                   mono={true}
                 />
               </div>
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* Main Layout: 70% left / 30% right */}
-      <div className="flex flex-col lg:flex-row gap-6">
-        {/* Left Column - 70% - Active Connections */}
-        <div className="lg:w-[70%] space-y-4">
+          )}
           {sortedActiveInterfaces.length > 0 ? (
             sortedActiveInterfaces.map((iface: any, index: number) => {
               const isWiFi = iface.type?.toLowerCase().includes('wifi') || 
@@ -335,27 +329,24 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
 
         {/* Right Column - 30% - VPN, Quality, WiFi Networks, Inactive */}
         <div className="lg:w-[30%] space-y-4">
-          {/* VPN Connection - Only shown when connected */}
+          {/* VPN Connection - top of sidebar when connected */}
           {hasConnectedVpn && (
-            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-                  <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                  </svg>
-                </div>
-                <span className="font-semibold text-gray-900 dark:text-white">VPN</span>
+            <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6 flex items-center gap-4">
+              <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-4 h-4 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
               </div>
-              <div className="space-y-2">
-                {connectedVpns.map((vpn: any, index: number) => (
-                  <div 
-                    key={vpn.name || index} 
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-700/50"
-                  >
-                    <span className="text-sm font-medium text-gray-900 dark:text-white flex-1">{vpn.name}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">{vpn.type || 'IPSec'}</span>
-                  </div>
-                ))}
+              <div className="min-w-0">
+                <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">VPN Connected</div>
+                <div className="flex flex-col gap-0.5">
+                  {connectedVpns.map((vpn: any, index: number) => (
+                    <div key={vpn.name || index} className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">{vpn.name}</span>
+                      {vpn.type && <span className="text-xs text-gray-500 dark:text-gray-400">{vpn.type}</span>}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
