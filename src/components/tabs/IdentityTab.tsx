@@ -36,6 +36,7 @@ import {
   ChevronDown,
   Fingerprint,
   Key,
+  Clock,
 } from 'lucide-react'
 import { extractIdentity, type IdentityInfo } from '../../lib/data-processing/modules/identity'
 
@@ -186,7 +187,7 @@ type UserSortColumn = 'username' | 'realName' | 'uid' | 'isAdmin' | 'lastLogon'
 type SortDirection = 'asc' | 'desc'
 
 export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
-  const [activeTable, setActiveTable] = useState<'users' | 'sessions' | 'history'>('users')
+  const [activeTable, setActiveTable] = useState<'users' | 'sessions' | 'history' | 'sessionHistory'>('users')
   const [userSearch, setUserSearch] = useState('')
   const [showAdminsOnly, setShowAdminsOnly] = useState(false)
   const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set())
@@ -927,6 +928,19 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
             <History className="w-4 h-4 inline mr-2" />
             Login History ({identity.loginHistory.length})
           </button>
+          {identity.sessionHistory.length > 0 && (
+            <button
+              onClick={() => setActiveTable('sessionHistory')}
+              className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                activeTable === 'sessionHistory'
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300'
+              }`}
+            >
+              <Clock className="w-4 h-4 inline mr-2" />
+              Session History ({identity.sessionHistory.length})
+            </button>
+          )}
         </nav>
       </div>
 
@@ -1336,6 +1350,138 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Session History Table (TerminalServices RDP sessions) */}
+      {activeTable === 'sessionHistory' && (
+        <div className="space-y-4">
+          {/* Session Utilization Summary */}
+          {identity.sessionSummary && (
+            <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Session Utilization
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{identity.sessionSummary.totalSessions}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Total Sessions</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">{identity.sessionSummary.uniqueUsers}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Unique Users</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {identity.sessionSummary.avgSessionMinutes > 60 
+                      ? `${(identity.sessionSummary.avgSessionMinutes / 60).toFixed(1)}h`
+                      : `${Math.round(identity.sessionSummary.avgSessionMinutes)}m`}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Avg Duration</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {identity.sessionSummary.medianSessionMinutes > 60 
+                      ? `${(identity.sessionSummary.medianSessionMinutes / 60).toFixed(1)}h`
+                      : `${Math.round(identity.sessionSummary.medianSessionMinutes)}m`}
+                  </div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">Median Duration</div>
+                </div>
+              </div>
+              {/* Peak hours */}
+              {Object.keys(identity.sessionSummary.sessionsByHour).length > 0 && (
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Peak Hours</div>
+                  <div className="flex flex-wrap gap-1">
+                    {Object.entries(identity.sessionSummary.sessionsByHour)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 5)
+                      .map(([hour, count]) => (
+                        <span key={hour} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                          {hour}:00 ({count})
+                        </span>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Session History Table */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700/50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">User</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Event</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">End</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Duration</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Source</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {identity.sessionHistory.map((entry, idx) => (
+                    <tr key={`session-${entry.username}-${idx}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/30">
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-gray-900 dark:text-white">{entry.username}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        {entry.eventType === 'Logoff' || entry.eventType === 'Disconnect' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            <LogIn className="w-3 h-3 mr-1 rotate-180" />
+                            {entry.eventType}
+                          </span>
+                        ) : entry.eventType === 'Active' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Active
+                          </span>
+                        ) : entry.eventType === 'Reconnect' ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            <LogIn className="w-3 h-3 mr-1" />
+                            Reconnect
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            <CheckCircle className="w-3 h-3 mr-1" />
+                            Logon
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {entry.timestamp ? formatDate(entry.timestamp).text : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {entry.endTime ? formatDate(entry.endTime).text : entry.eventType === 'Active' ? (
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">Active</span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {entry.duration || (entry.durationMinutes != null 
+                          ? entry.durationMinutes > 60 
+                            ? `${(entry.durationMinutes / 60).toFixed(1)}h`
+                            : `${Math.round(entry.durationMinutes)}m`
+                          : '—')}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {entry.sourceAddress || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                  {identity.sessionHistory.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+                        No session history available
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       )}

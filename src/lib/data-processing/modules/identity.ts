@@ -27,6 +27,8 @@ export interface IdentityInfo {
   secureTokenUsers: SecureTokenInfo | null  // macOS only
   platformSSOUsers: PlatformSSOUsersInfo | null  // macOS 13+ only
   enrollmentInfo: EnrollmentInfo | null  // Enrollment type (Entra/Domain/Hybrid)
+  sessionHistory: SessionHistoryEntry[]  // TerminalServices RDP session history
+  sessionSummary: SessionSummary | null  // Aggregated session utilization stats
   summary: IdentitySummary
 }
 
@@ -197,6 +199,31 @@ export interface PlatformSSOUser {
   userPrincipalName: string | null
 }
 
+// MARK: - Session History (TerminalServices RDP sessions)
+
+export interface SessionHistoryEntry {
+  username: string
+  timestamp: string
+  endTime?: string | null
+  duration?: string | null
+  durationMinutes?: number | null
+  eventId: number
+  eventType: string  // Logon, Logoff, Disconnect, Reconnect, Active
+  sessionId?: number | null
+  sourceAddress?: string | null
+}
+
+export interface SessionSummary {
+  totalSessions: number
+  uniqueUsers: number
+  avgSessionMinutes: number
+  medianSessionMinutes: number
+  oldestSession?: string | null
+  newestSession?: string | null
+  sessionsByHour: Record<string, number>
+  sessionsByDayOfWeek: Record<string, number>
+}
+
 // MARK: - Summary
 
 export interface IdentitySummary {
@@ -260,6 +287,8 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
     secureTokenUsers: identity.secureTokenUsers ? mapSecureTokenInfo(identity.secureTokenUsers) : null,
     platformSSOUsers: identity.platformSSOUsers ? mapPlatformSSOUsers(identity.platformSSOUsers) : null,
     enrollmentInfo: enrollmentInfo,
+    sessionHistory: identity.sessionHistory ? identity.sessionHistory.map(mapSessionHistory) : [],
+    sessionSummary: identity.sessionSummary ? mapSessionSummary(identity.sessionSummary) : null,
     summary: identity.summary ? mapIdentitySummary(identity.summary) : createEmptySummary()
   }
 }
@@ -489,6 +518,33 @@ function mapPlatformSSOUsers(psso: any): PlatformSSOUsersInfo {
   }
 }
 
+function mapSessionHistory(entry: any): SessionHistoryEntry {
+  return {
+    username: entry.username || entry.user || '',
+    timestamp: entry.timestamp || entry.time || '',
+    endTime: entry.endTime || entry.end_time || null,
+    duration: entry.duration || null,
+    durationMinutes: entry.durationMinutes ?? entry.duration_minutes ?? null,
+    eventId: entry.eventId || entry.event_id || 0,
+    eventType: entry.eventType || entry.event_type || 'Unknown',
+    sessionId: entry.sessionId ?? entry.session_id ?? null,
+    sourceAddress: entry.sourceAddress || entry.source_address || null
+  }
+}
+
+function mapSessionSummary(summary: any): SessionSummary {
+  return {
+    totalSessions: summary.totalSessions || summary.total_sessions || 0,
+    uniqueUsers: summary.uniqueUsers || summary.unique_users || 0,
+    avgSessionMinutes: summary.avgSessionMinutes ?? summary.avg_session_minutes ?? 0,
+    medianSessionMinutes: summary.medianSessionMinutes ?? summary.median_session_minutes ?? 0,
+    oldestSession: summary.oldestSession || summary.oldest_session || null,
+    newestSession: summary.newestSession || summary.newest_session || null,
+    sessionsByHour: summary.sessionsByHour || summary.sessions_by_hour || {},
+    sessionsByDayOfWeek: summary.sessionsByDayOfWeek || summary.sessions_by_day_of_week || {}
+  }
+}
+
 function mapIdentitySummary(summary: any): IdentitySummary {
   return {
     totalUsers: summary.totalUsers || summary.total_users || 0,
@@ -517,6 +573,8 @@ function createEmptyIdentityInfo(): IdentityInfo {
     secureTokenUsers: null,
     platformSSOUsers: null,
     enrollmentInfo: null,
+    sessionHistory: [],
+    sessionSummary: null,
     summary: createEmptySummary()
   }
 }

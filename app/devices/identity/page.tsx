@@ -46,6 +46,13 @@ interface IdentityDevice {
   trustStatus?: string | null
   // Auth method: "Platform SSO" (Mac) or "Hello for Business" (Windows)
   authMethod?: string | null
+  // Session utilization (TerminalServices RDP data)
+  sessionSummary?: {
+    totalSessions: number
+    uniqueUsers: number
+    avgSessionMinutes: number
+    medianSessionMinutes: number
+  } | null
 }
 
 function LoadingSkeleton() {
@@ -122,6 +129,8 @@ function IdentityPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [adminFilter, setAdminFilter] = useState('all')
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  // Utilization report mode
+  const [showUtilizationReport, setShowUtilizationReport] = useState(false)
   // Widget click filters
   const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
   const [authFilter, setAuthFilter] = useState<string | null>(null)
@@ -376,6 +385,24 @@ function IdentityPageContent() {
               )}
 
               <div className="flex-1" />
+
+              {/* Generate Utilization Report */}
+              {platformFilteredDevices.some(d => d.sessionSummary && d.sessionSummary.totalSessions > 0) && (
+                <button
+                  onClick={() => setShowUtilizationReport(!showUtilizationReport)}
+                  className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                    showUtilizationReport
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                      : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                  title="Show session utilization report for devices with RDP data"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  {showUtilizationReport ? 'Back to List' : 'Utilization Report'}
+                </button>
+              )}
 
               {/* Export CSV */}
               <button
@@ -712,6 +739,97 @@ function IdentityPageContent() {
           </div>
 
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
+            {showUtilizationReport ? (
+              /* Utilization Report View */
+              (() => {
+                const devicesWithSessions = filteredDevices
+                  .filter(d => d.sessionSummary && d.sessionSummary.totalSessions > 0)
+                  .sort((a, b) => (b.sessionSummary?.totalSessions || 0) - (a.sessionSummary?.totalSessions || 0))
+                
+                const fleetTotalSessions = devicesWithSessions.reduce((sum, d) => sum + (d.sessionSummary?.totalSessions || 0), 0)
+                const fleetUniqueUsers = devicesWithSessions.reduce((sum, d) => sum + (d.sessionSummary?.uniqueUsers || 0), 0)
+                const avgDurations = devicesWithSessions.map(d => d.sessionSummary?.avgSessionMinutes || 0).filter(v => v > 0)
+                const fleetAvgDuration = avgDurations.length > 0 ? avgDurations.reduce((a, b) => a + b, 0) / avgDurations.length : 0
+                
+                const formatDuration = (minutes: number) => {
+                  if (minutes > 60) return `${(minutes / 60).toFixed(1)}h`
+                  return `${Math.round(minutes)}m`
+                }
+                
+                return (
+                  <div className="p-6 space-y-6">
+                    {/* Fleet Summary Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-lg p-4 border border-indigo-200 dark:border-indigo-800">
+                        <div className="text-3xl font-bold text-indigo-700 dark:text-indigo-300">{devicesWithSessions.length}</div>
+                        <div className="text-sm text-indigo-600 dark:text-indigo-400">Devices with Sessions</div>
+                      </div>
+                      <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
+                        <div className="text-3xl font-bold text-blue-700 dark:text-blue-300">{fleetTotalSessions.toLocaleString()}</div>
+                        <div className="text-sm text-blue-600 dark:text-blue-400">Total Sessions</div>
+                      </div>
+                      <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-4 border border-green-200 dark:border-green-800">
+                        <div className="text-3xl font-bold text-green-700 dark:text-green-300">{fleetUniqueUsers}</div>
+                        <div className="text-sm text-green-600 dark:text-green-400">Total Unique Users</div>
+                      </div>
+                      <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-4 border border-amber-200 dark:border-amber-800">
+                        <div className="text-3xl font-bold text-amber-700 dark:text-amber-300">{formatDuration(fleetAvgDuration)}</div>
+                        <div className="text-sm text-amber-600 dark:text-amber-400">Avg Session Duration</div>
+                      </div>
+                    </div>
+
+                    {/* Per-Device Utilization Table */}
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Sessions</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Unique Users</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Avg Duration</th>
+                          <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Median Duration</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {devicesWithSessions.map(device => (
+                          <tr key={device.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                            <td className="px-6 py-4">
+                              <Link href={`/device/${device.serialNumber}#identity`} className="group block">
+                                <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">{device.deviceName}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{device.serialNumber}</div>
+                              </Link>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">{device.sessionSummary?.totalSessions.toLocaleString()}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-sm font-medium text-gray-900 dark:text-white">{device.sessionSummary?.uniqueUsers}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-sm text-gray-900 dark:text-white">{formatDuration(device.sessionSummary?.avgSessionMinutes || 0)}</span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-sm text-gray-900 dark:text-white">{formatDuration(device.sessionSummary?.medianSessionMinutes || 0)}</span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                              {device.lastSeen ? formatRelativeTime(device.lastSeen) : '-'}
+                            </td>
+                          </tr>
+                        ))}
+                        {devicesWithSessions.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-12 text-center">
+                              <p className="text-sm text-gray-500 dark:text-gray-400">No devices have session history data yet.</p>
+                              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Session data is collected from TerminalServices event logs on Windows devices.</p>
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()
+            ) : (
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
@@ -919,6 +1037,7 @@ function IdentityPageContent() {
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
       </div>
