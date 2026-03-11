@@ -154,8 +154,20 @@ function NetworkPageContent() {
     }
   })
 
-  // Count VPN-connected devices for the filter badge
-  const vpnDeviceCount = processedNetworkDevices.filter(n => n.networkInfo.vpnActive).length
+  // Platform-filtered devices (applies platform filter only, not connection/search filters)
+  // Used for badge counts so they stay consistent with the visible device set
+  const platformFilteredDevices = processedNetworkDevices.filter(n => {
+    if (!platformFilter) return true
+    const deviceFromMainAPI = devices.find(d =>
+      d.deviceId === n.deviceId ||
+      d.serialNumber === n.serialNumber
+    )
+    const platform = getDevicePlatform(deviceFromMainAPI || n)
+    return isPlatformVisible(platform)
+  })
+
+  // Count VPN-connected devices for the filter badge (respects platform filter)
+  const vpnDeviceCount = platformFilteredDevices.filter(n => n.networkInfo.vpnActive).length
 
   // Extract unique filter options from devices (inventory data)
   const filterOptions = {
