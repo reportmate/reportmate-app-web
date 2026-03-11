@@ -106,6 +106,9 @@ export async function GET(request: Request) {
             return null;
           })(),
           
+          // Session utilization summary (TerminalServices RDP data)
+          sessionSummary: item.sessionSummary || null,
+          
           // User previews (top 5, pre-sliced by API)
           users: users.map((u: any) => ({
             username: u.username,
