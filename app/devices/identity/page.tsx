@@ -204,12 +204,12 @@ function IdentityPageContent() {
     if (directoryFilter) {
       // Trust sub-statuses for domain joined / hybrid
       if (directoryFilter === 'Broken') {
-        if (d.trustStatus !== 'Broken') return false
+        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Broken') return false
       } else if (directoryFilter === 'Unconfirmed') {
-        const isDomainOrHybrid = d.enrollmentType === 'Domain Joined'
-        if (!isDomainOrHybrid || (d.trustStatus && d.trustStatus !== 'Unknown')) return false
+        if (d.enrollmentType !== 'Domain Joined') return false
+        if (d.trustStatus === 'Healthy' || d.trustStatus === 'Broken') return false
       } else if (directoryFilter === 'Trusted') {
-        if (d.trustStatus !== 'Healthy') return false
+        if (d.enrollmentType !== 'Domain Joined' || d.trustStatus !== 'Healthy') return false
       } else {
         if (d.enrollmentType !== directoryFilter) return false
       }
