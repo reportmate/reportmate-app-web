@@ -111,6 +111,70 @@ export function parseInstallsEventPayload(payload: any): LastRunSummaryData | nu
     lastRunItems.push(...directItems)
   }
 
+  // Strategy 4: Parse top-level "warnings" / "errors" text into items.
+  // Munki warning/error events store run-level text here rather than per-item flags.
+  if (lastRunItems.length === 0) {
+    const warningsText = String(effectivePayload.warnings || '')
+    const errorsText   = String(effectivePayload.errors || effectivePayload.error || '')
+
+    const textToItems = (text: string, status: string): LastRunItem[] => {
+      if (!text.trim()) return []
+      // Split on "; WARNING:" / "; ERROR:" boundaries then strip leading prefix
+      const segments = text
+        .split(/;\s*(?:WARNING|ERROR):\s*/i)
+        .map(s => s.replace(/^(?:WARNING|ERROR):\s*/i, '').trim())
+        // Drop bare keyword remnants (e.g. error field containing just "ERROR")
+        .filter(s => Boolean(s) && !/^(?:warning|error)$/i.test(s))
+
+      return segments.map(segment => {
+        // "... for PackageName" at end of sentence
+        const forMatch = segment.match(/\bfor\s+([A-Za-z0-9][\w.-]*)[\s;,.]*$/i)
+        if (forMatch) return { name: forMatch[1], version: '', status }
+
+        // "Package bundle.id references are: ["Name1", "Name2"]"
+        // Extract actual package names from the reference list rather than the bundle ID
+        const refsMatch = segment.match(/^Package\s+[\w.]+\s+references are:\s*\[([^\]]+)\]/i)
+        if (refsMatch) {
+          const names = (refsMatch[1].match(/"([^"]+)"/g) || []).map(n => n.replace(/"/g, ''))
+          if (names.length > 0) {
+            // Prefer the shortest name (base package, not a variant like "Zoom-IT")
+            const best = names.slice().sort((a, b) => a.length - b.length)[0]
+            return { name: best, version: '', status }
+          }
+        }
+
+        // "Package bundle.id ..." at start (no references array)
+        const pkgMatch = segment.match(/^Package\s+([\w.]+)/i)
+        if (pkgMatch) {
+          const parts = pkgMatch[1].split('.')
+          const readable = parts[parts.length - 1].replace(/([a-z])([A-Z])/g, '$1 $2')
+          return { name: readable, version: '', status }
+        }
+
+        // Fallback: use the whole sentence, truncated
+        return {
+          name: segment.length > 70 ? segment.substring(0, 67) + '...' : segment,
+          version: '',
+          status,
+        }
+      })
+    }
+
+    const allTextItems: LastRunItem[] = []
+    if (warningsText) allTextItems.push(...textToItems(warningsText, 'Warning'))
+    if (errorsText)   allTextItems.push(...textToItems(errorsText,   'Error'))
+
+    // Deduplicate by name (case-insensitive) — multiple warnings about the same package collapse to one
+    const seen = new Set<string>()
+    for (const item of allTextItems) {
+      const key = item.name.toLowerCase()
+      if (!seen.has(key)) {
+        seen.add(key)
+        lastRunItems.push(item)
+      }
+    }
+  }
+
   return { runType, successCount, errorCount, items: lastRunItems }
 }
 
