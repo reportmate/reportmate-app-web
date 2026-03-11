@@ -207,7 +207,7 @@ export function useLiveEvents() {
                 .map(sanitizeEventForDisplay)
               if (newEvents.length > 0) {
                 setLastUpdateTime(new Date())
-                return [...prev, ...newEvents].slice(-1000) // Keep last 1000 events
+                return [...newEvents, ...prev].slice(0, 1000) // Prepend newest, keep first 1000
               }
               return prev
             })
@@ -334,7 +334,7 @@ export function useLiveEvents() {
                   if (!existingIds.has(eventData.id)) {
                     const sanitized = sanitizeEventForDisplay(eventData)
                     setLastUpdateTime(new Date())
-                    return [sanitized, ...prev].slice(0, 50)
+                    return [sanitized, ...prev].slice(0, 1000)
                   }
                   return prev
                 })
