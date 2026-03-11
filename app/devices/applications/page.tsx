@@ -2008,8 +2008,8 @@ function ApplicationsPageContent() {
           )}
           
 
-          {/* Version Distribution Widget - Shows for Usage Report (from API data) */}
-          {reportType === 'usage' && utilizationData && utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && (
+          {/* Version Distribution Widget - Shows for Usage Report drill-down (version selected) */}
+          {reportType === 'usage' && utilizationData && utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && selectedVersions.length > 0 && (
             <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               <div className="px-6 py-4">
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
@@ -2222,9 +2222,92 @@ function ApplicationsPageContent() {
             </div>
           )}
 
-          {/* Usage Report Content - Shows utilization data with widgets */}
+          {/* Usage Report Content - single scrollable container for version distribution, analytics, and table */}
           {reportType === 'usage' && utilizationData && selectedVersions.length === 0 && (
-            <>
+            <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
+              {/* Version Distribution Widget - inside scroll container */}
+              {utilizationData.versionDistribution && Object.keys(utilizationData.versionDistribution).length > 0 && (
+                <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  <div className="px-6 py-4">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                      </svg>
+                      Version Distribution
+                      {selectedApplications.length > 0 && (
+                        <span className="text-sm font-normal text-blue-500 dark:text-blue-400">
+                          - Showing {selectedApplications.length} selected app{selectedApplications.length !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                    </h3>
+                    <div className="flex overflow-x-auto gap-4 pb-2" style={{ scrollbarWidth: 'thin' }}>
+                      {Object.keys(utilizationData.versionDistribution)
+                        .filter(appName => {
+                          if (selectedApplications.length === 0) return true
+                          return selectedApplications.some(selected =>
+                            appName.toLowerCase().includes(selected.toLowerCase()) ||
+                            selected.toLowerCase().includes(appName.toLowerCase())
+                          )
+                        })
+                        .sort((a, b) => {
+                          const aTotal = utilizationData.versionDistribution![a].totalDevices
+                          const bTotal = utilizationData.versionDistribution![b].totalDevices
+                          return bTotal - aTotal
+                        })
+                        .map(appName => {
+                          const appData = utilizationData.versionDistribution![appName]
+                          const versions = appData.versions
+                          const sortedVersions = Object.entries(versions)
+                            .sort(([vA,], [vB,]) => vB.localeCompare(vA, undefined, { numeric: true, sensitivity: 'base' }))
+                          const total = appData.totalDevices
+                          return (
+                            <div key={appName} className="flex-shrink-0 w-64 bg-gray-50 dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
+                              <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-sm font-semibold text-gray-900 dark:text-white truncate" title={appName}>{appName}</h4>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 whitespace-nowrap">{total} device{total !== 1 ? 's' : ''}</span>
+                              </div>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {sortedVersions.map(([version, versionInfo]) => {
+                                  const count = versionInfo.count
+                                  const percentage = Math.round((count / total) * 100)
+                                  const versionFilter = `${appName}:${version}`
+                                  const isSelected = selectedVersions.includes(versionFilter)
+                                  return (
+                                    <div
+                                      key={version}
+                                      className={`p-2 rounded cursor-pointer transition-colors ${
+                                        isSelected
+                                          ? 'bg-blue-100 dark:bg-blue-900 border-2 border-blue-500'
+                                          : 'hover:bg-gray-100 dark:hover:bg-gray-600 border-2 border-transparent'
+                                      }`}
+                                      onClick={() => toggleVersion(version, appName)}
+                                      title="Click to show devices with this version"
+                                    >
+                                      <div className="flex items-center justify-between mb-1">
+                                        <span className={`text-xs font-medium ${
+                                          isSelected ? 'text-blue-700 dark:text-blue-300 font-bold' : 'text-gray-700 dark:text-gray-300'
+                                        }`}>v{version}</span>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">{count} ({percentage}%)</span>
+                                      </div>
+                                      <div className="w-full bg-gray-200 dark:bg-gray-500 rounded-full h-1.5">
+                                        <div
+                                          className={`h-1.5 rounded-full transition-all duration-300 ${
+                                            isSelected ? 'bg-blue-700' : 'bg-blue-600'
+                                          }`}
+                                          style={{ width: `${percentage}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </div>
+                </div>
+              )}
               {/* Widgets Accordion - Collapsible section - ONLY for Usage Report */}
               {(utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
                 <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
@@ -2252,7 +2335,7 @@ function ApplicationsPageContent() {
               )}
 
               {/* Widgets Content - Collapsible */}
-              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)} maxHeight="60vh">
+              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)}>
               <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
               
               {/* Summary Cards - Inside Widgets Accordion */}
@@ -2415,7 +2498,7 @@ function ApplicationsPageContent() {
               </CollapsibleSection>
 
               {/* Utilization Data Table */}
-              <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
+              <div>
                 <table className="w-full">
                   <thead className="bg-blue-50 dark:bg-blue-900/30 sticky top-0 z-10">
                     <tr>
@@ -2627,7 +2710,7 @@ function ApplicationsPageContent() {
                   </tbody>
                 </table>
               </div>
-            </>
+            </div>
           )}
 
           {/* Missing Devices Table - Shown when report mode is 'missing' */}
