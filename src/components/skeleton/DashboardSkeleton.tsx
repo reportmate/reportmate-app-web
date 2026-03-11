@@ -170,62 +170,55 @@ const RecentEventsWidgetSkeleton: React.FC = () => (
 // Platform Distribution Widget Skeleton
 const PlatformDistributionWidgetSkeleton: React.FC = () => (
   <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+    {/* Header */}
     <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-          <div className="w-6 h-6 bg-gray-200 dark:bg-gray-600 rounded animate-pulse"></div>
+        <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+          <div className="w-6 h-6 bg-purple-200 dark:bg-purple-700 rounded animate-pulse"></div>
         </div>
-        <div>
-          <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        <div className="space-y-1.5">
+          <div className="h-5 w-44 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          <div className="h-3.5 w-36 bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
         </div>
       </div>
     </div>
-    
-    <div className="p-6">
-      <div className="space-y-6">
-        <div className="flex gap-6">
-          {/* Platform bars */}
-          <div className="flex-1 space-y-3">
-            {[...Array(2)].map((_, i) => (
-              <div key={i} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 bg-blue-200 dark:bg-blue-700 rounded-full animate-pulse"></div>
-                    <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  </div>
-                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-6 relative overflow-hidden">
-                  <div 
-                    className="h-full rounded-full bg-blue-200 dark:bg-blue-700 animate-pulse flex items-center justify-end pr-2"
-                    style={{ width: `${i === 0 ? 100 : Math.random() * 50 + 10}%` }}
-                  >
-                    <div className="w-4 h-3 bg-white rounded animate-pulse"></div>
-                  </div>
-                </div>
-                <div className="ml-7 text-xs space-y-1">
-                  <div className="h-3 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="h-3 w-40 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
+
+    {/* Platform cards */}
+    <div className="p-6 space-y-3">
+      {[70, 30].map((pct, i) => (
+        <div key={i} className="rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3">
+          <div className="flex items-center gap-3">
+            {/* Platform icon placeholder */}
+            <div className="w-7 h-7 bg-gray-200 dark:bg-gray-600 rounded animate-pulse flex-shrink-0"></div>
+
+            {/* Name + bar */}
+            <div className="flex-1 min-w-0 space-y-1.5">
+              <div className="flex items-baseline gap-2">
+                <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+                <div className="h-3 w-8 bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
               </div>
-            ))}
-          </div>
-          
-          {/* Filter controls */}
-          <div className="w-64 flex-shrink-0 space-y-4">
-            {[...Array(3)].map((_, i) => (
-              <div key={i}>
-                <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
-                <div className="flex flex-wrap gap-2">
-                  {[...Array(3)].map((_, j) => (
-                    <div key={j} className="h-6 w-16 bg-gray-200 dark:bg-gray-700 rounded-full animate-pulse"></div>
-                  ))}
-                </div>
+              <div className="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-purple-800 opacity-30 animate-pulse"
+                  style={{ width: `${pct}%` }}
+                />
               </div>
-            ))}
+            </div>
+
+            {/* Count */}
+            <div className="h-6 w-10 bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-shrink-0"></div>
+            {/* Chevron */}
+            <div className="w-4 h-4 bg-gray-100 dark:bg-gray-600 rounded animate-pulse flex-shrink-0"></div>
           </div>
         </div>
+      ))}
+
+      {/* Filter pills row */}
+      <div className="pt-1 flex flex-wrap items-center gap-1.5">
+        <div className="h-3 w-12 bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
+        {[16, 20, 14, 18].map((w, i) => (
+          <div key={i} className={`h-5 w-${w} bg-gray-100 dark:bg-gray-700 rounded-full animate-pulse`}></div>
+        ))}
       </div>
     </div>
   </div>
