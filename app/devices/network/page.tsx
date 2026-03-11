@@ -33,7 +33,7 @@ function NetworkPageContent() {
   const [loading, setLoading] = useState(true)
   const [, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless'>('all')
+  const [connectionFilter, setConnectionFilter] = useState<'all' | 'wired' | 'wireless' | 'vpn'>('all')
   const searchParams = useSearchParams()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
@@ -154,6 +154,9 @@ function NetworkPageContent() {
     }
   })
 
+  // Count VPN-connected devices for the filter badge
+  const vpnDeviceCount = processedNetworkDevices.filter(n => n.networkInfo.vpnActive).length
+
   // Extract unique filter options from devices (inventory data)
   const filterOptions = {
     usages: Array.from(new Set(
@@ -254,6 +257,10 @@ function NetworkPageContent() {
         }
       } else if (connectionFilter === 'wireless') {
         if (!(connectionType.includes('wireless') || connectionType.includes('wifi'))) {
+          return false
+        }
+      } else if (connectionFilter === 'vpn') {
+        if (!n.networkInfo.vpnActive) {
           return false
         }
       }
@@ -528,6 +535,28 @@ function NetworkPageContent() {
                       }`}
                     >
                       Wireless
+                    </button>
+                    <button
+                      onClick={() => setConnectionFilter(connectionFilter === 'vpn' ? 'all' : 'vpn')}
+                      className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-1.5 ${
+                        connectionFilter === 'vpn'
+                          ? 'bg-purple-100 border-purple-300 text-purple-800 dark:bg-purple-900 dark:border-purple-700 dark:text-purple-200'
+                          : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50 dark:bg-gray-800 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                      VPN
+                      {vpnDeviceCount > 0 && (
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                          connectionFilter === 'vpn'
+                            ? 'bg-purple-200 dark:bg-purple-800 text-purple-800 dark:text-purple-200'
+                            : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                        }`}>
+                          {vpnDeviceCount}
+                        </span>
+                      )}
                     </button>
                   </div>
                   
@@ -975,7 +1004,7 @@ function NetworkPageContent() {
                                 connections.push(ssid ? ssid : 'Wireless');
                               }
                               
-                              const connectionDisplay = connections.length > 0 ? connections.join(' + ') : 'N/A';
+                              const connectionDisplay = connections.length > 0 ? connections.join(' + ') : null;
                               
                               // Get protocol/band for wireless
                               let protocolBand = null;
@@ -1012,7 +1041,19 @@ function NetworkPageContent() {
                               
                               return (
                                 <>
-                                  <span className="text-sm text-gray-900 dark:text-white">{connectionDisplay}</span>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {connectionDisplay && (
+                                      <span className="text-sm text-gray-900 dark:text-white">{connectionDisplay}</span>
+                                    )}
+                                    {networkDevice.networkInfo.vpnActive && (
+                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700">
+                                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                                        </svg>
+                                        {networkDevice.networkInfo.vpnName || 'VPN'}
+                                      </span>
+                                    )}
+                                  </div>
                                   {protocolBand && protocolBand !== 'N/A' && (
                                     <span className="text-xs text-gray-500 dark:text-gray-400">{protocolBand}</span>
                                   )}
