@@ -14,8 +14,7 @@ export { extractHardware, type HardwareInfo } from './hardware'
 
 // Identity module
 export { 
-  extractIdentity, 
-  extractEnrollmentInfoFromIdentity,
+  extractIdentity,
   type IdentityInfo, 
   type UserAccount, 
   type BTMDBHealth,
