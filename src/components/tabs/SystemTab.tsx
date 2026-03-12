@@ -465,7 +465,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               <div className="flex items-start gap-3">
                 <div className="flex-1 min-w-0">
                   <label className="text-xs font-semibold text-pink-600 dark:text-pink-400 uppercase tracking-wide">Keyboard Layout</label>
-                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{!isMac ? (osInfo?.activeKeyboardLayout || '-') : '-'}</p>
+                  <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{osInfo?.activeKeyboardLayout || '-'}</p>
                 </div>
               </div>
             </div>
