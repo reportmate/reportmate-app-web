@@ -496,6 +496,11 @@ function HardwarePageContent() {
   // Helper to get inventory data
   const getInventory = (device: any) => device.inventory || {}
 
+  // Apply global platform filter for charts/widgets
+  const platformFilteredHardware = globalPlatformFilter && globalPlatformFilter !== 'all'
+    ? processedHardware.filter(h => isPlatformVisible(normalizePlatform(getDevicePlatform(h))))
+    : processedHardware
+
   const filteredHardware = processedHardware.filter(h => {
     if (globalPlatformFilter) {
       const platform = normalizePlatform(getDevicePlatform(h))
@@ -548,7 +553,7 @@ function HardwarePageContent() {
   })
 
   const _getChartFilteredData = (excludeFilters: string[] = []) => {
-    return processedHardware.filter(h => {
+    return platformFilteredHardware.filter(h => {
       if (processorFilter !== 'all') {
         const processorStr = typeof h.processor === 'string' ? h.processor.toLowerCase() : 
           (typeof h.processor === 'object' && h.processor ? ((h.processor as any).name || '').toLowerCase() : '')
@@ -708,21 +713,21 @@ function HardwarePageContent() {
                 {/* Horizontal scrollable row */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
                   <div className="flex-shrink-0 w-48 flex flex-col gap-4">
-                    <DeviceTypeDonutChart devices={processedHardware} loading={loading} selectedDeviceTypes={selectedDeviceTypes} onDeviceTypeToggle={handleDeviceTypeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} />
-                    <ArchitectureDonutChart devices={processedHardware} loading={loading} selectedArchitectures={selectedArchitectures} onArchitectureToggle={handleArchitectureToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    <DeviceTypeDonutChart devices={platformFilteredHardware} loading={loading} selectedDeviceTypes={selectedDeviceTypes} onDeviceTypeToggle={handleDeviceTypeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} />
+                    <ArchitectureDonutChart devices={platformFilteredHardware} loading={loading} selectedArchitectures={selectedArchitectures} onArchitectureToggle={handleArchitectureToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                   <div className="flex-shrink-0 w-[22rem]">
-                    <HardwareTypeChart devices={processedHardware} loading={loading} selectedModels={selectedModels} onModelToggle={handleModelToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    <HardwareTypeChart devices={platformFilteredHardware} loading={loading} selectedModels={selectedModels} onModelToggle={handleModelToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                   <div className="flex-shrink-0 w-72">
-                    <ProcessorDistributionChart devices={processedHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    <ProcessorDistributionChart devices={platformFilteredHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                   <div className="flex-shrink-0 w-72">
-                    <GraphicsDistributionChart devices={processedHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
+                    <GraphicsDistributionChart devices={platformFilteredHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
                   </div>
                   <div className="flex-shrink-0 w-72 flex flex-col gap-4">
-                    <MemoryBreakdownChart devices={processedHardware} loading={loading} selectedMemoryRanges={selectedMemoryRanges} onMemoryRangeToggle={handleMemoryRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
-                    <StorageBreakdownChart devices={processedHardware} loading={loading} selectedStorageRanges={selectedStorageRanges} onStorageRangeToggle={handleStorageRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    <MemoryBreakdownChart devices={platformFilteredHardware} loading={loading} selectedMemoryRanges={selectedMemoryRanges} onMemoryRangeToggle={handleMemoryRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    <StorageBreakdownChart devices={platformFilteredHardware} loading={loading} selectedStorageRanges={selectedStorageRanges} onStorageRangeToggle={handleStorageRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                 </div>
               </div>

@@ -119,6 +119,35 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
     // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
   }, [searchParams, isInitialized])
 
+  // Keep URL in sync with platform filter on every navigation
+  // When user clicks a Link that doesn't include ?platform=, this effect
+  // re-adds the parameter so it always appears in the address bar
+  useEffect(() => {
+    if (!isInitialized) return
+    // Skip individual device pages - platform toggle is hidden there
+    if (pathname.match(/^\/device\/[^/]+$/)) return
+    // Skip settings
+    if (pathname === '/settings') return
+
+    const currentUrlPlatform = searchParams.get('platform')
+    
+    if (platformFilter === 'macOS' && currentUrlPlatform !== 'mac') {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('platform', 'mac')
+      router.replace(`${pathname}?${params.toString()}`)
+    } else if (platformFilter === 'Windows' && currentUrlPlatform !== 'win') {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('platform', 'win')
+      router.replace(`${pathname}?${params.toString()}`)
+    } else if (platformFilter === 'all' && currentUrlPlatform) {
+      // Remove stale platform param when filter is set to 'all'
+      const params = new URLSearchParams(searchParams.toString())
+      params.delete('platform')
+      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
+      router.replace(newUrl)
+    }
+  }, [pathname, platformFilter, isInitialized, searchParams, router])
+
   const setPlatformFilter = useCallback((platform: Platform) => {
     setPlatformFilterState(platform)
     
