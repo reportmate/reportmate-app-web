@@ -152,7 +152,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   
   // Process system data using the centralized data processing function
   const systemTabData = extractSystem(normalizedDevice)
-  const { services, environment, updates, scheduledTasks, runningServices, isMac, pendingAppleUpdates, installHistory, loginItems, systemExtensions, kernelExtensions, privilegedHelperTools } = systemTabData
+  const { services, environment, updates, pendingWindowsUpdates, scheduledTasks, runningServices, isMac, pendingAppleUpdates, installHistory, loginItems, systemExtensions, kernelExtensions, privilegedHelperTools } = systemTabData
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
@@ -297,7 +297,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
         {(() => {
           const hasUpdates = isMac 
             ? pendingAppleUpdates.length > 0
-            : false; // TODO: Windows doesn't currently track pending updates
+            : pendingWindowsUpdates.length > 0;
           
           return (
             <div className="text-right mr-8">
@@ -308,7 +308,9 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
-                    {isMac ? `${pendingAppleUpdates.length} Pending Update${pendingAppleUpdates.length !== 1 ? 's' : ''}` : 'Pending Updates'}
+                    {isMac 
+                      ? `${pendingAppleUpdates.length} Pending Update${pendingAppleUpdates.length !== 1 ? 's' : ''}` 
+                      : `${pendingWindowsUpdates.length} Pending Update${pendingWindowsUpdates.length !== 1 ? 's' : ''}`}
                   </span>
                 </div>
               ) : (
@@ -480,6 +482,129 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
           </div>
       </div>
 
+      {/* Pending Windows Updates */}
+      {!isMac && pendingWindowsUpdates.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Pending Windows Updates</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  {pendingWindowsUpdates.length} update{pendingWindowsUpdates.length !== 1 ? 's' : ''} available for installation
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 dark:bg-gray-900">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">KB</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Severity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">CVEs</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Release Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {pendingWindowsUpdates.map((update, index) => (
+                  <tr key={update.kbNumber || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td className="px-6 py-4">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900 dark:text-white">{update.title}</div>
+                        {update.description && update.description !== update.title && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md truncate">{update.description}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {update.kbNumber ? (
+                        <a
+                          href={`https://support.microsoft.com/help/${update.kbNumber.replace('KB', '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline"
+                        >
+                          {update.kbNumber}
+                        </a>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                        {update.category || 'Update'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {update.severity ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          update.severity === 'Critical' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                          update.severity === 'Important' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                          update.severity === 'Moderate' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                          'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                        }`}>
+                          {update.severity}
+                        </span>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {update.cves.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {update.cves.slice(0, 3).map((cve) => (
+                            <a
+                              key={cve}
+                              href={`https://msrc.microsoft.com/update-guide/vulnerability/${cve}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:underline"
+                            >
+                              {cve}
+                            </a>
+                          ))}
+                          {update.cves.length > 3 && (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700" title={update.cves.slice(3).join(', ')}>
+                              +{update.cves.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-sm text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex gap-1">
+                        {update.isDownloaded ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Downloaded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200">
+                            Pending
+                          </span>
+                        )}
+                        {update.rebootRequired && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                            Reboot
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {update.releaseDate ? new Date(update.releaseDate).toISOString().split('T')[0] : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Recent Windows Updates - Second from top */}
       {!isMac && updates.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
@@ -520,7 +645,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {update.installDate ? new Date(update.installDate).toLocaleDateString() : 'Unknown'}
+                      {update.installDate ? new Date(update.installDate).toISOString().split('T')[0] : 'Unknown'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
