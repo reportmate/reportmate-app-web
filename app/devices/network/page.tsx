@@ -190,25 +190,25 @@ function NetworkPageContent() {
   }, {} as Record<string, number>)
   const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
 
-  // Calculate wireless statistics for widgets
+  // Calculate wireless statistics for widgets (uses platform-filtered data)
   const wirelessStats = {
     // Wireless State counts
-    wirelessOff: processedNetworkDevices.filter(n => {
+    wirelessOff: platformFilteredDevices.filter(n => {
       const state = n.networkInfo.wirelessState?.toLowerCase() || ''
       return state === 'off' || state === 'disabled'
     }).length,
-    wirelessOn: processedNetworkDevices.filter(n => {
+    wirelessOn: platformFilteredDevices.filter(n => {
       const state = n.networkInfo.wirelessState?.toLowerCase() || ''
       return state === 'on' || state === 'enabled' || state === 'disconnected'
     }).length,
-    wirelessConnected: processedNetworkDevices.filter(n => {
+    wirelessConnected: platformFilteredDevices.filter(n => {
       const state = n.networkInfo.wirelessState?.toLowerCase() || ''
       const connectionType = n.networkInfo.connectionType?.toLowerCase() || ''
       return state === 'connected' || (connectionType.includes('wireless') || connectionType.includes('wifi'))
     }).length,
     
     // Network names and counts
-    networkNames: processedNetworkDevices.reduce((acc, n) => {
+    networkNames: platformFilteredDevices.reduce((acc, n) => {
       const ssid = n.networkInfo.ssid || n.networkInfo.networkName || 'Unknown'
       if (ssid && ssid !== 'Unknown' && ssid !== 'N/A') {
         acc[ssid] = (acc[ssid] || 0) + 1
@@ -217,7 +217,7 @@ function NetworkPageContent() {
     }, {} as Record<string, number>),
     
     // Security types
-    securityTypes: processedNetworkDevices.reduce((acc, n) => {
+    securityTypes: platformFilteredDevices.reduce((acc, n) => {
       const security = n.networkInfo.wirelessSecurity || n.networkInfo.securityType || 'Unknown'
       if (security && security !== 'Unknown' && security !== 'N/A') {
         acc[security] = (acc[security] || 0) + 1
@@ -226,19 +226,19 @@ function NetworkPageContent() {
     }, {} as Record<string, number>),
     
     // Signal quality distribution
-    signalExcellent: processedNetworkDevices.filter(n => {
+    signalExcellent: platformFilteredDevices.filter(n => {
       const signal = n.networkInfo.signalStrength || 0
       return signal >= 75
     }).length,
-    signalGood: processedNetworkDevices.filter(n => {
+    signalGood: platformFilteredDevices.filter(n => {
       const signal = n.networkInfo.signalStrength || 0
       return signal >= 50 && signal < 75
     }).length,
-    signalFair: processedNetworkDevices.filter(n => {
+    signalFair: platformFilteredDevices.filter(n => {
       const signal = n.networkInfo.signalStrength || 0
       return signal >= 25 && signal < 50
     }).length,
-    signalPoor: processedNetworkDevices.filter(n => {
+    signalPoor: platformFilteredDevices.filter(n => {
       const signal = n.networkInfo.signalStrength || 0
       return signal > 0 && signal < 25
     }).length
@@ -914,7 +914,7 @@ function NetworkPageContent() {
                         <td className="px-4 py-3 w-56">
                           <div className="flex flex-col justify-center h-12 min-w-0">
                             <Link
-                              href={`/device/${encodeURIComponent(networkDevice.deviceId)}#network`}
+                              href={`/device/${encodeURIComponent(networkDevice.serialNumber)}#network`}
                               className="group block min-w-0"
                               title={networkDevice.deviceName || 'Unknown Device'}
                             >

@@ -1451,7 +1451,7 @@ function SystemPageContent() {
                     <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-4 max-w-56">
                         <Link 
-                          href={`/device/${sys.deviceId}#system`}
+                          href={`/device/${sys.serialNumber}#system`}
                           className="group block min-w-0"
                           title={sys.deviceName || 'Unknown Device'}
                         >
