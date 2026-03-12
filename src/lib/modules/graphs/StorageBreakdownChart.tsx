@@ -173,13 +173,19 @@ export function StorageBreakdownChart({
 
     const getMemoryRange = (memory: any): string => {
       if (!memory) return 'Unknown'
-      const memGb = parseFloat(memory)
-      if (isNaN(memGb)) return 'Unknown'
-      if (memGb <= 8) return '8 GB'
-      if (memGb <= 16) return '9-16 GB'
-      if (memGb <= 32) return '17-32 GB'
-      if (memGb <= 64) return '33-64 GB'
-      return '>64 GB'
+      let memoryGB = 0
+      if (typeof memory === 'object' && memory !== null) {
+        const memObj = memory as any
+        if (memObj.totalFormatted) { const m = memObj.totalFormatted.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]) }
+        else if (memObj.physical_memory || memObj.physicalMemory) { const v = memObj.physical_memory || memObj.physicalMemory; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+        else if (memObj.totalPhysical) { const v = memObj.totalPhysical; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+      } else if (typeof memory === 'number') { memoryGB = memory > 1000 ? memory / (1024 * 1024 * 1024) : memory }
+      else if (typeof memory === 'string') { const m = memory.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]); else { const v = parseFloat(memory); if (!isNaN(v)) memoryGB = v > 1000 ? v / (1024 * 1024 * 1024) : v } }
+      if (memoryGB <= 0) return 'Unknown'
+      const sizes = [2, 4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128, 192, 256, 384, 512]
+      let best = sizes[0], bestDiff = Math.abs(memoryGB - sizes[0])
+      for (const s of sizes) { const d = Math.abs(memoryGB - s); if (d < bestDiff) { best = s; bestDiff = d } }
+      return `${best} GB`
     }
 
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
@@ -266,7 +272,7 @@ export function StorageBreakdownChart({
           percentage,
           color: colors[index],
           isSelected,
-          isGreyedOut: count === 0 // Grey out sizes with no devices
+          isGreyedOut: selectedStorageRanges.length > 0 && !selectedStorageRanges.includes(size)
         }
       })
       .filter(item => item.count > 0) // Don't show sizes with no devices
@@ -295,7 +301,6 @@ export function StorageBreakdownChart({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Storage</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
       </div>
       
       <div className="space-y-1">
@@ -305,7 +310,7 @@ export function StorageBreakdownChart({
             className={`cursor-pointer rounded-lg p-2 transition-all hover:bg-gray-50 dark:hover:bg-gray-700/50 ${
               item.isSelected ? 'bg-blue-50 dark:bg-blue-900/30' : ''
             }`}
-            onClick={() => onStorageRangeToggle && onStorageRangeToggle(item.range)}
+            onClick={() => onStorageRangeToggle && onStorageRangeToggle(item.size)}
           >
             <div className="flex items-center justify-between mb-1">
               <span className={`text-sm font-medium transition-colors ${

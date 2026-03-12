@@ -17,6 +17,7 @@ import {
   HardwareTypeChart,
   ProcessorDistributionChart,
   GraphicsDistributionChart,
+  ChipConfigurationChart,
   DeviceTypeDonutChart 
 } from "../../../src/lib/modules/graphs"
 import { FitText } from "../../../src/components/ui/FitText"
@@ -67,8 +68,11 @@ function HardwarePageContent() {
     { enabled: !loading }
   )
   
+  // Detect if Mac-only view
+  const isMacPlatform = globalPlatformFilter === 'macOS'
+  
   // Sorting state
-  const [sortColumn, setSortColumn] = useState<'device' | 'model' | 'processor' | 'memory' | 'storage' | 'arch'>('device')
+  const [sortColumn, setSortColumn] = useState<'device' | 'model' | 'chip' | 'processor' | 'memory' | 'storage' | 'arch'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   
   // Chart filter states (controlled by widget charts)
@@ -80,6 +84,7 @@ function HardwarePageContent() {
   const [selectedProcessors, setSelectedProcessors] = useState<string[]>([])
   const [selectedGraphics, setSelectedGraphics] = useState<string[]>([])
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
+  const [selectedChipConfigs, setSelectedChipConfigs] = useState<string[]>([])
   
   // Inventory-based filter states (Selections accordion)
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
@@ -124,6 +129,10 @@ function HardwarePageContent() {
     setSelectedGraphics(prev => prev.includes(graphics) ? prev.filter(g => g !== graphics) : [...prev, graphics])
   }
 
+  const handleChipConfigToggle = (chip: string) => {
+    setSelectedChipConfigs(prev => prev.includes(chip) ? prev.filter(c => c !== chip) : [...prev, chip])
+  }
+
   const handleArchitectureToggle = (architecture: string) => {
     setSelectedArchitectures(prev => prev.includes(architecture) ? prev.filter(a => a !== architecture) : [...prev, architecture])
   }
@@ -163,7 +172,7 @@ function HardwarePageContent() {
   // Count for all active filters (for Clear button)
   const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length + 
     selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length + 
-    selectedGraphics.length + selectedPlatforms.length + selectedStatuses.length +
+    selectedGraphics.length + selectedPlatforms.length + selectedChipConfigs.length + selectedStatuses.length +
     selectedUsages.length + selectedCatalogs.length + selectedLocations.length
 
   const clearAllFilters = () => {
@@ -175,6 +184,7 @@ function HardwarePageContent() {
     setSelectedProcessors([])
     setSelectedGraphics([])
     setSelectedPlatforms([])
+    setSelectedChipConfigs([])
     setSelectedStatuses([])
     setSelectedUsages([])
     setSelectedCatalogs([])
@@ -304,9 +314,24 @@ function HardwarePageContent() {
     let processorCores = hardwareRecord.processorCores
     let processorSpeed = hardwareRecord.processorSpeed
 
+    let performanceCores = 0
+    let efficiencyCores = 0
+    let graphicsCores = 0
+    let graphicsMetalSupport = ''
+
     if (typeof processor === 'object' && processor !== null) {
       if (!processorCores) processorCores = (processor as any).cores || (processor as any).core_count || (processor as any).logicalCores
       if (!processorSpeed) processorSpeed = (processor as any).speed || (processor as any).frequency || (processor as any).currentSpeed
+      performanceCores = (processor as any).performance_cores || (processor as any).performanceCores || 0
+      efficiencyCores = (processor as any).efficiency_cores || (processor as any).efficiencyCores || 0
+    }
+
+    if (typeof graphics === 'object' && graphics !== null) {
+      const gfx = Array.isArray(graphics) ? graphics[0] : graphics
+      if (gfx) {
+        graphicsCores = gfx.cores || 0
+        graphicsMetalSupport = gfx.metalSupport || gfx.metal_support || ''
+      }
     }
 
     return {
@@ -318,7 +343,11 @@ function HardwarePageContent() {
       graphics,
       processor,
       processorCores,
-      processorSpeed
+      processorSpeed,
+      performanceCores,
+      efficiencyCores,
+      graphicsCores,
+      graphicsMetalSupport
     }
   })
 
@@ -329,6 +358,11 @@ function HardwarePageContent() {
       if (memObj.totalFormatted) {
         const match = memObj.totalFormatted.match(/(\d+(?:\.\d+)?)\s*GB/i)
         if (match) memoryGB = parseFloat(match[1])
+      } else if (memObj.physical_memory || memObj.physicalMemory) {
+        // Mac osquery: physical_memory (snake_case) or physicalMemory (normalized)
+        const val = memObj.physical_memory || memObj.physicalMemory
+        if (typeof val === 'number') memoryGB = val / (1024 * 1024 * 1024)
+        else if (typeof val === 'string' && /^\d+$/.test(val)) memoryGB = parseFloat(val) / (1024 * 1024 * 1024)
       } else if (memObj.totalPhysical) {
         const val = memObj.totalPhysical
         if (typeof val === 'number') memoryGB = val / (1024 * 1024 * 1024)
@@ -341,16 +375,23 @@ function HardwarePageContent() {
     }
     
     if (memoryGB <= 0) return 'Unknown'
-    if (memoryGB <= 4) return '4 GB'
-    if (memoryGB <= 8) return '8 GB'
-    if (memoryGB <= 16) return '16 GB'
-    if (memoryGB <= 32) return '32 GB'
-    if (memoryGB <= 64) return '64 GB'
-    return '128+ GB'
+    // Snap to nearest standard size to match widget labels
+    const sizes = [2, 4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128, 192, 256, 384, 512]
+    let best = sizes[0]
+    let bestDiff = Math.abs(memoryGB - sizes[0])
+    for (const s of sizes) {
+      const diff = Math.abs(memoryGB - s)
+      if (diff < bestDiff) { best = s; bestDiff = diff }
+    }
+    return `${best} GB`
   }
 
   const getDeviceModel = (h: any): string => {
-    return h.model || 'Unknown Model'
+    const raw: string = h.model || 'Unknown Model'
+    // Strip trailing duplicate year suffix e.g. "MacBook Pro (14-inch, Nov 2023) (2023)"
+    return raw.replace(/\s*\((\d{4})\)$/, (_: string, year: string) => {
+      return raw.slice(0, raw.length - _.length).includes(year) ? '' : _
+    })
   }
 
   const categorizeDeviceType = (model: string): string => {
@@ -377,6 +418,41 @@ function HardwarePageContent() {
     return getDevicePlatformLabel(h)
   }
 
+  // Extract chip name for Apple Silicon (M3, M4 Pro, M2 Max, etc.) - no "Apple" prefix
+  const getChipName = (device: any): string => {
+    const processor = device.processor || ''
+    let name = ''
+    if (typeof processor === 'string') name = processor
+    else if (typeof processor === 'object' && processor !== null) name = processor.name || processor.model || processor.brand || ''
+    else name = String(processor)
+    
+    const lower = name.toLowerCase()
+    if (lower.includes('apple') || /\bm[1-9]\b/.test(lower)) {
+      if (lower.includes('m5 ultra')) return 'M5 Ultra'
+      if (lower.includes('m5 max')) return 'M5 Max'
+      if (lower.includes('m5 pro')) return 'M5 Pro'
+      if (/\bm5\b/.test(lower)) return 'M5'
+      if (lower.includes('m4 ultra')) return 'M4 Ultra'
+      if (lower.includes('m4 max')) return 'M4 Max'
+      if (lower.includes('m4 pro')) return 'M4 Pro'
+      if (/\bm4\b/.test(lower)) return 'M4'
+      if (lower.includes('m3 ultra')) return 'M3 Ultra'
+      if (lower.includes('m3 max')) return 'M3 Max'
+      if (lower.includes('m3 pro')) return 'M3 Pro'
+      if (/\bm3\b/.test(lower)) return 'M3'
+      if (lower.includes('m2 ultra')) return 'M2 Ultra'
+      if (lower.includes('m2 max')) return 'M2 Max'
+      if (lower.includes('m2 pro')) return 'M2 Pro'
+      if (/\bm2\b/.test(lower)) return 'M2'
+      if (lower.includes('m1 ultra')) return 'M1 Ultra'
+      if (lower.includes('m1 max')) return 'M1 Max'
+      if (lower.includes('m1 pro')) return 'M1 Pro'
+      if (/\bm1\b/.test(lower)) return 'M1'
+      return 'Apple Silicon'
+    }
+    return ''
+  }
+
   const getStorageRange = (device: any): string => {
     const storage = device.storage
     if (!Array.isArray(storage)) return 'Unknown'
@@ -390,6 +466,23 @@ function HardwarePageContent() {
     if (storageGB >= 200) return '256 GB'
     if (storageGB >= 100) return '128 GB'
     return '64 GB'
+  }
+
+  // Build chip SKU string matching ChipConfigurationChart format for filtering
+  const getChipSku = (device: any): string => {
+    const chip = getChipName(device)
+    if (!chip) return ''
+    const cpuCores = device.processorCores || 0
+    const gpuCores = device.graphicsCores || 0
+    // NPU cores from raw data
+    const npu = device.npu || device.modules?.hardware?.npu
+    const npuCores = (typeof npu === 'object' && npu !== null) ? (npu.cores || 0) : 0
+    const parts: string[] = []
+    if (cpuCores > 0) parts.push(`${cpuCores}-core CPU`)
+    if (gpuCores > 0) parts.push(`${gpuCores}-core GPU`)
+    if (npuCores > 0) parts.push(`${npuCores}-core NPU`)
+    if (parts.length === 0) return chip
+    return `${chip} (${parts.join(', ')})`
   }
 
   const getProcessorName = (device: any): string => {
@@ -420,10 +513,27 @@ function HardwarePageContent() {
       if (lower.includes('threadripper')) return 'AMD Threadripper'
       return 'AMD Other'
     }
-    if (lower.includes('apple') || lower.includes('m1') || lower.includes('m2') || lower.includes('m3')) {
-      if (lower.includes('m3')) return 'Apple M3'
-      if (lower.includes('m2')) return 'Apple M2'
-      if (lower.includes('m1')) return 'Apple M1'
+    if (lower.includes('apple') || /\bm[1-9]\b/.test(lower)) {
+      if (lower.includes('m5 ultra')) return 'M5 Ultra'
+      if (lower.includes('m5 max')) return 'M5 Max'
+      if (lower.includes('m5 pro')) return 'M5 Pro'
+      if (/\bm5\b/.test(lower)) return 'M5'
+      if (lower.includes('m4 ultra')) return 'M4 Ultra'
+      if (lower.includes('m4 max')) return 'M4 Max'
+      if (lower.includes('m4 pro')) return 'M4 Pro'
+      if (/\bm4\b/.test(lower)) return 'M4'
+      if (lower.includes('m3 ultra')) return 'M3 Ultra'
+      if (lower.includes('m3 max')) return 'M3 Max'
+      if (lower.includes('m3 pro')) return 'M3 Pro'
+      if (/\bm3\b/.test(lower)) return 'M3'
+      if (lower.includes('m2 ultra')) return 'M2 Ultra'
+      if (lower.includes('m2 max')) return 'M2 Max'
+      if (lower.includes('m2 pro')) return 'M2 Pro'
+      if (/\bm2\b/.test(lower)) return 'M2'
+      if (lower.includes('m1 ultra')) return 'M1 Ultra'
+      if (lower.includes('m1 max')) return 'M1 Max'
+      if (lower.includes('m1 pro')) return 'M1 Pro'
+      if (/\bm1\b/.test(lower)) return 'M1'
       return 'Apple Silicon'
     }
     if (lower.includes('qualcomm') || lower.includes('snapdragon')) return 'Qualcomm Snapdragon'
@@ -470,11 +580,28 @@ function HardwarePageContent() {
       if (lower.includes('hd graphics')) return 'Intel HD Graphics'
       return 'Intel Integrated'
     }
-    if (lower.includes('apple') || lower.includes('m1') || lower.includes('m2') || lower.includes('m3')) {
-      if (lower.includes('m3')) return 'Apple M3 GPU'
-      if (lower.includes('m2')) return 'Apple M2 GPU'
-      if (lower.includes('m1')) return 'Apple M1 GPU'
-      return 'Apple GPU'
+    if (lower.includes('apple') || /\bm[1-9]\b/.test(lower)) {
+      if (lower.includes('m5 ultra')) return 'M5 Ultra'
+      if (lower.includes('m5 max')) return 'M5 Max'
+      if (lower.includes('m5 pro')) return 'M5 Pro'
+      if (/\bm5\b/.test(lower)) return 'M5'
+      if (lower.includes('m4 ultra')) return 'M4 Ultra'
+      if (lower.includes('m4 max')) return 'M4 Max'
+      if (lower.includes('m4 pro')) return 'M4 Pro'
+      if (/\bm4\b/.test(lower)) return 'M4'
+      if (lower.includes('m3 ultra')) return 'M3 Ultra'
+      if (lower.includes('m3 max')) return 'M3 Max'
+      if (lower.includes('m3 pro')) return 'M3 Pro'
+      if (/\bm3\b/.test(lower)) return 'M3'
+      if (lower.includes('m2 ultra')) return 'M2 Ultra'
+      if (lower.includes('m2 max')) return 'M2 Max'
+      if (lower.includes('m2 pro')) return 'M2 Pro'
+      if (/\bm2\b/.test(lower)) return 'M2'
+      if (lower.includes('m1 ultra')) return 'M1 Ultra'
+      if (lower.includes('m1 max')) return 'M1 Max'
+      if (lower.includes('m1 pro')) return 'M1 Pro'
+      if (/\bm1\b/.test(lower)) return 'M1'
+      return 'Apple Silicon'
     }
     if (lower.includes('qualcomm') || lower.includes('adreno')) return 'Qualcomm Adreno'
     if (lower.includes('virtual') || lower.includes('vmware') || lower.includes('hyper-v') || lower.includes('meta virtual')) return 'Meta Virtual Monitor'
@@ -529,6 +656,7 @@ function HardwarePageContent() {
     if (selectedStorageRanges.length > 0 && !selectedStorageRanges.includes(getStorageRange(h))) return false
     if (selectedProcessors.length > 0 && !selectedProcessors.includes(getProcessorName(h))) return false
     if (selectedGraphics.length > 0 && !selectedGraphics.includes(getGraphicsName(h))) return false
+    if (selectedChipConfigs.length > 0 && !selectedChipConfigs.includes(getChipSku(h))) return false
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
@@ -544,6 +672,7 @@ function HardwarePageContent() {
     switch (sortColumn) {
       case 'device': aValue = (a.deviceName || a.serialNumber || '').toLowerCase(); bValue = (b.deviceName || b.serialNumber || '').toLowerCase(); break
       case 'model': aValue = getDeviceModel(a).toLowerCase(); bValue = getDeviceModel(b).toLowerCase(); break
+      case 'chip': aValue = getChipName(a).toLowerCase(); bValue = getChipName(b).toLowerCase(); break
       case 'processor': aValue = getProcessorName(a).toLowerCase(); bValue = getProcessorName(b).toLowerCase(); break
       case 'memory': aValue = getMemoryRange(a.memory); bValue = getMemoryRange(b.memory); break
       case 'storage': aValue = getStorageRange(a); bValue = getStorageRange(b); break
@@ -576,6 +705,14 @@ function HardwarePageContent() {
     if (typeof memory === 'object' && memory !== null) {
       const memObj = memory as any
       if (memObj.totalFormatted) return memObj.totalFormatted.replace('.0 GB', ' GB')
+      // Mac osquery: physical_memory (snake_case) or physicalMemory (normalized)
+      const physMem = memObj.physical_memory || memObj.physicalMemory
+      if (physMem) {
+        const val = physMem
+        if (typeof val === 'number') return val >= 1000000000 ? formatGB(val) : `${Math.round(val / 1048576)} MB`
+        if (typeof val === 'string' && /^\d+$/.test(val)) return parseFloat(val) >= 1000000000 ? formatGB(parseFloat(val)) : `${Math.round(parseFloat(val) / 1048576)} MB`
+      }
+      // Windows: totalPhysical
       if (memObj.totalPhysical) {
         const val = memObj.totalPhysical
         if (typeof val === 'number') return val >= 1000000000 ? formatGB(val) : `${Math.round(val / 1048576)} MB`
@@ -599,8 +736,17 @@ function HardwarePageContent() {
     const totalSize = storage.reduce((sum, drive) => sum + (typeof (drive.size || drive.capacity) === 'number' ? (drive.size || drive.capacity) : 0), 0)
     const totalFree = storage.reduce((sum, drive) => sum + (typeof (drive.free || drive.available) === 'number' ? (drive.free || drive.available) : 0), 0)
     if (totalSize > 0) {
-      const totalFormatted = totalSize >= 1000000000000 ? `${(totalSize / 1099511627776).toFixed(1)} TB` : `${Math.round(totalSize / 1073741824)} GB`
-      const freeFormatted = totalFree > 0 ? (totalFree >= 1000000000000 ? `${(totalFree / 1099511627776).toFixed(1)} TB` : `${Math.round(totalFree / 1073741824)} GB`) : null
+      const totalGB = totalSize / 1073741824
+      const formatSize = (gb: number) => {
+        if (gb >= 3500) return '4 TB'
+        if (gb >= 1700) return '2 TB'
+        if (gb >= 900) return '1 TB'
+        if (gb >= 450) return '512 GB'
+        return `${Math.round(gb)} GB`
+      }
+      const totalFormatted = formatSize(totalGB)
+      const freeGB = totalFree / 1073741824
+      const freeFormatted = totalFree > 0 ? (freeGB >= 900 ? `${(freeGB / 1024).toFixed(1)} TB` : `${Math.round(freeGB)} GB`) : null
       return { total: totalFormatted, free: freeFormatted }
     }
     return { total: `${storage.length} drives`, free: null }
@@ -712,22 +858,30 @@ function HardwarePageContent() {
               <div className="pb-4">
                 {/* Horizontal scrollable row */}
                 <div className="flex gap-4 overflow-x-auto px-6 pb-2">
-                  <div className="flex-shrink-0 w-48 flex flex-col gap-4">
-                    <DeviceTypeDonutChart devices={platformFilteredHardware} loading={loading} selectedDeviceTypes={selectedDeviceTypes} onDeviceTypeToggle={handleDeviceTypeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} />
-                    <ArchitectureDonutChart devices={platformFilteredHardware} loading={loading} selectedArchitectures={selectedArchitectures} onArchitectureToggle={handleArchitectureToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedDeviceTypes={selectedDeviceTypes} />
-                  </div>
-                  <div className="flex-shrink-0 w-[22rem]">
+                  <div className="flex-1 min-w-[22rem]">
                     <HardwareTypeChart devices={platformFilteredHardware} loading={loading} selectedModels={selectedModels} onModelToggle={handleModelToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
-                  <div className="flex-shrink-0 w-72">
-                    <ProcessorDistributionChart devices={platformFilteredHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
-                  </div>
-                  <div className="flex-shrink-0 w-72">
-                    <GraphicsDistributionChart devices={platformFilteredHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
-                  </div>
+                  {isMacPlatform ? (
+                    <div className="flex-1 min-w-[28rem]">
+                      <ChipConfigurationChart devices={platformFilteredHardware} loading={loading} selectedChips={selectedChipConfigs} onChipToggle={handleChipConfigToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex-shrink-0 w-72">
+                        <ProcessorDistributionChart devices={platformFilteredHardware} loading={loading} selectedProcessors={selectedProcessors} onProcessorToggle={handleProcessorToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                      </div>
+                      <div className="flex-shrink-0 w-72">
+                        <GraphicsDistributionChart devices={platformFilteredHardware} loading={loading} selectedGraphics={selectedGraphics} onGraphicsToggle={handleGraphicsToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedStorageRanges={selectedStorageRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} globalSelectedProcessors={selectedProcessors} />
+                      </div>
+                    </>
+                  )}
                   <div className="flex-shrink-0 w-72 flex flex-col gap-4">
                     <MemoryBreakdownChart devices={platformFilteredHardware} loading={loading} selectedMemoryRanges={selectedMemoryRanges} onMemoryRangeToggle={handleMemoryRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
                     <StorageBreakdownChart devices={platformFilteredHardware} loading={loading} selectedStorageRanges={selectedStorageRanges} onStorageRangeToggle={handleStorageRangeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} globalSelectedDeviceTypes={selectedDeviceTypes} />
+                  </div>
+                  <div className="flex-shrink-0 w-48 flex flex-col gap-4">
+                    <DeviceTypeDonutChart devices={platformFilteredHardware} loading={loading} selectedDeviceTypes={selectedDeviceTypes} onDeviceTypeToggle={handleDeviceTypeToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedArchitectures={selectedArchitectures} />
+                    <ArchitectureDonutChart devices={platformFilteredHardware} loading={loading} selectedArchitectures={selectedArchitectures} onArchitectureToggle={handleArchitectureToggle} globalSelectedPlatforms={selectedPlatforms} globalSelectedModels={selectedModels} globalSelectedMemoryRanges={selectedMemoryRanges} globalSelectedDeviceTypes={selectedDeviceTypes} />
                   </div>
                 </div>
               </div>
@@ -740,12 +894,13 @@ function HardwarePageContent() {
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th onClick={() => handleSort('device')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-56 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Device{sortColumn === 'device' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
-                  <th onClick={() => handleSort('model')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-40 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Model{sortColumn === 'model' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
+                  <th onClick={() => handleSort('model')} className={`px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase ${isMacPlatform ? 'w-56' : 'w-40'} bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none`}><div className="flex items-center gap-1">Model{sortColumn === 'model' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
+                  {isMacPlatform && <th onClick={() => handleSort('chip')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-28 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Chip{sortColumn === 'chip' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>}
                   <th onClick={() => handleSort('processor')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-48 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Processor{sortColumn === 'processor' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-32 bg-gray-50 dark:bg-gray-700">Graphics</th>
                   <th onClick={() => handleSort('memory')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Memory{sortColumn === 'memory' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
                   <th onClick={() => handleSort('storage')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Storage{sortColumn === 'storage' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
-                  <th onClick={() => handleSort('arch')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-20 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Arch{sortColumn === 'arch' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
+                  {!isMacPlatform && <th onClick={() => handleSort('arch')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-20 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Arch{sortColumn === 'arch' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>}
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
@@ -757,22 +912,42 @@ function HardwarePageContent() {
                   filteredHardware.map((hw) => (
                     <tr key={hw.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 w-56"><div className="flex flex-col justify-center min-w-0"><Link href={`/device/${encodeURIComponent(hw.serialNumber)}#hardware`} className="group block min-w-0" title={hw.deviceName || hw.serialNumber || 'Unknown Device'}><span className="font-medium text-gray-900 group-hover:text-gray-700 dark:text-white dark:group-hover:text-gray-200 text-sm leading-tight block truncate">{hw.deviceName || hw.serialNumber || 'Unknown Device'}</span></Link><div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400 font-mono leading-tight"><span className="truncate max-w-32">{hw.serialNumber}</span><button onClick={() => copyToClipboard(hw.serialNumber)} className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 flex-shrink-0" title="Copy serial number"><Copy size={10} /></button>{hw.assetTag && <><span>|</span><span className="truncate max-w-20">{hw.assetTag}</span></>}</div></div></td>
-                      <td className="px-4 py-3 w-40" style={{ maxWidth: '160px' }}>
+                      <td className={`px-4 py-3 ${isMacPlatform ? 'w-56' : 'w-40'}`} style={{ maxWidth: isMacPlatform ? '224px' : '160px' }}>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">{hw.manufacturer || ''}</div>
                         <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">
                           {getDeviceModel(hw)}
                         </FitText>
                       </td>
+                      {isMacPlatform && <td className="px-4 py-3 w-28"><div className="text-sm font-semibold text-gray-900 dark:text-white">{getChipName(hw) || '-'}</div></td>}
                       <td className="px-4 py-3 w-48" style={{ maxWidth: '192px' }}>
-                        <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">
-                          {typeof hw.processor === 'object' && hw.processor ? (hw.processor as any).name || (hw.processor as any).model || 'Unknown' : hw.processor || 'Unknown'}
-                        </FitText>
-                        {hw.processorCores && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.processorCores} cores{hw.processorSpeed && ` ${hw.processorSpeed}`}</div>}
+                        {getChipName(hw) ? (
+                          <>
+                            <div className="text-sm font-semibold text-gray-900 dark:text-white">{hw.processorCores ? `${hw.processorCores} Cores` : getChipName(hw)}</div>
+                            {hw.performanceCores > 0 && hw.efficiencyCores > 0 && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{hw.performanceCores} Performance + {hw.efficiencyCores} Efficiency</div>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">
+                              {typeof hw.processor === 'object' && hw.processor ? (hw.processor as any).name || (hw.processor as any).model || 'Unknown' : hw.processor || 'Unknown'}
+                            </FitText>
+                            {hw.processorCores && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.processorCores} cores{hw.processorSpeed && ` ${hw.processorSpeed}`}</div>}
+                          </>
+                        )}
                       </td>
-                      <td className="px-4 py-3 w-32" style={{ maxWidth: '128px' }}>{(() => { const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
+                      <td className="px-4 py-3 w-32" style={{ maxWidth: '128px' }}>{(() => {
+                        // Apple Silicon: show cores + metal support
+                        if (getChipName(hw)) {
+                          if (hw.graphicsCores > 0) {
+                            return <div><div className="text-sm font-semibold text-gray-900 dark:text-white">{hw.graphicsCores} Cores</div></div>
+                          }
+                          return <div className="text-sm text-gray-900 dark:text-white">{getChipName(hw)}</div>
+                        }
+                        const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
                       <td className="px-4 py-3 w-24"><div className="text-sm text-gray-900 dark:text-white">{formatMemory(hw.memory)}</div>{hw.memoryModules?.length > 0 && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.memoryModules.length} modules</div>}</td>
                       <td className="px-4 py-3 w-24">{(() => { const s = formatStorage(hw.storage); return <div><div className="text-sm text-gray-900 dark:text-white">{s.total}</div>{s.free && <div className="text-xs text-gray-500 dark:text-gray-400">{s.free} free</div>}</div>; })()}</td>
-                      <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>
+                      {!isMacPlatform && <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>}
                     </tr>
                   ))
                 )}

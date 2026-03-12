@@ -3,7 +3,7 @@
  * Shows distribution of processor types across devices
  */
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { getDevicePlatformLabel } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
@@ -71,6 +71,7 @@ export function ProcessorDistributionChart({
   globalSelectedMemoryRanges = [],
   globalSelectedStorageRanges = []
 }: ProcessorDistributionChartProps) {
+  const [sortBy, setSortBy] = useState<'count' | 'alpha'>('count')
   const processorData = useMemo(() => {
     if (!devices || devices.length === 0) return []
 
@@ -121,10 +122,27 @@ export function ProcessorDistributionChart({
       }
       
       // Apple processors
-      if (name.includes('apple') || name.includes('m1') || name.includes('m2') || name.includes('m3')) {
-        if (name.includes('m3')) return 'Apple M3'
-        if (name.includes('m2')) return 'Apple M2'
-        if (name.includes('m1')) return 'Apple M1'
+      if (name.includes('apple') || /\bm[1-9]\b/.test(name)) {
+        if (name.includes('m5 ultra')) return 'M5 Ultra'
+        if (name.includes('m5 max')) return 'M5 Max'
+        if (name.includes('m5 pro')) return 'M5 Pro'
+        if (/\bm5\b/.test(name)) return 'M5'
+        if (name.includes('m4 ultra')) return 'M4 Ultra'
+        if (name.includes('m4 max')) return 'M4 Max'
+        if (name.includes('m4 pro')) return 'M4 Pro'
+        if (/\bm4\b/.test(name)) return 'M4'
+        if (name.includes('m3 ultra')) return 'M3 Ultra'
+        if (name.includes('m3 max')) return 'M3 Max'
+        if (name.includes('m3 pro')) return 'M3 Pro'
+        if (/\bm3\b/.test(name)) return 'M3'
+        if (name.includes('m2 ultra')) return 'M2 Ultra'
+        if (name.includes('m2 max')) return 'M2 Max'
+        if (name.includes('m2 pro')) return 'M2 Pro'
+        if (/\bm2\b/.test(name)) return 'M2'
+        if (name.includes('m1 ultra')) return 'M1 Ultra'
+        if (name.includes('m1 max')) return 'M1 Max'
+        if (name.includes('m1 pro')) return 'M1 Pro'
+        if (/\bm1\b/.test(name)) return 'M1'
         return 'Apple Silicon'
       }
       
@@ -187,35 +205,37 @@ export function ProcessorDistributionChart({
 
     const getMemoryRange = (memory: any): string => {
       if (!memory) return 'Unknown'
-      const memGb = parseFloat(memory)
-      if (isNaN(memGb)) return 'Unknown'
-      if (memGb <= 8) return '8 GB'
-      if (memGb <= 16) return '9-16 GB'
-      if (memGb <= 32) return '17-32 GB'
-      if (memGb <= 64) return '33-64 GB'
-      return '>64 GB'
+      let memoryGB = 0
+      if (typeof memory === 'object' && memory !== null) {
+        const memObj = memory as any
+        if (memObj.totalFormatted) { const m = memObj.totalFormatted.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]) }
+        else if (memObj.physical_memory || memObj.physicalMemory) { const v = memObj.physical_memory || memObj.physicalMemory; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+        else if (memObj.totalPhysical) { const v = memObj.totalPhysical; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+      } else if (typeof memory === 'number') { memoryGB = memory > 1000 ? memory / (1024 * 1024 * 1024) : memory }
+      else if (typeof memory === 'string') { const m = memory.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]); else { const v = parseFloat(memory); if (!isNaN(v)) memoryGB = v > 1000 ? v / (1024 * 1024 * 1024) : v } }
+      if (memoryGB <= 0) return 'Unknown'
+      const sizes = [2, 4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128, 192, 256, 384, 512]
+      let best = sizes[0], bestDiff = Math.abs(memoryGB - sizes[0])
+      for (const s of sizes) { const d = Math.abs(memoryGB - s); if (d < bestDiff) { best = s; bestDiff = d } }
+      return `${best} GB`
     }
 
     const getStorageRange = (device: Device): string => {
-      // Calculate total storage
       const storage = device.modules?.hardware?.storage || (device as any).storage
       if (!Array.isArray(storage)) return 'Unknown'
-      
       const totalBytes = storage.reduce((sum, drive) => {
-        const capacity = drive.capacity || drive.totalSize || 0
+        const capacity = drive.capacity || drive.totalSize || drive.size || 0
         return sum + (typeof capacity === 'number' ? capacity : 0)
       }, 0)
-      
       const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))
-      
       if (storageGB === 0) return 'Unknown'
-      if (storageGB <= 128) return '128 GB'
-      if (storageGB <= 256) return '129-256 GB'
-      if (storageGB <= 512) return '257-512 GB'
-      if (storageGB <= 1024) return '513 GB-1 TB'
-      if (storageGB <= 2048) return '1-2 TB'
-      if (storageGB <= 4096) return '2-4 TB'
-      return '>4 TB'
+      if (storageGB >= 3500) return '4 TB'
+      if (storageGB >= 1800) return '2 TB'
+      if (storageGB >= 900) return '1 TB'
+      if (storageGB >= 450) return '512 GB'
+      if (storageGB >= 200) return '256 GB'
+      if (storageGB >= 100) return '128 GB'
+      return '64 GB'
     }
 
     const getDevicePlatform = (device: Device): 'Windows' | 'Macintosh' | 'Other' => {
@@ -284,7 +304,7 @@ export function ProcessorDistributionChart({
 
     // Sort by count (most common first)
     const sortedProcessors = Object.entries(processorCounts)
-      .sort(([, a], [, b]) => b - a) // Sort by count descending
+      .sort(sortBy === 'alpha' ? ([a], [b]) => a.localeCompare(b) : ([, a], [, b]) => b - a)
 
     const colors = [
       '#3b82f6', // blue-500
@@ -314,7 +334,7 @@ export function ProcessorDistributionChart({
         isGreyedOut: count === 0
       }
     })
-  }, [devices, globalSelectedPlatforms, globalSelectedModels, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges, selectedProcessors])
+  }, [devices, globalSelectedPlatforms, globalSelectedModels, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges, selectedProcessors, sortBy])
 
   const total = useMemo(() => {
     return processorData.reduce((sum: number, item) => sum + item.count, 0)
@@ -338,8 +358,7 @@ export function ProcessorDistributionChart({
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Processor</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 select-none transition-colors" onClick={() => setSortBy(s => s === 'count' ? 'alpha' : 'count')} title={sortBy === 'count' ? 'Sort alphabetically' : 'Sort by quantity'}>Processor {sortBy === 'alpha' ? '(A-Z)' : ''}</h3>
       </div>
       
       <div className="space-y-1 max-h-[34rem] overflow-y-auto">
