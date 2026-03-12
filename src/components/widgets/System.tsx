@@ -178,6 +178,8 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
 
   // Software Update status logic - matching SystemTab.tsx
   const pendingAppleUpdates = system?.pendingAppleUpdates || system?.pending_apple_updates || []
+  const pendingWindowsUpdates = system?.pendingWindowsUpdates || system?.pending_windows_updates || []
+  const pendingWindowsUpdatesCount = !isMac ? pendingWindowsUpdates.length : 0
   const deferredUpdates = isMac ? pendingAppleUpdates.filter((u: any) => u.deferred || u.deferredUntil) : []
   const activeUpdates = isMac ? pendingAppleUpdates.filter((u: any) => !u.deferred && !u.deferredUntil) : []
   const hasDeferredUpdates = deferredUpdates.length > 0
@@ -270,6 +272,15 @@ export const SystemWidget: React.FC<SystemWidgetProps> = ({ device }) => {
                   Available {new Date(soonestDeferral.deferredUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                 </div>
               )}
+            </div>
+          ) : pendingWindowsUpdatesCount > 0 ? (
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                {pendingWindowsUpdatesCount} Pending Update{pendingWindowsUpdatesCount !== 1 ? 's' : ''}
+              </span>
             </div>
           ) : (
             <div className="flex items-center gap-2">
