@@ -488,7 +488,7 @@ function PeripheralsPageContent() {
                     <tr key={peripheral.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-6 py-4 max-w-56">
                         <Link 
-                          href={`/device/${peripheral.deviceId}#hardware`}
+                          href={`/device/${peripheral.serialNumber}#hardware`}
                           className="group block min-w-0"
                           title={peripheral.deviceName || 'Unknown Device'}
                         >
