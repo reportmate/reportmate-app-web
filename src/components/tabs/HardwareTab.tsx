@@ -12,7 +12,7 @@ import {
   Cpu, 
   MemoryStick, 
   HardDrive, 
-  Battery, 
+  BatteryFull, 
   Wifi, 
   Bluetooth, 
   Monitor, 
@@ -579,7 +579,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   {hasBattery ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-2 mb-2">
-                        <Battery className="w-5 h-5 text-green-500" />
+                        <BatteryFull className="w-5 h-5 text-green-500" />
                         <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                       </div>
                       <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
@@ -676,7 +676,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             {hasBattery ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-2">
-                  <Battery className="w-5 h-5 text-green-500" />
+                  <BatteryFull className="w-5 h-5 text-green-500" />
                   <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                 </div>
                 <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
@@ -996,7 +996,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {hasBattery && hardwareData.battery && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Battery className="w-6 h-6 text-gray-500" />
+            <BatteryFull className="w-6 h-6 text-gray-500" />
             Battery Information
           </h3>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
