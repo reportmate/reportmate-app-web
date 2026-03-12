@@ -3,7 +3,7 @@
  * Shows distribution of hardware models across devices
  */
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import { getDevicePlatformLabel } from '../../../providers/PlatformFilterProvider'
 
 interface Device {
@@ -71,16 +71,22 @@ export function HardwareTypeChart({
   globalSelectedMemoryRanges = [],
   globalSelectedStorageRanges = []
 }: HardwareModelChartProps) {
+  const [sortBy, setSortBy] = useState<'count' | 'alpha'>('count')
   const hardwareData = useMemo(() => {
     if (!devices || devices.length === 0) return []
 
     // Helper function to get model name
     const getModelName = (device: Device): string | null => {
-      return device.model || 
+      const raw = device.model || 
              device.modules?.hardware?.model ||
              device.modules?.system?.hardwareInfo?.model ||
-             // NO FAKE DATA - Return null for unknown models
              null
+      if (!raw) return null
+      // Strip trailing duplicate year suffix e.g. "MacBook Pro (14-inch, Nov 2023) (2023)"
+      return raw.replace(/\s*\(\d{4}\)$/, (suffix: string) => {
+        const year = suffix.trim().slice(1, -1) // extract "2023"
+        return raw.slice(0, raw.length - suffix.length).includes(year) ? '' : suffix
+      })
     }
 
     // Helper function to determine device type
@@ -145,14 +151,20 @@ export function HardwareTypeChart({
     // Helper function to get memory range
     const getMemoryRange = (device: Device): string | null => {
       const memory = (device as any).memory
-      if (!memory) return null // NO FAKE DATA - Return null for unknown memory
-      const memGb = parseFloat(memory)
-      if (isNaN(memGb)) return null
-      if (memGb <= 8) return '8 GB'
-      if (memGb <= 16) return '9-16 GB'
-      if (memGb <= 32) return '17-32 GB'
-      if (memGb <= 64) return '33-64 GB'
-      return '>64 GB'
+      if (!memory) return null
+      let memoryGB = 0
+      if (typeof memory === 'object' && memory !== null) {
+        const memObj = memory as any
+        if (memObj.totalFormatted) { const m = memObj.totalFormatted.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]) }
+        else if (memObj.physical_memory || memObj.physicalMemory) { const v = memObj.physical_memory || memObj.physicalMemory; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+        else if (memObj.totalPhysical) { const v = memObj.totalPhysical; memoryGB = (typeof v === 'number' ? v : parseFloat(v)) / (1024 * 1024 * 1024) }
+      } else if (typeof memory === 'number') { memoryGB = memory > 1000 ? memory / (1024 * 1024 * 1024) : memory }
+      else if (typeof memory === 'string') { const m = memory.match(/(\d+\.?\d*)\s*GB/i); if (m) memoryGB = parseFloat(m[1]); else { const v = parseFloat(memory); if (!isNaN(v)) memoryGB = v > 1000 ? v / (1024 * 1024 * 1024) : v } }
+      if (memoryGB <= 0) return null
+      const sizes = [2, 4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128, 192, 256, 384, 512]
+      let best = sizes[0], bestDiff = Math.abs(memoryGB - sizes[0])
+      for (const s of sizes) { const d = Math.abs(memoryGB - s); if (d < bestDiff) { best = s; bestDiff = d } }
+      return `${best} GB`
     }
 
     // Helper function to get architecture
@@ -230,7 +242,7 @@ export function HardwareTypeChart({
 
     // Get top models - no need to filter "Unknown Model" since we don't generate it
     const sortedModels = Object.entries(counts)
-      .sort(([, a], [, b]) => b - a) // Sort by count descending
+      .sort(sortBy === 'alpha' ? ([a], [b]) => a.localeCompare(b) : ([, a], [, b]) => b - a)
 
     const total = Object.values(counts).reduce((sum, count) => sum + count, 0)
 
@@ -262,7 +274,7 @@ export function HardwareTypeChart({
         isGreyedOut
       }
     })
-  }, [devices, selectedModels, globalSelectedPlatforms, globalSelectedProcessors, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges])
+  }, [devices, selectedModels, globalSelectedPlatforms, globalSelectedProcessors, globalSelectedArchitectures, globalSelectedDeviceTypes, globalSelectedMemoryRanges, globalSelectedStorageRanges, sortBy])
 
   const total = useMemo(() => {
     return hardwareData.reduce((sum, item) => sum + item.count, 0)
@@ -292,11 +304,10 @@ export function HardwareTypeChart({
   return (
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Models</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{total} devices</span>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 select-none transition-colors" onClick={() => setSortBy(s => s === 'count' ? 'alpha' : 'count')} title={sortBy === 'count' ? 'Sort alphabetically' : 'Sort by quantity'}>Models {sortBy === 'alpha' ? '(A-Z)' : ''}</h3>
       </div>
       
-      <div className="space-y-1 max-h-[34rem] overflow-y-auto">
+      <div className="space-y-1 max-h-[36.4rem] overflow-y-auto">
         {hardwareData.map(item => (
           <div 
             key={item.name}
