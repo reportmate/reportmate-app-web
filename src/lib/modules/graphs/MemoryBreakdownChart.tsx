@@ -41,6 +41,8 @@ interface Device {
     totalPhysical?: number | string
     availablePhysical?: number | string
     totalFormatted?: string
+    physical_memory?: number | string
+    physicalMemory?: number | string
   }
 }
 
@@ -84,8 +86,16 @@ export function MemoryBreakdownChart({
     const getMemoryGB = (device: Device): number => {
       // Try the modules.hardware.memory structure first (from HardwareTab.tsx)
       if (device.modules?.hardware?.memory) {
-        const mem = device.modules.hardware.memory
-        // Handle totalPhysical
+        const mem = device.modules.hardware.memory as any
+        // Handle physical_memory / physicalMemory (Mac osquery)
+        const physMem = mem.physical_memory || mem.physicalMemory
+        if (physMem) {
+          const totalBytes = typeof physMem === 'string' ? parseFloat(physMem) : physMem
+          if (!isNaN(totalBytes)) {
+            return Math.round(totalBytes / (1024 * 1024 * 1024))
+          }
+        }
+        // Handle totalPhysical (Windows)
         if (mem.totalPhysical) {
           const totalBytes = typeof mem.totalPhysical === 'string' ? parseFloat(mem.totalPhysical) : mem.totalPhysical
           if (!isNaN(totalBytes)) {
@@ -125,6 +135,15 @@ export function MemoryBreakdownChart({
         // Try to handle object memory
         if (typeof memoryField === 'object' && memoryField !== null) {
           const memObj = memoryField as any
+          // Mac osquery: physical_memory / physicalMemory
+          const physMem = memObj.physical_memory || memObj.physicalMemory
+          if (physMem) {
+            const totalBytes = typeof physMem === 'string' ? parseFloat(physMem) : physMem
+            if (!isNaN(totalBytes)) {
+               return Math.round(totalBytes / (1024 * 1024 * 1024))
+            }
+          }
+          // Windows: totalPhysical
           if (memObj.totalPhysical) {
             const totalBytes = typeof memObj.totalPhysical === 'string' ? parseFloat(memObj.totalPhysical) : memObj.totalPhysical
             if (!isNaN(totalBytes)) {
@@ -199,65 +218,56 @@ export function MemoryBreakdownChart({
       return true
     })
 
-    // Define memory ranges
-    const memoryRanges = [
-      { range: '4 GB', min: 0, max: 4, color: '#ef4444' },
-      { range: '8 GB', min: 5, max: 8, color: '#f97316' },
-      { range: '16 GB', min: 9, max: 16, color: '#eab308' },
-      { range: '32 GB', min: 17, max: 32, color: '#22c55e' },
-      { range: '64 GB', min: 33, max: 64, color: '#3b82f6' },
-      { range: '128+ GB', min: 65, max: Infinity, color: '#8b5cf6' }
-    ]
+    // Snap raw GB to nearest standard memory size
+    const snapToStandardSize = (gb: number): string => {
+      const sizes = [2, 4, 8, 12, 16, 24, 32, 36, 48, 64, 96, 128, 192, 256, 384, 512]
+      let best = sizes[0]
+      let bestDiff = Math.abs(gb - sizes[0])
+      for (const s of sizes) {
+        const diff = Math.abs(gb - s)
+        if (diff < bestDiff) { best = s; bestDiff = diff }
+      }
+      return `${best} GB`
+    }
 
-    // Count devices in each range from full dataset (to show all possible ranges)
-    const allRangeCounts: { [key: string]: number } = {}
+    const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#10b981', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7', '#ec4899']
+
+    // Count from full dataset (to know which sizes exist)
+    const allSizeCounts: { [key: string]: number } = {}
     devices.forEach(device => {
       const memoryGB = getMemoryGB(device)
       if (memoryGB > 0) {
-        const range = memoryRanges.find(r => memoryGB >= r.min && memoryGB <= r.max)
-        if (range) {
-          allRangeCounts[range.range] = (allRangeCounts[range.range] || 0) + 1
-        }
+        const label = snapToStandardSize(memoryGB)
+        allSizeCounts[label] = (allSizeCounts[label] || 0) + 1
       }
     })
 
-    // Count devices in each range from filtered dataset (for synchronized percentages)
-    const filteredRangeCounts: { [key: string]: number } = {}
+    // Count from filtered dataset
+    const filteredSizeCounts: { [key: string]: number } = {}
     filteredDevices.forEach(device => {
       const memoryGB = getMemoryGB(device)
       if (memoryGB > 0) {
-        const range = memoryRanges.find(r => memoryGB >= r.min && memoryGB <= r.max)
-        if (range) {
-          filteredRangeCounts[range.range] = (filteredRangeCounts[range.range] || 0) + 1
-        }
+        const label = snapToStandardSize(memoryGB)
+        filteredSizeCounts[label] = (filteredSizeCounts[label] || 0) + 1
       }
     })
 
-    // Convert to array with percentages
-    const totalFilteredDevicesWithMemory = Object.values(filteredRangeCounts).reduce((sum, count) => sum + count, 0)
+    const totalFiltered = Object.values(filteredSizeCounts).reduce((sum, c) => sum + c, 0)
 
-    return memoryRanges
-      .map(range => {
-        const allCount = allRangeCounts[range.range] || 0
-        const filteredCount = filteredRangeCounts[range.range] || 0
-        
-        return {
-          range: range.range,
-          count: filteredCount, // Show filtered count
-          percentage: totalFilteredDevicesWithMemory > 0 ? Math.round((filteredCount / totalFilteredDevicesWithMemory) * 100) : 0,
-          color: range.color,
-          isSelected: selectedMemoryRanges.includes(range.range),
-          isGreyedOut: selectedMemoryRanges.length > 0 && !selectedMemoryRanges.includes(range.range)
-        }
-      })
-      // Only show ranges that have actual data in the full dataset
-      .filter(item => allRangeCounts[item.range] > 0)
-      // Sort by size (smallest first: 4 GB, 8 GB, 16 GB, etc.)
-      .sort((a, b) => {
-        const aSize = parseInt(a.range)
-        const bSize = parseInt(b.range)
-        return aSize - bSize
-      })
+    // Build sorted list of sizes that have data
+    const sizeLabels = Object.keys(allSizeCounts).sort((a, b) => parseInt(a) - parseInt(b))
+
+    return sizeLabels.map((label, i) => {
+      const filteredCount = filteredSizeCounts[label] || 0
+      return {
+        range: label,
+        count: filteredCount,
+        percentage: totalFiltered > 0 ? Math.round((filteredCount / totalFiltered) * 100) : 0,
+        color: colors[i % colors.length],
+        isSelected: selectedMemoryRanges.includes(label),
+        isGreyedOut: selectedMemoryRanges.length > 0 && !selectedMemoryRanges.includes(label)
+      }
+    }).filter(item => allSizeCounts[item.range] > 0)
   }, [devices, selectedMemoryRanges, globalSelectedPlatforms, globalSelectedModels, globalSelectedArchitectures, globalSelectedDeviceTypes])
 
   if (loading) {
@@ -296,10 +306,9 @@ export function MemoryBreakdownChart({
     <div className={`bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 ${className}`}>
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Memory</h3>
-        <span className="text-xs text-gray-500 dark:text-gray-400">{totalDevices} devices</span>
       </div>
       
-      <div className="space-y-1">
+      <div className="space-y-1 max-h-[250px] overflow-y-auto pr-1">
         {memoryData.map(item => (
           <div 
             key={item.range}

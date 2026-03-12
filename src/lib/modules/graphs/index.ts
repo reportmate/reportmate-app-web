@@ -19,6 +19,7 @@ export { StorageBreakdownChart } from './StorageBreakdownChart'
 export { HardwareTypeChart } from './HardwareTypeChart'
 export { ProcessorDistributionChart } from './ProcessorDistributionChart'
 export { GraphicsDistributionChart } from './GraphicsDistributionChart'
+export { ChipConfigurationChart } from './ChipConfigurationChart'
 export { DeviceTypeDonutChart } from './DeviceTypeDonutChart'
 
 // System Fleet Charts
