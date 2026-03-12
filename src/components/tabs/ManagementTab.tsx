@@ -712,7 +712,43 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       {parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload) ? 'Yes' : 'No'}
                     </span>
                   </div>
+
+                  {/* Disallows Activation Lock - from mdmclient */}
+                  {mdmInfo.denies_activation_lock !== undefined && mdmInfo.denies_activation_lock !== '' && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Disallows Activation Lock</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        parseBool(mdmInfo.denies_activation_lock)
+                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
+                      }`}>
+                        {parseBool(mdmInfo.denies_activation_lock) ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Activation Lock Manageable - from mdmclient */}
+                  {mdmInfo.activation_lock_manageable !== undefined && mdmInfo.activation_lock_manageable !== '' && (
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activation Lock Manageable</span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                        parseBool(mdmInfo.activation_lock_manageable)
+                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
+                      }`}>
+                        {parseBool(mdmInfo.activation_lock_manageable) ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  )}
                 </div>
+
+                {/* Original Enrolled OS Version - from mdmclient */}
+                {mdmInfo.original_os_version && (
+                  <div className="flex items-center gap-3 pt-2">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Original Enrolled OS</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{mdmInfo.original_os_version}</span>
+                  </div>
+                )}
 
                 {/* MDM Server URL - Full URL visible */}
                 {serverUrl && (
@@ -736,182 +772,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                         {mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl}
                       </span>
                       <CopyButton value={mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Mac: MDM Status - from mdmclient dumpManagementStatus */}
-          {isEnrolled && isMac && Object.keys(mdmInfo).length > 0 && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">MDM Status</h3>
-              <div className="space-y-0">
-                <table className="w-full">
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {mdmInfo.is_supervised !== undefined && mdmInfo.is_supervised !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Mac is Supervised</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.is_supervised)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.is_supervised) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.is_user_approved !== undefined && mdmInfo.is_user_approved !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">MDM is User Approved</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.is_user_approved)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.is_user_approved) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.enrolled_in_dep !== undefined && mdmInfo.enrolled_in_dep !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">ABM/ASM Assigned</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.enrolled_in_dep)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.enrolled_in_dep) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.managed_via_mdm !== undefined && mdmInfo.managed_via_mdm !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Managed via MDM</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.managed_via_mdm)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.managed_via_mdm) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.is_user_enrollment !== undefined && mdmInfo.is_user_enrollment !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">User Enrollment</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.is_user_enrollment)
-                              ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
-                              : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                          }`}>
-                            {parseBool(mdmInfo.is_user_enrollment) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.denies_activation_lock !== undefined && mdmInfo.denies_activation_lock !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Disallows Activation Lock</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.denies_activation_lock)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.denies_activation_lock) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.activation_lock_manageable !== undefined && mdmInfo.activation_lock_manageable !== '' && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Activation Lock Manageable</td>
-                        <td className="py-2">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            parseBool(mdmInfo.activation_lock_manageable)
-                              ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                              : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                          }`}>
-                            {parseBool(mdmInfo.activation_lock_manageable) ? 'Yes' : 'No'}
-                          </span>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.mdm_server_url_full && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">MDM Server URL</td>
-                        <td className="py-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-mono text-gray-900 dark:text-white break-all">{mdmInfo.mdm_server_url_full}</span>
-                            <CopyButton value={mdmInfo.mdm_server_url_full} />
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {mdmInfo.org_name && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Organization Name</td>
-                        <td className="py-2 text-sm text-gray-900 dark:text-white">{mdmInfo.org_name}</td>
-                      </tr>
-                    )}
-                    {mdmInfo.org_department && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Department</td>
-                        <td className="py-2 text-sm text-gray-900 dark:text-white">{mdmInfo.org_department}</td>
-                      </tr>
-                    )}
-                    {mdmInfo.original_os_version && (
-                      <tr>
-                        <td className="py-2 pr-4 text-sm font-medium text-gray-600 dark:text-gray-400">Original Enrolled OS Version</td>
-                        <td className="py-2 text-sm text-gray-900 dark:text-white">{mdmInfo.original_os_version}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-
-                {/* Organization Contact Details - collapsible */}
-                {(mdmInfo.org_email || mdmInfo.org_phone || mdmInfo.org_support_email || mdmInfo.org_address) && (
-                  <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Organization Contact</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {mdmInfo.org_email && (
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Email</span>
-                          <p className="text-sm text-gray-900 dark:text-white">{mdmInfo.org_email}</p>
-                        </div>
-                      )}
-                      {mdmInfo.org_phone && (
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Phone</span>
-                          <p className="text-sm text-gray-900 dark:text-white">{mdmInfo.org_phone}</p>
-                        </div>
-                      )}
-                      {mdmInfo.org_support_email && (
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Support Email</span>
-                          <p className="text-sm text-gray-900 dark:text-white">{mdmInfo.org_support_email}</p>
-                        </div>
-                      )}
-                      {(mdmInfo.org_address || mdmInfo.org_city || mdmInfo.org_country) && (
-                        <div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">Address</span>
-                          <p className="text-sm text-gray-900 dark:text-white">
-                            {[mdmInfo.org_address, mdmInfo.org_city, mdmInfo.org_zip_code, mdmInfo.org_country]
-                              .filter(Boolean).join(', ')}
-                          </p>
-                        </div>
-                      )}
                     </div>
                   </div>
                 )}
@@ -1079,12 +939,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       </div>
                     )}
 
-                    {/* Organization - from ADE Configuration */}
-                    {adeConfiguration.organization && (
+                    {/* Organization - from mdmclient or ADE Configuration */}
+                    {(mdmInfo.org_name || adeConfiguration.organization) && (
                       <div>
                         <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Organization</div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {adeConfiguration.organization}
+                          {mdmInfo.org_name || adeConfiguration.organization}
                         </div>
                       </div>
                     )}

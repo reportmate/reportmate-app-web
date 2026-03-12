@@ -679,97 +679,6 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               </div>
             </div>
           </div>
-          {/* Pending Updates */}
-          {pendingAppleUpdates.length > 0 && (
-            <div className="overflow-x-auto border-b border-gray-200 dark:border-gray-700">
-              <div className="px-6 py-2 bg-yellow-50 dark:bg-yellow-900/20">
-                <span className="text-xs font-medium text-yellow-700 dark:text-yellow-300">Pending Updates</span>
-              </div>
-              <table className="w-full">
-                <thead className="bg-gray-50 dark:bg-gray-900">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Restart</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                  {pendingAppleUpdates.map((update, index) => (
-                  <tr key={update.productKey || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4">
-                      <div>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white">{update.name}</div>
-                        {update.buildVersion && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.buildVersion}</div>
-                        )}
-                        {!update.buildVersion && update.productKey && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.productKey}</div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                      {update.version || 'Unknown'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex gap-1 flex-wrap">
-                          {update.deferred && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                              Deferred
-                            </span>
-                          )}
-                          {update.isSecurity && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                              Security
-                            </span>
-                          )}
-                          {update.recommended && !update.deferred && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              Recommended
-                            </span>
-                          )}
-                          {!update.isSecurity && !update.recommended && !update.deferred && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                              Optional
-                            </span>
-                          )}
-                        </div>
-                        {update.deferred && update.deferredUntil && (
-                          <div className="text-xs text-orange-600 dark:text-orange-400">
-                            Available {new Date(update.deferredUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
-                        )}
-                        {update.deferred && !update.deferredUntil && update.firstOfferedAt && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            Offered {new Date(update.firstOfferedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {update.deferred ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-500 dark:bg-gray-700 dark:text-gray-400">
-                          —
-                        </span>
-                      ) : (
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          update.restartRequired
-                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                            : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                        }`}>
-                          {update.restartRequired ? 'Required' : 'No'}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          )}
-          
-          {/* Recently Installed System Updates (from Install History - macOS updates only) */}
           {(() => {
             const systemUpdates = installHistory
               .filter(item => 
@@ -780,27 +689,79 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                 item.packageId?.toLowerCase().includes('xprotect')
               )
               .slice(0, 10)
-            
-            return systemUpdates.length > 0 && (
-              <div className="overflow-x-auto max-h-[300px] overflow-y-auto">
+
+            const hasRows = pendingAppleUpdates.length > 0 || systemUpdates.length > 0
+
+            return hasRows ? (
+              <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0">
+                  <thead className="bg-gray-50 dark:bg-gray-900">
                     <tr>
-                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
-                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                      <th className="px-6 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Installed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Installed</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                    {pendingAppleUpdates.map((update, index) => (
+                      <tr key={`pending-${update.productKey || index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td className="px-6 py-4">
+                          <div>
+                            <div className="text-sm font-medium text-gray-900 dark:text-white">{update.name}</div>
+                            {update.buildVersion && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.buildVersion}</div>
+                            )}
+                            {!update.buildVersion && update.productKey && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{update.productKey}</div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                          {update.version || 'Unknown'}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex gap-1 flex-wrap">
+                              {update.deferred ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">
+                                  Deferred
+                                </span>
+                              ) : update.restartRequired ? (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                  Restart Required
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                  Pending
+                                </span>
+                              )}
+                            </div>
+                            {update.deferred && update.deferredUntil && (
+                              <div className="text-xs text-orange-600 dark:text-orange-400">
+                                Available {new Date(update.deferredUntil).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
+                            )}
+                            {update.deferred && !update.deferredUntil && update.firstOfferedAt && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400">
+                                Offered {new Date(update.firstOfferedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"></td>
+                      </tr>
+                    ))}
                     {systemUpdates.map((item, index) => (
-                      <tr key={item.packageId || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <tr key={`installed-${item.packageId || index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-3">
                           <div className="text-sm font-medium text-gray-900 dark:text-white font-mono">{item.packageId}</div>
                         </td>
                         <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                           {item.version || 'Unknown'}
                         </td>
-                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400">
+                        <td className="px-6 py-3"></td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-600 dark:text-gray-400 text-right">
                           {item.installTime ? formatRelativeTime(new Date(parseInstallTime(item.installTime)).toISOString()) : 'Unknown'}
                         </td>
                       </tr>
@@ -808,7 +769,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                   </tbody>
                 </table>
               </div>
-            )
+            ) : null
           })()}
         </div>
       )}

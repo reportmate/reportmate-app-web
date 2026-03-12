@@ -14,11 +14,11 @@ export function DeviceDetailSkeleton({ activeTab: initialActiveTab = 'info', isM
     { id: 'info', label: 'Info', icon: 'M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' },
     { id: 'installs', label: 'Installs', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4', accentColor: 'emerald' },
     { id: 'applications', label: 'Applications', icon: 'M19 12.2H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V10.2a2 2 0 00-2-2M5 12.2V10.2a2 2 0 012-2m0 0V6.2a2 2 0 012-2h6a2 2 0 012 2v2M7 8.2h10', accentColor: 'blue' },
+    { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', accentColor: 'purple' },
     { id: 'management', label: 'Management', icon: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z', accentColor: 'yellow' },
+    { id: 'identity', label: 'Identity', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', accentColor: 'indigo' },
     { id: 'hardware', label: 'Hardware', icon: 'M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z', accentColor: 'orange' },
     { id: 'peripherals', label: 'Peripherals', icon: 'M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z', accentColor: 'cyan' },
-    { id: 'system', label: 'System', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z', accentColor: 'purple' },
-    { id: 'identity', label: 'Identity', icon: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z', accentColor: 'indigo' },
     { id: 'security', label: 'Security', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z', accentColor: 'red' },
     { id: 'network', label: 'Network', icon: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0', accentColor: 'teal' },
     { id: 'events', label: 'Events', icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', accentColor: 'monochrome' }
@@ -639,21 +639,116 @@ export function HardwareTabSkeleton({ isMac }: { isMac?: boolean }) {
 export function SystemTabSkeleton() {
   return (
     <div className="space-y-6">
-      {/* System info grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {['Operating System', 'System Information'].map((title) => (
-          <div key={title} className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="h-6 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+      {/* Header - purple icon + title + update badge */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-200 dark:bg-purple-800 rounded-lg animate-pulse"></div>
+          <div>
+            <div className="h-7 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+        </div>
+        {/* Software Update badge */}
+        <div className="text-right mr-8">
+          <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+          <div className="h-9 w-36 bg-green-100 dark:bg-green-900 rounded-full animate-pulse"></div>
+        </div>
+      </div>
+
+      {/* OS Details card */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+        {/* Row 1: 3 primary stat cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {[
+            { label: 'w-12', value: 'w-20' },
+            { label: 'w-14', value: 'w-24' },
+            { label: 'w-10', value: 'w-28' },
+          ].map((widths, i) => (
+            <div key={i} className="bg-white/60 dark:bg-gray-900/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+              <div className={`h-3 ${widths.label} bg-purple-200 dark:bg-purple-700 rounded animate-pulse mb-3`}></div>
+              <div className={`h-6 ${widths.value} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`}></div>
             </div>
-            <div className="p-6 space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex justify-between items-center">
-                  <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                  <div className="h-4 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
-                </div>
-              ))}
+          ))}
+        </div>
+
+        {/* Row 2: 5 secondary stat cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+          {[
+            { label: 'w-20', value: 'w-24' },
+            { label: 'w-16', value: 'w-20' },
+            { label: 'w-20', value: 'w-16' },
+            { label: 'w-24', value: 'w-20' },
+            { label: 'w-16', value: 'w-24' },
+          ].map((widths, i) => (
+            <div key={i} className="bg-white/60 dark:bg-gray-900/40 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+              <div className={`h-3 ${widths.label} bg-gray-300 dark:bg-gray-600 rounded animate-pulse mb-3`}></div>
+              <div className={`h-4 ${widths.value} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`}></div>
             </div>
+          ))}
+        </div>
+      </div>
+
+      {/* macOS Updates table skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="h-5 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-56 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+        </div>
+        <div className="p-4 space-y-3">
+          {[80, 72, 88, 64].map((w, i) => (
+            <div key={i} className="flex items-center gap-4 py-2">
+              <div className={`h-4 w-${w} bg-gray-200 dark:bg-gray-700 rounded animate-pulse flex-shrink-0`} style={{ width: `${w * 2}px` }}></div>
+              <div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+              <div className="h-6 w-20 bg-blue-100 dark:bg-blue-900 rounded-full animate-pulse ml-auto"></div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* System Statistics strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { num: 'w-10', label: 'w-32', color: 'text-blue-600' },
+          { num: 'w-8',  label: 'w-20', color: 'text-green-600' },
+          { num: 'w-8',  label: 'w-24', color: 'text-purple-600' },
+          { num: 'w-6',  label: 'w-24', color: 'text-pink-600' },
+        ].map((s, i) => (
+          <div key={i} className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+            <div className={`h-8 ${s.num} bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2`}></div>
+            <div className={`h-4 ${s.label} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`}></div>
+          </div>
+        ))}
+      </div>
+
+      {/* Background Activity / Services table skeleton */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+          <div>
+            <div className="h-5 w-44 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-4 w-64 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
+          </div>
+          {/* Search box */}
+          <div className="h-9 w-48 bg-gray-100 dark:bg-gray-700 rounded-md animate-pulse"></div>
+        </div>
+        {/* Table header */}
+        <div className="px-6 py-3 bg-gray-50 dark:bg-gray-900 grid grid-cols-4 gap-4">
+          {['w-16', 'w-12', 'w-20', 'w-24'].map((w, i) => (
+            <div key={i} className={`h-3 ${w} bg-gray-300 dark:bg-gray-600 rounded animate-pulse`}></div>
+          ))}
+        </div>
+        {/* Table rows */}
+        {[
+          ['w-48', 'w-16', 'w-20', 'w-32'],
+          ['w-56', 'w-16', 'w-24', 'w-40'],
+          ['w-40', 'w-16', 'w-20', 'w-28'],
+          ['w-52', 'w-16', 'w-16', 'w-36'],
+          ['w-44', 'w-16', 'w-20', 'w-44'],
+          ['w-60', 'w-16', 'w-24', 'w-32'],
+        ].map((cols, i) => (
+          <div key={i} className="px-6 py-4 grid grid-cols-4 gap-4 border-t border-gray-200 dark:border-gray-700">
+            {cols.map((w, j) => (
+              <div key={j} className={`h-4 ${w} bg-gray-200 dark:bg-gray-700 rounded animate-pulse`}></div>
+            ))}
           </div>
         ))}
       </div>

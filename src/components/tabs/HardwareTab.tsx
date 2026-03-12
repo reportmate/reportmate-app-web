@@ -164,6 +164,12 @@ interface HardwareData {
     nanotextureOption?: boolean | number;
     data_source?: string;
     dataSource?: string;
+    // EDID enrichment fields
+    manufacturer?: string;
+    vendor_id?: string;
+    product_id?: string;
+    manufacture_year?: number;
+    manufacture_week?: number;
   }>;
   wireless?: {
     name?: unknown;
@@ -795,7 +801,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       </h4>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {diagonalInches ? `${diagonalInches}" ` : ''}
-                        {display.type === 'internal' ? 'Built-in' : 'External'} {displayType}
+                        {display.type === 'internal' ? 'Built-in' : 'External'} {displayType || display.manufacturer || ''}
                       </div>
                     </div>
                   </div>
