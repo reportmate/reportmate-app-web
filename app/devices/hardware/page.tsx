@@ -10,6 +10,7 @@ import { usePlatformFilterSafe, normalizePlatform, getDevicePlatformLabel } from
 import { Copy } from "lucide-react"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -92,13 +93,26 @@ function HardwarePageContent() {
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   
-  // Filter options from inventory data
-  const [filterOptions, setFilterOptions] = useState<{
-    usages: string[]
-    catalogs: string[]
-    locations: string[]
-    locationCounts: Record<string, number>
-  }>({ usages: [], catalogs: [], locations: [], locationCounts: {} })
+  // Main devices (with inventory) from the devices API
+  const { devices: allDevices } = useDeviceData()
+
+  // Filter options computed from inventory data
+  const filterOptions = {
+    usages: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.usage).filter(Boolean)
+    )).sort() as string[],
+    catalogs: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.catalog).filter(Boolean)
+    )).sort() as string[],
+    locations: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.location).filter(Boolean)
+    )).sort() as string[],
+    locationCounts: allDevices.reduce((acc: Record<string, number>, d: any) => {
+      const loc = d.modules?.inventory?.location
+      if (loc) acc[loc] = (acc[loc] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+  }
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -239,30 +253,6 @@ function HardwarePageContent() {
           
           setHardware(processedData)
           setError(null)
-          
-          // Extract filter options from inventory data
-          const usages = new Set<string>()
-          const catalogs = new Set<string>()
-          const locations = new Set<string>()
-          
-          processedData.forEach((h: any) => {
-            if (h.inventory?.usage) usages.add(h.inventory.usage)
-            if (h.inventory?.catalog) catalogs.add(h.inventory.catalog)
-            if (h.inventory?.location) locations.add(h.inventory.location)
-          })
-          
-          // Build location counts for proportional sizing
-          const locCounts: Record<string, number> = {}
-          processedData.forEach((h: any) => {
-            const loc = h.inventory?.location
-            if (loc) locCounts[loc] = (locCounts[loc] || 0) + 1
-          })
-          setFilterOptions({
-            usages: Array.from(usages).sort(),
-            catalogs: Array.from(catalogs).sort(),
-            locations: Array.from(locations).sort(),
-            locationCounts: locCounts
-          })
         } else {
           throw new Error('Invalid hardware API response format')
         }
@@ -621,7 +611,12 @@ function HardwarePageContent() {
   }
 
   // Helper to get inventory data
-  const getInventory = (device: any) => device.inventory || {}
+  const getInventory = (device: any) => {
+    if (device.inventory && Object.keys(device.inventory).length > 0) return device.inventory
+    if (device.modules?.inventory) return device.modules.inventory
+    const match = allDevices.find((d: any) => d.serialNumber === device.serialNumber || d.deviceId === device.deviceId)
+    return match?.modules?.inventory || {}
+  }
 
   // Apply global platform filter for charts/widgets
   const platformFilteredHardware = globalPlatformFilter && globalPlatformFilter !== 'all'
