@@ -39,6 +39,19 @@ export interface WindowsUpdate {
   requiresRestart?: boolean
 }
 
+export interface PendingWindowsUpdate {
+  title: string
+  kbNumber: string
+  category: string
+  severity: string
+  description: string
+  cves: string[]
+  isMandatory: boolean
+  isDownloaded: boolean
+  rebootRequired: boolean
+  releaseDate?: string
+}
+
 // Mac-specific: Pending Apple Updates
 export interface MacUpdate {
   name: string
@@ -163,6 +176,8 @@ export interface SystemInfo {
   services: SystemService[]
   environment: EnvironmentVariable[]
   updates: WindowsUpdate[]
+  pendingWindowsUpdates: PendingWindowsUpdate[]
+  pendingWindowsUpdatesCount: number
   scheduledTasks: ScheduledTask[]
   runningServices: number
   operatingSystem: OperatingSystemInfo
@@ -190,6 +205,8 @@ export function extractSystem(deviceModules: any): SystemInfo {
     services: [],
     environment: [],
     updates: [],
+    pendingWindowsUpdates: [],
+    pendingWindowsUpdatesCount: 0,
     scheduledTasks: [],
     runningServices: 0,
     operatingSystem: {},
@@ -303,6 +320,28 @@ export function extractSystem(deviceModules: any): SystemInfo {
       installDate: update.installDate || update.installed_date || '',
       requiresRestart: update.requiresRestart || update.requires_restart || false
     }))
+  }
+
+  // Extract Windows pending updates with KB details and CVEs
+  const rawPendingWindowsUpdates = modules?.system?.pendingWindowsUpdates || modules?.system?.pending_windows_updates
+  if (rawPendingWindowsUpdates && Array.isArray(rawPendingWindowsUpdates)) {
+    systemInfo.pendingWindowsUpdates = rawPendingWindowsUpdates.map((update: any) => ({
+      title: update.title || '',
+      kbNumber: update.kbNumber || update.kb_number || '',
+      category: update.category || '',
+      severity: update.severity || '',
+      description: update.description || '',
+      cves: Array.isArray(update.cves) ? update.cves : [],
+      isMandatory: !!(update.isMandatory ?? update.is_mandatory ?? false),
+      isDownloaded: !!(update.isDownloaded ?? update.is_downloaded ?? false),
+      rebootRequired: !!(update.rebootRequired ?? update.reboot_required ?? false),
+      releaseDate: update.releaseDate || update.release_date || ''
+    }))
+    systemInfo.pendingWindowsUpdatesCount = systemInfo.pendingWindowsUpdates.length
+  }
+  // Also check for pendingWindowsUpdatesCount from API
+  if (modules?.system?.pendingWindowsUpdatesCount != null) {
+    systemInfo.pendingWindowsUpdatesCount = modules.system.pendingWindowsUpdatesCount
   }
 
   // Extract Mac pending Apple updates
