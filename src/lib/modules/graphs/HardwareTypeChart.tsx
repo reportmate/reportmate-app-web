@@ -223,8 +223,21 @@ export function HardwareTypeChart({
 
       // Storage range filter
       if (globalSelectedStorageRanges.length > 0) {
-        // This would need storage calculation logic here
-        // Skipping for now to avoid complexity
+        const storage = (device.modules?.hardware as any)?.storage || (device as any).storage
+        if (!Array.isArray(storage)) return false
+        const totalBytes = storage.reduce((sum: number, drive: any) => {
+          const capacity = drive.capacity || drive.totalSize || drive.size || 0
+          return sum + (typeof capacity === 'number' ? capacity : 0)
+        }, 0)
+        const storageGB = Math.round(totalBytes / (1024 * 1024 * 1024))
+        let storageLabel = '64 GB'
+        if (storageGB >= 3500) storageLabel = '4 TB'
+        else if (storageGB >= 1800) storageLabel = '2 TB'
+        else if (storageGB >= 900) storageLabel = '1 TB'
+        else if (storageGB >= 450) storageLabel = '512 GB'
+        else if (storageGB >= 200) storageLabel = '256 GB'
+        else if (storageGB >= 100) storageLabel = '128 GB'
+        if (!globalSelectedStorageRanges.includes(storageLabel)) return false
       }
 
       return true
