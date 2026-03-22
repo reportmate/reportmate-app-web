@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     // Forward query parameters
     const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
     const queryString = incomingParams.toString()
-    const dashboardUrl = `${apiBaseUrl}/api/dashboard${queryString ? `?${queryString}` : ''}`
+    const dashboardUrl = `${apiBaseUrl}/api/v1/dashboard${queryString ? `?${queryString}` : ''}`
     
         
     // Use shared authentication headers

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
       if (status) params.set('status', status)
       if (includeArchived) params.set('includeArchived', 'true')
       
-      const url = `${apiBaseUrl}/api/devices/security/certificates?${params.toString()}`
+      const url = `${apiBaseUrl}/api/v1/devices/security/certificates?${params.toString()}`
       console.log(`[CERT SEARCH API] ${timestamp} - Fetching from: ${url}`)
       
       const headers: Record<string, string> = {

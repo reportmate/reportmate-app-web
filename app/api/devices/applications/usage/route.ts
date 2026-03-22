@@ -24,7 +24,7 @@ export async function GET(request: Request) {
     // Use internal API URL for container-to-container communication
     const API_BASE_URL = process.env.API_BASE_URL || 'http://reportmate-functions-api'
     
-    const fastApiUrl = `${API_BASE_URL}/api/devices/applications/usage?${searchParams.toString()}`
+    const fastApiUrl = `${API_BASE_URL}/api/v1/devices/applications/usage?${searchParams.toString()}`
         
     // Use shared auth headers for internal API calls
     const headers = getInternalApiHeaders()

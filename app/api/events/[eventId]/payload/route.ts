@@ -22,7 +22,7 @@ export async function GET(
     headers['Content-Type'] = 'application/json'
 
     try {
-      const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/events/${encodeURIComponent(eventId)}/payload`, {
+      const response = await fetch(`${AZURE_FUNCTIONS_BASE_URL}/api/v1/events/${encodeURIComponent(eventId)}/payload`, {
         method: 'GET',
         headers,
         cache: 'no-store',

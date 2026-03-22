@@ -12,7 +12,7 @@ export async function GET() {
       throw new Error('API_BASE_URL not configured')
     }
     
-    const fastApiUrl = `${apiBaseUrl}/api/devices/inventory`
+    const fastApiUrl = `${apiBaseUrl}/api/v1/devices/inventory`
         
     // Container-to-container auth requires X-Internal-Secret header
     const headers: Record<string, string> = {

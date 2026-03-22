@@ -96,19 +96,19 @@ if ($Target -eq "api" -or $Target -eq "all") {
 
     Write-Host "`nHealth (no auth):" -ForegroundColor Yellow
     Test-Endpoint "GET /"            "$ApiBase/"
-    Test-Endpoint "GET /api/health"  "$ApiBase/api/health"
-    Test-Endpoint "GET /api/negotiate" "$ApiBase/api/negotiate" -ExpectedStatus @(200, 500)
+    Test-Endpoint "GET /api/v1/health"  "$ApiBase/api/v1/health"
+    Test-Endpoint "GET /api/v1/negotiate" "$ApiBase/api/v1/negotiate" -ExpectedStatus @(200, 500)
 
     Write-Host "`nCore endpoints (auth):" -ForegroundColor Yellow
-    Test-Endpoint "GET /api/dashboard"  "$ApiBase/api/dashboard"   -Headers $authHeaders
-    Test-Endpoint "GET /api/devices"    "$ApiBase/api/devices"     -Headers $authHeaders
-    Test-Endpoint "GET /api/events"     "$ApiBase/api/events"      -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/dashboard"  "$ApiBase/api/v1/dashboard"   -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/devices"    "$ApiBase/api/v1/devices"     -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/events"     "$ApiBase/api/v1/events"      -Headers $authHeaders
 
     Write-Host "`nDevice-specific ($DeviceSerial):" -ForegroundColor Yellow
-    Test-Endpoint "GET /api/device/:serial"          "$ApiBase/api/device/$DeviceSerial"          -Headers $authHeaders
-    Test-Endpoint "GET /api/device/:serial/events"   "$ApiBase/api/device/$DeviceSerial/events"   -Headers $authHeaders
-    Test-Endpoint "GET /api/device/:serial/info"     "$ApiBase/api/device/$DeviceSerial/info"     -Headers $authHeaders
-    Test-Endpoint "GET /api/device/:serial/installs/log" "$ApiBase/api/device/$DeviceSerial/installs/log" -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/device/:serial"          "$ApiBase/api/v1/device/$DeviceSerial"          -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/device/:serial/events"   "$ApiBase/api/v1/device/$DeviceSerial/events"   -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/device/:serial/info"     "$ApiBase/api/v1/device/$DeviceSerial/info"     -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/device/:serial/installs/log" "$ApiBase/api/v1/device/$DeviceSerial/installs/log" -Headers $authHeaders
 
     Write-Host "`nFleet module endpoints:" -ForegroundColor Yellow
     $fleetEndpoints = @(
@@ -117,24 +117,24 @@ if ($Target -eq "api" -or $Target -eq "all") {
         "management", "inventory", "system", "peripherals", "identity"
     )
     foreach ($ep in $fleetEndpoints) {
-        Test-Endpoint "GET /api/devices/$ep" "$ApiBase/api/devices/$ep" -Headers $authHeaders
+        Test-Endpoint "GET /api/v1/devices/$ep" "$ApiBase/api/v1/devices/$ep" -Headers $authHeaders
     }
 
     Write-Host "`nDevice module data:" -ForegroundColor Yellow
     $modules = @("applications", "hardware", "installs", "inventory", "management", "network", "security", "system")
     foreach ($mod in $modules) {
-        Test-Endpoint "GET /api/device/:serial/modules/$mod" "$ApiBase/api/device/$DeviceSerial/modules/$mod" -Headers $authHeaders
+        Test-Endpoint "GET /api/v1/device/:serial/modules/$mod" "$ApiBase/api/v1/device/$DeviceSerial/modules/$mod" -Headers $authHeaders
     }
 
     Write-Host "`nStats endpoints:" -ForegroundColor Yellow
-    Test-Endpoint "GET /api/stats/installs"           "$ApiBase/api/stats/installs"           -Headers $authHeaders
-    Test-Endpoint "GET /api/stats/applications/usage"  "$ApiBase/api/stats/applications/usage"  -Headers $authHeaders
-    Test-Endpoint "GET /api/devices/applications/usage" "$ApiBase/api/devices/applications/usage" -Headers $authHeaders
-    Test-Endpoint "GET /api/device/:serial/applications/usage" "$ApiBase/api/device/$DeviceSerial/applications/usage" -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/stats/installs"           "$ApiBase/api/v1/stats/installs"           -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/stats/applications/usage"  "$ApiBase/api/v1/stats/applications/usage"  -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/devices/applications/usage" "$ApiBase/api/v1/devices/applications/usage" -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/device/:serial/applications/usage" "$ApiBase/api/v1/device/$DeviceSerial/applications/usage" -Headers $authHeaders
 
     Write-Host "`nAuth enforcement (should reject):" -ForegroundColor Yellow
-    Test-Endpoint "GET /api/devices (no auth)" "$ApiBase/api/devices" -ExpectedStatus @(401, 403)
-    Test-Endpoint "GET /api/dashboard (no auth)" "$ApiBase/api/dashboard" -ExpectedStatus @(401, 403)
+    Test-Endpoint "GET /api/v1/devices (no auth)" "$ApiBase/api/v1/devices" -ExpectedStatus @(401, 403)
+    Test-Endpoint "GET /api/v1/dashboard (no auth)" "$ApiBase/api/v1/dashboard" -ExpectedStatus @(401, 403)
 }
 
 # ── Frontend ─────────────────────────────────────────────────────
@@ -158,13 +158,13 @@ if ($Target -eq "frontend" -or $Target -eq "all") {
     }
 
     Write-Host "`nAPI proxy routes:" -ForegroundColor Yellow
-    Test-Endpoint "GET /api/healthz"    "$FrontendBase/api/healthz"
-    Test-Endpoint "GET /api/version"    "$FrontendBase/api/version"
-    Test-Endpoint "GET /api/dashboard"  "$FrontendBase/api/dashboard"
-    Test-Endpoint "GET /api/devices"    "$FrontendBase/api/devices"
-    Test-Endpoint "GET /api/events"     "$FrontendBase/api/events"
-    Test-Endpoint "GET /api/stats"      "$FrontendBase/api/stats" -ExpectedStatus @(200, 405)
-    Test-Endpoint "GET /api/stats/installs" "$FrontendBase/api/stats/installs"
+    Test-Endpoint "GET /api/v1/healthz"    "$FrontendBase/api/v1/healthz"
+    Test-Endpoint "GET /api/v1/version"    "$FrontendBase/api/v1/version"
+    Test-Endpoint "GET /api/v1/dashboard"  "$FrontendBase/api/v1/dashboard"
+    Test-Endpoint "GET /api/v1/devices"    "$FrontendBase/api/v1/devices"
+    Test-Endpoint "GET /api/v1/events"     "$FrontendBase/api/v1/events"
+    Test-Endpoint "GET /api/v1/stats"      "$FrontendBase/api/v1/stats" -ExpectedStatus @(200, 405)
+    Test-Endpoint "GET /api/v1/stats/installs" "$FrontendBase/api/v1/stats/installs"
 }
 
 # ── Summary ──────────────────────────────────────────────────────

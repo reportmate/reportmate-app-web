@@ -41,7 +41,7 @@ export async function GET(
     try {
       // Try to fetch from Azure Functions if available
       const headers = getInternalApiHeaders()
-      const response = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events`, {
+      const response = await fetch(`${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/events`, {
         cache: 'no-store',
         headers,
         signal: AbortSignal.timeout(10000)

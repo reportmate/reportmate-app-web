@@ -149,7 +149,7 @@ export async function GET(request: Request) {
     const baseUrl = CONTAINER_APPS_API_BASE
     const headers = getInternalApiHeaders()
     
-    const response = await fetch(`${baseUrl}/api/devices/applications/filters`, {
+    const response = await fetch(`${baseUrl}/api/v1/devices/applications/filters`, {
       method: 'GET',
       headers,
     })

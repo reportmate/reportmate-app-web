@@ -51,7 +51,7 @@ export async function GET(_request: NextRequest) {
     try {
       // First, get all devices
             const headers = getInternalApiHeaders()
-      const devicesResponse = await fetch(`${apiBaseUrl}/api/devices`, {
+      const devicesResponse = await fetch(`${apiBaseUrl}/api/v1/devices`, {
         cache: 'no-store',
         headers
       })
@@ -89,7 +89,7 @@ export async function GET(_request: NextRequest) {
         await Promise.all(batch.map(async (device: any) => {
           const deviceSerial = device.serialNumber || device.serial_number || device.id || 'unknown'
           try {
-            const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${deviceSerial}`, {
+            const deviceResponse = await fetch(`${apiBaseUrl}/api/v1/device/${deviceSerial}`, {
               cache: 'no-store',
               headers
             })

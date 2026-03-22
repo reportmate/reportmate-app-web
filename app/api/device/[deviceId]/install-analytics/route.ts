@@ -27,7 +27,7 @@ export async function GET(
     }
 
     // Construct the API URL with query parameters
-    const apiUrl = new URL(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/install-analytics`)
+    const apiUrl = new URL(`${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/install-analytics`)
     apiUrl.searchParams.set('range', range)
     
         const headers = getInternalApiHeaders()

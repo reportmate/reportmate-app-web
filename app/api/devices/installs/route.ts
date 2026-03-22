@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       const headers = getInternalApiHeaders();
 
       // Fetch device data from Azure Functions device endpoint
-      const apiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(deviceId)}`, {
+      const apiResponse = await fetch(`${API_BASE_URL}/api/v1/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
         headers
       });

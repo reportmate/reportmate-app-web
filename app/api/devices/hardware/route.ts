@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       throw new Error('API_BASE_URL not configured')
     }
     
-    const fastApiUrl = `${apiBaseUrl}/api/devices/hardware?${searchParams.toString()}`
+    const fastApiUrl = `${apiBaseUrl}/api/v1/devices/hardware?${searchParams.toString()}`
         
     // Use shared authentication headers
     const headers = getInternalApiHeaders()

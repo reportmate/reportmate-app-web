@@ -22,7 +22,7 @@ export async function GET(_request: NextRequest) {
   const headers = getInternalApiHeaders()
 
   try {
-    const response = await fetch(`${apiBaseUrl}/api/stats/installs`, {
+    const response = await fetch(`${apiBaseUrl}/api/v1/stats/installs`, {
       cache: 'no-store',
       headers,
     })

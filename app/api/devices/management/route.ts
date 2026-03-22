@@ -13,7 +13,7 @@ export async function GET() {
       throw new Error('API_BASE_URL not configured')
     }
     
-    const fastApiUrl = `${apiBaseUrl}/api/devices/management`
+    const fastApiUrl = `${apiBaseUrl}/api/v1/devices/management`
         
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
