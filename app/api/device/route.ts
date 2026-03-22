@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       headers['Content-Type'] = 'application/json'
 
       // Forward the request to Azure Functions /api/device endpoint
-      response = await fetch(`${apiBaseUrl}/api/device`, {
+      response = await fetch(`${apiBaseUrl}/api/v1/device`, {
         method: 'POST',
         headers,
         body: JSON.stringify(requestData)

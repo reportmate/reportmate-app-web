@@ -21,7 +21,7 @@ export async function GET(request: Request) {
     // Call the dedicated FastAPI /api/devices/security endpoint (NOT /api/devices)
     // This endpoint returns optimized security summary data, not full device modules
     try {
-      const url = `${apiBaseUrl}/api/devices/security${includeArchived ? '?includeArchived=true' : ''}`
+      const url = `${apiBaseUrl}/api/v1/devices/security${includeArchived ? '?includeArchived=true' : ''}`
       console.log(`[SECURITY API] ${timestamp} - Fetching from: ${url}`)
             
       // Container-to-container auth requires X-Internal-Secret header

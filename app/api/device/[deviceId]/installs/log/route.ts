@@ -30,7 +30,7 @@ export async function GET(
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
     
-    const upstreamUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/installs/log`
+    const upstreamUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/installs/log`
         
     const response = await fetch(upstreamUrl, {
       cache: 'no-store',

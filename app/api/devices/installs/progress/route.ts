@@ -66,7 +66,7 @@ export async function GET(request: Request) {
           const _timestamp = new Date().toISOString();
                     
           // Fetch all devices first
-          const apiResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+          const apiResponse = await fetch(`${API_BASE_URL}/api/v1/devices`, {
             cache: 'no-store',
             headers: {
               'Cache-Control': 'no-cache',
@@ -153,7 +153,7 @@ export async function GET(request: Request) {
               }
 
               try {
-                const deviceApiResponse = await fetch(`${API_BASE_URL}/api/device/${encodeURIComponent(serialNumber)}`, {
+                const deviceApiResponse = await fetch(`${API_BASE_URL}/api/v1/device/${encodeURIComponent(serialNumber)}`, {
                   cache: 'no-store',
                   headers: {
                     'Cache-Control': 'no-cache',

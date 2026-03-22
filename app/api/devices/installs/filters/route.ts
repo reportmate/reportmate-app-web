@@ -21,7 +21,7 @@ export async function GET(_request: Request) {
     // Use new FastAPI server-side filters endpoint (pre-computed counts, no items arrays)
     const headers = getInternalApiHeaders();
     
-    const response = await fetch(`${API_BASE_URL}/api/devices/installs/filters`, {
+    const response = await fetch(`${API_BASE_URL}/api/v1/devices/installs/filters`, {
       cache: 'no-store',
       headers
     });

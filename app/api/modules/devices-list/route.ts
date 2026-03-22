@@ -18,7 +18,7 @@ export async function GET() {
       headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
     }
     
-    const devicesResponse = await fetch(`${API_BASE_URL}/api/devices`, {
+    const devicesResponse = await fetch(`${API_BASE_URL}/api/v1/devices`, {
       headers,
       signal: AbortSignal.timeout(30000) // 30 second timeout
     })

@@ -48,7 +48,7 @@ export async function GET(
     if (moduleName === 'events') {
       const eventsParams = new URLSearchParams({ limit })
       if (validType) eventsParams.append('type', validType)
-      const eventsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/events?${eventsParams.toString()}`
+      const eventsUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/events?${eventsParams.toString()}`
             
       const eventsResponse = await fetch(eventsUrl, {
         cache: 'no-store',
@@ -86,7 +86,7 @@ export async function GET(
     }
     
     // Fetch module data directly from the backend module endpoint (more efficient)
-    const moduleUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/modules/${encodeURIComponent(moduleName)}`
+    const moduleUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/modules/${encodeURIComponent(moduleName)}`
         
     const response = await fetch(moduleUrl, {
       cache: 'no-store',
