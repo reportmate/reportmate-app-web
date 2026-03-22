@@ -33,7 +33,7 @@ export async function fetchBulkInstallRecords(): Promise<any[]> {
   const headers = getInternalApiHeaders();
   
   // Use the bulk /api/devices/installs endpoint - much faster than individual fetches!
-  const response = await fetch(`${API_BASE_URL}/api/devices/installs`, {
+  const response = await fetch(`${API_BASE_URL}/api/v1/devices/installs`, {
     cache: 'no-store',
     headers
   });

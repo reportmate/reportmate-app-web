@@ -32,7 +32,7 @@ export async function GET(
     }
     
     // Call the fast FastAPI /info endpoint (6 targeted DB queries, not 11+)
-    const infoUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/info`
+    const infoUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/info`
     
     const headers = getInternalApiHeaders()
         

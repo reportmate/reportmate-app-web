@@ -144,7 +144,7 @@ export async function GET(request: Request) {
       if (validType) queryParams.append('type', validType)
       
       const queryString = queryParams.toString()
-      const apiUrl = `${apiBaseUrl}/api/events?${queryString}`
+      const apiUrl = `${apiBaseUrl}/api/v1/events?${queryString}`
       
             
       // Use longer timeout (15 seconds) for Azure Functions

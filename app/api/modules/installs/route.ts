@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
         headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
       }
       
-      const deviceResponse = await fetch(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`, {
+      const deviceResponse = await fetch(`${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}`, {
         cache: 'no-store',
         headers,
         signal: AbortSignal.timeout(30000) // 30 second timeout

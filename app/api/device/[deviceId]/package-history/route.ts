@@ -25,7 +25,7 @@ export async function GET(
     }
 
     // Construct the API URL
-    const apiUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/package-history`
+    const apiUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/package-history`
     
         const headers = getInternalApiHeaders()
     const response = await fetch(apiUrl, {

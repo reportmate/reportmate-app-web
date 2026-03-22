@@ -20,7 +20,7 @@ export async function GET(request: Request) {
     
     // Call FastAPI bulk endpoint - NO LIMITS!
     try {
-      const url = `${apiBaseUrl}/api/devices/system${includeArchived ? '?includeArchived=true' : ''}`
+      const url = `${apiBaseUrl}/api/v1/devices/system${includeArchived ? '?includeArchived=true' : ''}`
       console.log(`[SYSTEM API] ${timestamp} - Fetching from: ${url}`)
             
       // Container-to-container auth requires X-Internal-Secret header

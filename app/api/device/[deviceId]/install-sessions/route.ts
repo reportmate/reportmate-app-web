@@ -28,7 +28,7 @@ export async function GET(
     }
 
     // Construct the API URL with query parameters
-    const apiUrl = new URL(`${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}/install-sessions`)
+    const apiUrl = new URL(`${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/install-sessions`)
     apiUrl.searchParams.set('limit', limit.toString())
     apiUrl.searchParams.set('offset', offset.toString())
     

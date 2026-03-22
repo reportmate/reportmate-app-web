@@ -9,13 +9,13 @@ export async function GET(_request: Request) {
     const baseUrl = `http://localhost:${internalPort}`;
     
     // Test devices API
-    const devicesResponse = await fetch(`${baseUrl}/api/devices`, {
+    const devicesResponse = await fetch(`${baseUrl}/api/v1/devices`, {
       cache: 'no-store'
     })
     const devicesData = await devicesResponse.json()
     
     // Test events API
-    const eventsResponse = await fetch(`${baseUrl}/api/events?limit=5`, {
+    const eventsResponse = await fetch(`${baseUrl}/api/v1/events?limit=5`, {
       cache: 'no-store'
     })
     const eventsData = await eventsResponse.json()

@@ -109,7 +109,7 @@ export async function GET(
       }, { status: 500 })
     }
     
-        const azureFunctionsUrl = `${apiBaseUrl}/api/device/${encodeURIComponent(deviceId)}`
+        const azureFunctionsUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}`
         
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
@@ -209,7 +209,7 @@ export async function GET(
             
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
-                const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
                 
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
@@ -291,7 +291,7 @@ export async function GET(
             
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
-                const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
                 
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
@@ -376,7 +376,7 @@ export async function GET(
                         
         // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
         try {
-                    const deviceEventsUrl = `${apiBaseUrl}/api/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                    const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
                     
           // Use shared auth headers for internal API calls
           const eventsHeaders = getInternalApiHeaders()

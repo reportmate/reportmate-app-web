@@ -94,7 +94,7 @@ export async function GET(request: NextRequest) {
 
     const incomingParams = new URLSearchParams(request.nextUrl.searchParams)
     const queryString = incomingParams.toString()
-    const devicesUrl = `${apiBaseUrl}/api/devices${queryString ? `?${queryString}` : ''}`
+    const devicesUrl = `${apiBaseUrl}/api/v1/devices${queryString ? `?${queryString}` : ''}`
         
     // Use shared authentication headers
     const headers = getInternalApiHeaders()
