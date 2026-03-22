@@ -9,6 +9,8 @@ import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
 import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
 import { DebugModeProvider } from "../src/providers/DebugModeProvider";
+import { DemoModeProvider } from "../src/providers/DemoModeProvider";
+import { DemoBanner } from "../src/components/ui/DemoBanner";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
@@ -170,7 +172,9 @@ export default async function RootLayout({
             <PlatformFilterProvider>
               <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
                 <DebugModeProvider>
+                <DemoModeProvider>
                 <EdgeThemeFix />
+                <DemoBanner />
                 <ErrorBoundary>
                   {isDevelopment ? (
                     // Development: No AutoAuth component
@@ -186,6 +190,7 @@ export default async function RootLayout({
                     </AutoAuth>
                   )}
                 </ErrorBoundary>
+                </DemoModeProvider>
                 </DebugModeProvider>
               </ThemeProvider>
             </PlatformFilterProvider>
