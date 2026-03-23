@@ -10,7 +10,6 @@ import { SWRProvider } from "../src/providers/SWRProvider";
 import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
 import { DebugModeProvider } from "../src/providers/DebugModeProvider";
 import { DemoModeProvider } from "../src/providers/DemoModeProvider";
-import { DemoBanner } from "../src/components/ui/DemoBanner";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
@@ -87,8 +86,10 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // For development, completely bypass all authentication
+  // For development or demo mode, completely bypass all authentication
   const isDevelopment = process.env.NODE_ENV === 'development'
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+  const skipAuth = isDevelopment || isDemoMode
   
   // Fetch devices for search preloading
   const devices = await getDevices()
@@ -174,10 +175,9 @@ export default async function RootLayout({
                 <DebugModeProvider>
                 <DemoModeProvider>
                 <EdgeThemeFix />
-                <DemoBanner />
                 <ErrorBoundary>
-                  {isDevelopment ? (
-                    // Development: No AutoAuth component
+                  {skipAuth ? (
+                    // Development/Demo: No AutoAuth component
                     <ToolbarWrapper preloadedDevices={devices}>
                       {children}
                     </ToolbarWrapper>

@@ -191,6 +191,11 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next()
   }
   
+  // DEMO MODE BYPASS - Skip auth for demo environment
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+    return NextResponse.next()
+  }
+  
   // Don't redirect public routes
   if (isPublicRoute(pathname)) {
     return NextResponse.next()

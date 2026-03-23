@@ -12,13 +12,15 @@ export default function HomePage() {
   
   // Development mode: skip authentication completely
   const isDevelopment = process.env.NODE_ENV === 'development'
+  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+  const skipAuth = isDevelopment || isDemoMode
   
   // Get session data (only used in production)
   const { data: _session, status } = useSession()
   
   useEffect(() => {
-    if (isDevelopment) {
-      // In development, go straight to dashboard
+    if (skipAuth) {
+      // In development or demo mode, go straight to dashboard
       router.push('/dashboard')
       return
     }
@@ -27,7 +29,7 @@ export default function HomePage() {
     if (status === 'authenticated') {
       router.push('/dashboard')
     }
-  }, [router, isDevelopment, status])
+  }, [router, skipAuth, status])
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">

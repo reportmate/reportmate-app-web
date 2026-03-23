@@ -8,6 +8,7 @@ import { DevicePageNavigation } from "./DevicePageNavigation"
 import { DeviceSearchField } from "../search/DeviceSearchField"
 import { SearchModal } from "../search/SearchModal"
 import { PlatformToggle } from "../ui/PlatformToggle"
+import { DemoBanner } from "../ui/DemoBanner"
 
 interface Device {
   deviceId: string
@@ -74,6 +75,7 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
                 </div>
               </div>
             </Link>
+            <DemoBanner />
             
             {/* Search Field (desktop) - center-aligned with platform filter on left */}
             <div className="hidden md:flex flex-1 items-center gap-3">
