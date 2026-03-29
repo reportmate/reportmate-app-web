@@ -1096,12 +1096,70 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     // (e.g., "Could not process item ReportMate for install" when ReportMate isn't in items array)
     // This always runs — the per-item lastWarning/lastError only covers items that exist.
     if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
-      for (const msg of installs.munki.errors.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
+      // Pre-process: group installer log blocks (delimited by --- lines) into single coherent errors.
+      // macOS installer output arrives as semicolon-separated lines between --- delimiters:
+      //   "---; installer: Package name is; installer:PHASE:...; installer: The upgrade failed. ...; ---"
+      // We group these into one error with the failure line as message and full log as details.
+      const rawParts = installs.munki.errors.split(';').map((s: string) => s.trim())
+      const processedMessages: Array<{ message: string; details?: string }> = []
+      let blockLines: string[] = []
+      let inBlock = false
+
+      for (const part of rawParts) {
+        if (!part) continue
+
+        // Detect delimiter lines (10+ dashes)
+        if (/^-{10,}$/.test(part)) {
+          if (inBlock && blockLines.length > 0) {
+            // End of block — find the meaningful error line (skip phases, status, percentages)
+            const summaryLine = blockLines.find(l =>
+              !l.match(/^installer:PHASE:/i) &&
+              !l.match(/^installer:STATUS:/i) &&
+              !l.match(/^installer:%/i) &&
+              !l.match(/^installer:\s*Package name is\s*$/i) &&
+              !l.match(/^installer:\s*Upgrading at base path/i) &&
+              l.trim().length > 10
+            ) || blockLines[blockLines.length - 1]
+
+            processedMessages.push({
+              message: summaryLine,
+              details: blockLines.join('\n')
+            })
+            blockLines = []
+          }
+          inBlock = !inBlock
+          continue
+        }
+
+        if (inBlock) {
+          blockLines.push(part)
+        } else {
+          processedMessages.push({ message: part })
+        }
+      }
+
+      // Handle unclosed block
+      if (blockLines.length > 0) {
+        const summaryLine = blockLines.find(l =>
+          !l.match(/^installer:PHASE:/i) &&
+          !l.match(/^installer:STATUS:/i) &&
+          !l.match(/^installer:%/i) &&
+          !l.match(/^installer:\s*Package name is\s*$/i) &&
+          !l.match(/^installer:\s*Upgrading at base path/i) &&
+          l.trim().length > 10
+        ) || blockLines[blockLines.length - 1]
+        processedMessages.push({
+          message: summaryLine,
+          details: blockLines.join('\n')
+        })
+      }
+
+      for (const { message: msg, details } of processedMessages) {
         const matchedPkg = findPackageForMessage(msg, packages)
         if (matchedPkg) {
           if (matchedPkg.errors?.some(e => e.message === msg)) continue
           if (!matchedPkg.errors) matchedPkg.errors = []
-          matchedPkg.errors.push({ id: `munki-run-error-${matchedPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: matchedPkg.name })
+          matchedPkg.errors.push({ id: `munki-run-error-${matchedPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: matchedPkg.name, details })
           matchedPkg.status = 'Error'
         } else {
           const itemName = extractItemNameFromMessage(msg)
@@ -1122,10 +1180,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
               packages.push(syntheticPkg)
             }
             if (!syntheticPkg.errors) syntheticPkg.errors = []
-            syntheticPkg.errors.push({ id: `munki-run-error-${syntheticPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: itemName })
+            syntheticPkg.errors.push({ id: `munki-run-error-${syntheticPkg.id}`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: itemName, details })
             syntheticPkg.status = 'Error'
           } else {
-            installsInfo.messages?.errors.push({ id: `munki-run-error-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: 'Munki' })
+            installsInfo.messages?.errors.push({ id: `munki-run-error-system`, message: msg, timestamp: installs.munki.endTime || new Date().toISOString(), code: 'MUNKI_ERROR', package: 'Munki', details })
           }
         }
       }
