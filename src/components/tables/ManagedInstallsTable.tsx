@@ -645,9 +645,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                       {error.message}
                                                     </p>
                                                     {error.details && (
-                                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-[300px] overflow-y-auto">
                                                         {error.details}
-                                                      </p>
+                                                      </pre>
                                                     )}
                                                   </div>
                                                   );
@@ -704,9 +704,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                       {warning.message}
                                                     </p>
                                                     {warning.details && (
-                                                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                                      <pre className="text-xs text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-[300px] overflow-y-auto">
                                                         {warning.details}
-                                                      </p>
+                                                      </pre>
                                                     )}
                                                   </div>
                                                   );
@@ -881,9 +881,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               {error.message}
                                             </p>
                                             {error.details && (
-                                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                              <pre className="text-xs text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-[300px] overflow-y-auto">
                                                 {error.details}
-                                              </p>
+                                              </pre>
                                             )}
                                           </div>
                                           );
@@ -940,9 +940,9 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                               {warning.message}
                                             </p>
                                             {warning.details && (
-                                              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                                              <pre className="text-xs text-gray-600 dark:text-gray-400 mt-2 whitespace-pre-wrap font-mono bg-gray-50 dark:bg-gray-900 p-3 rounded border border-gray-200 dark:border-gray-700 max-h-[300px] overflow-y-auto">
                                                 {warning.details}
-                                              </p>
+                                              </pre>
                                             )}
                                           </div>
                                           );
