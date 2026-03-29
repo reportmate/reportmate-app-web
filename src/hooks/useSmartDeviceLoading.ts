@@ -23,7 +23,7 @@ export interface ModuleStatus {
 const INFO_MODULES = new Set(['system', 'hardware', 'management', 'network', 'security', 'inventory'])
 
 // Only fetch modules NOT included in the info response
-const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'displays', 'printers', 'peripherals', 'identity']
+const BACKGROUND_MODULES: string[] = ['events', 'installs', 'applications', 'peripherals', 'identity']
 
 export function useSmartDeviceLoading(deviceId: string) {
   // Device info (core identity + info tab modules)
