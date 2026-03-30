@@ -289,12 +289,14 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
       <div className="flex flex-col lg:flex-row gap-6">
         {/* Left Column - 70% - Local Hostname + Active Connections */}
         <div className="lg:w-[70%] space-y-4">
-          {(networkData.localHostname || rawNetworkModule?.localHostname) && (
+          {(networkData.localHostname || rawNetworkModule?.localHostname || networkData.hostname || rawNetworkModule?.hostname) && (
             <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-4 pl-6">
-              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">Local Hostname</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+                {(networkData.localHostname || rawNetworkModule?.localHostname) ? 'Local Hostname' : 'Hostname'}
+              </div>
               <div className="text-lg font-semibold text-gray-900 dark:text-white">
                 <CopyableValue
-                  value={networkData.localHostname || rawNetworkModule?.localHostname}
+                  value={networkData.localHostname || rawNetworkModule?.localHostname || networkData.hostname || rawNetworkModule?.hostname}
                   className="text-lg"
                   mono={true}
                 />
