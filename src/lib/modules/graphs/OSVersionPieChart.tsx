@@ -6,8 +6,7 @@
 
 'use client'
 
-import { useRouter } from 'next/navigation'
-import React, { useState, useMemo, useCallback } from 'react'
+import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 interface Device {
   deviceId: string
@@ -40,6 +39,12 @@ interface OSVersionPieChartProps {
   loading: boolean
   osType: 'macOS' | 'Windows'
   onFilterApplied?: () => void
+  /** Called when user selects a version. isDrillDown=true means entering a group, false means a leaf. */
+  onVersionSelect?: (version: string, isDrillDown: boolean) => void
+  /** Called when user clicks the back button to clear the filter. */
+  onClearFilter?: () => void
+  /** Current active version filter (e.g. from URL). Chart auto-drills into the matching group. */
+  activeVersion?: string
 }
 
 interface VersionDataPoint {
@@ -253,12 +258,23 @@ const CustomTooltip = ({ active, payload, total }: any) => {
   return null
 }
 
-export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType, onFilterApplied }) => {
-  const router = useRouter()
+export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType, onFilterApplied, onVersionSelect, onClearFilter, activeVersion }) => {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const versionData = useMemo(() => processVersionsHierarchical(devices, osType), [devices, osType])
+
+  // When URL has an osVersion filter on load, auto-drill the chart into the matching group
+  useEffect(() => {
+    if (!activeVersion || versionData.length === 0) return
+    const decoded = decodeURIComponent(activeVersion)
+    // Find the group that either IS the filter or CONTAINS it as a child
+    const matchingGroup = versionData.find(g =>
+      g.name === decoded ||
+      g.children?.some(c => c.name === decoded)
+    )
+    setSelectedGroup(matchingGroup ? matchingGroup.name : null)
+  }, [activeVersion, versionData])
 
   // Get donut data - show groups, or children when drilled down
   const donutData = useMemo(() => {
@@ -290,29 +306,27 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
   const maxBarCount = useMemo(() => Math.max(...barData.map(item => item.value), 1), [barData])
 
   const handleDonutClick = useCallback((entry: VersionDataPoint) => {
-    if (!selectedGroup && entry.children && entry.children.length > 0) {
-      setSelectedGroup(entry.name)
-    } else {
-      // Navigate to filtered view for leaf nodes
-      router.push(`/devices/system?osVersion=${encodeURIComponent(entry.name)}`)
-      onFilterApplied?.()
-    }
-  }, [selectedGroup, router, onFilterApplied])
+    const isDrillDown = !selectedGroup && entry.children != null && entry.children.length > 0
+    onVersionSelect?.(entry.name, isDrillDown)
+    // Only collapse widgets on leaf node selection, not on group drill-down
+    if (!isDrillDown) onFilterApplied?.()
+    // Drill down into group if it has children
+    if (isDrillDown) setSelectedGroup(entry.name)
+  }, [selectedGroup, onVersionSelect, onFilterApplied])
 
   const handleBarClick = useCallback((entry: VersionDataPoint) => {
-    // If clicking a group bar (top level), drill down
-    if (!selectedGroup && entry.children && entry.children.length > 0) {
-      setSelectedGroup(entry.name)
-    } else {
-      // Navigate to filtered view for leaf nodes or groups with no children
-      router.push(`/devices/system?osVersion=${encodeURIComponent(entry.name)}`)
-      onFilterApplied?.()
-    }
-  }, [selectedGroup, router, onFilterApplied])
+    const isDrillDown = !selectedGroup && entry.children != null && entry.children.length > 0
+    onVersionSelect?.(entry.name, isDrillDown)
+    // Only collapse widgets on leaf node selection, not on group drill-down
+    if (!isDrillDown) onFilterApplied?.()
+    // Drill down into group if it has children
+    if (isDrillDown) setSelectedGroup(entry.name)
+  }, [selectedGroup, onVersionSelect, onFilterApplied])
 
   const handleBack = useCallback(() => {
     setSelectedGroup(null)
-  }, [])
+    onClearFilter?.()
+  }, [onClearFilter])
 
   if (loading) {
     return (

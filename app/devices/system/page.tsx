@@ -576,15 +576,25 @@ function SystemPageContent() {
           windowsChildKey = `${windowsVersion}.${build}.0`
         }
 
+        // Normalize version to at least 3 parts (e.g. '26.4' -> '26.4.0')
+        // The chart pads missing patch to .0, so '26.4' stored must match filter '26.4.0'
+        const normalizeVer = (v: string) => {
+          if (!v) return ''
+          const parts = v.split('.')
+          while (parts.length < 3) parts.push('0')
+          return parts.slice(0, 3).join('.')
+        }
+
         // Match Logic:
         // 1. Exact match version (Mac full version e.g. 15.4.1)
-        // 2. Exact match windows chart key (e.g. 11.26200.1)
-        // 3. Exact match windows group key (e.g. 11.26200)
-        // 4. Starts with (Mac group e.g. 15.4 matches 15.4.1)
+        // 2. Normalized match (e.g. stored '26.4' matches filter '26.4.0')
+        // 3. Exact match windows chart key (e.g. 11.26200.1)
+        // 4. Exact match windows group key (e.g. 11.26200)
+        // 5. Starts with (Mac group e.g. 15.4 matches 15.4.1)
         
         const matchesWindowKey = windowsChildKey === decodedFilter
         const matchesWindowGroup = windowsGroupKey === decodedFilter
-        const matchesVersion = sysVersion === decodedFilter
+        const matchesVersion = sysVersion === decodedFilter || normalizeVer(sysVersion) === normalizeVer(decodedFilter)
         const matchesGroup = sysVersion.startsWith(`${decodedFilter}.`)
         
         if (!matchesWindowKey && !matchesWindowGroup && !matchesVersion && !matchesGroup) return false
@@ -693,6 +703,29 @@ function SystemPageContent() {
       }
     }
   })
+
+  // When an OS version filter is active, restrict Uptime and Pending widgets to matching devices only
+  const osVersionFilteredForWidgets = (() => {
+    if (!osVersionFilter) return devicesForOSWidget
+    const decodedFilter = decodeURIComponent(osVersionFilter)
+    const normalizeVer = (v: string) => {
+      if (!v) return ''
+      const parts = v.split('.')
+      while (parts.length < 3) parts.push('0')
+      return parts.slice(0, 3).join('.')
+    }
+    return devicesForOSWidget.filter(d => {
+      const version = d.osVersion?.version || ''
+      if (decodedFilter.startsWith('Windows ')) {
+        return (d.osVersion?.name || '').includes(decodedFilter)
+      }
+      return (
+        version === decodedFilter ||
+        normalizeVer(version) === normalizeVer(decodedFilter) ||
+        version.startsWith(`${decodedFilter}.`)
+      )
+    })
+  })()
 
   // Apply search filter after processing (so we search the correct device names)
   const searchFilteredSystems = processedSystems.filter(sys => {
@@ -1126,7 +1159,15 @@ function SystemPageContent() {
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="Windows" onFilterApplied={() => setWidgetsExpanded(false)} />
+                    <OSVersionPieChart
+                      devices={devicesForOSWidget as any}
+                      loading={loading || moduleLoading}
+                      osType="Windows"
+                      activeVersion={osVersionFilter || undefined}
+                      onFilterApplied={() => setWidgetsExpanded(false)}
+                      onVersionSelect={(version) => router.push(`/devices/system?osVersion=${encodeURIComponent(version)}`)}
+                      onClearFilter={() => router.push('/devices/system')}
+                    />
                   </div>
                 </div>
                 )}
@@ -1145,7 +1186,15 @@ function SystemPageContent() {
                     </div>
                   </div>
                   <div className="px-3 py-2">
-                    <OSVersionPieChart devices={devicesForOSWidget as any} loading={loading || moduleLoading} osType="macOS" onFilterApplied={() => setWidgetsExpanded(false)} />
+                    <OSVersionPieChart
+                      devices={devicesForOSWidget as any}
+                      loading={loading || moduleLoading}
+                      osType="macOS"
+                      activeVersion={osVersionFilter || undefined}
+                      onFilterApplied={() => setWidgetsExpanded(false)}
+                      onVersionSelect={(version) => router.push(`/devices/system?osVersion=${encodeURIComponent(version)}`)}
+                      onClearFilter={() => router.push('/devices/system')}
+                    />
                   </div>
                 </div>
                 )}
@@ -1238,7 +1287,7 @@ function SystemPageContent() {
                   </div>
                   <div className="p-4">
                     <UptimeDistributionChart
-                      devices={devicesForOSWidget}
+                      devices={osVersionFilteredForWidgets}
                       loading={loading || moduleLoading}
                       selectedBuckets={selectedUptimeBuckets}
                       onBucketToggle={toggleUptimeBucket}
@@ -1260,7 +1309,7 @@ function SystemPageContent() {
                   </div>
                   <div className="p-4">
                     <PendingUpdatesChart
-                      devices={devicesForOSWidget}
+                      devices={osVersionFilteredForWidgets}
                       loading={loading || moduleLoading}
                       selectedBuckets={selectedPendingBuckets}
                       onBucketToggle={togglePendingBucket}
@@ -1473,10 +1522,19 @@ function SystemPageContent() {
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        {(sys.pendingUpdatesCount ?? 0) > 0 ? (
-                          <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 whitespace-nowrap">
-                            {sys.pendingUpdatesCount} pending
-                          </span>
+                        {((sys.pendingUpdatesCount ?? 0) > 0 || (sys.deferredUpdatesCount ?? 0) > 0) ? (
+                          <div className="flex flex-col gap-1">
+                            {(sys.pendingUpdatesCount ?? 0) > 0 && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 whitespace-nowrap">
+                                {sys.pendingUpdatesCount} pending
+                              </span>
+                            )}
+                            {(sys.deferredUpdatesCount ?? 0) > 0 && (
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300 whitespace-nowrap">
+                                {sys.deferredUpdatesCount} deferred
+                              </span>
+                            )}
+                          </div>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
                         )}
