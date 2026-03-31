@@ -436,6 +436,11 @@ function SecurityPageContent() {
   const getTamperSecured = (d: SecurityDevice) =>
     isWin(d) ? (d.tpmPresent && d.tpmEnabled) : (d.sipEnabled === true)
 
+  const getTamperLabel = (d: SecurityDevice): string => {
+    if (isWin(d)) return d.secureBootEnabled ? 'Secured' : 'Insecure'
+    return (d.sipEnabled === true || d.secureBootEnabled) ? 'Secured' : 'Insecure'
+  }
+
   const getProtectionLabel = (d: SecurityDevice): string => {
     if (d.antivirusEnabled && d.antivirusUpToDate) return 'Current'
     if (d.antivirusEnabled) return 'Out of Date'
@@ -486,7 +491,7 @@ function SecurityPageContent() {
   const protectionCounts = countBy(getProtectionLabel)
   const detectionCounts = countBy(d => (d.detectionCount ?? 0) > 0 ? 'Threats Detected' : 'Clean')
   const firewallCounts = countBy(d => d.firewallEnabled ? 'Enabled' : 'Disabled')
-  const tamperingCounts = countBy(d => getTamperSecured(d) ? 'Secured' : 'Unsecured')
+  const tamperingCounts = countBy(getTamperLabel)
   const remoteCounts = countBy(getRemoteLabel)
   const certCounts = countBy(getCertLabel)
   const cveCounts = countBy(getCveLabel)
@@ -525,7 +530,7 @@ function SecurityPageContent() {
     if (protectionFilter && getProtectionLabel(d) !== protectionFilter) return false
     if (detectionFilter && ((d.detectionCount ?? 0) > 0 ? 'Threats Detected' : 'Clean') !== detectionFilter) return false
     if (firewallFilter && (d.firewallEnabled ? 'Enabled' : 'Disabled') !== firewallFilter) return false
-    if (tamperingFilter && (getTamperSecured(d) ? 'Secured' : 'Unsecured') !== tamperingFilter) return false
+    if (tamperingFilter && getTamperLabel(d) !== tamperingFilter) return false
     if (remoteFilter && getRemoteLabel(d) !== remoteFilter) return false
     if (certFilter && getCertLabel(d) !== certFilter) return false
     if (cveFilter && getCveLabel(d) !== cveFilter) return false
@@ -550,7 +555,7 @@ function SecurityPageContent() {
       case 'protection': av = getProtectionLabel(a); bv = getProtectionLabel(b); break
       case 'detection': av = String(a.detectionCount ?? 0).padStart(5, '0'); bv = String(b.detectionCount ?? 0).padStart(5, '0'); break
       case 'firewall': av = a.firewallEnabled ? '1' : '0'; bv = b.firewallEnabled ? '1' : '0'; break
-      case 'tampering': av = getTamperSecured(a) ? '1' : '0'; bv = getTamperSecured(b) ? '1' : '0'; break
+      case 'tampering': av = getTamperLabel(a); bv = getTamperLabel(b); break
       case 'remote': av = getRemoteLabel(a); bv = getRemoteLabel(b); break
       case 'certificates': av = String(a.expiredCertCount + a.expiringSoonCertCount).padStart(5, '0'); bv = String(b.expiredCertCount + b.expiringSoonCertCount).padStart(5, '0'); break
       case 'cve': av = String(a.cveCount).padStart(5, '0'); bv = String(b.cveCount).padStart(5, '0'); break
@@ -568,7 +573,7 @@ function SecurityPageContent() {
       d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
       esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
       d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
-      isWin(d) ? (d.tpmPresent && d.tpmEnabled ? 'Active' : 'Inactive') : (d.sipEnabled ? 'SIP On' : 'SIP Off'),
+      isWin(d) ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}` : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`,
       d.firewallEnabled ? 'On' : 'Off',
       [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
       String(d.expiredCertCount), String(d.expiringSoonCertCount),
@@ -585,6 +590,7 @@ function SecurityPageContent() {
   // ============ CHART COLORS ============
 
   const greenRed: Record<string, string> = { 'Encrypted': '#22c55e', 'Not Encrypted': '#ef4444', 'Enabled': '#22c55e', 'Disabled': '#ef4444', 'Active': '#22c55e', 'Inactive': '#ef4444', 'Secured': '#22c55e', 'Unsecured': '#ef4444' }
+  const tamperingColors: Record<string, string> = { 'Secured': '#22c55e', 'Insecure': '#ef4444' }
   const detectionColors: Record<string, string> = { 'Clean': '#22c55e', 'Threats Detected': '#ef4444' }
   const firewallColors: Record<string, string> = { 'Enabled': '#22c55e', 'Disabled': '#94a3b8' }
   const protColors: Record<string, string> = { 'Current': '#22c55e', 'Out of Date': '#f59e0b', 'Disabled': '#ef4444' }
@@ -713,7 +719,7 @@ function SecurityPageContent() {
                   <MiniDonut title="Protection" data={Object.entries(protectionCounts).map(([label, value]) => ({ label, value }))} colors={protColors} onFilter={setProtectionFilter} activeFilter={protectionFilter} />
                   <MiniDonut title="Detection" data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={detectionColors} onFilter={setDetectionFilter} activeFilter={detectionFilter} />
                   <MiniDonut title="Firewall" data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={firewallColors} onFilter={setFirewallFilter} activeFilter={firewallFilter} />
-                  <MiniDonut title="Tampering" data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={greenRed} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />
+                  <MiniDonut title="Tampering" data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={tamperingColors} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />
                   <MiniDonut title="Access" data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />
                   <MiniDonut title="Certificates" data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />
                   <MiniDonut title="Vulnerabilities" data={Object.entries(cveCounts).map(([label, value]) => ({ label, value }))} colors={cveColors} onFilter={setCveFilter} activeFilter={cveFilter} />
@@ -978,22 +984,29 @@ function SecurityPageContent() {
                         </td>
                         {/* Tampering */}
                         <td className="px-3 py-3">
-                          {win ? (
-                            <Badge className={d.tpmPresent && d.tpmEnabled ? greenBadge : redBadge}>
-                              TPM {d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'}
-                            </Badge>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {d.sipEnabled !== undefined && (
-                                <Badge className={d.sipEnabled ? greenBadge : redBadge}>
-                                  SIP {d.sipEnabled ? 'On' : 'Off'}
+                          <div className="flex flex-wrap gap-1">
+                            {win ? (
+                              <>
+                                <Badge className={d.tpmPresent && d.tpmEnabled ? greenBadge : redBadge}>
+                                  TPM {d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'}
                                 </Badge>
-                              )}
-                              {d.secureBootEnabled && (
-                                <Badge className={greenBadge}>SB On</Badge>
-                              )}
-                            </div>
-                          )}
+                                <Badge className={d.secureBootEnabled ? greenBadge : redBadge}>
+                                  SB {d.secureBootEnabled ? 'On' : 'Off'}
+                                </Badge>
+                              </>
+                            ) : (
+                              <>
+                                {d.sipEnabled !== undefined && (
+                                  <Badge className={d.sipEnabled ? greenBadge : redBadge}>
+                                    SIP {d.sipEnabled ? 'On' : 'Off'}
+                                  </Badge>
+                                )}
+                                <Badge className={d.secureBootEnabled ? greenBadge : redBadge}>
+                                  SB {d.secureBootEnabled ? 'On' : 'Off'}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
                         </td>
                         {/* Firewall */}
                         <td className="px-3 py-3">

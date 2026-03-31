@@ -304,17 +304,13 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 
                 {/* Secure Boot - from security module (not health attestation) */}
                 <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Secure Boot
-                  </div>
                   <DetailRow 
                     label="Secure Boot" 
                     isStatus 
-                    enabled={security?.secureBoot?.isEnabled} 
-                  />
-                  <DetailRow 
-                    label="Status" 
-                    value={security?.secureBoot?.statusDisplay || (security?.secureBoot?.isEnabled ? 'Enabled' : 'Disabled')} 
+                    enabled={security?.secureBoot?.isEnabled}
+                    activeLabel="Enabled"
+                    inactiveLabel="Disabled"
+                    danger
                   />
                   
                   {/* UEFI DB Certificates */}
