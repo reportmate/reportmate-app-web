@@ -682,31 +682,81 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Version" value={tpm?.version} />
                 <DetailRow label="Manufacturer" value={tpm?.manufacturer} />
                 
-                {/* Health Attestation - Secure Boot & Code Integrity */}
-                {(security?.healthAttestation || security?.health_attestation) && (
-                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Boot Security
-                    </div>
-                    <DetailRow 
-                      label="Secure Boot" 
-                      isStatus 
-                      enabled={security?.healthAttestation?.secureBootEnabled || security?.health_attestation?.secure_boot_enabled} 
-                    />
-                    <DetailRow 
-                      label="Code Integrity" 
-                      isStatus 
-                      enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
-                    />
-                    <DetailRow 
-                      label="Boot Debugging" 
-                      isStatus 
-                      neutral
-                      enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
-                      value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
-                    />
+                {/* Secure Boot - from security module (not health attestation) */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Secure Boot
                   </div>
-                )}
+                  <DetailRow 
+                    label="Secure Boot" 
+                    isStatus 
+                    enabled={security?.secureBoot?.isEnabled} 
+                  />
+                  <DetailRow 
+                    label="Status" 
+                    value={security?.secureBoot?.statusDisplay || (security?.secureBoot?.isEnabled ? 'Enabled' : 'Disabled')} 
+                  />
+                  
+                  {/* UEFI DB Certificates */}
+                  {security?.secureBoot?.dbCertificates?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Secure Boot DB ({security.secureBoot.dbCertificates.length})
+                      </div>
+                      <div className="space-y-1">
+                        {security.secureBoot.dbCertificates.map((cert: any, idx: number) => (
+                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
+                            {cert.thumbprint && (
+                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
+                                {cert.thumbprint.substring(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* UEFI KEK Certificates */}
+                  {security?.secureBoot?.kekCertificates?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Key Exchange Keys ({security.secureBoot.kekCertificates.length})
+                      </div>
+                      <div className="space-y-1">
+                        {security.secureBoot.kekCertificates.map((cert: any, idx: number) => (
+                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
+                            {cert.thumbprint && (
+                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
+                                {cert.thumbprint.substring(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Code Integrity / Boot Debugging from health attestation if available */}
+                  {(security?.healthAttestation || security?.health_attestation) && (
+                    <>
+                      <DetailRow 
+                        label="Code Integrity" 
+                        isStatus 
+                        enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
+                      />
+                      <DetailRow 
+                        label="Boot Debugging" 
+                        isStatus 
+                        neutral
+                        enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
+                        value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
+                      />
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
