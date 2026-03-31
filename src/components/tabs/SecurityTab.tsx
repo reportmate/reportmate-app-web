@@ -232,42 +232,151 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
       {/* 3x2 Grid of Security Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         
-        {/* 1. Encryption Card - Platform Specific */}
+        {/* 1. Tampering Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
-              <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+            <div className="w-9 h-9 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+              {isMac ? (
+                <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              ) : (
+                <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+              )}
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tampering</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS FileVault (no token data - that's in IdentityTab now)
+              // macOS: SIP + Secure Enclave + Root User + Secure Boot
               <>
-                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  FileVault Disk Encryption
+                <DetailRow label="System Integrity Protection" isStatus danger enabled={sipEnabled} activeLabel="Enabled" inactiveLabel="Disabled" />
+                {/* Secure Enclave - no divider */}
+                <DetailRow 
+                  label="Secure Enclave" 
+                  isStatus 
+                  neutral
+                  enabled={security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true} 
+                  value={(security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true) ? 'Present' : 'Not Present'}
+                />
+                <DetailRow 
+                  label="Biometric" 
+                  isStatus 
+                  neutral
+                  enabled={security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true} 
+                  value={(security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true) ? 'Supported' : 'Not Supported'}
+                />
+                {/* Secure Boot - Apple Silicon */}
+                {security?.secureBoot?.externalBootAllowed && (
+                  <DetailRow 
+                    label="External Boot" 
+                    value={security.secureBoot.externalBootAllowed}
+                  />
+                )}
+                {/* Root User - security concern if enabled */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <DetailRow 
+                    label="Root User" 
+                    isStatus 
+                    neutral
+                    enabled={!(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true)}
+                    value={(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true) ? 'Enabled' : 'Disabled'}
+                  />
+                  <DetailRow 
+                    label="Authenticated Root" 
+                    isStatus 
+                    neutral
+                    enabled={!(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1)}
+                    value={(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1) ? 'Allowed' : 'Required'}
+                  />
                 </div>
-                <DetailRow label="Encrypted Volumes" value={
-                  security?.fileVault?.encryptedVolumes?.length > 0 
-                    ? security.fileVault.encryptedVolumes.map((v: any) => v.name || v.volumeName || v).join(', ')
-                    : fileVaultEnabled ? 'System Volume' : 'None'
-                } />
-                <DetailRow label="Status" isStatus enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
               </>
             ) : (
-              // Windows BitLocker (now all camelCase after normalization)
+              // Windows TPM + Health Attestation (Secure Boot) - support both snake_case and camelCase
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  BitLocker Drive Encryption
+                  Trusted Platform Module
                 </div>
-                {security?.encryption?.bitLocker?.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 ? (
-                  <DetailRow label="Drives" value={security.encryption.bitLocker.encryptedDrives.join(', ')} />
-                ) : (
-                  <DetailRow label="Drives" value="None encrypted" />
-                )}
-                <DetailRow label="Method" value={security?.encryption?.encryptedVolumes?.[0]?.encryptionMethod || 'XTS-AES'} />
-                <DetailRow label="Status" value={security?.encryption?.bitLocker?.status || (security?.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
+                <DetailRow label="Present" isStatus enabled={tpm?.is_present || tpm?.isPresent} />
+                <DetailRow label="Enabled" isStatus enabled={tpm?.is_enabled || tpm?.isEnabled} />
+                <DetailRow label="Activated" isStatus enabled={tpm?.is_activated || tpm?.isActivated} />
+                <DetailRow label="Version" value={tpm?.version} />
+                <DetailRow label="Manufacturer" value={tpm?.manufacturer} />
+                
+                {/* Secure Boot - from security module (not health attestation) */}
+                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Secure Boot
+                  </div>
+                  <DetailRow 
+                    label="Secure Boot" 
+                    isStatus 
+                    enabled={security?.secureBoot?.isEnabled} 
+                  />
+                  <DetailRow 
+                    label="Status" 
+                    value={security?.secureBoot?.statusDisplay || (security?.secureBoot?.isEnabled ? 'Enabled' : 'Disabled')} 
+                  />
+                  
+                  {/* UEFI DB Certificates */}
+                  {security?.secureBoot?.dbCertificates?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Secure Boot DB ({security.secureBoot.dbCertificates.length})
+                      </div>
+                      <div className="space-y-1">
+                        {security.secureBoot.dbCertificates.map((cert: any, idx: number) => (
+                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
+                            {cert.thumbprint && (
+                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
+                                {cert.thumbprint.substring(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* UEFI KEK Certificates */}
+                  {security?.secureBoot?.kekCertificates?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                        Key Exchange Keys ({security.secureBoot.kekCertificates.length})
+                      </div>
+                      <div className="space-y-1">
+                        {security.secureBoot.kekCertificates.map((cert: any, idx: number) => (
+                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
+                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
+                            {cert.thumbprint && (
+                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
+                                {cert.thumbprint.substring(0, 8)}...
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Code Integrity / Boot Debugging from health attestation if available */}
+                  {(security?.healthAttestation || security?.health_attestation) && (
+                    <>
+                      <DetailRow 
+                        label="Code Integrity" 
+                        isStatus 
+                        enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
+                      />
+                      <DetailRow 
+                        label="Boot Debugging" 
+                        isStatus 
+                        neutral
+                        enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
+                        value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
+                      />
+                    </>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -612,151 +721,42 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
           </div>
         </div>
 
-        {/* 4. Tampering Card - Platform Specific */}
+        {/* 4. Encryption Card - Platform Specific */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-5">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-9 h-9 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
-              {isMac ? (
-                <ShieldCheck className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              ) : (
-                <Cpu className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              )}
+            <div className="w-9 h-9 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+              <HardDrive className="w-5 h-5 text-purple-600 dark:text-purple-400" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Tampering</h3>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Encryption</h3>
           </div>
           
           <div className="space-y-2">
             {isMac ? (
-              // macOS: SIP + Secure Enclave + Root User + Secure Boot
-              <>
-                <DetailRow label="System Integrity Protection" isStatus danger enabled={sipEnabled} activeLabel="Enabled" inactiveLabel="Disabled" />
-                {/* Secure Enclave - no divider */}
-                <DetailRow 
-                  label="Secure Enclave" 
-                  isStatus 
-                  neutral
-                  enabled={security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true} 
-                  value={(security?.secureEnclave?.present === 1 || security?.secureEnclave?.present === true) ? 'Present' : 'Not Present'}
-                />
-                <DetailRow 
-                  label="Biometric" 
-                  isStatus 
-                  neutral
-                  enabled={security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true} 
-                  value={(security?.secureEnclave?.touchIdSupported === 1 || security?.secureEnclave?.touchIdSupported === true) ? 'Supported' : 'Not Supported'}
-                />
-                {/* Secure Boot - Apple Silicon */}
-                {security?.secureBoot?.externalBootAllowed && (
-                  <DetailRow 
-                    label="External Boot" 
-                    value={security.secureBoot.externalBootAllowed}
-                  />
-                )}
-                {/* Root User - security concern if enabled */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <DetailRow 
-                    label="Root User" 
-                    isStatus 
-                    neutral
-                    enabled={!(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true)}
-                    value={(security?.rootUser?.enabled === 1 || security?.rootUser?.enabled === true) ? 'Enabled' : 'Disabled'}
-                  />
-                  <DetailRow 
-                    label="Authenticated Root" 
-                    isStatus 
-                    neutral
-                    enabled={!(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1)}
-                    value={(security?.systemIntegrityProtection?.configFlags?.allowUnauthenticatedRoot === 1 || security?.systemIntegrityProtection?.configFlags?.allow_unauthenticated_root === 1) ? 'Allowed' : 'Required'}
-                  />
-                </div>
-              </>
-            ) : (
-              // Windows TPM + Health Attestation (Secure Boot) - support both snake_case and camelCase
+              // macOS FileVault (no token data - that's in IdentityTab now)
               <>
                 <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
-                  Trusted Platform Module
+                  FileVault Disk Encryption
                 </div>
-                <DetailRow label="Present" isStatus enabled={tpm?.is_present || tpm?.isPresent} />
-                <DetailRow label="Enabled" isStatus enabled={tpm?.is_enabled || tpm?.isEnabled} />
-                <DetailRow label="Activated" isStatus enabled={tpm?.is_activated || tpm?.isActivated} />
-                <DetailRow label="Version" value={tpm?.version} />
-                <DetailRow label="Manufacturer" value={tpm?.manufacturer} />
-                
-                {/* Secure Boot - from security module (not health attestation) */}
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                    Secure Boot
-                  </div>
-                  <DetailRow 
-                    label="Secure Boot" 
-                    isStatus 
-                    enabled={security?.secureBoot?.isEnabled} 
-                  />
-                  <DetailRow 
-                    label="Status" 
-                    value={security?.secureBoot?.statusDisplay || (security?.secureBoot?.isEnabled ? 'Enabled' : 'Disabled')} 
-                  />
-                  
-                  {/* UEFI DB Certificates */}
-                  {security?.secureBoot?.dbCertificates?.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        Secure Boot DB ({security.secureBoot.dbCertificates.length})
-                      </div>
-                      <div className="space-y-1">
-                        {security.secureBoot.dbCertificates.map((cert: any, idx: number) => (
-                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
-                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
-                            {cert.thumbprint && (
-                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
-                                {cert.thumbprint.substring(0, 8)}...
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* UEFI KEK Certificates */}
-                  {security?.secureBoot?.kekCertificates?.length > 0 && (
-                    <div className="mt-2">
-                      <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
-                        Key Exchange Keys ({security.secureBoot.kekCertificates.length})
-                      </div>
-                      <div className="space-y-1">
-                        {security.secureBoot.kekCertificates.map((cert: any, idx: number) => (
-                          <div key={idx} className="text-xs px-2 py-1 rounded text-gray-600 dark:text-gray-400">
-                            <span className="font-medium">{cert.commonName || cert.subject || 'Unknown'}</span>
-                            {cert.thumbprint && (
-                              <span className="ml-1 font-mono text-gray-400 dark:text-gray-500" title={cert.thumbprint}>
-                                {cert.thumbprint.substring(0, 8)}...
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Code Integrity / Boot Debugging from health attestation if available */}
-                  {(security?.healthAttestation || security?.health_attestation) && (
-                    <>
-                      <DetailRow 
-                        label="Code Integrity" 
-                        isStatus 
-                        enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
-                      />
-                      <DetailRow 
-                        label="Boot Debugging" 
-                        isStatus 
-                        neutral
-                        enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
-                        value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
-                      />
-                    </>
-                  )}
+                <DetailRow label="Encrypted Volumes" value={
+                  security?.fileVault?.encryptedVolumes?.length > 0 
+                    ? security.fileVault.encryptedVolumes.map((v: any) => v.name || v.volumeName || v).join(', ')
+                    : fileVaultEnabled ? 'System Volume' : 'None'
+                } />
+                <DetailRow label="Status" isStatus enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
+              </>
+            ) : (
+              // Windows BitLocker (now all camelCase after normalization)
+              <>
+                <div className="text-base font-medium text-gray-900 dark:text-white mb-3">
+                  BitLocker Drive Encryption
                 </div>
+                {security?.encryption?.bitLocker?.encryptedDrives && security.encryption.bitLocker.encryptedDrives.length > 0 ? (
+                  <DetailRow label="Drives" value={security.encryption.bitLocker.encryptedDrives.join(', ')} />
+                ) : (
+                  <DetailRow label="Drives" value="None encrypted" />
+                )}
+                <DetailRow label="Method" value={security?.encryption?.encryptedVolumes?.[0]?.encryptionMethod || 'XTS-AES'} />
+                <DetailRow label="Status" value={security?.encryption?.bitLocker?.status || (security?.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
               </>
             )}
           </div>
