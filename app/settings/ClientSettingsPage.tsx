@@ -1,11 +1,21 @@
 "use client"
 
 import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
+import { useDemoMode } from '../../src/providers/DemoModeProvider'
 
 export default function ClientSettingsPage() {
   const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations'>('general')
+  const { isDemoMode } = useDemoMode()
+  const router = useRouter()
+
+  // Redirect to dashboard in demo mode
+  if (isDemoMode) {
+    router.replace('/dashboard')
+    return null
+  }
 
   const menuItems = [
     { id: 'general', name: 'General', icon: '' },
