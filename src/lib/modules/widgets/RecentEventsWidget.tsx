@@ -229,9 +229,9 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // Info hidden by default — dashboard shows success, warning, error, system
-  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info']), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  // All types visible by default
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>([]), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set([]))
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
