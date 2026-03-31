@@ -112,6 +112,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             
             <div className="flex gap-3">
+              {process.env.NEXT_PUBLIC_DEMO_MODE !== 'true' && (
               <button
                 onClick={() => {
                   // Use Next.js API route for clearing events (if implemented)
@@ -130,6 +131,7 @@ export class ErrorBoundary extends Component<Props, State> {
               >
                 Clear Data & Reload
               </button>
+              )}
               <button
                 onClick={() => {
                   const win = window.open('', '_blank')
