@@ -470,17 +470,30 @@ function SecurityPageContent() {
     return 'None'
   }
 
-  // ============ WIDGET STATS (computed from platform-filtered base) ============
+  // ============ WIDGET STATS (computed from selection-filtered base, excluding widget filters) ============
 
-  const platformFiltered = devices.filter(d => {
+  const selectionFiltered = devices.filter(d => {
     if (globalPlatformFilter !== 'all' && !isPlatformVisible(normalizePlatform(d.platform))) return false
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(normalizePlatform(d.platform))) return false
+    if (selectedStatuses.length > 0 && d.status && !selectedStatuses.includes(d.status)) return false
+    if (selectedCatalogs.length > 0 && d.catalog && !selectedCatalogs.includes(d.catalog)) return false
+    if (selectedLocations.length > 0 && d.location && !selectedLocations.includes(d.location)) return false
+    if (selectedUsages.length > 0 && d.usage && !selectedUsages.includes(d.usage)) return false
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase()
+      return (
+        d.deviceName?.toLowerCase().includes(q) ||
+        d.serialNumber?.toLowerCase().includes(q) ||
+        d.antivirusName?.toLowerCase().includes(q) ||
+        d.autoLoginUser?.toLowerCase().includes(q)
+      )
+    }
     return true
   })
 
   const countBy = (fn: (d: SecurityDevice) => string) => {
     const counts: Record<string, number> = {}
-    for (const d of platformFiltered) {
+    for (const d of selectionFiltered) {
       const label = fn(d)
       counts[label] = (counts[label] || 0) + 1
     }
