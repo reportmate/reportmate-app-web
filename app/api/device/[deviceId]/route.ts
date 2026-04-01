@@ -198,6 +198,7 @@ export async function GET(
           device: {
             deviceId: device.deviceId,
             serialNumber: device.serialNumber,
+            name: device.name,
             // Let frontend calculate status based on lastSeen timestamp
             lastSeen: device.lastSeen || device.collectedAt,
             createdAt: device.createdAt, // Include registration date
