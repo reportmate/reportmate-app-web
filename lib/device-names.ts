@@ -25,12 +25,18 @@ export async function getDeviceNames(_requestedSerials: string[] = []): Promise<
   
   try {
     // Fetch only basic device info from FastAPI Container
-    const response = await fetch(`${apiBaseUrl}/api/devices`, {
+    const headers: Record<string, string> = {
+      'Cache-Control': 'no-cache',
+      'User-Agent': 'ReportMate-DeviceNames/1.0'
+    }
+    if (process.env.API_INTERNAL_SECRET) {
+      headers['X-Internal-Secret'] = process.env.API_INTERNAL_SECRET
+    } else if (process.env.REPORTMATE_PASSPHRASE) {
+      headers['X-API-PASSPHRASE'] = process.env.REPORTMATE_PASSPHRASE
+    }
+    const response = await fetch(`${apiBaseUrl}/api/v1/devices`, {
       cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache',
-        'User-Agent': 'ReportMate-DeviceNames/1.0'
-      }
+      headers
     })
     
     if (!response.ok) {

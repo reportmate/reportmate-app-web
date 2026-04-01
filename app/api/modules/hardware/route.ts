@@ -18,7 +18,7 @@ export async function GET() {
     
     // NO LOCAL FALLBACK: Call FastAPI container directly
     try {
-      const url = `${apiBaseUrl}/api/v1/modules/hardware`
+      const url = `${apiBaseUrl}/api/v1/devices/hardware`
             
       // Container-to-container auth requires X-Internal-Secret header
       const headers: Record<string, string> = {
