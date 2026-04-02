@@ -9,6 +9,14 @@ const publicRoutes = [
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
   '/api/version',       // Build/version metadata endpoint for status widgets
+  '/api/dashboard',     // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/device',        // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/devices',       // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/modules',       // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/stats',         // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/events',        // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/applications',  // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/diagnostic',    // Diagnostic endpoint
   '/auth',
   '/_next',
   '/favicon.ico',
@@ -86,7 +94,7 @@ async function resolveDeviceInMiddleware(identifier: string, _request: NextReque
     }
     
     // Fetch devices directly from the Azure Function API (not the Next.js API)
-    const response = await fetch(`${apiBaseUrl}/api/devices?limit=1000`, {
+    const response = await fetch(`${apiBaseUrl}/api/v1/devices?limit=1000`, {
       headers
     })
     
