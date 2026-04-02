@@ -278,7 +278,7 @@ export function useLiveEvents() {
         
         // Get negotiate token from API with timeout
         const negotiateResponse = await Promise.race([
-          fetch(`${apiBaseUrl}/api/negotiate?device=dashboard`),
+          fetch(`${apiBaseUrl}/api/v1/negotiate?device=dashboard`),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
           )
