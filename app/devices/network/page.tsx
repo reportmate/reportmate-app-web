@@ -52,6 +52,7 @@ function NetworkPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [speedFilter, setSpeedFilter] = useState<'excellent' | 'good' | 'fair' | 'poor' | 'nodata' | null>(null)
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -216,15 +217,38 @@ function NetworkPageContent() {
       return acc
     }, {} as Record<string, number>),
     
-    // Security types
-    securityTypes: platformFilteredDevices.reduce((acc, n) => {
-      const security = n.networkInfo.wirelessSecurity || n.networkInfo.securityType || 'Unknown'
-      if (security && security !== 'Unknown' && security !== 'N/A') {
-        acc[security] = (acc[security] || 0) + 1
-      }
-      return acc
-    }, {} as Record<string, number>),
-    
+    // Network quality distribution (based on download/upload speed)
+    speedExcellent: platformFilteredDevices.filter(n => {
+      const nq = n.networkInfo.networkQuality
+      if (!nq?.downlinkCapacity) return false
+      const dl = parseFloat(nq.downlinkCapacity)
+      const ul = parseFloat(nq.uplinkCapacity || '0')
+      return dl >= 500 && ul >= 100
+    }).length,
+    speedGood: platformFilteredDevices.filter(n => {
+      const nq = n.networkInfo.networkQuality
+      if (!nq?.downlinkCapacity) return false
+      const dl = parseFloat(nq.downlinkCapacity)
+      const ul = parseFloat(nq.uplinkCapacity || '0')
+      return dl >= 100 && ul >= 25 && !(dl >= 500 && ul >= 100)
+    }).length,
+    speedFair: platformFilteredDevices.filter(n => {
+      const nq = n.networkInfo.networkQuality
+      if (!nq?.downlinkCapacity) return false
+      const dl = parseFloat(nq.downlinkCapacity)
+      const ul = parseFloat(nq.uplinkCapacity || '0')
+      return dl >= 25 && ul >= 5 && !(dl >= 100 && ul >= 25)
+    }).length,
+    speedPoor: platformFilteredDevices.filter(n => {
+      const nq = n.networkInfo.networkQuality
+      if (!nq?.downlinkCapacity) return false
+      const dl = parseFloat(nq.downlinkCapacity)
+      return dl < 25 || parseFloat(nq.uplinkCapacity || '0') < 5
+    }).length,
+    speedNoData: platformFilteredDevices.filter(n => {
+      return !n.networkInfo.networkQuality?.downlinkCapacity
+    }).length,
+
     // Signal quality distribution
     signalExcellent: platformFilteredDevices.filter(n => {
       const signal = n.networkInfo.signalStrength || 0
@@ -282,6 +306,19 @@ function NetworkPageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
+
+    // Network quality widget filter
+    if (speedFilter) {
+      const nq = n.networkInfo.networkQuality
+      const dl = nq?.downlinkCapacity ? parseFloat(nq.downlinkCapacity) : 0
+      const ul = nq?.uplinkCapacity ? parseFloat(nq.uplinkCapacity) : 0
+      const hasData = !!nq?.downlinkCapacity
+      if (speedFilter === 'excellent' && !(hasData && dl >= 500 && ul >= 100)) return false
+      if (speedFilter === 'good' && !(hasData && dl >= 100 && ul >= 25 && !(dl >= 500 && ul >= 100))) return false
+      if (speedFilter === 'fair' && !(hasData && dl >= 25 && ul >= 5 && !(dl >= 100 && ul >= 25))) return false
+      if (speedFilter === 'poor' && !(hasData && (dl < 25 || ul < 5))) return false
+      if (speedFilter === 'nodata' && hasData) return false
+    }
 
     // Search query filter
     if (searchQuery.trim()) {
@@ -576,9 +613,10 @@ function NetworkPageContent() {
                   <button
                     onClick={() => {
                       // Build CSV from filtered data only
-                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS']
+                      const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'IP Address', 'MAC Address', 'Connection Type', 'Network/SSID', 'DNS', 'Download Mbps', 'Upload Mbps', 'Latency']
                       const rows = filteredNetworkDevices.map(n => {
                         const ipv4 = getIPv4Address(n.networkInfo.ipAddress)
+                        const nq = n.networkInfo.networkQuality
                         return [
                           n.deviceName || '',
                           n.serialNumber || '',
@@ -587,7 +625,10 @@ function NetworkPageContent() {
                           n.networkInfo.macAddress || '',
                           n.networkInfo.connectionType || '',
                           n.networkInfo.ssid || '',
-                          n.networkInfo.dnsAddress || ''
+                          n.networkInfo.dnsAddress || '',
+                          nq?.downlinkCapacity ? parseFloat(nq.downlinkCapacity).toString() : '',
+                          nq?.uplinkCapacity ? parseFloat(nq.uplinkCapacity).toString() : '',
+                          nq?.idleLatency || ''
                         ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(',')
                       })
                       
@@ -780,18 +821,39 @@ function NetworkPageContent() {
                     </div>
                   </div>
 
-                  {/* Wireless Security Widget */}
+                  {/* Network Quality Widget */}
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Wireless Security</h4>
-                    <div className="space-y-2 max-h-32 overflow-y-auto">
-                      {Object.entries(wirelessStats.securityTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
-                        <div key={type} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px]" title={type}>{type}</span>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Network Quality</h4>
+                    <div className="space-y-1">
+                      {([
+                        { key: 'excellent' as const, label: 'Excellent', color: 'bg-green-500', count: wirelessStats.speedExcellent },
+                        { key: 'good' as const, label: 'Good', color: 'bg-teal-500', count: wirelessStats.speedGood },
+                        { key: 'fair' as const, label: 'Fair', color: 'bg-yellow-500', count: wirelessStats.speedFair },
+                        { key: 'poor' as const, label: 'Poor', color: 'bg-red-500', count: wirelessStats.speedPoor },
+                      ]).map(({ key, label, color, count }) => (
+                        <button
+                          key={key}
+                          onClick={() => setSpeedFilter(speedFilter === key ? null : key)}
+                          className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${speedFilter === key ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className={`w-2.5 h-2.5 rounded-full ${color}`}></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
+                          </div>
                           <span className="text-sm font-medium text-gray-900 dark:text-white">{count}</span>
-                        </div>
+                        </button>
                       ))}
-                      {Object.keys(wirelessStats.securityTypes).length === 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No data available</span>
+                      {wirelessStats.speedNoData > 0 && (
+                        <button
+                          onClick={() => setSpeedFilter(speedFilter === 'nodata' ? null : 'nodata')}
+                          className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${speedFilter === 'nodata' ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full bg-gray-300 dark:bg-gray-500"></div>
+                            <span className="text-sm text-gray-600 dark:text-gray-400">No Data</span>
+                          </div>
+                          <span className="text-sm font-medium text-gray-900 dark:text-white">{wirelessStats.speedNoData}</span>
+                        </button>
                       )}
                     </div>
                   </div>
@@ -835,8 +897,8 @@ function NetworkPageContent() {
             </CollapsibleSection>
           </div>
 
-          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
-            <table className="min-w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
+          <div ref={tableContainerRef} className="flex-1 overflow-y-auto min-h-0 table-scrollbar">
+            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
                   <th 
@@ -879,7 +941,7 @@ function NetworkPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('network')}
                     className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-44 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
@@ -892,12 +954,13 @@ function NetworkPageContent() {
                       )}
                     </div>
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36 bg-gray-50 dark:bg-gray-700">Speed</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {filteredNetworkDevices.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                       <svg className="w-12 h-12 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9v9" />
                       </svg>
@@ -1072,6 +1135,22 @@ function NetworkPageContent() {
                                 </>
                               );
                             })()}
+                          </div>
+                        </td>
+                        <td className="px-6 py-3">
+                          <div className="flex items-center h-12">
+                            {networkDevice.networkInfo.networkQuality?.downlinkCapacity ? (
+                              <span
+                                className="text-sm text-gray-900 dark:text-white font-mono"
+                                title={`DL: ${networkDevice.networkInfo.networkQuality.downlinkCapacity}, UL: ${networkDevice.networkInfo.networkQuality.uplinkCapacity || 'N/A'}${networkDevice.networkInfo.networkQuality.idleLatency ? `, Latency: ${networkDevice.networkInfo.networkQuality.idleLatency}` : ''}`}
+                              >
+                                <span className="inline-flex items-center">&#8595;&nbsp;{parseFloat(networkDevice.networkInfo.networkQuality.downlinkCapacity)}</span>
+                                {'  '}
+                                <span className="inline-flex items-center">&#8593;&nbsp;{parseFloat(networkDevice.networkInfo.networkQuality.uplinkCapacity || '0')}</span>
+                              </span>
+                            ) : (
+                              <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                            )}
                           </div>
                         </td>
                       </tr>
