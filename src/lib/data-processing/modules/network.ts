@@ -39,13 +39,16 @@ export interface NetworkInfo {
     band?: string // 2.4GHz, 5GHz, 6GHz
     signalStrength?: number | string
   }
-  // Network quality test results (macOS)
+  // Network quality test results (macOS networkquality / Windows Speedtest CLI)
   networkQuality?: {
     uplinkCapacity?: string
     downlinkCapacity?: string
     uplinkResponsiveness?: string
     downlinkResponsiveness?: string
     idleLatency?: string
+    jitter?: string
+    serverName?: string
+    source?: string
     raw?: string
   }
   // Current active WiFi SSID (for marking in saved list)
@@ -699,6 +702,17 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       // Use idle_latency if available
       if (idleLatency) {
         networkInfo.networkQuality.idleLatency = `${Math.round(parseFloat(idleLatency))} ms`
+      }
+
+      // Windows Speedtest CLI extras
+      if (nq.jitter) {
+        networkInfo.networkQuality.jitter = `${Math.round(parseFloat(nq.jitter))} ms`
+      }
+      if (nq.serverName) {
+        networkInfo.networkQuality.serverName = nq.serverName
+      }
+      if (nq.source) {
+        networkInfo.networkQuality.source = nq.source
       }
     }
   }
