@@ -360,9 +360,24 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialF
             <div className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Catalog</div>
             <div className="text-sm text-gray-900 dark:text-white font-mono bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded border w-fit">
               {(() => {
-                const catalogs = device?.modules?.installs?.cimian?.catalogs || 
+                const catalogs = device?.modules?.installs?.cimian?.catalogs ||
                                  device?.modules?.installs?.munki?.catalogs || []
-                return Array.isArray(catalogs) && catalogs.length > 0 ? catalogs.join(', ') : 'Not configured'
+                if (Array.isArray(catalogs) && catalogs.length > 0) return catalogs.join(', ')
+                // Fallback: Cimian config has DefaultCatalog or Catalogs string
+                const cimianConfig = device?.modules?.installs?.cimian?.config
+                if (cimianConfig) {
+                  const defaultCatalog = cimianConfig.DefaultCatalog || cimianConfig.defaultCatalog || cimianConfig.default_catalog
+                  if (defaultCatalog) return defaultCatalog
+                  // Catalogs may be a JSON string like "[\"Production\"]"
+                  const catalogsStr = cimianConfig.Catalogs || cimianConfig.catalogs
+                  if (catalogsStr && typeof catalogsStr === 'string' && catalogsStr !== '[]') {
+                    try {
+                      const parsed = JSON.parse(catalogsStr)
+                      if (Array.isArray(parsed) && parsed.length > 0) return parsed.join(', ')
+                    } catch { /* not valid JSON */ }
+                  }
+                }
+                return 'Not configured'
               })()}
             </div>
           </div>
