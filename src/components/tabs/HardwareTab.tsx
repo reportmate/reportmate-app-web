@@ -7,17 +7,22 @@ import React from 'react'
 import { StorageVisualization } from '../storage'
 import { CopyButton } from '../ui/CopyButton'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
-import { DebugAccordion } from '../DebugAccordion'
 import { 
   Cpu, 
   MemoryStick, 
   HardDrive, 
-  BatteryFull, 
+  Battery, 
   Wifi, 
   Bluetooth, 
   Monitor, 
+  Box, 
+  Zap, 
   Activity,
+  Microchip,
   Layers,
+  Smartphone,
+  Laptop,
+  Server,
   Brain
 } from 'lucide-react'
 
@@ -164,12 +169,6 @@ interface HardwareData {
     nanotextureOption?: boolean | number;
     data_source?: string;
     dataSource?: string;
-    // EDID enrichment fields
-    manufacturer?: string;
-    vendor_id?: string;
-    product_id?: string;
-    manufacture_year?: number;
-    manufacture_week?: number;
   }>;
   wireless?: {
     name?: unknown;
@@ -259,7 +258,7 @@ const formatBytes = (bytes: number) => {
 
 // --- Sub-components for the new layout ---
 
-const _SpecCard = ({ 
+const SpecCard = ({ 
   title, 
   icon: Icon, 
   children, 
@@ -283,7 +282,7 @@ const _SpecCard = ({
   </div>
 )
 
-const _DetailRow = ({ label, value, subValue }: { label?: string, value: React.ReactNode, subValue?: string }) => (
+const DetailRow = ({ label, value, subValue }: { label?: string, value: React.ReactNode, subValue?: string }) => (
   <div>
     {label && <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</div>}
     <div className="text-sm font-medium text-gray-900 dark:text-white">{value}</div>
@@ -352,8 +351,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     return total + freeSpace
   }, 0) || 0
   
-  // Memory - support physicalMemory (normalized from physical_memory), physical_memory (pre-normalization), totalPhysical (Windows)
-  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
+  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
@@ -375,8 +374,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize) || safeNumber(hardwareData.graphics?.memory_size)
   const graphicsDriverVersion = safeString(hardwareData.graphics?.driverVersion)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  // Support both metalSupport (normalized from metal_support) and metalSupport (Windows camelCase)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport ?? hardwareData.graphics?.metal_support)
+  // Support both metal_support (Mac) and metalSupport (Windows)
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
   
   // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
   const cleanGraphicsName = (() => {
@@ -393,7 +392,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   })()
   
   const npuName = safeString(hardwareData.npu?.name)
-  const _npuManufacturer = safeString(hardwareData.npu?.manufacturer)
+  const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits)
   const npuCores = safeNumber(hardwareData.npu?.cores)
   const npuTops = safeString(hardwareData.npu?.performanceTops)
@@ -406,13 +405,13 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const hasDisplays = displays.length > 0
   
   // Support both osquery snake_case (Mac) and camelCase (Windows)
-  const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount) || safeNumber(hardwareData.battery?.cycle_count)
-  const batteryChargePercent = safeNumber(hardwareData.battery?.percentRemaining) || safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
+  const batteryCycleCount = safeNumber(hardwareData.battery?.cycle_count) || safeNumber(hardwareData.battery?.cycleCount)
+  const batteryChargePercent = safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
   const batteryHealth = safeString(hardwareData.battery?.health)
   const batteryIsCharging = hardwareData.battery?.charging === 1 || Boolean(hardwareData.battery?.isCharging)
   // osquery: minutes_until_empty, Windows: estimatedRuntime
-  const batteryEstimatedRuntime = (hardwareData.battery?.minutesUntilEmpty || hardwareData.battery?.minutes_until_empty)
-    ? `${hardwareData.battery.minutesUntilEmpty ?? hardwareData.battery.minutes_until_empty} min`
+  const batteryEstimatedRuntime = hardwareData.battery?.minutes_until_empty 
+    ? `${hardwareData.battery.minutes_until_empty} min`
     : (typeof hardwareData.battery?.estimatedRuntime === 'string' ? hardwareData.battery.estimatedRuntime : '')
   const batteryItems = Array.isArray(hardwareData.battery?.items) ? hardwareData.battery.items : null
   const formFactor = hardwareData.formFactor as string | undefined
@@ -423,11 +422,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Wireless data
   const wifiGeneration = safeString(hardwareData.wireless?.wifiGeneration || hardwareData.wireless?.wifi_generation)
   const wifiVersion = safeString(hardwareData.wireless?.wifiVersion || hardwareData.wireless?.wifi_version)
-  const rawWirelessStatus = hardwareData.wireless?.status
-  // Suppress hardware-level "off" status — WiFi can be active while interface reports "off"
-  const wirelessStatus = rawWirelessStatus && String(rawWirelessStatus).toLowerCase() !== 'off'
-    ? safeString(rawWirelessStatus)
-    : 'Unknown'
+  const wirelessStatus = safeString(hardwareData.wireless?.status)
   const wirelessAvailable = Boolean(hardwareData.wireless?.isAvailable || hardwareData.wireless?.is_available)
   const wirelessName = safeString(hardwareData.wireless?.name)
   const wirelessProtocol = safeString(hardwareData.wireless?.protocol)
@@ -438,10 +433,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const bluetoothAvailable = Boolean(hardwareData.bluetooth?.isAvailable)
 
   // Unified Memory Detection
-  // 1. Backend flag: unifiedMemory (normalized from unified_memory set by Mac client for Apple Silicon)
+  // 1. Backend flag: unified_memory (set by Mac client for Apple Silicon)
   // 2. Apple Silicon with performance/efficiency cores (M-series chips)
   // 3. CPU name matches GPU name (common in SoCs)
-  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unifiedMemory || hardwareData.memory?.unified_memory)
+  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unified_memory)
   const isUnifiedMemory = hasUnifiedMemoryFlag || hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown')
 
   // Clean up GPU name if it repeats the processor name
@@ -494,12 +489,12 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               </div>
             </div>
             
-            {/* Identifier - check both normalized (modelIdentifier) and raw (model_identifier) */}
-            {(hardwareData.modelIdentifier || hardwareData.model_identifier) && safeString(hardwareData.modelIdentifier ?? hardwareData.model_identifier) !== 'Unknown' && (
+            {/* Identifier */}
+            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
               <div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
                 <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                  {safeString(hardwareData.modelIdentifier ?? hardwareData.model_identifier)}
+                  {safeString(hardwareData.model_identifier)}
                 </div>
               </div>
             )}
@@ -585,7 +580,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   {hasBattery ? (
                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                       <div className="flex items-center gap-2 mb-2">
-                        <BatteryFull className="w-5 h-5 text-green-500" />
+                        <Battery className="w-5 h-5 text-green-500" />
                         <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                       </div>
                       <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
@@ -682,7 +677,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             {hasBattery ? (
               <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
                 <div className="flex items-center gap-2 mb-2">
-                  <BatteryFull className="w-5 h-5 text-green-500" />
+                  <Battery className="w-5 h-5 text-green-500" />
                   <h4 className="font-semibold text-gray-900 dark:text-white">Battery</h4>
                 </div>
                 <div className="text-2xl font-bold text-green-500 mb-1">{batteryCycleCount} Cycles</div>
@@ -785,7 +780,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               const brightnessNits = display.brightness_nits ?? display.brightnessNits
               const trueTone = display.true_tone ?? display.trueTone
               const refreshRate = display.refresh_rate ?? display.refreshRate
-              const _hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
+              const hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
               
               return (
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -801,7 +796,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       </h4>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {diagonalInches ? `${diagonalInches}" ` : ''}
-                        {display.type === 'internal' ? 'Built-in' : 'External'} {displayType || display.manufacturer || ''}
+                        {display.type === 'internal' ? 'Built-in' : 'External'} {displayType}
                       </div>
                     </div>
                   </div>
@@ -830,16 +825,17 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         <div className="text-base font-medium text-gray-900 dark:text-white">{colorGamut}</div>
                       </div>
                     )}
-                    {/* Only show serial number for external displays */}
-                    {display.type !== 'internal' && displaySerialNumber && (
-                      <div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
-                        <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
-                          <span>{displaySerialNumber}</span>
-                          <CopyButton value={displaySerialNumber} size="sm" />
-                        </div>
+                    <div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Serial Number</div>
+                      <div className="text-base font-mono text-gray-900 dark:text-white flex items-center gap-2">
+                        {displaySerialNumber ? (
+                          <>
+                            <span>{displaySerialNumber}</span>
+                            <CopyButton value={displaySerialNumber} size="sm" />
+                          </>
+                        ) : 'N/A'}
                       </div>
-                    )}
+                    </div>
                     {displayFirmwareVersion && (
                       <div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Firmware</div>
@@ -860,21 +856,17 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {refreshRate}
                       </span>
                     )}
-                    {/* Only show Main Display badge for external displays */}
-                    {display.type !== 'internal' && (displayIsMainDisplay === 1 || displayIsMainDisplay === true) && (
+                    {displayIsMainDisplay === 1 || displayIsMainDisplay === true ? (
                       <span className="px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 text-sm font-medium rounded whitespace-nowrap text-center">
                         Main Display
                       </span>
-                    )}
-                    {/* Only show Connected badge for external displays */}
-                    {display.type !== 'internal' && (
-                      <span className={`inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-1 rounded whitespace-nowrap ${
-                        display.online ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
-                      }`}>
-                        <div className={`w-2 h-2 rounded-full ${display.online ? 'bg-green-500' : 'bg-gray-400'}`}></div>
-                        {display.online ? 'Connected' : 'Disconnected'}
-                      </span>
-                    )}
+                    ) : null}
+                    <span className={`inline-flex items-center justify-center gap-1.5 text-sm font-medium px-3 py-1 rounded whitespace-nowrap ${
+                      display.online ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${display.online ? 'bg-green-500' : 'bg-gray-400'}`}></div>
+                      {display.online ? 'Connected' : 'Disconnected'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1002,7 +994,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
       {hasBattery && hardwareData.battery && (
         <div className="space-y-4">
           <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <BatteryFull className="w-6 h-6 text-gray-500" />
+            <Battery className="w-6 h-6 text-gray-500" />
             Battery Information
           </h3>
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -1023,10 +1015,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     {batteryEstimatedRuntime && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Runtime</th>
                     )}
-                    {(hardwareData.battery.designedCapacity !== undefined || hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Design Capacity</th>
                     )}
-                    {(hardwareData.battery.currentCapacity !== undefined || hardwareData.battery.current_capacity !== undefined) && (
+                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Capacity</th>
                     )}
                   </tr>
@@ -1064,14 +1056,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {batteryEstimatedRuntime}
                       </td>
                     )}
-                    {(hardwareData.battery.designedCapacity !== undefined || hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.designedCapacity) || safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
+                        {safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
                       </td>
                     )}
-                    {(hardwareData.battery.currentCapacity !== undefined || hardwareData.battery.current_capacity !== undefined) && (
+                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.currentCapacity) || safeNumber(hardwareData.battery.current_capacity)} mAh
+                        {safeNumber(hardwareData.battery.current_capacity) || safeNumber(hardwareData.battery.currentCapacity)} mAh
                       </td>
                     )}
                   </tr>
@@ -1128,11 +1120,38 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         </div>
       )}
 
-      <DebugAccordion
-        data={device?.modules?.hardware}
-        label="device.modules.hardware"
-        moduleVersion={device?.modules?.hardware?.moduleVersion}
-      />
+      {/* Debug Accordion */}
+      <div className="mt-6">
+        <details className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <summary className="cursor-pointer px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">
+            <div className="flex items-center gap-2">
+              <Activity className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Debug API JSON Data</span>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              device.modules.hardware
+            </span>
+          </summary>
+          <div className="border-t border-gray-200 dark:border-gray-700">
+            <div className="p-4">
+              <div className="flex justify-end gap-2 mb-2">
+                <button
+                  onClick={() => {
+                    const jsonString = JSON.stringify(device?.modules?.hardware, null, 2)
+                    navigator.clipboard.writeText(jsonString)
+                  }}
+                  className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Copy JSON
+                </button>
+              </div>
+              <pre className="p-4 bg-gray-900 dark:bg-black text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto rounded border border-gray-700">
+                {JSON.stringify(device?.modules?.hardware, null, 2)}
+              </pre>
+            </div>
+          </div>
+        </details>
+      </div>
     </div>
   )
 }
