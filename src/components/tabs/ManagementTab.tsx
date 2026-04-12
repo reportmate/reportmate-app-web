@@ -10,7 +10,6 @@ import React, { useState, useMemo } from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
-import { DebugAccordion } from '../DebugAccordion'
 
 // Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
 function parseBool(value: any): boolean {
@@ -39,7 +38,7 @@ function parseMdmCertificate(mdmCertificate: any): {
   if (mdmCertificate.output && typeof mdmCertificate.output === 'string') {
     try {
       // Clean up the JSON string - handle osquery's escaped format with semicolons INSIDE quotes
-      const cleanJson = mdmCertificate.output
+      let cleanJson = mdmCertificate.output
         .replace(/";\\",/g, '",')       // Fix: "value";\", → "value",
         .replace(/";\\"\n/g, '"\n')     // Fix: "value";\" \n → "\n
         .replace(/";\s*,/g, '",')       // Fix: "value"; , → "value",
@@ -152,57 +151,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const [profileSearch, setProfileSearch] = useState('')
   // State for policies search
   const [policySearch, setPolicySearch] = useState('')
-  // State for Windows policy section expansion
-  const [expandedWinPolicies, setExpandedWinPolicies] = useState<Set<string>>(new Set())
-  const [winPolicySearch, setWinPolicySearch] = useState('')
   
   // Access management data from modular structure or fallback to device level
   const rawManagement = (device as any).modules?.management || (device as any).management
 
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)
-
-  // Extract data needed by hooks before early return (with safe defaults)
-  // Wrapped in useMemo so references are stable for downstream useMemo deps
-  const installedProfiles = useMemo(
-    () => management?.installed_profiles || management?.installedProfiles || [],
-    [management?.installed_profiles, management?.installedProfiles]
-  )
-  const managedPolicies = useMemo(
-    () => management?.managed_policies || management?.managedPolicies || [],
-    [management?.managed_policies, management?.managedPolicies]
-  )
-
-  // Hooks must be called unconditionally — before any early return
-  const filteredProfiles = useMemo(() => {
-    const sorted = [...installedProfiles].sort((a: any, b: any) =>
-      (a.name || a.identifier || '').localeCompare(b.name || b.identifier || '')
-    )
-    if (!profileSearch.trim()) return sorted
-    const search = profileSearch.toLowerCase()
-    return sorted.filter((profile: any) => {
-      const name = (profile.name || profile.identifier || '').toLowerCase()
-      const identifier = (profile.identifier || '').toLowerCase()
-      const org = (profile.organization || '').toLowerCase()
-      return name.includes(search) || identifier.includes(search) || org.includes(search)
-    })
-  }, [installedProfiles, profileSearch])
-  
-  // Filter managed policies by search
-  const filteredPolicies = useMemo(() => {
-    if (!policySearch.trim()) return managedPolicies
-    const search = policySearch.toLowerCase()
-    return managedPolicies.filter((policy: any) => {
-      const domain = (policy.domain || '').toLowerCase()
-      // Also check individual settings for search term
-      const settings = policy.settings || []
-      const settingsMatch = settings.some((s: any) => 
-        (s.name || '').toLowerCase().includes(search) ||
-        (s.value || '').toLowerCase().includes(search)
-      )
-      return domain.includes(search) || settingsMatch
-    })
-  }, [managedPolicies, policySearch])
 
   if (!management) {
     return (
@@ -239,23 +193,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const tenantDetails = management.tenant_details || management.tenantDetails || {}
   const deviceDetails = management.device_details || management.deviceDetails || {}
   // NOTE: compliance_status removed from management module - moved to security module
-  const _remoteManagement = management.remote_management || management.remoteManagement || {}
+  const remoteManagement = management.remote_management || management.remoteManagement || {}
+  const installedProfiles = management.installed_profiles || management.installedProfiles || []
   const profiles = management.profiles || []
+  const managedPolicies = management.managed_policies || management.managedPolicies || []
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
-  const _deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
-  
-  // MDM client info (from mdmclient dumpManagementStatus on Mac)
-  const mdmInfo = management.mdm_info || management.mdmInfo || {}
-  
-  // Windows policy data (consolidated from deprecated profiles module)
-  const intunePolicies: any[] = management.intune_policies || management.intunePolicies || []
-  const securityPolicies: any[] = management.security_policies || management.securityPolicies || []
-  const configurationProfiles: any[] = management.configuration_profiles || management.configurationProfiles || []
-  const registryPolicies: any[] = management.registry_policies || management.registryPolicies || []
-  const omaUriSettings: any[] = management.omauri_settings || management.omauriSettings || management.OMAURISettings || []
-  const mdmConfigurations: any[] = management.mdm_configurations || management.mdmConfigurations || []
-  const totalPoliciesApplied: number = management.total_policies_applied || management.totalPoliciesApplied || 0
-  const policyCountsBySource: Record<string, number> = management.policy_counts_by_source || management.policyCountsBySource || {}
+  const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
   
   // Toggle profile expansion
   const toggleProfile = (identifier: string) => {
@@ -283,20 +226,33 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     })
   }
   
-  // Toggle Windows policy expansion 
-  const toggleWinPolicy = (key: string) => {
-    setExpandedWinPolicies(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(key)) {
-        newSet.delete(key)
-      } else {
-        newSet.add(key)
-      }
-      return newSet
+  // Filter profiles by search
+  const filteredProfiles = useMemo(() => {
+    if (!profileSearch.trim()) return installedProfiles
+    const search = profileSearch.toLowerCase()
+    return installedProfiles.filter((profile: any) => {
+      const name = (profile.name || profile.identifier || '').toLowerCase()
+      const identifier = (profile.identifier || '').toLowerCase()
+      const org = (profile.organization || '').toLowerCase()
+      return name.includes(search) || identifier.includes(search) || org.includes(search)
     })
-  }
+  }, [installedProfiles, profileSearch])
   
-  // Filter profiles by search — already computed above early return
+  // Filter managed policies by search
+  const filteredPolicies = useMemo(() => {
+    if (!policySearch.trim()) return managedPolicies
+    const search = policySearch.toLowerCase()
+    return managedPolicies.filter((policy: any) => {
+      const domain = (policy.domain || '').toLowerCase()
+      // Also check individual settings for search term
+      const settings = policy.settings || []
+      const settingsMatch = settings.some((s: any) => 
+        (s.name || '').toLowerCase().includes(search) ||
+        (s.value || '').toLowerCase().includes(search)
+      )
+      return domain.includes(search) || settingsMatch
+    })
+  }, [managedPolicies, policySearch])
   
   // Parse the MDM certificate (handles nested JSON in 'output' field)
   const mdmCertificate = parseMdmCertificate(mdmCertificateRaw)
@@ -311,58 +267,36 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const serverUrl = mdmEnrollment.server_url || mdmEnrollment.serverUrl
   const provider = detectMdmProvider(serverUrl, mdmCertificate) || mdmEnrollment.provider
   
-  // Enrollment type - Mac uses ADE/User Approved (MDM-specific, stays here)
-  // Windows joining method (Entra/Domain/Hybrid) moved to Identity tab
+  // Enrollment type - Mac uses ADE/User Approved, Windows uses Entra/Domain Join
   // Detect Mac from platform field OR from Mac-specific MDM fields in data
   const platform = (device as any).platform?.toLowerCase() || ''
   const isMac = platform === 'macos' || platform === 'darwin' || platform === 'mac' || detectMacFromData(mdmEnrollment)
   
-  // Windows-specific data - Autopilot configuration (must be declared before enrollmentType)  
-  const autopilotConfig = management.autopilot_config || management.autopilotConfig
-  
-  // Enrollment type - Mac: ADE/User Approved, Windows: Autopilot/MDM
-  // Note: Windows joining method (Entra/Domain/Hybrid) is shown in Identity tab
   let enrollmentType: string | undefined
-  let enrollmentTypeDetail: string | undefined
   if (isMac) {
     const installedFromDep = parseBool(mdmEnrollment.installed_from_dep || mdmEnrollment.installedFromDep)
     const userApproved = parseBool(mdmEnrollment.user_approved || mdmEnrollment.userApproved)
     
     if (installedFromDep) {
       enrollmentType = 'Automated Device Enrollment'
-      enrollmentTypeDetail = 'Device enrolled automatically via Apple Business/School Manager'
     } else if (userApproved) {
       enrollmentType = 'User Approved Enrollment'
-      enrollmentTypeDetail = 'User manually approved MDM enrollment in System Settings'
     } else if (isEnrolled) {
-      enrollmentType = 'Manual Enrollment'
+      enrollmentType = 'MDM Enrolled'
     }
-  } else if (isEnrolled) {
-    if (autopilotConfig && parseBool(autopilotConfig.registered)) {
-      enrollmentType = 'Windows Autopilot'
-      enrollmentTypeDetail = 'Device provisioned via Windows Autopilot'
-    } else {
-      // Use the enrollment method collected on device (how it was enrolled)
-      const method = mdmEnrollment.enrollment_method || mdmEnrollment.enrollmentMethod
-      enrollmentType = method || 'MDM Enrolled'
-      const detailMap: Record<string, string> = {
-        'Auto-Enrolled':     'Entra join automatically triggered enrollment',
-        'User-Enrolled':     'User manually enrolled via Windows Settings',
-        'Bulk Enrolled':     'Enrolled via provisioning package or bulk token',
-        'Co-Managed':        'Jointly managed by ConfigMgr and Microsoft Intune',
-        'Device Enrollment': 'Enrolled as an AAD device',
-      }
-      enrollmentTypeDetail = method ? detailMap[method] : undefined
-    }
+  } else {
+    enrollmentType = mdmEnrollment.enrollment_type || mdmEnrollment.enrollmentType || deviceState?.status
   }
   
   const tenantName = tenantDetails.tenant_name || tenantDetails.tenantName || tenantDetails.organization
   const deviceAuthStatus = deviceDetails.device_auth_status || deviceDetails.deviceAuthStatus
   const profileCount = installedProfiles.length || profiles.length || 0
-  const totalManagedSettings = managedPolicies.reduce((sum: number, p: any) => sum + (p.settings || []).length, 0)
   
   // Mac-specific data - ADE configuration and device identifiers
   // NOTE: Compliance moved to Security tab, Remote Management may move to Security/Remote Access
+  
+  // Windows-specific data - Autopilot configuration, Primary User, Management Name
+  const autopilotConfig = management.autopilot_config || management.autopilotConfig
   const primaryUser = deviceDetails.primary_user || deviceDetails.primaryUser
   const managementName = deviceDetails.management_name || deviceDetails.managementName
   
@@ -390,7 +324,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // Extract expiry date from validity range string
   // Input: "[ 2025-03-25 22:47:56.000 UTC -- 2035-03-25 23:17:56.000 UTC ]"
   // Output: "Mar 25, 2035"
-  const _formatCertificateValidity = (validityString?: string) => {
+  const formatCertificateValidity = (validityString?: string) => {
     if (!validityString) return 'Unknown'
     
     // Try to parse the end date from the range
@@ -456,18 +390,25 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               </span>
             </div>
 
-            {/* Enrollment Type - Mac: ADE/User Approved, Windows: Autopilot/MDM */}
+            {/* Enrollment Type with conditional color */}
             {enrollmentType && (
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  <span className="text-base font-medium text-gray-900 dark:text-white">Enrollment Type</span>
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
-                    {enrollmentType}
-                  </span>
-                </div>
-                {enrollmentTypeDetail && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 ml-0.5">{enrollmentTypeDetail}</p>
-                )}
+              <div className="flex items-center gap-3">
+                <span className="text-base font-medium text-gray-900 dark:text-white">Enrollment Type</span>
+                {(() => {
+                  let displayType = enrollmentType
+                  if (displayType === 'Hybrid Entra Join') displayType = 'Domain Joined'
+                  if (displayType === 'Entra Join') displayType = 'Entra Joined'
+                  const isYellow = displayType === 'Domain Joined'
+                  return (
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      isYellow 
+                        ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                        : 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                    }`}>
+                      {displayType}
+                    </span>
+                  )
+                })()}
               </div>
             )}
 
@@ -485,108 +426,129 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               </div>
             )}
 
+            {/* User Principal Name - who enrolled the device */}
+            {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
+              <div className="flex items-start">
+                <span className="text-base font-medium text-gray-900 dark:text-white">Enrolled By</span>
+                <span className="text-base font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
+              </div>
+            )}
           </div>
 
-          {/* Windows: Autopilot Configuration (mirrors Mac ADE layout) */}
-          {isEnrolled && !isMac && autopilotConfig && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Enrollment Details</h3>
-              <div className="space-y-3 max-w-md">
-                {/* Autopilot Registration Status - Primary */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Autopilot Registration</span>
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                    parseBool(autopilotConfig.registered)
-                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                      : parseBool(autopilotConfig.activated)
-                        ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                  }`}>
-                    {parseBool(autopilotConfig.registered)
-                      ? 'Registered'
-                      : (autopilotConfig.status || autopilotConfig.Status || (parseBool(autopilotConfig.activated) ? 'Not Registered' : 'No'))}
-                  </span>
-                </div>
+          {/* Windows: Autopilot Configuration */}
+          {isEnrolled && !isMac && (management.autopilot_config || management.autopilotConfig) && (() => {
+            const autopilot = management.autopilot_config || management.autopilotConfig
+            return (
+              <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
+                <div className="space-y-3">
+                  {/* Status Pills - Two columns */}
+                  <div className="grid grid-cols-2 gap-4">
+                    {/* Assigned Status */}
+                    {autopilot.assigned !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.assigned)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.assigned) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
 
-                {/* Status detail (e.g. ZtdDeviceIsNotRegistered) */}
-                {(autopilotConfig.status_detail || autopilotConfig.statusDetail) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Detail</span>
-                    <span className="text-sm font-mono text-gray-500 dark:text-gray-400">
-                      {autopilotConfig.status_detail || autopilotConfig.statusDetail}
-                    </span>
+                    {/* Enrollment Status Page */}
+                    {autopilot.enrollment_status_page_enabled !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment Status Page</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.enrollment_status_page_enabled)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.enrollment_status_page_enabled) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Activated Status */}
+                    {autopilot.activated !== undefined && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activated</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          parseBool(autopilot.activated)
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                        }`}>
+                          {parseBool(autopilot.activated) ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Deployment Phase */}
+                    {autopilot.deployment_phase && (
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Phase</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                          autopilot.deployment_phase === 'Completed'
+                            ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                            : 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300'
+                        }`}>
+                          {autopilot.deployment_phase}
+                        </span>
+                      </div>
+                    )}
                   </div>
-                )}
 
-                {/* Deployment Mode */}
-                {(autopilotConfig.deployment_mode || autopilotConfig.deploymentMode) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Deployment Mode</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.deployment_mode || autopilotConfig.deploymentMode}
-                    </span>
-                  </div>
-                )}
-
-                {/* Profile Name */}
-                {(autopilotConfig.profile_name || autopilotConfig.profileName) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Profile</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.profile_name || autopilotConfig.profileName}
-                    </span>
-                  </div>
-                )}
-
-                {/* Forced Enrollment */}
-                {(autopilotConfig.forced_enrollment !== undefined || autopilotConfig.forcedEnrollment !== undefined) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Forced Enrollment</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      parseBool(autopilotConfig.forced_enrollment ?? autopilotConfig.forcedEnrollment)
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {parseBool(autopilotConfig.forced_enrollment ?? autopilotConfig.forcedEnrollment) ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Last Policy Check */}
-                {(autopilotConfig.policy_date || autopilotConfig.policyDate) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Last Policy Check</span>
-                    <span className="text-sm text-gray-900 dark:text-white">
-                      {formatExpiryDate(autopilotConfig.policy_date || autopilotConfig.policyDate)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Tenant Domain */}
-                {(autopilotConfig.tenant_domain || autopilotConfig.tenantDomain) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Tenant Domain</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.tenant_domain || autopilotConfig.tenantDomain}
-                    </span>
-                  </div>
-                )}
-
-                {/* Correlation ID */}
-                {(autopilotConfig.correlation_id || autopilotConfig.correlationId) && (
-                  <div className="flex items-center gap-6">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 shrink-0">Correlation ID</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-gray-500 dark:text-gray-400">
-                        {autopilotConfig.correlation_id || autopilotConfig.correlationId}
-                      </span>
-                      <CopyButton value={autopilotConfig.correlation_id || autopilotConfig.correlationId} />
+                  {/* Additional Details */}
+                  {(autopilot.profile_name || autopilot.group_tag || autopilot.tenant_domain || autopilot.tenant_id || autopilot.deployment_mode || autopilot.join_method) && (
+                    <div className="pt-3 space-y-2">
+                      {autopilot.profile_name && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Profile</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.profile_name}</span>
+                        </div>
+                      )}
+                      {autopilot.group_tag && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Group Tag</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.group_tag}</span>
+                        </div>
+                      )}
+                      {autopilot.tenant_domain && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Tenant</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.tenant_domain}</span>
+                        </div>
+                      )}
+                      {autopilot.tenant_id && (
+                        <div className="flex items-center">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Tenant ID</span>
+                          <div className="flex items-center gap-2 ml-3">
+                            <span className="text-sm font-mono text-gray-900 dark:text-white">{autopilot.tenant_id}</span>
+                            <CopyButton value={autopilot.tenant_id} />
+                          </div>
+                        </div>
+                      )}
+                      {autopilot.deployment_mode && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Mode</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.deployment_mode}</span>
+                        </div>
+                      )}
+                      {autopilot.join_method && (
+                        <div className="flex items-start">
+                          <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Join Method</span>
+                          <span className="text-sm text-gray-900 dark:text-white ml-3">{autopilot.join_method}</span>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
-          )}
+            )
+          })()}
 
           {/* Organization */}
           {isEnrolled && tenantName && (
@@ -712,43 +674,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       {parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload) ? 'Yes' : 'No'}
                     </span>
                   </div>
-
-                  {/* Disallows Activation Lock - from mdmclient */}
-                  {mdmInfo.denies_activation_lock !== undefined && mdmInfo.denies_activation_lock !== '' && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Disallows Activation Lock</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        parseBool(mdmInfo.denies_activation_lock)
-                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                      }`}>
-                        {parseBool(mdmInfo.denies_activation_lock) ? 'Yes' : 'No'}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Activation Lock Manageable - from mdmclient */}
-                  {mdmInfo.activation_lock_manageable !== undefined && mdmInfo.activation_lock_manageable !== '' && (
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activation Lock Manageable</span>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        parseBool(mdmInfo.activation_lock_manageable)
-                          ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                          : 'bg-red-100 dark:bg-red-900 text-red-600 dark:text-red-300'
-                      }`}>
-                        {parseBool(mdmInfo.activation_lock_manageable) ? 'Yes' : 'No'}
-                      </span>
-                    </div>
-                  )}
                 </div>
-
-                {/* Original Enrolled OS Version - from mdmclient */}
-                {mdmInfo.original_os_version && (
-                  <div className="flex items-center gap-3 pt-2">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Original Enrolled OS</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">{mdmInfo.original_os_version}</span>
-                  </div>
-                )}
 
                 {/* MDM Server URL - Full URL visible */}
                 {serverUrl && (
@@ -860,9 +786,189 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             </div>
           )}
 
-          {/* Windows Autopilot - single section above (duplicate removed) */}
+          {/* Windows: Autopilot Configuration (equivalent to Mac ADE) */}
+          {isEnrolled && !isMac && autopilotConfig && (autopilotConfig.assigned || autopilotConfig.activated) && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
+              <div className="space-y-3">
+                {/* Autopilot Assigned/Activated */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.assigned
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.assigned ? 'Yes' : 'No'}
+                    </span>
+                  </div>
 
-          {/* Domain Trust Status moved to Identity tab */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activated</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.activated
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.activated ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Deployment Mode */}
+                {autopilotConfig.deployment_mode && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Mode</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.deployment_mode}
+                    </span>
+                  </div>
+                )}
+
+                {/* Profile Name */}
+                {autopilotConfig.profile_name && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Profile</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.profile_name}
+                    </span>
+                  </div>
+                )}
+
+                {/* Group Tag */}
+                {autopilotConfig.group_tag && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Group Tag</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                      {autopilotConfig.group_tag}
+                    </span>
+                  </div>
+                )}
+
+                {/* Enrollment Status Page */}
+                {autopilotConfig.enrollment_status_page_enabled !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment Status Page</span>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      autopilotConfig.enrollment_status_page_enabled
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
+                    }`}>
+                      {autopilotConfig.enrollment_status_page_enabled ? 'Enabled' : 'Disabled'}
+                    </span>
+                  </div>
+                )}
+
+                {/* Deployment Phase */}
+                {autopilotConfig.deployment_phase && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Phase</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {autopilotConfig.deployment_phase}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Domain Trust Status - Only for Domain Joined (Hybrid Entra Join) devices */}
+          {/* Support both snake_case and camelCase */}
+          {(enrollmentType === 'Hybrid Entra Join' || enrollmentType === 'Domain Joined') && (management.domain_trust || management.domainTrust) && (() => {
+            const domainTrust = management.domain_trust || management.domainTrust
+            return (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Domain Trust Status</h3>
+              <div className="space-y-3">
+                {/* Trust Status with pill */}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Secure Channel</span>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                    (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === true
+                      ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                      : (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === false
+                      ? 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                      : 'bg-gray-100 dark:bg-gray-900 text-gray-700 dark:text-gray-300'
+                  }`}>
+                    {(domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === true ? 'Valid' : 
+                     (domainTrust.secure_channel_valid ?? domainTrust.secureChannelValid) === false ? 'Invalid' : 'Unknown'}
+                  </span>
+                </div>
+
+                {/* Domain Name */}
+                {(domainTrust.domain_name || domainTrust.domainName) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain</span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {domainTrust.domain_name || domainTrust.domainName}
+                    </span>
+                  </div>
+                )}
+
+                {/* Domain Controller */}
+                {(domainTrust.domain_controller || domainTrust.domainController) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Domain Controller</span>
+                    <span className="text-sm font-mono text-gray-900 dark:text-white text-xs">
+                      {domainTrust.domain_controller || domainTrust.domainController}
+                    </span>
+                  </div>
+                )}
+
+                {/* Trust Status */}
+                {(domainTrust.trust_status || domainTrust.trustStatus) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Trust Status</span>
+                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                      (domainTrust.trust_status || domainTrust.trustStatus) === 'Healthy' || (domainTrust.trust_status || domainTrust.trustStatus) === 'Success' || (domainTrust.trust_status || domainTrust.trustStatus) === 'Trusted'
+                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
+                        : 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300'
+                    }`}>
+                      {domainTrust.trust_status || domainTrust.trustStatus}
+                    </span>
+                  </div>
+                )}
+
+                {/* Machine Password Age */}
+                {(domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays) !== undefined && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Password Age</span>
+                    <span className={`text-sm font-medium ${
+                      (domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays) > 30
+                        ? 'text-yellow-600 dark:text-yellow-400'
+                        : 'text-gray-900 dark:text-white'
+                    }`}>
+                      {domainTrust.machine_password_age_days ?? domainTrust.machinePasswordAgeDays} days
+                    </span>
+                  </div>
+                )}
+
+                {/* Last Checked */}
+                {(domainTrust.last_checked || domainTrust.lastChecked) && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Last Checked</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                      {formatExpiryDate(domainTrust.last_checked || domainTrust.lastChecked)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Error Message if present */}
+                {(domainTrust.error_message || domainTrust.errorMessage) && (
+                  <div className="mt-2 p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-sm text-red-700 dark:text-red-300">{domainTrust.error_message || domainTrust.errorMessage}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+            )
+          })()}
 
           {/* Management URL - Move to bottom */}
           {management.mdmEnrollment?.managementUrl && (
@@ -939,12 +1045,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       </div>
                     )}
 
-                    {/* Organization - from mdmclient or ADE Configuration */}
-                    {(mdmInfo.org_name || adeConfiguration.organization) && (
+                    {/* Organization - from ADE Configuration */}
+                    {adeConfiguration.organization && (
                       <div>
                         <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">Organization</div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">
-                          {mdmInfo.org_name || adeConfiguration.organization}
+                          {adeConfiguration.organization}
                         </div>
                       </div>
                     )}
@@ -971,28 +1077,13 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 </div>
 
-                {/* Management Summary */}
-                {(profileCount > 0 || managedPolicies.length > 0) && (
-                  <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Profiles Summary</h4>
-                    <div className="space-y-2">
-                      {profileCount > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Configuration Profiles</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{profileCount}</span>
-                        </div>
-                      )}
-                      {managedPolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Managed Preferences</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">
-                            {managedPolicies.length} domain{managedPolicies.length !== 1 ? 's' : ''}{totalManagedSettings > 0 ? ` · ${totalManagedSettings} settings` : ''}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                {/* Configuration Profiles Count */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration Profiles</span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{profileCount}</span>
                   </div>
-                )}
+                </div>
                 </>
             ) : !isMac && tenantName ? (
               /* Windows: Certificate Card */
@@ -1107,108 +1198,70 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 </div>
 
-                {/* Policy Summary */}
-                {totalPoliciesApplied > 0 && (
-                  <div className="mt-6 pt-5 border-t border-gray-200 dark:border-gray-700">
-                    <h4 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Policy Summary</h4>
-                    <div className="space-y-2">
-                      {intunePolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Configuration</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{intunePolicies.length}</span>
-                        </div>
-                      )}
-                      {securityPolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Security</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{securityPolicies.length}</span>
-                        </div>
-                      )}
-                      {registryPolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Group Policy</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{registryPolicies.length}</span>
-                        </div>
-                      )}
-                      {omaUriSettings.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">OMA-URI</span>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">{omaUriSettings.length}</span>
-                        </div>
-                      )}
-                    </div>
+                {/* TODO: Resources at bottom - Currently always 0, needs proper policy/app collection */}
+                {/* <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration Profiles</span>
+                    <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{profileCount}</span>
                   </div>
-                )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Compliance Policies</span>
+                    <span className="text-lg font-bold text-green-600 dark:text-green-400">{compliancePolicyCount}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</span>
+                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{managedAppCount}</span>
+                  </div>
+                </div> */}
               </>
             ) : (
-              /* Windows: Policy Summary in sidebar */
+              /* Fallback: Simple Management Resources */
               <>
-                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Policy Summary</h3>
-
-                {totalPoliciesApplied > 0 ? (
-                  <div className="space-y-5">
-                    <div className="text-left">
-                      <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalPoliciesApplied}</div>
-                      <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Policies Applied</div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Management Resources</h3>
+                
+                <div className="grid grid-cols-1 gap-6">
+                  <div className="text-left">
+                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                      {profileCount}
                     </div>
-
-                    <div className="space-y-3">
-                      {Object.entries(policyCountsBySource).map(([source, count]) => (
-                        <div key={source} className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{source}</span>
-                          <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{count as number}</span>
-                        </div>
-                      ))}
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Configuration Profiles
                     </div>
-
-                    <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2">
-                      {securityPolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-red-500 rounded-full"></span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{securityPolicies.length} Security Policies</span>
-                        </div>
-                      )}
-                      {registryPolicies.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{registryPolicies.length} Group Policy Settings</span>
-                        </div>
-                      )}
-                      {omaUriSettings.length > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-purple-500 rounded-full"></span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{omaUriSettings.length} OMA-URI Settings</span>
-                        </div>
-                      )}
-                      {managedAppCount > 0 && (
-                        <div className="flex items-center gap-2">
-                          <span className="w-2 h-2 bg-orange-500 rounded-full"></span>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">{managedAppCount} Managed Apps</span>
-                        </div>
-                      )}
-                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      MDM policy areas applied
+                    </p>
                   </div>
-                ) : (
-                  <div className="space-y-5">
-                    <div className="text-left">
-                      <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{profileCount}</div>
-                      <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration Profiles</div>
-                      <p className="text-xs text-gray-500 mt-1">MDM policy areas applied</p>
+                  
+                  <div className="text-left">
+                    <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                      {compliancePolicyCount}
                     </div>
-
-                    <div className="text-left">
-                      <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">{managedAppCount}</div>
-                      <div className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</div>
-                      <p className="text-xs text-gray-500 mt-1">Apps deployed via MDM</p>
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Compliance Policies
                     </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      Security & health requirements
+                    </p>
                   </div>
-                )}
+                  
+                  <div className="text-left">
+                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
+                      {managedAppCount}
+                    </div>
+                    <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                      Managed Apps
+                    </div>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                      Apps deployed via MDM
+                    </p>
+                  </div>
+                </div>
 
-                {/* Compliance Status */}
+                {/* Compliance Status with pill on right */}
                 <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
                   {compliancePolicyCount > 0 ? (
                     <div className="flex items-center justify-between">
-                      <span className="text-base font-medium text-gray-900 dark:text-white">Compliance</span>
+                      <span className="text-base font-medium text-gray-900 dark:text-white">Compliance Policies</span>
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
                         {compliancePolicyCount} applied
                       </span>
@@ -1263,7 +1316,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
               const isExpanded = expandedProfiles.has(identifier)
               const payloads = profile.payloads || []
               const payloadCount = payloads.length || profile.payload_count || 0
-              const _isVerified = profile.verification_state === 'verified'
+              const isVerified = profile.verification_state === 'verified'
               const isRemovalDisallowed = profile.removal_disallowed === true || profile.removal_disallowed === 'true'
               
               return (
@@ -1303,21 +1356,22 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                           )}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                          {payloadCount > 0 ? `${payloadCount} payload${payloadCount !== 1 ? 's' : ''}` : identifier}
+                          {profile.organization || 'Unknown Organization'}
                         </div>
                       </div>
                     </div>
                     
                     {/* Right Side Badges */}
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      {/* User scope badge */}
+                      {payloadCount > 0 && (
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {payloadCount} payload{payloadCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {/* User scope badge (e.g., "System Level") */}
                       {profile.user && (
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          profile.user === 'System Level'
-                            ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/50 dark:text-purple-300'
-                            : 'bg-orange-100 text-orange-800 dark:bg-orange-900/50 dark:text-orange-300'
-                        }`}>
-                          {profile.user === 'System Level' ? 'System' : profile.user}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {profile.user}
                         </span>
                       )}
                       {/* Method badge: Only show for legacy MCX profiles */}
@@ -1354,14 +1408,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                                 {profile.uuid}
                               </span>
                               <CopyButton value={profile.uuid} />
-                            </div>
-                          </div>
-                        )}
-                        {profile.organization && (
-                          <div>
-                            <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Organization</div>
-                            <div className="text-xs text-gray-900 dark:text-white">
-                              {profile.organization}
                             </div>
                           </div>
                         )}
@@ -1572,258 +1618,40 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
         </div>
       )}
 
-      {/* ===== Windows: Configuration Policies ===== */}
-      {!isMac && (() => {
-        // Group all intune config policies by policyName, merging settings from all entries with the same name
-        const groupMap = new Map<string, { policyType: string; enforcementState: string; byBase: Map<string, { value: string; winningProvider?: string }> }>()
-        intunePolicies
-          .filter((p: any) => p.policyType === 'Configuration' || p.policyType === 'Device Configuration')
-          .filter((p: any) => p.policyName)
-          .forEach((p: any) => {
-            const name = p.policyName
-            if (!groupMap.has(name)) {
-              groupMap.set(name, {
-                policyType: p.policyType || 'Configuration',
-                enforcementState: p.enforcementState || p.status || 'Applied',
-                byBase: new Map()
-              })
-            }
-            const group = groupMap.get(name)!
-            const config = p.configuration || {}
-            Object.entries(config).forEach(([k, v]) => {
-              const val = String(v)
-              if (k.endsWith('_ProviderSet')) {
-                const base = k.replace(/_ProviderSet$/, '')
-                if (!group.byBase.has(base)) group.byBase.set(base, { value: val })
-                else group.byBase.get(base)!.value = val
-              } else if (k.endsWith('_WinningProvider')) {
-                const base = k.replace(/_WinningProvider$/, '')
-                const entry = group.byBase.get(base)
-                if (entry) entry.winningProvider = val
-                else group.byBase.set(base, { value: '', winningProvider: val })
-              } else if (k.endsWith('_LastWrite')) {
-                const base = k.replace(/_LastWrite$/, '')
-                if (!group.byBase.has(base)) group.byBase.set(base, { value: val })
-              }
-            })
-          })
-
-        // Convert to sorted array, drop policies with no settings
-        const grouped = Array.from(groupMap.entries())
-          .map(([name, g]) => ({
-            name,
-            policyType: g.policyType,
-            enforcementState: g.enforcementState,
-            settings: Array.from(g.byBase.entries()).map(([key, entry]) => ({ key, ...entry }))
-          }))
-          .filter(g => g.settings.length > 0)
-          .sort((a, b) => a.name.localeCompare(b.name))
-
-        const filtered = winPolicySearch.trim()
-          ? grouped.filter(g =>
-              g.name.toLowerCase().includes(winPolicySearch.toLowerCase()) ||
-              g.settings.some(s => s.key.toLowerCase().includes(winPolicySearch.toLowerCase()))
-            )
-          : grouped
-
-        if (grouped.length === 0) return null
-
-        return (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Configuration Policies</h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{grouped.length} policies applied</p>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                  <input
-                    type="text"
-                    className="block w-full sm:w-64 pl-9 pr-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-white dark:bg-gray-700 placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                    placeholder="Search policies..."
-                    value={winPolicySearch}
-                    onChange={(e) => setWinPolicySearch(e.target.value)}
-                  />
-                </div>
+      {/* Debug Accordion for API Data */}
+      <div className="mt-6">
+        <details className="bg-gray-50 dark:bg-gray-900/20 border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+          <summary className="cursor-pointer px-4 py-3 flex items-center justify-between hover:bg-gray-100 dark:hover:bg-gray-800/50 transition-colors">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+              </svg>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Debug API JSON Data</span>
+            </div>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              device.modules.management
+            </span>
+          </summary>
+          <div className="border-t border-gray-200 dark:border-gray-700">
+            <div className="p-4">
+              <div className="flex justify-end gap-2 mb-2">
+                <button
+                  onClick={() => {
+                    const jsonString = JSON.stringify((device as any)?.modules?.management, null, 2)
+                    navigator.clipboard.writeText(jsonString)
+                  }}
+                  className="px-3 py-1 text-xs font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                >
+                  Copy JSON
+                </button>
               </div>
-            </div>
-
-            <div className="divide-y divide-gray-200 dark:divide-gray-700">
-              {filtered.map((group) => {
-                const policyKey = `cfg-${group.name}`
-                const isExpanded = expandedWinPolicies.has(policyKey)
-                const settingCount = group.settings.length
-
-                return (
-                  <div key={policyKey} className="group">
-                    <button
-                      className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors text-left"
-                      onClick={() => toggleWinPolicy(policyKey)}
-                    >
-                      <div className="flex items-center gap-4 flex-1 min-w-0">
-                        <svg
-                          className={`w-5 h-5 text-gray-400 transition-transform flex-shrink-0 ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div className="w-10 h-10 bg-gray-100 dark:bg-gray-700 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <svg className="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{group.name}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {group.policyType} &middot; {settingCount} setting{settingCount !== 1 ? 's' : ''}
-                          </div>
-                        </div>
-                      </div>
-                    </button>
-
-                    {isExpanded && (
-                      <div className="bg-gray-50 dark:bg-gray-900/30 border-t border-gray-200 dark:border-gray-700">
-                        <table className="w-full text-sm">
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {group.settings.map((s, sIdx) => (
-                              <tr key={sIdx} className="hover:bg-gray-100/50 dark:hover:bg-gray-800/50">
-                                <td className="px-6 py-2.5">
-                                  <div className="flex items-center gap-2">
-                                    {s.value === '1' || s.value === '0' ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                        s.value === '1' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                      }`}>
-                                        {s.value === '1' ? 'Enabled' : 'Disabled'}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">{s.value}</span>
-                                    )}
-                                    <span className="font-medium text-gray-700 dark:text-gray-300">{s.key}</span>
-                                  </div>
-                                  {s.winningProvider && (
-                                    <div className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5 ml-16">{s.winningProvider}</div>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+              <pre className="p-4 bg-gray-900 dark:bg-black text-gray-100 text-xs font-mono overflow-x-auto whitespace-pre-wrap max-h-[600px] overflow-y-auto rounded border border-gray-700">
+                {JSON.stringify((device as any)?.modules?.management, null, 2)}
+              </pre>
             </div>
           </div>
-        )
-      })()}
-
-      {/* ===== Windows: Security Policies ===== */}
-      {!isMac && securityPolicies.length > 0 && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Security Policies</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Security configuration policies ({securityPolicies.length} policies)
-            </p>
-          </div>
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
-            {(() => {
-              // Group security policies by policyArea
-              const grouped = securityPolicies.reduce((acc: Record<string, any[]>, p: any) => {
-                const area = p.policyArea || 'General'
-                if (!acc[area]) acc[area] = []
-                acc[area].push(p)
-                return acc
-              }, {} as Record<string, any[]>)
-
-              return Object.entries(grouped).map(([area, policies]) => {
-                const areaKey = `sec-area-${area}`
-                const isExpanded = expandedWinPolicies.has(areaKey)
-                const highSeverity = (policies as any[]).some((p: any) => p.severity === 'High')
-                const compliantCount = (policies as any[]).filter((p: any) => p.complianceStatus === 'Compliant').length
-
-                return (
-                  <div key={areaKey}>
-                    <button
-                      className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-                      onClick={() => toggleWinPolicy(areaKey)}
-                    >
-                      <div className="flex items-center gap-3 text-left">
-                        <svg
-                          className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                        <div>
-                          <div className="font-medium text-gray-900 dark:text-white">{area}</div>
-                          <div className="text-xs text-gray-500 dark:text-gray-400">
-                            {(policies as any[]).length} setting{(policies as any[]).length !== 1 ? 's' : ''} &middot; {compliantCount}/{(policies as any[]).length} compliant
-                          </div>
-                        </div>
-                      </div>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                        highSeverity ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                        compliantCount === (policies as any[]).length ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                        'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                      }`}>
-                        {highSeverity ? 'High' : compliantCount === (policies as any[]).length ? 'Compliant' : 'Review'}
-                      </span>
-                    </button>
-
-                    {isExpanded && (
-                      <div className="bg-gray-50 dark:bg-gray-900/30">
-                        <table className="w-full text-sm">
-                          <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                            {(policies as any[]).map((p: any, idx: number) => (
-                              <tr key={idx} className="hover:bg-gray-100/50 dark:hover:bg-gray-800/50">
-                                <td className="px-6 py-2.5">
-                                  <div className="flex items-center gap-2">
-                                    {p.value === '1' || p.value === '0' || p.value === 1 || p.value === 0 ? (
-                                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                        String(p.value) === '1' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                      }`}>
-                                        {String(p.value) === '1' ? 'Enabled' : 'Disabled'}
-                                      </span>
-                                    ) : (
-                                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">{String(p.value)}</span>
-                                    )}
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                      p.complianceStatus === 'Compliant' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                      'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                    }`}>
-                                      {p.complianceStatus || 'Unknown'}
-                                    </span>
-                                    <span className="font-medium text-gray-700 dark:text-gray-300">
-                                      {(p.setting || p.policyName || '').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2').trim()}
-                                    </span>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                )
-              })
-            })()}
-          </div>
-        </div>
-      )}
-
-      <DebugAccordion
-        data={(device as any)?.modules?.management}
-        label="device.modules.management"
-        moduleVersion={(device as any)?.modules?.management?.moduleVersion}
-      />
+        </details>
+      </div>
     </div>
   )
 }
