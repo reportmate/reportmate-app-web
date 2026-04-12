@@ -8,6 +8,40 @@ import { normalizeCimianTimestamp } from '../../time'
 
 export type StandardInstallStatus = 'Installed' | 'Pending' | 'Warning' | 'Error' | 'Removed'
 
+/**
+ * Compare two version strings semantically.
+ * Returns: 1 if a > b, -1 if a < b, 0 if equal.
+ * Falls back to case-insensitive string comparison if either side cannot be parsed.
+ * Used to recognize when the device has a newer version than the repo (which is fine).
+ */
+function compareSemanticVersions(a: string, b: string): number {
+  if (!a && !b) return 0
+  if (!a) return -1
+  if (!b) return 1
+  if (a === b) return 0
+
+  const parse = (v: string): number[] | null => {
+    const match = v.trim().match(/^\d+(?:\.\d+)*/)
+    if (!match) return null
+    return match[0].split('.').map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+  }
+
+  const pa = parse(a)
+  const pb = parse(b)
+  if (!pa || !pb || pa.length === 0 || pb.length === 0) {
+    return a.localeCompare(b, undefined, { sensitivity: 'base' })
+  }
+
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const ai = pa[i] ?? 0
+    const bi = pb[i] ?? 0
+    if (ai > bi) return 1
+    if (ai < bi) return -1
+  }
+  return 0
+}
+
 export enum ErrorCategory {
   ARCHITECTURE = 'architecture',
   MSI_INSTALLER = 'msi_installer', 
@@ -698,27 +732,29 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   if (packagesToProcess.length > 0) {
     for (const item of packagesToProcess) {
             
-// For Cimian packages, respect the raw status first, then fall back to version comparison
+// For Cimian packages, respect definitive raw statuses, otherwise compare versions
       let finalStatus: StandardInstallStatus
-      
+
       if (item.type === 'cimian') {
         // First, try to standardize the raw status
         const standardizedRawStatus = standardizeInstallStatus(item.status)
-        
-        // For Cimian, if the raw status indicates pending/error/warning, trust it
-        if (standardizedRawStatus === 'Pending' || standardizedRawStatus === 'Error' || standardizedRawStatus === 'Warning') {
+
+        // Trust definitive failure/transition statuses from Cimian
+        if (standardizedRawStatus === 'Error' || standardizedRawStatus === 'Warning' || standardizedRawStatus === 'Removed') {
           finalStatus = standardizedRawStatus
-                  } else if (item.version && item.installedVersion) {
-          // Only use version comparison as fallback for unclear statuses
-          if (item.version === item.installedVersion) {
+        } else if (item.version && item.installedVersion) {
+          // Semantic version comparison: device having installed >= latest is "Installed".
+          // A newer installed version than the repo is intentional and considered fine
+          // (we only care that the endpoint has at least the latest published version).
+          if (compareSemanticVersions(item.installedVersion, item.version) >= 0) {
             finalStatus = 'Installed'
-                      } else {
+          } else {
             finalStatus = 'Pending'
-                      }
+          }
         } else {
-          // No version info, use standardized status
+          // No reliable version info, use standardized raw status
           finalStatus = standardizedRawStatus
-                  }
+        }
       } else {
         // For non-Cimian packages, use the standardized status
         finalStatus = standardizeInstallStatus(item.status)
@@ -730,6 +766,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         name: item.name || 'Unknown Package',
         displayName: item.displayName || item.name || 'Unknown Package',
         version: item.version || item.installedVersion || '',
+        installedVersion: item.installedVersion || '',
         status: finalStatus,  // ENFORCED: Version-based for Cimian, standardized for others
         type: item.type || 'Package',
         // DATE PROCESSED: Only show for items processed in the LATEST session
