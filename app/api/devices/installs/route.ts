@@ -120,6 +120,10 @@ export async function GET(request: Request) {
         });
       
       // Create a record for each install item
+      const manifest = device.modules?.installs?.cimian?.config?.ClientIdentifier
+        || device.modules?.installs?.munki?.clientIdentifier
+        || device.modules?.installs?.munki?.manifest
+        || '';
       for (const item of filteredItems) {
         const usage = parsedInventory?.usage || '';
         const catalog = parsedInventory?.catalog || '';
@@ -155,6 +159,7 @@ export async function GET(request: Request) {
             if (p === 'Darwin' || p.toLowerCase().includes('mac')) return 'Macintosh';
             return p || 'Unknown';
           })(),
+          manifest,
           raw: device
         });
       }
