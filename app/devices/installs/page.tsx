@@ -47,6 +47,7 @@ interface InstallRecord {
   room?: string
   fleet?: string
   platform?: string
+  manifest?: string
   raw?: any
 }
 
@@ -377,9 +378,25 @@ function InstallsPageContent() {
       }
 
       const data = await response.json()
-      
+
       if (Array.isArray(data)) {
-        setInstalls(data)
+        // Enrich install records with manifest from devices state
+        // (the bulk /api/devices/installs endpoint doesn't reliably carry manifest)
+        const manifestBySerial = new Map<string, string>()
+        for (const d of devices) {
+          const m = d?.modules?.installs?.cimian?.config?.ClientIdentifier
+            || d?.modules?.installs?.munki?.clientIdentifier
+            || d?.modules?.installs?.munki?.manifest
+            || ''
+          if (d?.serialNumber && m) {
+            manifestBySerial.set(d.serialNumber, m)
+          }
+        }
+        const enriched = data.map((rec: InstallRecord) => ({
+          ...rec,
+          manifest: rec.manifest || manifestBySerial.get(rec.serialNumber) || ''
+        }))
+        setInstalls(enriched)
         setHasGeneratedReport(true)
         setFiltersExpanded(true) // Auto-expand filters after report generation
       } else {
@@ -678,14 +695,20 @@ function InstallsPageContent() {
       })
     }
     
-    // Apply search query filter (search by device name, serial, or asset tag)
+    // Apply search query filter (search by device name, serial, asset tag, or manifest)
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase()
       filtered = filtered.filter(device => {
         const deviceName = device.deviceName?.toLowerCase() || ''
         const serial = device.serialNumber?.toLowerCase() || ''
         const assetTag = device.assetTag?.toLowerCase() || ''
-        return deviceName.includes(lowerQuery) || serial.includes(lowerQuery) || assetTag.includes(lowerQuery)
+        const manifest = device.clientIdentifier?.toLowerCase() || ''
+        const softwareRepo = device.softwareRepoUrl?.toLowerCase() || ''
+        return deviceName.includes(lowerQuery)
+          || serial.includes(lowerQuery)
+          || assetTag.includes(lowerQuery)
+          || manifest.includes(lowerQuery)
+          || softwareRepo.includes(lowerQuery)
       })
     }
     
@@ -756,12 +779,14 @@ function InstallsPageContent() {
     // Apply search query filter
     if (searchQuery) {
       const lowerQuery = searchQuery.toLowerCase()
-      filtered = filtered.filter(install => 
+      filtered = filtered.filter(install =>
         install.deviceName?.toLowerCase().includes(lowerQuery) ||
         install.serialNumber?.toLowerCase().includes(lowerQuery) ||
+        install.assetTag?.toLowerCase().includes(lowerQuery) ||
         install.name?.toLowerCase().includes(lowerQuery) ||
         install.version?.toLowerCase().includes(lowerQuery) ||
         install.source?.toLowerCase().includes(lowerQuery) ||
+        install.manifest?.toLowerCase().includes(lowerQuery) ||
         // Add support for "Name - Version" search from widget clicks
         `${install.name} - ${install.version || 'Unknown'}`.toLowerCase().includes(lowerQuery)
       )
@@ -797,13 +822,39 @@ function InstallsPageContent() {
     
     // Apply Location filter
     if (selectedRooms.length > 0) {
-      filtered = filtered.filter(install => 
+      filtered = filtered.filter(install =>
         install.room && selectedRooms.includes(install.room)
       )
     }
-    
-    return filtered
-  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter])
+
+    // Sort data by selected column
+    const sorted = [...filtered].sort((a: any, b: any) => {
+      let aVal = a[sortColumn]
+      let bVal = b[sortColumn]
+
+      // Normalize undefined/null for stable comparisons
+      if (aVal == null) aVal = ''
+      if (bVal == null) bVal = ''
+
+      // Date columns compare by time
+      if (sortColumn === 'lastSeen') {
+        const aTime = aVal ? new Date(aVal).getTime() : 0
+        const bTime = bVal ? new Date(bVal).getTime() : 0
+        if (aTime < bTime) return sortDirection === 'asc' ? -1 : 1
+        if (aTime > bTime) return sortDirection === 'asc' ? 1 : -1
+        return 0
+      }
+
+      if (typeof aVal === 'string') aVal = aVal.toLowerCase()
+      if (typeof bVal === 'string') bVal = bVal.toLowerCase()
+
+      if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return sorted
+  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection])
 
   useEffect(() => {
     fetchFilterOptions()
@@ -3589,11 +3640,42 @@ function InstallsPageContent() {
               <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                 <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Device</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Install</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Version</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Seen</th>
+                    <th
+                      onClick={() => handleSort('deviceName')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Device {sortColumn === 'deviceName' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('manifest')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Manifest {sortColumn === 'manifest' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('name')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Install {sortColumn === 'name' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('version')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Version {sortColumn === 'version' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('status')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Status {sortColumn === 'status' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
+                    <th
+                      onClick={() => handleSort('lastSeen')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 select-none"
+                    >
+                      Last Seen {sortColumn === 'lastSeen' && (sortDirection === 'asc' ? '▲' : '▼')}
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -3610,17 +3692,20 @@ function InstallsPageContent() {
                               {install.deviceName}
                             </span>
                           </Link>
-                          <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                            <span className="truncate">{install.serialNumber}</span>
-                            <CopyButton value={install.serialNumber} size="sm" />
-                            {install.assetTag && (
-                              <>
-                                <span className="text-gray-300 dark:text-gray-600">|</span>
-                                <span>{install.assetTag}</span>
-                                <CopyButton value={install.assetTag} size="sm" />
-                              </>
-                            )}
-                          </div>
+                          {install.assetTag && (
+                            <div className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                              <span className="truncate">{install.assetTag}</span>
+                              <CopyButton value={install.assetTag} size="sm" />
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 max-w-[240px]">
+                        <div
+                          className="text-sm text-gray-900 dark:text-white font-mono truncate"
+                          title={install.manifest || '-'}
+                        >
+                          {install.manifest || '-'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -3631,7 +3716,7 @@ function InstallsPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          install.status === 'installed' 
+                          install.status === 'installed'
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : install.status === 'pending'
                             ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
