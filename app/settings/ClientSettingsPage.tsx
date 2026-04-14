@@ -7,7 +7,9 @@ import { ThemeToggle } from '../../src/components/theme-toggle'
 import { useDemoMode } from '../../src/providers/DemoModeProvider'
 
 export default function ClientSettingsPage() {
-  const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations'>('general')
+  const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
+  const [clearDays, setClearDays] = useState(10)
+  const [clearStatus, setClearStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message?: string }>({ type: 'idle' })
   const { isDemoMode } = useDemoMode()
   const router = useRouter()
 
@@ -22,7 +24,38 @@ export default function ClientSettingsPage() {
     { id: 'modules', name: 'Modules', icon: '' },
     { id: 'security', name: 'Security', icon: '' },
     { id: 'integrations', name: 'Integrations', icon: '' },
+    { id: 'maintenance', name: 'Maintenance', icon: '' },
   ]
+
+  async function handleClearInstallsErrors() {
+    if (clearStatus.type === 'loading') return
+
+    const confirmed = window.confirm(
+      `This will clear all installs errors and warnings from devices that haven't reported in ${clearDays} or more days. Continue?`
+    )
+    if (!confirmed) return
+
+    setClearStatus({ type: 'loading' })
+
+    try {
+      const response = await fetch(`/api/admin/installs/clear-errors?days=${clearDays}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        setClearStatus({ type: 'error', message: data.detail || data.error || 'Request failed' })
+        return
+      }
+
+      setClearStatus({
+        type: 'success',
+        message: `Cleared errors and warnings from ${data.cleared} device${data.cleared === 1 ? '' : 's'} (${data.totalStale} stale device${data.totalStale === 1 ? '' : 's'} checked)`
+      })
+    } catch (err) {
+      setClearStatus({ type: 'error', message: err instanceof Error ? err.message : 'Network error' })
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
@@ -339,6 +372,70 @@ export default function ClientSettingsPage() {
                         Create incidents and sync CMDB data with ServiceNow instance.
                       </p>
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {activeSection === 'maintenance' && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Maintenance
+                  </h2>
+                  <p className="text-gray-600 dark:text-gray-400 mb-6">
+                    Manual cleanup operations for stale data. These actions are not automated and must be triggered by an administrator.
+                  </p>
+
+                  <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      Clear Stale Installs Errors and Warnings
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Clears error and warning fields from installs data for devices that have not reported
+                      within the specified number of days. This removes outdated error messages from
+                      decommissioned or offline devices that are no longer relevant.
+                    </p>
+
+                    <div className="flex items-end gap-4 mb-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Older than (days)
+                        </label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={clearDays}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10)
+                            if (!isNaN(v) && v >= 1 && v <= 365) setClearDays(v)
+                          }}
+                          className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                      </div>
+                      <button
+                        onClick={handleClearInstallsErrors}
+                        disabled={clearStatus.type === 'loading'}
+                        className={`px-4 py-2 text-sm font-medium rounded-md text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 ${
+                          clearStatus.type === 'loading'
+                            ? 'bg-gray-400 cursor-not-allowed'
+                            : 'bg-red-600 hover:bg-red-700'
+                        }`}
+                      >
+                        {clearStatus.type === 'loading' ? 'Clearing...' : 'Clear Errors and Warnings'}
+                      </button>
+                    </div>
+
+                    {clearStatus.type === 'success' && (
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-md">
+                        <p className="text-sm text-green-800 dark:text-green-200">{clearStatus.message}</p>
+                      </div>
+                    )}
+
+                    {clearStatus.type === 'error' && (
+                      <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-md">
+                        <p className="text-sm text-red-800 dark:text-red-200">{clearStatus.message}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
