@@ -1053,20 +1053,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           }
   }
 
-  // Collect all package-level errors and warnings
-  const packageErrors: ErrorMessage[] = []
-  const packageWarnings: WarningMessage[] = []
-  
-  for (const pkg of packages) {
-    if (pkg.errors && pkg.errors.length > 0) {
-      packageErrors.push(...pkg.errors)
-    }
-    if (pkg.warnings && pkg.warnings.length > 0) {
-      packageWarnings.push(...pkg.warnings)
-    }
-  }
-  
-  
+  // messages holds RUN-LEVEL (unattributable) errors/warnings only — the Munki/Cimian
+  // equivalent of MunkiReport's "Errors and Warnings" section. Per-package errors live
+  // on each package's errors/warnings arrays; don't duplicate them here or badge counts
+  // will double-count.
   const installsInfo: InstallsInfo = {
     totalPackages: packages.length,
     installed: statusCounts.installed,
@@ -1096,8 +1086,8 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       durationSeconds: latestDurationSeconds
     },
     messages: {
-      errors: [...sessionErrors, ...packageErrors],
-      warnings: [...sessionWarnings, ...packageWarnings]
+      errors: [...sessionErrors],
+      warnings: [...sessionWarnings]
     }
   }
 
@@ -1319,7 +1309,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     installsInfo.totalPackages = packages.length
     installsInfo.installed = statusCounts.installed
     installsInfo.pending = statusCounts.pending
-    installsInfo.failed = statusCounts.errors + statusCounts.warnings
+    installsInfo.failed =
+      statusCounts.errors + statusCounts.warnings +
+      (installsInfo.messages?.errors.length || 0) +
+      (installsInfo.messages?.warnings.length || 0)
   }
 
   
