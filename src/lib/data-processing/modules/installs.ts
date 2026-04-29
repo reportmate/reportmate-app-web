@@ -668,14 +668,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       id: item.id || (item.item_name || item.itemName || '')?.toLowerCase() || 'unknown',
       type: 'cimian',
       // Match the Mac branch: only items whose raw record proves they were
-      // acted on this run get a non-empty lastSeenInSession. Falling back to
-      // installs.lastCheckIn would stamp every catalog member as "touched"
-      // and make the Last Run filter useless. The Windows client now derives
-      // last_seen_in_session per-run from events.jsonl
-      // (see InstallsModuleProcessor.FinalizeItemsFromEvents); once Cimian
-      // ships the upstream fix described in
-      // clients/windows/docs/CIMIAN_ITEMS_JSON_FINALIZATION.md the same field
-      // will arrive directly in items.json and this code path won't change.
+      // acted on in this run get a non-empty lastSeenInSession. Do not fall
+      // back to installs.lastCheckIn here — that would stamp every catalog
+      // member as "touched" and make the Last Run filter useless. This field
+      // is therefore populated only when the upstream item record already
+      // includes a per-run last_seen_in_session / lastSeenInSession value.
       lastSeenInSession: item.last_seen_in_session || item.lastSeenInSession || '',
       lastUpdate: item.last_update || item.lastUpdate || '',
       lastAttemptTime: item.last_attempt_time || item.lastAttemptTime || '',
