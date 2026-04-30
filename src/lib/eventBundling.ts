@@ -214,16 +214,25 @@ function getBundlePrimaryKind(kinds: string[]): string {
   if (kinds.includes('error')) return 'error'
   if (kinds.includes('warning')) return 'warning'
   if (kinds.includes('success')) return 'success'
+  if (kinds.includes('system')) return 'system'
   return kinds[0] || 'info'
 }
 
 // Create a message for bundled info/system events.
 // Since success/warning/error are never bundled, this only handles routine data collection bundles.
-function createBundleMessage(events: FleetEvent[], _kinds: string[]): string {
+function createBundleMessage(events: FleetEvent[], kinds: string[]): string {
   // If all events share the same message, use it
   const uniqueMessages = [...new Set(events.map(e => e.message).filter(Boolean))]
   if (uniqueMessages.length === 1 && uniqueMessages[0]) {
     return uniqueMessages[0]
+  }
+
+  // System events take priority over generic info events — prefer the system message
+  if (kinds.includes('system') && kinds.includes('info')) {
+    const systemEvent = events.find(e => e.kind === 'system' && e.message)
+    if (systemEvent?.message) {
+      return systemEvent.message
+    }
   }
 
   // Extract module names from all bundled events
