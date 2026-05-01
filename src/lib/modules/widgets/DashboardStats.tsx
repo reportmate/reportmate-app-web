@@ -11,15 +11,19 @@ import Link from 'next/link'
 
 // Type for pre-aggregated install stats from API
 export interface InstallStatsData {
-  devicesWithErrors?: number
-  devicesWithWarnings?: number
-  totalErrorItems: number      // Total error items across all devices (Cimian + Munki)
-  totalWarningItems: number    // Total warning items across all devices (Cimian + Munki)
-  winErrorItems?: number       // Windows (Cimian) error items
-  winWarningItems?: number     // Windows (Cimian) warning items
-  macErrorItems?: number       // macOS (Munki) error items
-  macWarningItems?: number     // macOS (Munki) warning items
-  hasInstallData: boolean      // Whether any install data exists
+  devicesWithErrors: number          // Distinct devices with >=1 error item (any platform)
+  devicesWithWarnings: number        // Distinct devices with >=1 warning item (any platform)
+  winDevicesWithErrors: number       // Distinct Windows devices with >=1 Cimian error item
+  winDevicesWithWarnings: number     // Distinct Windows devices with >=1 Cimian warning item
+  macDevicesWithErrors: number       // Distinct macOS devices with >=1 Munki error item
+  macDevicesWithWarnings: number     // Distinct macOS devices with >=1 Munki warning item
+  totalErrorItems: number            // Total error items across all devices (Cimian + Munki)
+  totalWarningItems: number          // Total warning items across all devices (Cimian + Munki)
+  winErrorItems?: number             // Windows (Cimian) error items
+  winWarningItems?: number           // Windows (Cimian) warning items
+  macErrorItems?: number             // macOS (Munki) error items
+  macWarningItems?: number           // macOS (Munki) warning items
+  hasInstallData: boolean            // Whether any install data exists
 }
 
 interface StatsWidgetProps {
@@ -112,19 +116,19 @@ export const SuccessStatsWidget: React.FC<{ events: any[] }> = ({ events }) => {
 }
 
 // Warning Events Widget - uses pre-calculated stats from API
-// Displays WARNING ITEMS scoped to the active platform filter
-export const WarningStatsWidget: React.FC<{ 
+// Displays the count of DEVICES with one or more warning items, scoped to the
+// active platform filter. Matches the /devices/installs page categorization.
+export const WarningStatsWidget: React.FC<{
   installStats?: InstallStatsData | null
   isLoading?: boolean
   platformFilter?: string
 }> = ({ installStats, isLoading = false, platformFilter = 'all' }) => {
-  // Pick the right count based on current platform filter
   const warningCount = installStats?.hasInstallData
     ? platformFilter === 'macOS'
-      ? (installStats.macWarningItems ?? installStats.totalWarningItems)
+      ? installStats.macDevicesWithWarnings
       : platformFilter === 'Windows'
-        ? (installStats.winWarningItems ?? installStats.totalWarningItems)
-        : installStats.totalWarningItems
+        ? installStats.winDevicesWithWarnings
+        : installStats.devicesWithWarnings
     : null
 
   if (isLoading || warningCount === null) {
@@ -163,19 +167,19 @@ export const WarningStatsWidget: React.FC<{
 }
 
 // Error Events Widget - uses pre-calculated stats from API
-// Displays ERROR ITEMS scoped to the active platform filter
-export const ErrorStatsWidget: React.FC<{ 
+// Displays the count of DEVICES with one or more error items, scoped to the
+// active platform filter. Matches the /devices/installs page categorization.
+export const ErrorStatsWidget: React.FC<{
   installStats?: InstallStatsData | null
   isLoading?: boolean
   platformFilter?: string
 }> = ({ installStats, isLoading = false, platformFilter = 'all' }) => {
-  // Pick the right count based on current platform filter
   const errorCount = installStats?.hasInstallData
     ? platformFilter === 'macOS'
-      ? (installStats.macErrorItems ?? installStats.totalErrorItems)
+      ? installStats.macDevicesWithErrors
       : platformFilter === 'Windows'
-        ? (installStats.winErrorItems ?? installStats.totalErrorItems)
-        : installStats.totalErrorItems
+        ? installStats.winDevicesWithErrors
+        : installStats.devicesWithErrors
     : null
 
   if (isLoading || errorCount === null) {
