@@ -374,16 +374,23 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   )}
                 </div>
 
-                {/* Firmware Password — SMBIOS for all OEMs, augmented with Lenovo WMI bitmask */}
+                {/* Firmware Password — SMBIOS for all OEMs, augmented with OEM-specific sources
+                    such as Lenovo WMI bitmask, Dell CIM, and HP CMI */}
                 {security?.firmwarePassword && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
                     <DetailRow
                       label="Firmware Password"
                       isStatus
-                      danger
-                      enabled={security.firmwarePassword.statusDisplay === 'Set'}
+                      danger={security.firmwarePassword.statusDisplay === 'Not Set'}
+                      enabled={
+                        security.firmwarePassword.statusDisplay === 'Set'
+                          ? true
+                          : security.firmwarePassword.statusDisplay === 'Not Set'
+                            ? false
+                            : undefined
+                      }
                       activeLabel={security.firmwarePassword.statusDisplay || 'Set'}
-                      inactiveLabel={security.firmwarePassword.statusDisplay || 'Not Set'}
+                      inactiveLabel={security.firmwarePassword.statusDisplay || 'Unknown'}
                     />
                     {security.firmwarePassword.adminPasswordSet !== null && security.firmwarePassword.adminPasswordSet !== undefined && (
                       <DetailRow
@@ -399,7 +406,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <DetailRow
                         label="Power-on Password"
                         isStatus
-                        neutral
+                        danger
                         enabled={security.firmwarePassword.powerOnPasswordSet}
                         activeLabel="Set"
                         inactiveLabel="Not Set"
@@ -409,7 +416,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                       <DetailRow
                         label="HDD Password"
                         isStatus
-                        neutral
+                        danger
                         enabled={security.firmwarePassword.hddPasswordSet}
                         activeLabel="Set"
                         inactiveLabel="Not Set"
