@@ -24,6 +24,7 @@ interface InventoryItem {
   usage?: string
   catalog?: string
   computerName?: string
+  hostname?: string
   domain?: string
   organizationalUnit?: string
   manufacturer?: string
@@ -114,6 +115,7 @@ function DevicesPageContent() {
               department: inventory.department,
               owner: inventory.owner,
               computerName: inventory.deviceName,
+              hostname: device.modules?.hardware?.system?.hostname || device.modules?.hardware?.system?.computer_name || device.modules?.network?.hostname,
               domain: inventory.domain,
               organizationalUnit: inventory.organizationalUnit,
               manufacturer: inventory.manufacturer,
@@ -210,6 +212,7 @@ function DevicesPageContent() {
               item?.assetTag?.toLowerCase().includes(query) ||
               item?.serialNumber?.toLowerCase().includes(query) ||
               item?.computerName?.toLowerCase().includes(query) ||
+              item?.hostname?.toLowerCase().includes(query) ||
               item?.location?.toLowerCase().includes(query) ||
               item?.manufacturer?.toLowerCase().includes(query) ||
               item?.model?.toLowerCase().includes(query) ||
@@ -223,7 +226,7 @@ function DevicesPageContent() {
           }
         })
       }
-      
+
       // Remove duplicates based on serialNumber
       const uniqueFiltered = filtered.reduce((unique: InventoryItem[], item: InventoryItem) => {
         if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
@@ -347,6 +350,7 @@ function DevicesPageContent() {
               item?.assetTag?.toLowerCase().includes(query) ||
               item?.serialNumber?.toLowerCase().includes(query) ||
               item?.computerName?.toLowerCase().includes(query) ||
+              item?.hostname?.toLowerCase().includes(query) ||
               item?.location?.toLowerCase().includes(query) ||
               item?.manufacturer?.toLowerCase().includes(query) ||
               item?.model?.toLowerCase().includes(query) ||
@@ -360,7 +364,7 @@ function DevicesPageContent() {
           }
         })
       }
-      
+
       // Calculate counts from search-filtered results
       return {
         all: searchFiltered.filter(item => !item.archived).length,
