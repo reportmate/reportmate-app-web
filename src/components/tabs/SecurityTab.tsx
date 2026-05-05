@@ -358,14 +358,14 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   {/* Code Integrity / Boot Debugging from health attestation if available */}
                   {(security?.healthAttestation || security?.health_attestation) && (
                     <>
-                      <DetailRow 
-                        label="Code Integrity" 
-                        isStatus 
-                        enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled} 
+                      <DetailRow
+                        label="Code Integrity"
+                        isStatus
+                        enabled={security?.healthAttestation?.codeIntegrityEnabled || security?.health_attestation?.code_integrity_enabled}
                       />
-                      <DetailRow 
-                        label="Boot Debugging" 
-                        isStatus 
+                      <DetailRow
+                        label="Boot Debugging"
+                        isStatus
                         neutral
                         enabled={!(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled)}
                         value={(security?.healthAttestation?.bootDebuggingEnabled || security?.health_attestation?.boot_debugging_enabled) ? 'Enabled' : 'Disabled'}
@@ -373,6 +373,60 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     </>
                   )}
                 </div>
+
+                {/* Firmware Password — SMBIOS for all OEMs, augmented with OEM-specific sources
+                    such as Lenovo WMI bitmask, Dell CIM, and HP CMI */}
+                {security?.firmwarePassword && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    <DetailRow
+                      label="Firmware Password"
+                      isStatus
+                      danger={security.firmwarePassword.statusDisplay === 'Not Set'}
+                      enabled={
+                        security.firmwarePassword.statusDisplay === 'Set'
+                          ? true
+                          : security.firmwarePassword.statusDisplay === 'Not Set'
+                            ? false
+                            : undefined
+                      }
+                      activeLabel={security.firmwarePassword.statusDisplay || 'Set'}
+                      inactiveLabel={security.firmwarePassword.statusDisplay || 'Unknown'}
+                    />
+                    {security.firmwarePassword.adminPasswordSet !== null && security.firmwarePassword.adminPasswordSet !== undefined && (
+                      <DetailRow
+                        label="Admin / Supervisor"
+                        isStatus
+                        danger
+                        enabled={security.firmwarePassword.adminPasswordSet}
+                        activeLabel="Set"
+                        inactiveLabel="Not Set"
+                      />
+                    )}
+                    {security.firmwarePassword.powerOnPasswordSet !== null && security.firmwarePassword.powerOnPasswordSet !== undefined && (
+                      <DetailRow
+                        label="Power-on Password"
+                        isStatus
+                        danger
+                        enabled={security.firmwarePassword.powerOnPasswordSet}
+                        activeLabel="Set"
+                        inactiveLabel="Not Set"
+                      />
+                    )}
+                    {security.firmwarePassword.hddPasswordSet !== null && security.firmwarePassword.hddPasswordSet !== undefined && (
+                      <DetailRow
+                        label="HDD Password"
+                        isStatus
+                        danger
+                        enabled={security.firmwarePassword.hddPasswordSet}
+                        activeLabel="Set"
+                        inactiveLabel="Not Set"
+                      />
+                    )}
+                    {security.firmwarePassword.source && (
+                      <DetailRow label="Source" value={security.firmwarePassword.source} />
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
