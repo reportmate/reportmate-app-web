@@ -115,7 +115,7 @@ function DevicesPageContent() {
               department: inventory.department,
               owner: inventory.owner,
               computerName: inventory.deviceName,
-              hostname: device.modules?.hardware?.system?.hostname || device.modules?.hardware?.system?.computer_name || device.modules?.network?.hostname,
+              hostname: device.hostname || device.modules?.network?.hostname,
               domain: inventory.domain,
               organizationalUnit: inventory.organizationalUnit,
               manufacturer: inventory.manufacturer,
