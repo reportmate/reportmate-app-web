@@ -249,11 +249,18 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const runLevelErrors = data?.messages?.errors ?? [];
   const runLevelWarnings = data?.messages?.warnings ?? [];
   const lastRunCount = packages.filter((pkg: any) => pkg.lastUpdate && pkg.lastUpdate !== '').length;
-  const installedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
-  const pendingCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length;
-  const warningCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length + runLevelWarnings.length;
-  const errorCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length + runLevelErrors.length;
-  const removedCount = packages.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length;
+  // When Last Run is active, status pill counts reflect what happened *this run*
+  // (items with a non-empty lastUpdate / last_seen_in_session). Otherwise they
+  // reflect overall inventory state. Run-level messages are always included in
+  // warning/error totals since they aren't tied to a specific package.
+  const contextPackages = statusFilter.has('last_run')
+    ? packages.filter((pkg: any) => pkg.lastUpdate && pkg.lastUpdate !== '')
+    : packages;
+  const installedCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
+  const pendingCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length;
+  const warningCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length + runLevelWarnings.length;
+  const errorCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length + runLevelErrors.length;
+  const removedCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length;
 
   const hasRunLevelMessages = runLevelErrors.length > 0 || runLevelWarnings.length > 0;
 
