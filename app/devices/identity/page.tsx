@@ -480,7 +480,7 @@ function IdentityPageContent() {
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
             <button
-              onClick={() => setWidgetsExpanded(!effectiveWidgetsExpanded)}
+              onClick={() => setWidgetsExpanded(!widgetsExpanded)}
               className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
             >
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
@@ -608,7 +608,7 @@ function IdentityPageContent() {
                                   </div>
                                   {isExpandable && isExpanded && (
                                     <div className="ml-5 mt-1 space-y-1 border-l-2 border-gray-200 dark:border-gray-600 pl-2">
-                                      {trustItems.map((t) => (
+                                      {trustItems.filter(t => t.value > 0).map((t) => (
                                         <button
                                           key={t.label}
                                           onClick={() => setDirectoryFilter(directoryFilter === t.label ? null : t.label)}
@@ -1007,6 +1007,9 @@ function IdentityPageContent() {
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{device.totalUsers}</div>
+                          <div className={`text-xs ${device.adminUsers === 0 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                            {device.adminUsers === 0 ? 'no admins' : `${device.adminUsers} admin${device.adminUsers === 1 ? '' : 's'}`}
+                          </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">
