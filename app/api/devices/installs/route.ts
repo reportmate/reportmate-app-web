@@ -146,7 +146,7 @@ export async function GET(request: Request) {
           assetTag,
           lastSeen: device.lastSeen,
           name: item.itemName || item.displayName || item.name,
-          version: item.latestVersion || item.installedVersion || '',
+          version: item.installedVersion || item.latestVersion || '',
           status: item.currentStatus?.toLowerCase() || 'unknown',
           source: 'cimian',
           usage,
