@@ -188,7 +188,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialF
           id: item.id || item.itemName?.toLowerCase() || 'unknown',
           name: item.itemName || item.displayName || 'Unknown Package',
           displayName: item.displayName || item.itemName || 'Unknown Package',
-          version: item.latestVersion || item.installedVersion || item.version || 'Unknown',
+          version: item.installedVersion || item.version || item.latestVersion || 'Unknown',
           status: status,
           type: 'cimian',
           lastUpdate: new Date().toISOString(),

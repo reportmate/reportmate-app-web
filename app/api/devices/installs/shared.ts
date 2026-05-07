@@ -135,7 +135,7 @@ export async function getDevicesWithInstalls(): Promise<{
           name: r.itemName,
           displayName: r.itemName,
           status: r.currentStatus,
-          version: r.latestVersion,
+          version: r.installedVersion || r.latestVersion,
           installedVersion: r.installedVersion,
           ...r.raw
         })),

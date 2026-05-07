@@ -663,7 +663,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       name: item.item_name || item.itemName || item.display_name || item.displayName || item.name || 'Unknown',
       displayName: item.display_name || item.displayName || item.item_name || item.itemName || item.name || 'Unknown',
       status: item.current_status || item.currentStatus || item.mapped_status || item.mappedStatus, // Keep original status for standardization
-      version: item.latest_version || item.latestVersion || item.installed_version || item.installedVersion || item.version || 'Unknown',
+      version: item.installed_version || item.installedVersion || item.version || item.latest_version || item.latestVersion || 'Unknown',
       installedVersion: item.installed_version || item.installedVersion || '',
       id: item.id || (item.item_name || item.itemName || '')?.toLowerCase() || 'unknown',
       type: 'cimian',
