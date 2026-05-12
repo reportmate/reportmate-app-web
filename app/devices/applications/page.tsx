@@ -3,9 +3,9 @@
 // Force dynamic rendering and disable caching for applications page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense, useMemo } from "react"
+import { useEffect, useState, Suspense, useMemo, useRef } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
 import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
 import { usePlatformFilterSafe } from '../../../src/providers/PlatformFilterProvider'
@@ -46,6 +46,14 @@ interface UtilizationApp {
   name: string
   totalSeconds: number
   totalHours: number
+  // Active vs foreground vs total — null/0 when no client in scope reports
+  // idle-time data yet. activeRatio is null until at least one device has
+  // non-zero active_seconds for this canonical app.
+  activeSeconds?: number
+  activeHours?: number
+  foregroundSeconds?: number
+  foregroundHours?: number
+  activeRatio?: number | null
   launchCount: number
   deviceCount: number
   userCount: number
@@ -54,6 +62,7 @@ interface UtilizationApp {
   devices: string[]
   users: string[]
   isSingleUser: boolean
+  aliasedFrom?: string[]
 }
 
 interface TopUser {
@@ -412,6 +421,30 @@ function ApplicationsPageContent() {
   const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
+  // Collection health (audit-readiness): per-device coverage of application
+  // usage data. Surfaces "dark" devices that aren't collecting so the fleet
+  // utilization numbers can be defended.
+  const [collectionHealth, setCollectionHealth] = useState<{
+    summary: { totalDevices: number; healthy: number; stale: number; dark: number; never: number; freshDays: number; staleDays: number }
+    byPlatform: Record<string, { healthy: number; stale: number; dark: number; never: number; total: number }>
+    darkDevices: Array<{
+      serialNumber: string
+      deviceName: string
+      platform: string | null
+      osName: string | null
+      lastSeen: string | null
+      usage: string | null
+      catalog: string | null
+      location: string | null
+      lastUsageDate: string | null
+      daysSinceUsage: number | null
+      totalHoursEver: number
+      rowCount: number
+      bucket: 'dark' | 'never'
+    }>
+  } | null>(null)
+  const [collectionHealthExpanded, setCollectionHealthExpanded] = useState(false)
+
   // Report type: 'usage' for full usage analytics, 'versions' for version distribution only
   const [reportType, setReportType] = useState<'usage' | 'versions' | null>(null)
   
@@ -450,38 +483,181 @@ function ApplicationsPageContent() {
   const [lastAppliedFilters, setLastAppliedFilters] = useState<string>('')
   
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const hydratedRef = useRef(false)
+  const lastWrittenUrlRef = useRef<string>('')
+  const [pendingReport, setPendingReport] = useState<'usage' | 'versions' | null>(null)
+  const [linkCopied, setLinkCopied] = useState(false)
 
-  // Initialize search query and filters from URL parameters
+  // Hydrate state from URL once on mount. See URL_STATE_CONVENTIONS.md for the
+  // Collection health: fetched once on mount, independent of report state.
+  // Surfaces fleet-wide audit readiness so dark devices show up before the
+  // user runs any report.
   useEffect(() => {
+    let cancelled = false
+    fetch('/api/devices/applications/collection-health?freshDays=7&staleDays=30')
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data || data.error) return
+        setCollectionHealth({
+          summary: data.summary,
+          byPlatform: data.byPlatform || {},
+          darkDevices: data.darkDevices || [],
+        })
+      })
+      .catch(() => { /* non-fatal */ })
+    return () => { cancelled = true }
+  }, [])
+
+  // param contract. Auto-triggers a report load if `type` is in the URL so deep
+  // links like ?type=usage&period=30&apps=Houdini render the report directly.
+  useEffect(() => {
+    if (hydratedRef.current) return
     try {
-      const urlSearch = searchParams.get('search')
-      if (urlSearch) {
-        setSearchQuery(urlSearch)
-      }
-      
-      const urlApp = searchParams.get('application')
-      if (urlApp) {
-        setSelectedApplications([urlApp])
+      const sp = searchParams
+      const getList = (k: string): string[] => {
+        const v = sp.get(k)
+        return v ? v.split(',').map(s => s.trim()).filter(Boolean) : []
       }
 
-      const urlUsage = searchParams.get('usage')
-      if (urlUsage && ['assigned', 'shared'].includes(urlUsage.toLowerCase())) {
-        setSelectedUsages([urlUsage.toLowerCase()])
+      // Back-compat with legacy ?application=, ?usage=, ?catalog=, ?room=, ?search=
+      const legacyApp = sp.get('application')
+      const legacyUsage = sp.get('usage')
+      const legacyCatalog = sp.get('catalog')
+      const legacyRoom = sp.get('room')
+      const legacySearch = sp.get('search')
+
+      const apps = getList('apps')
+      if (legacyApp && !apps.includes(legacyApp)) apps.push(legacyApp)
+      const usages = getList('usages')
+      if (legacyUsage && ['assigned', 'shared'].includes(legacyUsage.toLowerCase()) && !usages.includes(legacyUsage.toLowerCase())) {
+        usages.push(legacyUsage.toLowerCase())
+      }
+      const catalogs = getList('catalogs')
+      if (legacyCatalog && ['curriculum', 'staff', 'faculty', 'kiosk'].includes(legacyCatalog.toLowerCase()) && !catalogs.includes(legacyCatalog.toLowerCase())) {
+        catalogs.push(legacyCatalog.toLowerCase())
+      }
+      const locations = getList('locations')
+      const rooms = getList('rooms')
+      if (legacyRoom && !rooms.includes(legacyRoom)) rooms.push(legacyRoom)
+      const fleets = getList('fleets')
+      const versions = getList('versions')
+
+      const q = sp.get('q') ?? legacySearch
+      const type = sp.get('type') as 'versions' | 'usage' | null
+      const period = sp.get('period')
+      const mode = sp.get('mode') as 'has' | 'missing' | null
+
+      if (q) setSearchQuery(q)
+      if (apps.length) setSelectedApplications(apps)
+      if (usages.length) setSelectedUsages(usages)
+      if (catalogs.length) setSelectedCatalogs(catalogs)
+      if (locations.length) setSelectedLocations(locations)
+      if (rooms.length) setSelectedRooms(rooms)
+      if (fleets.length) setSelectedFleets(fleets)
+      if (versions.length) setSelectedVersions(versions)
+      if (period) {
+        const n = parseInt(period, 10)
+        if (!Number.isNaN(n)) setUtilizationDays(n)
+      }
+      if (mode === 'missing') setReportMode('missing')
+
+      if (type === 'usage' || type === 'versions') {
+        // Set reportType directly so the sync effect's first post-hydration
+        // run doesn't strip `type`/`period` from the URL while the deferred
+        // report-loader is queued (race window). The report handler will set
+        // it again later but that's a harmless redundant write.
+        setReportType(type)
+        setPendingReport(type)
       }
 
-      const urlCatalog = searchParams.get('catalog')
-      if (urlCatalog && ['curriculum', 'staff', 'faculty', 'kiosk'].includes(urlCatalog.toLowerCase())) {
-        setSelectedCatalogs([urlCatalog.toLowerCase()])
-      }
+      // Seed the dedup ref with the canonical form of the incoming URL so the
+      // first post-hydration sync no-ops instead of writing the same value.
+      const initialQs = searchParams.toString()
+      lastWrittenUrlRef.current = initialQs ? `${pathname}?${initialQs}` : pathname
 
-      const urlRoom = searchParams.get('room')
-      if (urlRoom) {
-        setSelectedRooms([urlRoom])
+      // If we hydrated any filter state from the URL, collapse the Selections
+      // accordion — the user came in via a deep link and doesn't need the
+      // picker UI open by default.
+      const hasFilterParams =
+        apps.length > 0 || usages.length > 0 || catalogs.length > 0 ||
+        locations.length > 0 || rooms.length > 0 || fleets.length > 0 ||
+        versions.length > 0 || !!type || !!mode
+      if (hasFilterParams) {
+        setFiltersExpanded(false)
       }
     } catch (e) {
-      console.warn('Failed to get search params:', e)
+      console.warn('Failed to hydrate state from URL:', e)
+    } finally {
+      hydratedRef.current = true
     }
-  }, [searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Trigger pending report once state has hydrated (one tick after hydration
+  // so that handlers see the seeded selections).
+  useEffect(() => {
+    if (!pendingReport) return
+    const t = setTimeout(() => {
+      if (pendingReport === 'usage') {
+        handleLoadUtilization()
+      } else {
+        handleLoadVersionsReport()
+      }
+      setPendingReport(null)
+    }, 0)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingReport])
+
+  // Sync state → URL whenever selections, period, reportType, or reportMode
+  // change. Skipped during hydration to avoid clobbering the incoming URL.
+  useEffect(() => {
+    if (!hydratedRef.current) return
+    try {
+      const params = new URLSearchParams()
+      // Preserve platform (set by global nav).
+      const platform = searchParams.get('platform')
+      if (platform) params.set('platform', platform)
+
+      if (searchQuery) params.set('q', searchQuery)
+      if (reportType) params.set('type', reportType)
+      if (reportType === 'usage') params.set('period', String(utilizationDays))
+      if (reportMode === 'missing') params.set('mode', 'missing')
+      if (selectedApplications.length) params.set('apps', selectedApplications.join(','))
+      if (selectedUsages.length) params.set('usages', selectedUsages.join(','))
+      if (selectedCatalogs.length) params.set('catalogs', selectedCatalogs.join(','))
+      if (selectedLocations.length) params.set('locations', selectedLocations.join(','))
+      if (selectedRooms.length) params.set('rooms', selectedRooms.join(','))
+      if (selectedFleets.length) params.set('fleets', selectedFleets.join(','))
+      if (selectedVersions.length) params.set('versions', selectedVersions.join(','))
+
+      const qs = params.toString()
+      const newUrl = qs ? `${pathname}?${qs}` : pathname
+      // Dedup via a ref so we don't compare against potentially-stale
+      // searchParams from the closure (period changes were silently no-oping
+      // because the prior URL hadn't propagated back into searchParams yet).
+      if (newUrl !== lastWrittenUrlRef.current) {
+        lastWrittenUrlRef.current = newUrl
+        // Force address-bar update directly. Next.js's router.replace
+        // sometimes optimizes away the visible URL change for same-route
+        // search-param updates, so do a manual history.replaceState to
+        // guarantee the address bar reflects current state.
+        if (typeof window !== 'undefined') {
+          window.history.replaceState(null, '', newUrl)
+        }
+        router.replace(newUrl, { scroll: false })
+      }
+    } catch (e) {
+      console.warn('Failed to sync state to URL:', e)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    reportType, reportMode, utilizationDays, searchQuery,
+    selectedApplications, selectedUsages, selectedCatalogs,
+    selectedLocations, selectedRooms, selectedFleets, selectedVersions,
+  ])
 
   // Load ALL applications data on mount with progressive loading
   useEffect(() => {
@@ -1383,10 +1559,114 @@ function ApplicationsPageContent() {
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8 flex flex-col min-h-0">
+        {/* Collection-health banner: surfaces "dark" devices that aren't reporting
+            application usage data, so utilization numbers can be defended. */}
+        {collectionHealth && collectionHealth.summary.totalDevices > 0 && (() => {
+          const s = collectionHealth.summary
+          const darkTotal = s.dark + s.never
+          const pct = s.totalDevices ? Math.round((darkTotal / s.totalDevices) * 100) : 0
+          const severity =
+            darkTotal === 0 ? 'ok' :
+            pct < 5 ? 'low' :
+            pct < 20 ? 'medium' : 'high'
+          const tone = {
+            ok:     'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100',
+            low:    'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100',
+            medium: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100',
+            high:   'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100',
+          }[severity]
+          return (
+            <div className={`mb-4 rounded-xl border ${tone}`}>
+              <button
+                type="button"
+                onClick={() => setCollectionHealthExpanded(v => !v)}
+                className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-left"
+                aria-expanded={collectionHealthExpanded}
+              >
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+                  <span className="font-semibold">Usage data coverage</span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
+                    {s.healthy} healthy
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                    {s.stale} stale
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span>
+                    {s.dark} dark
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                    {s.never} never
+                  </span>
+                  <span className="text-xs opacity-75">
+                    of {s.totalDevices} devices
+                    {darkTotal > 0 && ` • ${darkTotal} not collecting (${pct}%)`}
+                  </span>
+                </div>
+                {darkTotal > 0 && (
+                  <span className="text-xs font-medium underline">
+                    {collectionHealthExpanded ? 'Hide details' : 'Show details'}
+                  </span>
+                )}
+              </button>
+              {collectionHealthExpanded && darkTotal > 0 && (
+                <div className="border-t border-current/10 max-h-72 overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead className="sticky top-0 bg-inherit">
+                      <tr className="text-left">
+                        <th className="px-4 py-2 font-medium">Status</th>
+                        <th className="px-4 py-2 font-medium">Device</th>
+                        <th className="px-4 py-2 font-medium">Platform</th>
+                        <th className="px-4 py-2 font-medium">Usage</th>
+                        <th className="px-4 py-2 font-medium">Location</th>
+                        <th className="px-4 py-2 font-medium">Last seen</th>
+                        <th className="px-4 py-2 font-medium">Last usage</th>
+                        <th className="px-4 py-2 font-medium text-right">Days dark</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {collectionHealth.darkDevices.map(dev => (
+                        <tr key={dev.serialNumber} className="border-t border-current/10 hover:bg-current/5">
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                              dev.bucket === 'never' ? 'bg-red-200/60 text-red-900 dark:bg-red-900/40 dark:text-red-100' :
+                              'bg-orange-200/60 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100'
+                            }`}>
+                              {dev.bucket}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">
+                            <Link href={`/device/${dev.serialNumber}`} className="font-medium hover:underline">
+                              {dev.deviceName || dev.serialNumber}
+                            </Link>
+                            <div className="text-[10px] opacity-60 font-mono">{dev.serialNumber}</div>
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">{dev.platform || '—'}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">{dev.usage || '—'}</td>
+                          <td className="px-4 py-2 whitespace-nowrap">{dev.location || '—'}</td>
+                          <td className="px-4 py-2 whitespace-nowrap" suppressHydrationWarning>
+                            {dev.lastSeen ? formatRelativeTime(dev.lastSeen) : '—'}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">{dev.lastUsageDate || 'never'}</td>
+                          <td className="px-4 py-2 text-right whitespace-nowrap">
+                            {dev.daysSinceUsage !== null ? `${dev.daysSinceUsage}d` : '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        })()}
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
 
           {/* Header Section */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between sm:flex-wrap gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {reportType === 'usage' ? 'Applications Usage Report' : 'Applications Report'}
@@ -1400,8 +1680,8 @@ function ApplicationsPageContent() {
                 }
               </p>
             </div>
-            
-            <div className="flex items-center gap-4">
+
+            <div className="flex flex-wrap items-center gap-3">
               {/* Time Period Selector - Only show for usage reports */}
               {reportType === 'usage' && utilizationData && (
                 <div className="flex items-center gap-2">
@@ -1427,7 +1707,7 @@ function ApplicationsPageContent() {
               )}
               
               {/* Generate Report Button with Loading Spinner */}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 {/* Loading Spinner - Left of Button */}
                 {loading && (
                   <div className="flex items-center gap-2">
@@ -1517,6 +1797,19 @@ function ApplicationsPageContent() {
                   </button>
                 )}
                 
+                {/* Versions Report Button - Return from Usage view, preserving selections */}
+                {!loading && reportType === 'usage' && (
+                  <button
+                    onClick={() => handleLoadVersionsReport()}
+                    className="px-4 py-2 text-white text-sm rounded-lg transition-colors whitespace-nowrap font-medium bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    Versions Report
+                  </button>
+                )}
+
                 {/* Update Usage Report Button - Show when usage report is loaded */}
                 {!loading && reportType === 'usage' && (
                   <button
@@ -1554,6 +1847,38 @@ function ApplicationsPageContent() {
                 )}
               </div>
               
+              {/* Copy Link Button - any loaded report */}
+              {reportType && !loading && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(window.location.href)
+                      setLinkCopied(true)
+                      setTimeout(() => setLinkCopied(false), 1500)
+                    } catch (err) {
+                      console.warn('Clipboard write failed:', err)
+                    }
+                  }}
+                  title="Copy a shareable link to this exact report (URL preserves all selections)"
+                  className={`px-4 py-2 text-sm rounded-lg transition-colors whitespace-nowrap font-medium flex items-center gap-2 ${
+                    linkCopied
+                      ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-900 dark:text-white'
+                  }`}
+                >
+                  {linkCopied ? (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  )}
+                  {linkCopied ? 'Link Copied' : 'Copy Link'}
+                </button>
+              )}
+
               {/* Export CSV Button - Usage Report */}
               {reportType === 'usage' && utilizationData && utilizationData.applications.length > 0 && (
                 <button
@@ -2622,12 +2947,20 @@ function ApplicationsPageContent() {
                         </td>
                       </tr>
                     ) : (
-                      sortedUtilizationApps.map((app) => (
+                      sortedUtilizationApps.map((app) => {
+                        const fromQs = searchParams.toString()
+                        const fromUrl = `${pathname}${fromQs ? `?${fromQs}` : ''}`
+                        const drillHref = `/devices/applications/usage/${encodeURIComponent(app.name)}?days=${utilizationDays}&from=${encodeURIComponent(fromUrl)}`
+                        return (
                         <tr key={app.name} className="hover:bg-blue-50 dark:hover:bg-blue-900/10">
                           <td className="px-4 lg:px-6 py-4">
-                            <div className="font-medium text-gray-900 dark:text-white truncate max-w-xs" title={app.name}>
+                            <Link
+                              href={drillHref}
+                              className="font-medium text-blue-600 dark:text-blue-400 hover:underline truncate max-w-xs block"
+                              title={`View per-device breakdown for ${app.name}`}
+                            >
                               {app.name}
-                            </div>
+                            </Link>
                           </td>
                           <td className="px-4 lg:px-6 py-4">
                             {/* Show versions from versionAnalysis - use normalized name for lookup */}
@@ -2668,6 +3001,15 @@ function ApplicationsPageContent() {
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               {app.totalHours.toFixed(1)} hours
                             </div>
+                            {/* Idle-time split: shown only when at least one client in scope
+                                has reported active_seconds for this app. Until clients ship
+                                Phase 2/3 of the idle-time work, this stays hidden. */}
+                            {app.activeRatio != null && app.activeHours != null && (
+                              <div className="text-xs mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
+                                <span className="font-medium">{app.activeHours.toFixed(1)}h active</span>
+                                <span className="opacity-70">({Math.round(app.activeRatio * 100)}%)</span>
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 lg:px-6 py-4">
                             <div className="text-sm text-gray-900 dark:text-white">
@@ -2705,7 +3047,8 @@ function ApplicationsPageContent() {
                             )}
                           </td>
                         </tr>
-                      ))
+                        )
+                      })
                     )}
                   </tbody>
                 </table>
