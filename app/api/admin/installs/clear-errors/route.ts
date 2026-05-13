@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import { getInternalApiHeaders } from '@/lib/api-auth'
+import { requireAdmin } from '@/lib/auth-roles'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export async function DELETE(request: Request) {
+  const guard = await requireAdmin(request)
+  if (guard instanceof NextResponse) return guard
+
   try {
     const { searchParams } = new URL(request.url)
     const days = searchParams.get('days') || '10'

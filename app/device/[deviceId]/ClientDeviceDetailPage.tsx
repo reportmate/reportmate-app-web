@@ -9,6 +9,8 @@ import { getDevicePlatform } from "../../../src/providers/PlatformFilterProvider
 import { PlatformBadge } from "../../../src/components/ui/PlatformBadge"
 // Import SMART loading hook (V2 - parallel loading)
 import { useSmartDeviceLoading } from "../../../src/hooks/useSmartDeviceLoading"
+import { useHasRole } from "../../../hooks/useAuth"
+import { ADMIN_ROLE } from "../../../lib/auth-roles"
 import { 
   InfoTab,
   InstallsTab,
@@ -258,6 +260,60 @@ export default function ClientDeviceDetailPage() {
   const [showActionsDropdown, setShowActionsDropdown] = useState(false)
   const reportsDropdownRef = useRef<HTMLDivElement>(null)
   const actionsDropdownRef = useRef<HTMLDivElement>(null)
+
+  // Admin actions
+  const isAdmin = useHasRole(ADMIN_ROLE)
+  const [adminBusy, setAdminBusy] = useState(false)
+  const [adminToast, setAdminToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+
+  async function handleArchiveToggle(serialNumber: string, currentlyArchived: boolean) {
+    if (adminBusy) return
+    const action = currentlyArchived ? 'unarchive' : 'archive'
+    setAdminBusy(true)
+    setShowActionsDropdown(false)
+    try {
+      const res = await fetch(`/api/admin/device/${encodeURIComponent(serialNumber)}/${action}`, {
+        method: 'POST',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAdminToast({ kind: 'error', message: data?.detail || data?.error || `${action} failed` })
+        return
+      }
+      setAdminToast({ kind: 'success', message: data?.message || `Device ${action}d` })
+      // Reload to reflect the new archived status from the API
+      router.refresh()
+    } catch (err) {
+      setAdminToast({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' })
+    } finally {
+      setAdminBusy(false)
+    }
+  }
+
+  async function handleConfirmDelete(serialNumber: string) {
+    if (adminBusy) return
+    setAdminBusy(true)
+    try {
+      const res = await fetch(`/api/admin/device/${encodeURIComponent(serialNumber)}`, {
+        method: 'DELETE',
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setAdminToast({ kind: 'error', message: data?.detail || data?.error || 'Delete failed' })
+        setShowDeleteModal(false)
+        return
+      }
+      setShowDeleteModal(false)
+      setAdminToast({ kind: 'success', message: 'Device deleted. Redirecting...' })
+      setTimeout(() => router.push('/device/list'), 1200)
+    } catch (err) {
+      setAdminToast({ kind: 'error', message: err instanceof Error ? err.message : 'Network error' })
+    } finally {
+      setAdminBusy(false)
+    }
+  }
   
   // Close dropdowns on outside click
   useEffect(() => {
@@ -949,6 +1005,40 @@ export default function ClientDeviceDetailPage() {
                           </button>
                         )
                       })()}
+
+                      {isAdmin && (() => {
+                        const serial = deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber || deviceId
+                        const archivedNow = deviceInfo.archived === true
+                        return (
+                          <>
+                            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
+                            <button
+                              onClick={() => handleArchiveToggle(serial, archivedNow)}
+                              disabled={adminBusy}
+                              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-amber-50 dark:hover:bg-amber-900/30 hover:text-amber-700 dark:hover:text-amber-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l-2 2v10a2 2 0 002 2h14a2 2 0 002-2V10l-2-2M5 8h14M5 8l2-4h10l2 4M9 13h6" />
+                              </svg>
+                              <span>{archivedNow ? 'Unarchive Device' : 'Archive Device'}</span>
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeleteConfirmText('')
+                                setShowDeleteModal(true)
+                                setShowActionsDropdown(false)
+                              }}
+                              disabled={adminBusy}
+                              className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3" />
+                              </svg>
+                              <span>Delete Permanently...</span>
+                            </button>
+                          </>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
@@ -1264,9 +1354,9 @@ export default function ClientDeviceDetailPage() {
           ) : isModuleLoaded('events') ? (
             <EventsTab device={deviceInfo as any} events={Array.isArray(getModuleData('events')) ? getModuleData('events') : []} data={getModuleData('events') as unknown as Record<string, unknown>} />
           ) : (
-            <ModuleLoadingState 
-              moduleName="events" 
-              state="loading" 
+            <ModuleLoadingState
+              moduleName="events"
+              state="loading"
               icon="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               accentColor="monochrome"
               isMac={isMac}
@@ -1275,6 +1365,73 @@ export default function ClientDeviceDetailPage() {
           </div>
         )}
       </div>
+
+      {adminToast && (
+        <div className="fixed top-4 right-4 z-[300] max-w-md">
+          <div
+            className={`px-4 py-3 rounded-md shadow-lg border ${
+              adminToast.kind === 'success'
+                ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-700 text-green-800 dark:text-green-200'
+                : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-sm flex-1">{adminToast.message}</span>
+              <button
+                onClick={() => setAdminToast(null)}
+                className="text-xs opacity-70 hover:opacity-100"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteModal && (() => {
+        const serial = deviceInfo.serialNumber || deviceInfo.modules?.inventory?.serialNumber || deviceId
+        return (
+          <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                Delete device {serial}?
+              </h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Permanently removes the device record and all module data, events, and usage history.
+                This action cannot be undone. Archive instead if you might want this data back.
+              </p>
+              <p className="text-sm text-gray-700 dark:text-gray-300 mt-4">
+                Type <span className="font-mono font-semibold">{serial}</span> to confirm:
+              </p>
+              <input
+                type="text"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                autoFocus
+                className="mt-2 w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder={serial}
+              />
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={adminBusy}
+                  className="px-4 py-2 text-sm font-medium rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleConfirmDelete(serial)}
+                  disabled={adminBusy || deleteConfirmText !== serial}
+                  className="px-4 py-2 text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {adminBusy ? 'Deleting...' : 'Delete permanently'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
