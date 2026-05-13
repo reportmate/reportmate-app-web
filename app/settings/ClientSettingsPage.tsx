@@ -5,12 +5,21 @@ import { useRouter } from 'next/navigation'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
 import { useDemoMode } from '../../src/providers/DemoModeProvider'
+import { useHasRole } from '../../hooks/useAuth'
+import { ADMIN_ROLE } from '../../lib/auth-roles'
+
+type MaintStatus = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string }
 
 export default function ClientSettingsPage() {
   const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
   const [clearDays, setClearDays] = useState(10)
-  const [clearStatus, setClearStatus] = useState<{ type: 'idle' | 'loading' | 'success' | 'error'; message?: string }>({ type: 'idle' })
+  const [clearStatus, setClearStatus] = useState<MaintStatus>({ type: 'idle' })
+  const [deleteSerial, setDeleteSerial] = useState('')
+  const [deleteStatus, setDeleteStatus] = useState<MaintStatus>({ type: 'idle' })
+  const [bulkSerials, setBulkSerials] = useState('')
+  const [bulkStatus, setBulkStatus] = useState<MaintStatus & { results?: Array<{ serialNumber: string; ok: boolean; detail?: string }> }>({ type: 'idle' })
   const { isDemoMode } = useDemoMode()
+  const isAdmin = useHasRole(ADMIN_ROLE)
   const router = useRouter()
 
   // Redirect to dashboard in demo mode
@@ -54,6 +63,72 @@ export default function ClientSettingsPage() {
       })
     } catch (err) {
       setClearStatus({ type: 'error', message: err instanceof Error ? err.message : 'Network error' })
+    }
+  }
+
+  async function handleDeleteSingleDevice() {
+    const serial = deleteSerial.trim()
+    if (!serial) return
+    if (deleteStatus.type === 'loading') return
+    const confirmed = window.confirm(
+      `Permanently delete device "${serial}"? This removes all module data, events, and usage history. This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setDeleteStatus({ type: 'loading' })
+    try {
+      const response = await fetch(`/api/admin/device/${encodeURIComponent(serial)}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setDeleteStatus({ type: 'error', message: data.detail || data.error || 'Delete failed' })
+        return
+      }
+      const moduleRecords = data?.deletedData?.totalModuleRecords ?? 0
+      const events = data?.deletedData?.events ?? 0
+      setDeleteStatus({
+        type: 'success',
+        message: `Deleted ${serial} (${events} events, ${moduleRecords} module records).`,
+      })
+      setDeleteSerial('')
+    } catch (err) {
+      setDeleteStatus({ type: 'error', message: err instanceof Error ? err.message : 'Network error' })
+    }
+  }
+
+  async function handleBulkDelete() {
+    if (bulkStatus.type === 'loading') return
+    const serials = bulkSerials
+      .split(/[\n,]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+    if (serials.length === 0) return
+    const confirmed = window.confirm(
+      `Permanently delete ${serials.length} device${serials.length === 1 ? '' : 's'}? This cannot be undone.`
+    )
+    if (!confirmed) return
+
+    setBulkStatus({ type: 'loading' })
+    try {
+      const response = await fetch('/api/admin/devices/bulk-delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serialNumbers: serials }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        setBulkStatus({ type: 'error', message: data.detail || data.error || 'Bulk delete failed' })
+        return
+      }
+      setBulkStatus({
+        type: 'success',
+        message: `Deleted ${data.succeeded} of ${data.requested} devices (${data.failed} failed).`,
+        results: data.results,
+      })
+      if (data.failed === 0) setBulkSerials('')
+    } catch (err) {
+      setBulkStatus({ type: 'error', message: err instanceof Error ? err.message : 'Network error' })
     }
   }
 
@@ -377,14 +452,25 @@ export default function ClientSettingsPage() {
               )}
 
               {activeSection === 'maintenance' && (
-                <div className="p-6">
-                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-                    Maintenance
-                  </h2>
-                  <p className="text-gray-600 dark:text-gray-400 mb-6">
-                    Manual cleanup operations for stale data. These actions are not automated and must be triggered by an administrator.
-                  </p>
+                <div className="p-6 space-y-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                      Maintenance
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      Manual cleanup operations for stale data. These actions are not automated and must be triggered by an administrator.
+                    </p>
+                  </div>
 
+                  {!isAdmin && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-md">
+                      <p className="text-sm text-amber-800 dark:text-amber-200">
+                        Maintenance actions require the <span className="font-mono">{ADMIN_ROLE}</span> role. Contact a ReportMate administrator if you need access.
+                      </p>
+                    </div>
+                  )}
+
+                  {isAdmin && (<>
                   <div className="border border-gray-200 dark:border-gray-700 rounded-lg p-6">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                       Clear Stale Installs Errors and Warnings
@@ -437,6 +523,101 @@ export default function ClientSettingsPage() {
                       </div>
                     )}
                   </div>
+
+                  <div className="border border-red-200 dark:border-red-800 rounded-lg p-6 bg-red-50/30 dark:bg-red-900/10">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      Delete Device by Serial Number
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Permanently removes a single device along with all module data, events, and usage history. Prefer archiving for normal decommissioning. This action cannot be undone.
+                    </p>
+
+                    <div className="flex items-end gap-4 mb-4">
+                      <div className="flex-1 max-w-md">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Serial number
+                        </label>
+                        <input
+                          type="text"
+                          value={deleteSerial}
+                          onChange={(e) => setDeleteSerial(e.target.value)}
+                          placeholder="e.g. 0F33V9G25083HJ"
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                        />
+                      </div>
+                      <button
+                        onClick={handleDeleteSingleDevice}
+                        disabled={deleteStatus.type === 'loading' || !deleteSerial.trim()}
+                        className="px-4 py-2 text-sm font-medium rounded-md text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
+                      >
+                        {deleteStatus.type === 'loading' ? 'Deleting...' : 'Delete Device'}
+                      </button>
+                    </div>
+
+                    {deleteStatus.type === 'success' && (
+                      <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-md">
+                        <p className="text-sm text-green-800 dark:text-green-200">{deleteStatus.message}</p>
+                      </div>
+                    )}
+                    {deleteStatus.type === 'error' && (
+                      <div className="p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-md">
+                        <p className="text-sm text-red-800 dark:text-red-200">{deleteStatus.message}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="border border-red-200 dark:border-red-800 rounded-lg p-6 bg-red-50/30 dark:bg-red-900/10">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+                      Bulk Delete Devices
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                      Paste one serial number per line (or comma-separated). Each device is deleted independently; per-device results are reported below. Capped at 100 devices per request.
+                    </p>
+
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Serial numbers
+                      </label>
+                      <textarea
+                        value={bulkSerials}
+                        onChange={(e) => setBulkSerials(e.target.value)}
+                        rows={6}
+                        placeholder="0F33V9G25083HJ&#10;ABCD1234&#10;..."
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white font-mono text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={bulkStatus.type === 'loading' || !bulkSerials.trim()}
+                      className="px-4 py-2 text-sm font-medium rounded-md text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 disabled:cursor-not-allowed bg-red-600 hover:bg-red-700"
+                    >
+                      {bulkStatus.type === 'loading' ? 'Deleting...' : 'Delete All Listed Devices'}
+                    </button>
+
+                    {bulkStatus.type === 'success' && (
+                      <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-md">
+                        <p className="text-sm text-green-800 dark:text-green-200 mb-2">{bulkStatus.message}</p>
+                        {bulkStatus.results && bulkStatus.results.some((r) => !r.ok) && (
+                          <ul className="text-xs text-gray-700 dark:text-gray-300 font-mono space-y-1 mt-2">
+                            {bulkStatus.results
+                              .filter((r) => !r.ok)
+                              .map((r) => (
+                                <li key={r.serialNumber}>
+                                  <span className="text-red-700 dark:text-red-300">FAIL</span> {r.serialNumber}: {r.detail || 'unknown error'}
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                    {bulkStatus.type === 'error' && (
+                      <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-md">
+                        <p className="text-sm text-red-800 dark:text-red-200">{bulkStatus.message}</p>
+                      </div>
+                    )}
+                  </div>
+                  </>)}
                 </div>
               )}
             </div>
