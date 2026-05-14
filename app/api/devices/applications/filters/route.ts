@@ -100,6 +100,7 @@ function normalizeAppName(appName: string): string {
     .replace(/\s+/g, ' ')
     .replace(/\s*-\s*$/, '')
     .replace(/^\s*-\s*/, '')
+    .replace(/\.app$/i, '')
     .trim()
   
   if (!normalized || normalized.length < 2) return ''
