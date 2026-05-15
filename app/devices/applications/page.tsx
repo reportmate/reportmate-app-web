@@ -36,6 +36,8 @@ interface ApplicationItem {
   location?: string
   room?: string
   fleet?: string
+  department?: string
+  area?: string
   assetTag?: string
   platform?: string
   raw?: any
@@ -160,6 +162,7 @@ interface FilterOptions {
   catalogs: string[]
   rooms: string[]
   fleets: string[]
+  areas: string[]
   locations: string[]
   devicesWithData: number
 }
@@ -410,6 +413,7 @@ function ApplicationsPageContent() {
     catalogs: [],
     rooms: [],
     fleets: [],
+    areas: [],
     locations: [],
     devicesWithData: 0
   })
@@ -467,6 +471,7 @@ function ApplicationsPageContent() {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedVersions, setSelectedVersions] = useState<string[]>([])
   
   // Track last applied filters to detect changes
@@ -513,6 +518,7 @@ function ApplicationsPageContent() {
       const rooms = getList('rooms')
       if (legacyRoom && !rooms.includes(legacyRoom)) rooms.push(legacyRoom)
       const fleets = getList('fleets')
+      const areas = getList('areas')
       const versions = getList('versions')
 
       const q = sp.get('q') ?? legacySearch
@@ -527,6 +533,7 @@ function ApplicationsPageContent() {
       if (locations.length) setSelectedLocations(locations)
       if (rooms.length) setSelectedRooms(rooms)
       if (fleets.length) setSelectedFleets(fleets)
+      if (areas.length) setSelectedAreas(areas)
       if (versions.length) setSelectedVersions(versions)
       if (period) {
         const n = parseInt(period, 10)
@@ -554,7 +561,7 @@ function ApplicationsPageContent() {
       const hasFilterParams =
         apps.length > 0 || usages.length > 0 || catalogs.length > 0 ||
         locations.length > 0 || rooms.length > 0 || fleets.length > 0 ||
-        versions.length > 0 || !!type || !!mode
+        areas.length > 0 || versions.length > 0 || !!type || !!mode
       if (hasFilterParams) {
         setFiltersExpanded(false)
       }
@@ -602,6 +609,7 @@ function ApplicationsPageContent() {
       if (selectedLocations.length) params.set('locations', selectedLocations.join(','))
       if (selectedRooms.length) params.set('rooms', selectedRooms.join(','))
       if (selectedFleets.length) params.set('fleets', selectedFleets.join(','))
+      if (selectedAreas.length) params.set('areas', selectedAreas.join(','))
       if (selectedVersions.length) params.set('versions', selectedVersions.join(','))
 
       const qs = params.toString()
@@ -627,7 +635,7 @@ function ApplicationsPageContent() {
   }, [
     reportType, reportMode, utilizationDays, searchQuery,
     selectedApplications, selectedUsages, selectedCatalogs,
-    selectedLocations, selectedRooms, selectedFleets, selectedVersions,
+    selectedLocations, selectedRooms, selectedFleets, selectedAreas, selectedVersions,
   ])
 
   // Load ALL applications data on mount with progressive loading
@@ -658,6 +666,7 @@ function ApplicationsPageContent() {
               locations: data.locations || [],
               rooms: data.rooms || [],
               fleets: data.fleets || [],
+              areas: data.areas || [],
               devicesWithData: data.devices?.length || 0
             })
             
@@ -785,8 +794,9 @@ function ApplicationsPageContent() {
         const locations = data.locations || []
         const rooms = data.rooms || []
         const fleets = data.fleets || []
-        
-        
+        const areas = data.areas || []
+
+
         setFilterOptions({
           applicationNames: data.applicationNames || [],
           windowsApplicationNames: data.windowsApplicationNames,
@@ -796,6 +806,7 @@ function ApplicationsPageContent() {
           locations,
           rooms,
           fleets,
+          areas,
           devicesWithData: actualDeviceCount
         })
         
@@ -911,7 +922,8 @@ function ApplicationsPageContent() {
           catalogs: selectedCatalogs,
           locations: selectedLocations,
           rooms: selectedRooms,
-          fleets: selectedFleets
+          fleets: selectedFleets,
+          areas: selectedAreas
         })
         setLastAppliedFilters(currentFilters)
       } else {
@@ -1209,8 +1221,9 @@ function ApplicationsPageContent() {
         app.room?.toLowerCase().includes(room.toLowerCase())
       )
     const matchesFleets = selectedFleets.length === 0 || selectedFleets.includes(app.fleet || '')
-    
-    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets
+    const matchesAreas = selectedAreas.length === 0 || selectedAreas.includes((app.department || '') as string)
+
+    return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesAreas
   })
 
   // Filter applications for display (includes version filter for table)
@@ -1313,8 +1326,14 @@ function ApplicationsPageContent() {
   }
 
   const toggleFleet = (fleet: string) => {
-    setSelectedFleets(prev => 
+    setSelectedFleets(prev =>
       prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
     )
   }
 
@@ -1625,7 +1644,7 @@ function ApplicationsPageContent() {
                 )}
 
                 {/* Clear All Selections Button - Show when selections are active and NO report loaded */}
-                {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && 
+                {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0) && 
                  !loading && 
                  !reportType && (
                   <button
@@ -1986,9 +2005,9 @@ function ApplicationsPageContent() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Selections {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0) && (
+                    Selections {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0) && (
                       <span className="ml-2 text-blue-600 dark:text-blue-400">
-                        ({[selectedApplications, selectedUsages, selectedCatalogs, selectedLocations, selectedRooms, selectedFleets].reduce((sum, arr) => sum + arr.length, 0)} active)
+                        ({[selectedApplications, selectedUsages, selectedCatalogs, selectedLocations, selectedRooms, selectedFleets, selectedAreas].reduce((sum, arr) => sum + arr.length, 0)} active)
                       </span>
                     )}
                   </h3>
@@ -2096,6 +2115,30 @@ function ApplicationsPageContent() {
                     </div>
                   </div>
 
+                  {/* Area Filter - Only show if areas exist */}
+                  {filterOptions.areas.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
+                    </h3>
+                    <div className="flex flex-wrap gap-1">
+                      {filterOptions.areas.map(area => (
+                        <button
+                          key={area}
+                          onClick={() => toggleArea(area)}
+                          className={`px-2 py-1 text-xs rounded-full border ${
+                            selectedAreas.includes(area)
+                              ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
+                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                          }`}
+                        >
+                          {area}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  )}
+
                   {/* Fleet Filter - Only show if fleets exist */}
                   {filterOptions.fleets.length > 0 && (
                   <div>
@@ -2109,7 +2152,7 @@ function ApplicationsPageContent() {
                           onClick={() => toggleFleet(fleet)}
                           className={`px-2 py-1 text-xs rounded-full border ${
                             selectedFleets.includes(fleet)
-                              ? 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-600'
+                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                           }`}
                         >

@@ -27,6 +27,7 @@ interface FilterOptions {
   catalogs: string[]
   rooms: string[]
   fleets: string[]
+  areas: string[]
   platforms: string[]
   devicesWithData: number
 }
@@ -46,6 +47,8 @@ interface InstallRecord {
   catalog?: string
   room?: string
   fleet?: string
+  area?: string
+  department?: string
   platform?: string
   manifest?: string
   raw?: any
@@ -119,8 +122,9 @@ function InstallsPageContent() {
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedRooms, setSelectedRooms] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
-  
+
   // Track last applied filters to detect changes for smart button text
   const [lastAppliedFilters, setLastAppliedFilters] = useState<{
     installs: string[]
@@ -128,9 +132,10 @@ function InstallsPageContent() {
     catalogs: string[]
     rooms: string[]
     fleets: string[]
+    areas: string[]
     platforms: string[]
-  }>({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], platforms: [] })
-  
+  }>({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
+
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
     managedInstalls: [],
     otherInstalls: [],
@@ -140,6 +145,7 @@ function InstallsPageContent() {
     catalogs: [],
     rooms: [],
     fleets: [],
+    areas: [],
     platforms: [],
     devicesWithData: 0
   })
@@ -178,10 +184,18 @@ function InstallsPageContent() {
   }
 
   const toggleFleet = (fleet: string) => {
-    setSelectedFleets(prev => 
-      prev.includes(fleet) 
+    setSelectedFleets(prev =>
+      prev.includes(fleet)
         ? prev.filter(f => f !== fleet)
         : [...prev, fleet]
+    )
+  }
+
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(area)
+        ? prev.filter(a => a !== area)
+        : [...prev, area]
     )
   }
 
@@ -199,6 +213,7 @@ function InstallsPageContent() {
     setSelectedCatalogs([])
     setSelectedRooms([])
     setSelectedFleets([])
+    setSelectedAreas([])
     setSelectedPlatforms([])
     setSearchQuery('')
     setItemsStatusFilter('all')
@@ -367,6 +382,7 @@ function InstallsPageContent() {
       selectedCatalogs.forEach(catalog => params.append('catalogs', catalog))
       selectedRooms.forEach(room => params.append('rooms', room))
       selectedFleets.forEach(fleet => params.append('fleets', fleet))
+      selectedAreas.forEach(area => params.append('areas', area))
       selectedPlatforms.forEach(platform => params.append('platforms', platform))
 
       const response = await fetch(`/api/devices/installs?${params}`, {
@@ -416,6 +432,7 @@ function InstallsPageContent() {
         catalogs: [...selectedCatalogs],
         rooms: [...selectedRooms],
         fleets: [...selectedFleets],
+        areas: [...selectedAreas],
         platforms: [...selectedPlatforms]
       })
     } catch (error) {
@@ -448,8 +465,9 @@ function InstallsPageContent() {
            !arraysEqual(selectedCatalogs, lastAppliedFilters.catalogs) ||
            !arraysEqual(selectedRooms, lastAppliedFilters.rooms) ||
            !arraysEqual(selectedFleets, lastAppliedFilters.fleets) ||
+           !arraysEqual(selectedAreas, lastAppliedFilters.areas) ||
            !arraysEqual(selectedPlatforms, lastAppliedFilters.platforms)
-  }, [selectedInstalls, selectedUsages, selectedCatalogs, selectedRooms, selectedFleets, selectedPlatforms, lastAppliedFilters, installs.length])
+  }, [selectedInstalls, selectedUsages, selectedCatalogs, selectedRooms, selectedFleets, selectedAreas, selectedPlatforms, lastAppliedFilters, installs.length])
   
   // Helper function to classify item status
   const classifyItemStatus = (item: any): 'installed' | 'pending' | 'error' | 'warning' | 'removed' => {
@@ -583,7 +601,7 @@ function InstallsPageContent() {
     setSelectedCimianVersion('')
     setSortColumn('deviceName')
     setSortDirection('asc')
-    setLastAppliedFilters({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], platforms: [] })
+    setLastAppliedFilters({ installs: [], usages: [], catalogs: [], rooms: [], fleets: [], areas: [], platforms: [] })
     setSearchQuery('')
     setItemsStatusFilter('all')
     setDeviceStatusFilter('all')
@@ -594,6 +612,7 @@ function InstallsPageContent() {
     setSelectedCatalogs([])
     setSelectedRooms([])
     setSelectedFleets([])
+    setSelectedAreas([])
     setSelectedPlatforms([])
     // Go to Generate Report view with filters expanded
     setIsGeneratingReport(true)
@@ -682,6 +701,12 @@ function InstallsPageContent() {
         return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
       })
     }
+    if (selectedAreas.length > 0) {
+      filtered = filtered.filter(device => {
+        const area = (device.area || device.department || '').toLowerCase()
+        return selectedAreas.some(a => area.includes(a.toLowerCase()))
+      })
+    }
     if (selectedPlatforms.length > 0) {
       filtered = filtered.filter(device => {
         const platform = device.platform?.toLowerCase() || ''
@@ -727,7 +752,7 @@ function InstallsPageContent() {
     })
     
     return filtered
-  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
+  }, [configReportData, deviceStatusFilter, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, searchQuery, sortColumn, sortDirection])
   
   // Filter installs based on search query AND inventory filters AND device status AND install status
   const filteredInstalls = useMemo(() => {
@@ -808,8 +833,14 @@ function InstallsPageContent() {
     
     // Apply Fleet filter
     if (selectedFleets.length > 0) {
-      filtered = filtered.filter(install => 
+      filtered = filtered.filter(install =>
         install.fleet && selectedFleets.includes(install.fleet)
+      )
+    }
+    // Apply Area filter
+    if (selectedAreas.length > 0) {
+      filtered = filtered.filter(install =>
+        (install.area || install.department) && selectedAreas.includes((install.area || install.department) as string)
       )
     }
     
@@ -854,7 +885,7 @@ function InstallsPageContent() {
     })
 
     return sorted
-  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection])
+  }, [installs, searchQuery, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms, deviceStatusFilter, installStatusFilter, sortColumn, sortDirection])
 
   useEffect(() => {
     fetchFilterOptions()
@@ -960,6 +991,12 @@ function InstallsPageContent() {
           return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
         })
       }
+      if (selectedAreas.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const area = (device.area || device.department || '').toLowerCase()
+          return selectedAreas.some(a => area.includes(a.toLowerCase()))
+        })
+      }
       if (selectedPlatforms.length > 0) {
         dataToCount = dataToCount.filter(device => {
           const platform = device.platform?.toLowerCase() || ''
@@ -1042,8 +1079,13 @@ function InstallsPageContent() {
         )
       }
       if (selectedFleets.length > 0) {
-        installsToCount = installsToCount.filter(install => 
+        installsToCount = installsToCount.filter(install =>
           install.fleet && selectedFleets.includes(install.fleet)
+        )
+      }
+      if (selectedAreas.length > 0) {
+        installsToCount = installsToCount.filter(install =>
+          (install.area || install.department) && selectedAreas.includes((install.area || install.department) as string)
         )
       }
       if (selectedPlatforms.length > 0) {
@@ -1142,7 +1184,7 @@ function InstallsPageContent() {
       })
     }
     return counts
-  }, [installs, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter, isConfigReport, configReportData, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+  }, [installs, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, itemsStatusFilter, isConfigReport, configReportData, installStatusFilter, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
 
   // Calculate install status counts (Installed/Pending/Warnings/Errors/Removed)
   // Counts should reflect data with OTHER filters applied (not installStatusFilter itself)
@@ -1207,6 +1249,12 @@ function InstallsPageContent() {
         dataToCount = dataToCount.filter(device => {
           const fleet = device.fleet?.toLowerCase() || ''
           return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
+        })
+      }
+      if (selectedAreas.length > 0) {
+        dataToCount = dataToCount.filter(device => {
+          const area = (device.area || device.department || '').toLowerCase()
+          return selectedAreas.some(a => area.includes(a.toLowerCase()))
         })
       }
       if (selectedPlatforms.length > 0) {
@@ -1274,8 +1322,13 @@ function InstallsPageContent() {
         )
       }
       if (selectedFleets.length > 0) {
-        installsToCount = installsToCount.filter(install => 
+        installsToCount = installsToCount.filter(install =>
           install.fleet && selectedFleets.includes(install.fleet)
+        )
+      }
+      if (selectedAreas.length > 0) {
+        installsToCount = installsToCount.filter(install =>
+          (install.area || install.department) && selectedAreas.includes((install.area || install.department) as string)
         )
       }
       if (selectedPlatforms.length > 0) {
@@ -1306,33 +1359,37 @@ function InstallsPageContent() {
       })
     }
     return counts
-  }, [installs, configReportData, isConfigReport, deviceStatusFilter, searchQuery, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+  }, [installs, configReportData, isConfigReport, deviceStatusFilter, searchQuery, selectedManifest, selectedSoftwareRepo, selectedMunkiVersion, selectedCimianVersion, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
 
   // Compute available filter options from the current report data (installs array)
   // Only show filter values that actually exist in the report
   const reportFilterOptions = useMemo(() => {
     if (installs.length === 0) {
-      return { usages: [], catalogs: [], fleets: [], platforms: [], rooms: [] }
+      return { usages: [], catalogs: [], fleets: [], areas: [], platforms: [], rooms: [] }
     }
-    
+
     const usages = new Set<string>()
     const catalogs = new Set<string>()
     const fleets = new Set<string>()
+    const areas = new Set<string>()
     const platforms = new Set<string>()
     const rooms = new Set<string>()
-    
+
     installs.forEach(install => {
       if (install.usage) usages.add(install.usage)
       if (install.catalog) catalogs.add(install.catalog)
       if (install.fleet) fleets.add(install.fleet)
+      const a = install.area || install.department
+      if (a) areas.add(a)
       if (install.platform) platforms.add(install.platform)
       if (install.room) rooms.add(install.room)
     })
-    
+
     return {
       usages: Array.from(usages).sort(),
       catalogs: Array.from(catalogs).sort(),
       fleets: Array.from(fleets).sort(),
+      areas: Array.from(areas).sort(),
       platforms: Array.from(platforms).sort(),
       rooms: Array.from(rooms).sort()
     }
@@ -1395,6 +1452,12 @@ function InstallsPageContent() {
       filtered = filtered.filter((device: any) => {
         const fleet = device.modules?.inventory?.fleet?.toLowerCase() || ''
         return selectedFleets.some(f => fleet.toLowerCase().includes(f.toLowerCase()))
+      })
+    }
+    if (selectedAreas.length > 0) {
+      filtered = filtered.filter((device: any) => {
+        const area = (device.modules?.inventory?.area || device.modules?.inventory?.department || '').toLowerCase()
+        return selectedAreas.some(a => area.includes(a.toLowerCase()))
       })
     }
     if (selectedPlatforms.length > 0) {
@@ -1480,7 +1543,7 @@ function InstallsPageContent() {
     }
     
     return filtered
-  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedPlatforms, selectedRooms])
+  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
 
   // Aggregate items with errors across all devices
   const itemsWithErrors = useMemo(() => {
@@ -3160,9 +3223,9 @@ function InstallsPageContent() {
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     Filters
                   </span>
-                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0) && (
+                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0) && (
                     <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {selectedInstalls.length + selectedUsages.length + selectedCatalogs.length + selectedRooms.length + selectedFleets.length + selectedPlatforms.length} active
+                      {selectedInstalls.length + selectedUsages.length + selectedCatalogs.length + selectedRooms.length + selectedFleets.length + selectedAreas.length + selectedPlatforms.length} active
                     </span>
                   )}
                 </div>
@@ -3294,6 +3357,30 @@ function InstallsPageContent() {
                   </div>
                   )}
 
+                  {/* Area Filter - Only show if data exists */}
+                  {activeFilters.areas && activeFilters.areas.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
+                    </h3>
+                    <div className="flex flex-wrap gap-1">
+                      {activeFilters.areas.map((area: string) => (
+                        <button
+                          key={area}
+                          onClick={() => toggleArea(area)}
+                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
+                            selectedAreas.includes(area)
+                              ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
+                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                          }`}
+                        >
+                          {area}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  )}
+
                   {/* Fleet Filter - Only show if data exists */}
                   {activeFilters.fleets && activeFilters.fleets.length > 0 && (
                   <div>
@@ -3307,7 +3394,7 @@ function InstallsPageContent() {
                           onClick={() => toggleFleet(fleet)}
                           className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                             selectedFleets.includes(fleet)
-                              ? 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900 dark:text-orange-200 dark:border-orange-600'
+                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-600'
                               : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
                           }`}
                         >
@@ -3545,7 +3632,7 @@ function InstallsPageContent() {
                   )}
                 </div>
                 {/* Clear Filter(s) Button - Show when any filter is active */}
-                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
+                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
                   <button
                     onClick={() => {
                       setItemsStatusFilter('all')
