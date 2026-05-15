@@ -197,10 +197,6 @@ function HardwarePageContent() {
            selectedAreas.length > 0 || selectedFleets.length > 0
   }
 
-  // Count for Selections accordion (inventory filters only)
-  const totalSelectionsFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length +
-    selectedLocations.length + selectedAreas.length + selectedFleets.length
-
   // Count for all active filters (for Clear button)
   const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length +
     selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length +
