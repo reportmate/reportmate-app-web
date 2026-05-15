@@ -11,6 +11,7 @@ import { Copy } from "lucide-react"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
 import { useDeviceData } from "../../../src/hooks/useDeviceData"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -92,12 +93,15 @@ function HardwarePageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   
   // Main devices (with inventory) from the devices API
   const { devices: allDevices } = useDeviceData()
 
   // Filter options computed from inventory data
-  const filterOptions = {
+  const filterOptions: FilterOptions = {
+    statuses: ['Active', 'Stale', 'Missing'],
     usages: Array.from(new Set(
       allDevices.map((d: any) => d.modules?.inventory?.usage).filter(Boolean)
     )).sort() as string[],
@@ -107,12 +111,18 @@ function HardwarePageContent() {
     locations: Array.from(new Set(
       allDevices.map((d: any) => d.modules?.inventory?.location).filter(Boolean)
     )).sort() as string[],
-    locationCounts: allDevices.reduce((acc: Record<string, number>, d: any) => {
-      const loc = d.modules?.inventory?.location
-      if (loc) acc[loc] = (acc[loc] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
+    areas: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.area || d.modules?.inventory?.department).filter(Boolean)
+    )).sort() as string[],
+    fleets: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.fleet).filter(Boolean)
+    )).sort() as string[],
   }
+  const locationCounts = allDevices.reduce((acc: Record<string, number>, d: any) => {
+    const loc = d.modules?.inventory?.location
+    if (loc) acc[loc] = (acc[loc] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
   
   const handleSort = (column: typeof sortColumn) => {
     if (sortColumn === column) {
@@ -172,22 +182,27 @@ function HardwarePageContent() {
   const toggleLocation = (location: string) => {
     setSelectedLocations(prev => prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location])
   }
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area])
+  }
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev => prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet])
+  }
 
   const _hasActiveFilters = () => {
     return selectedModels.length > 0 || selectedMemoryRanges.length > 0 || selectedStorageRanges.length > 0 ||
            selectedArchitectures.length > 0 || selectedDeviceTypes.length > 0 || selectedProcessors.length > 0 ||
            selectedGraphics.length > 0 || selectedPlatforms.length > 0 || selectedStatuses.length > 0 ||
-           selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0
+           selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 ||
+           selectedAreas.length > 0 || selectedFleets.length > 0
   }
 
-  // Count for Selections accordion (inventory filters only)
-  const totalSelectionsFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length + selectedLocations.length
-  
   // Count for all active filters (for Clear button)
-  const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length + 
-    selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length + 
+  const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length +
+    selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length +
     selectedGraphics.length + selectedPlatforms.length + selectedChipConfigs.length + selectedStatuses.length +
-    selectedUsages.length + selectedCatalogs.length + selectedLocations.length
+    selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
+    selectedAreas.length + selectedFleets.length
 
   const clearAllFilters = () => {
     setSelectedModels([])
@@ -203,6 +218,8 @@ function HardwarePageContent() {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedAreas([])
+    setSelectedFleets([])
     setSearchQuery('')
   }
   
@@ -641,6 +658,8 @@ function HardwarePageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes((inventory as any).area || (inventory as any).department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes((inventory as any).fleet || '')) return false
 
     // Hardware-specific filters (from widget charts)
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(getDevicePlatform(h))) return false
@@ -783,65 +802,28 @@ function HardwarePageContent() {
             </div>
           </div>
 
-          {/* Selections Accordion */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button onClick={() => setFiltersExpanded(!filtersExpanded)} className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {totalSelectionsFilters > 0 && <span className="px-2 py-0.5 text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-full">{totalSelectionsFilters} active</span>}
-              </div>
-              <svg className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-            </button>
-            <CollapsibleSection expanded={effectiveFiltersExpanded}>
-              <div className="px-6 pb-4 space-y-4">
-                {/* Status Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Status</div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Active', 'Stale', 'Missing'].map(status => (
-                      <button key={status} onClick={() => toggleStatus(status)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedStatuses.includes(status) ? (status === 'Active' ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' : status === 'Stale' ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700' : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700') : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{status}</button>
-                    ))}
-                  </div>
-                </div>
-                {/* Usage Filter */}
-                {filterOptions.usages.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.usages.map(usage => (
-                        <button key={usage} onClick={() => toggleUsage(usage)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedUsages.includes(usage) ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{usage}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Catalog Filter */}
-                {filterOptions.catalogs.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.catalogs.map(catalog => (
-                        <button key={catalog} onClick={() => toggleCatalog(catalog)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedCatalogs.includes(catalog) ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{catalog}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                {/* Location Filter */}
-                {filterOptions.locations.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-                    <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                      {(() => { const maxCount = Math.max(...Object.values(filterOptions.locationCounts).map(Number), 1); return filterOptions.locations.map(location => {
-                        const count = filterOptions.locationCounts[location] || 0
-                        const scale = count / maxCount
-                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                        return <button key={location} onClick={() => toggleLocation(location)} title={`${location} (${count} devices)`} className={`${sizeClass} rounded-full border transition-colors ${selectedLocations.includes(location) ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{location}</button>
-                      })})()}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          {/* Selections accordion (shared component) */}
+          <DeviceFilters
+            filterOptions={filterOptions}
+            selectedStatuses={selectedStatuses}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedUsages={selectedUsages}
+            onStatusToggle={toggleStatus}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
+            locationCounts={locationCounts}
+          />
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">

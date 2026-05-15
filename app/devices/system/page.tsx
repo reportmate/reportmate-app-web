@@ -16,6 +16,7 @@ import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface SystemDevice {
   id: string
@@ -251,6 +252,8 @@ function SystemPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const [selectedEditions, setSelectedEditions] = useState<string[]>([])
   const [selectedActivationStatus, setSelectedActivationStatus] = useState<string[]>([])
   const [selectedLicenseType, setSelectedLicenseType] = useState<string[]>([])
@@ -296,11 +299,23 @@ function SystemPageContent() {
   }
   
   const toggleLocation = (location: string) => {
-    setSelectedLocations(prev => 
+    setSelectedLocations(prev =>
       prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
     )
   }
-  
+
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+    )
+  }
+
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev =>
+      prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+
   const toggleEdition = (edition: string) => {
     setSelectedEditions(prev => 
       prev.includes(edition) ? prev.filter(e => e !== edition) : [...prev, edition]
@@ -361,6 +376,8 @@ function SystemPageContent() {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedAreas([])
+    setSelectedFleets([])
     setSelectedEditions([])
     setSelectedActivationStatus([])
     setSelectedLicenseType([])
@@ -376,7 +393,8 @@ function SystemPageContent() {
     if (osVersionFilter) router.push('/devices/system')
   }
   
-  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
+  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
+    selectedAreas.length + selectedFleets.length +
     selectedEditions.length + selectedActivationStatus.length + selectedLicenseType.length +
     selectedArchitectures.length + selectedTimeZones.length + selectedUptimeBuckets.length + selectedLicenseSources.length +
     selectedPendingBuckets.length +
@@ -463,6 +481,12 @@ function SystemPageContent() {
     locations: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
     )).sort() as string[],
+    areas: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.area || d.modules?.inventory?.department).filter(Boolean)
+    )).sort() as string[],
+    fleets: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.fleet).filter(Boolean)
+    )).sort() as string[],
     editions: Array.from(new Set(
       systems.map(s => s.edition).filter(Boolean)
     )).sort() as string[],
@@ -477,13 +501,22 @@ function SystemPageContent() {
     )).sort() as string[],
   }
 
+  // FilterOptions slice fed to the shared DeviceFilters component (inventory dimensions only)
+  const selectionFilterOptions: FilterOptions = {
+    statuses: [],
+    usages: filterOptions.usages,
+    catalogs: filterOptions.catalogs,
+    areas: filterOptions.areas,
+    locations: filterOptions.locations,
+    fleets: filterOptions.fleets,
+  }
+
   // Compute location counts for proportional pill sizing
   const locationCounts = devices.reduce((acc: Record<string, number>, d: any) => {
     const loc = d.modules?.inventory?.location
     if (loc) acc[loc] = (acc[loc] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
 
   // Filter systems
   const filteredSystems = systems.filter(s => {
@@ -605,6 +638,8 @@ function SystemPageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes((inventory as any)?.area || (inventory as any)?.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes((inventory as any)?.fleet || '')) return false
     
     return true
   })
@@ -850,274 +885,28 @@ function SystemPageContent() {
             </div>
           </div>
 
-          {/* Selections Accordion Section - First */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setFiltersExpanded(!effectiveFiltersExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {totalActiveFilters > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
-                    {totalActiveFilters} active
-                  </span>
-                )}
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            
-            <CollapsibleSection expanded={effectiveFiltersExpanded}>
-              <div className="px-6 pb-4 space-y-4">
-                {/* OS Version Filter */}
-                {osVersionFilter && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OS Version</div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => router.push('/devices/system')}
-                        className="px-3 py-1 text-xs font-medium rounded-full border transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700 flex items-center gap-1 group"
-                      >
-                        {decodeURIComponent(osVersionFilter)}
-                        <svg className="w-3 h-3 group-hover:text-blue-600 dark:group-hover:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Edition Filter */}
-                {filterOptions.editions.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Edition</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.editions.map(edition => (
-                        <button
-                          key={edition}
-                          onClick={() => toggleEdition(edition)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedEditions.includes(edition)
-                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {edition}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Architecture Filter */}
-                {filterOptions.architectures.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Architecture</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.architectures.map(arch => (
-                        <button
-                          key={arch}
-                          onClick={() => toggleArchitecture(arch)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedArchitectures.includes(arch)
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {arch}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Pending Updates Filter */}
-                {systems.some(s => s.pendingUpdatesCount != null) && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Pending Updates</div>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { key: 'up-to-date', label: 'Up to date' },
-                        { key: '1-5', label: '1-5 pending' },
-                        { key: '6-10', label: '6-10 pending' },
-                        { key: '10+', label: '10+ pending' },
-                      ].map(bucket => (
-                        <button
-                          key={bucket.key}
-                          onClick={() => togglePendingBucket(bucket.key)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedPendingBuckets.includes(bucket.key)
-                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {bucket.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* License Source Filter */}
-                {filterOptions.licenseSources.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">License Source</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.licenseSources.map(src => (
-                        <button
-                          key={src}
-                          onClick={() => toggleLicenseSource(src)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedLicenseSources.includes(src)
-                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {src}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Activation Status Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Activation Status</div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Activated', 'Not Activated'].map(status => (
-                      <button
-                        key={status}
-                        onClick={() => toggleActivationStatus(status)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          selectedActivationStatus.includes(status)
-                            ? status === 'Activated' 
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* License Type Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OEM License</div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Has OEM License', 'No OEM License'].map(type => (
-                      <button
-                        key={type}
-                        onClick={() => toggleLicenseType(type)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          selectedLicenseType.includes(type)
-                            ? type === 'Has OEM License'
-                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700'
-                              : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                        title={type === 'Has OEM License' 
-                          ? 'Has usable firmware-embedded (UEFI/BIOS) Pro/Enterprise license' 
-                          : 'No usable OEM license - may lose activation when migrating from AD to Entra ID'}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* Usage Filter */}
-                {filterOptions.usages.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.usages.map(usage => (
-                        <button
-                          key={usage}
-                          onClick={() => toggleUsage(usage)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedUsages.includes(usage)
-                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {usage}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Catalog Filter */}
-                {filterOptions.catalogs.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.catalogs.map(catalog => (
-                        <button
-                          key={catalog}
-                          onClick={() => toggleCatalog(catalog)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedCatalogs.includes(catalog)
-                              ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {catalog}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Location Filter */}
-                {filterOptions.locations.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.locations.map(location => {
-                        const count = locationCounts[location] || 0
-                        const scale = count / maxLocationCount
-                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                        return (
-                        <button
-                          key={location}
-                          onClick={() => toggleLocation(location)}
-                          title={`${location} (${count} devices)`}
-                          className={`${sizeClass} rounded-full border transition-colors ${
-                            selectedLocations.includes(location)
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {location}
-                        </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Clear All Selections */}
-                {totalActiveFilters > 0 && (
-                  <div className="pt-2">
-                    <button
-                      onClick={clearAllFilters}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                    >
-                      Clear all selections
-                    </button>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          {/* Selections accordion (shared component) */}
+          <DeviceFilters
+            filterOptions={selectionFilterOptions}
+            selectedStatuses={[]}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedUsages={selectedUsages}
+            onStatusToggle={() => { /* no statuses on /system */ }}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
+            locationCounts={locationCounts}
+          />
 
           {/* Widgets Accordion - OS Version Charts */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>

@@ -11,6 +11,7 @@ import { usePlatformFilterSafe, getDevicePlatform } from "../../../src/providers
 import { Copy } from "lucide-react"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface NetworkDevice {
   id: string
@@ -52,6 +53,8 @@ function NetworkPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const [speedFilter, setSpeedFilter] = useState<'excellent' | 'good' | 'fair' | 'poor' | 'nodata' | null>(null)
   
   const handleSort = (column: typeof sortColumn) => {
@@ -77,21 +80,32 @@ function NetworkPageContent() {
   }
   
   const toggleLocation = (location: string) => {
-    setSelectedLocations(prev => 
+    setSelectedLocations(prev =>
       prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
     )
   }
-  
+
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+    )
+  }
+
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev =>
+      prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+
   const _clearAllFilters = () => {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedAreas([])
+    setSelectedFleets([])
     setConnectionFilter('all')
     setSearchQuery('')
   }
-  
-  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
-    (connectionFilter !== 'all' ? 1 : 0)
 
   // Use useDeviceData hook to get devices with inventory data
   const { devices } = useDeviceData({
@@ -171,7 +185,8 @@ function NetworkPageContent() {
   const vpnDeviceCount = platformFilteredDevices.filter(n => n.networkInfo.vpnActive).length
 
   // Extract unique filter options from devices (inventory data)
-  const filterOptions = {
+  const filterOptions: FilterOptions = {
+    statuses: [],
     usages: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.usage).filter(Boolean)
     )).sort() as string[],
@@ -180,7 +195,13 @@ function NetworkPageContent() {
     )).sort() as string[],
     locations: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
-    )).sort() as string[]
+    )).sort() as string[],
+    areas: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.area || d.modules?.inventory?.department).filter(Boolean)
+    )).sort() as string[],
+    fleets: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.fleet).filter(Boolean)
+    )).sort() as string[],
   }
 
   // Compute location counts for proportional pill sizing
@@ -189,7 +210,6 @@ function NetworkPageContent() {
     if (loc) acc[loc] = (acc[loc] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
 
   // Calculate wireless statistics for widgets (uses platform-filtered data)
   const wirelessStats = {
@@ -306,6 +326,8 @@ function NetworkPageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(inventory?.area || inventory?.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(inventory?.fleet || '')) return false
 
     // Network quality widget filter
     if (speedFilter) {
@@ -656,106 +678,28 @@ function NetworkPageContent() {
             </div>
           </div>
 
-          {/* Filters Accordion Section */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setFiltersExpanded(!filtersExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {totalActiveFilters > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
-                    {totalActiveFilters} active
-                  </span>
-                )}
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : 'rotate-180'}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            
-            <CollapsibleSection expanded={effectiveFiltersExpanded}>
-              <div className="px-6 pb-4 space-y-4">
-                {/* Usage Filter */}
-                {filterOptions.usages.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.usages.map(usage => (
-                        <button
-                          key={usage}
-                          onClick={() => toggleUsage(usage)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedUsages.includes(usage)
-                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {usage}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Catalog Filter */}
-                {filterOptions.catalogs.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.catalogs.map(catalog => (
-                        <button
-                          key={catalog}
-                          onClick={() => toggleCatalog(catalog)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedCatalogs.includes(catalog)
-                              ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {catalog}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Location Filter */}
-                {filterOptions.locations.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.locations.map(location => {
-                        const count = locationCounts[location] || 0
-                        const scale = count / maxLocationCount
-                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                        return (
-                        <button
-                          key={location}
-                          onClick={() => toggleLocation(location)}
-                          title={`${location} (${count} devices)`}
-                          className={`${sizeClass} rounded-full border transition-colors ${
-                            selectedLocations.includes(location)
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {location}
-                        </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          {/* Selections accordion (shared component) */}
+          <DeviceFilters
+            filterOptions={filterOptions}
+            selectedStatuses={[]}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedUsages={selectedUsages}
+            onStatusToggle={() => { /* no statuses on /network */ }}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onUsageToggle={toggleUsage}
+            onClearAll={_clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
+            locationCounts={locationCounts}
+          />
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">

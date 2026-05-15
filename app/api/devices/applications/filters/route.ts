@@ -188,6 +188,7 @@ export async function GET(request: Request) {
       catalogs: data.catalogs || [],
       locations: data.locations || [],
       rooms: data.rooms || [],
+      areas: data.areas || [],
       fleets: data.fleets || [],
       devicesWithData: data.devicesWithData || 0
     }
