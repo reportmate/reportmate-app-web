@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useMemo, useState } from "react"
+import React, { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../../../../src/lib/time"
@@ -48,7 +48,7 @@ interface ApiResponse {
   lastUpdated: string
 }
 
-type SortColumn = 'deviceName' | 'location' | 'totalHours' | 'launchCount' | 'userCount' | 'lastUsed'
+type SortColumn = 'deviceName' | 'location' | 'usage' | 'catalog' | 'area' | 'totalHours' | 'launchCount' | 'userCount' | 'lastUsed'
 
 function formatDuration(seconds: number): string {
   if (!seconds || seconds <= 0) return '0m'
@@ -78,6 +78,7 @@ export default function ApplicationUsageByDevicePage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc')
   const [linkCopied, setLinkCopied] = useState(false)
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [metric, setMetric] = useState<'hours' | 'launches'>('launches')
 
   useEffect(() => {
     let cancelled = false
@@ -117,15 +118,24 @@ export default function ApplicationUsageByDevicePage() {
   // already have so this stays a single-request page.
   const aggregates = useMemo(() => {
     const devices = data?.devices ?? []
-    const grandTotalHours = devices.reduce((s, d) => s + d.totalHours, 0) || 1
+    const valueOf = (d: DeviceRow) => metric === 'hours' ? d.totalHours : d.launchCount
+    const grandTotal = devices.reduce((s, d) => s + valueOf(d), 0) || 1
+
+    const isUnknown = (k: string | null | undefined) => {
+      if (!k) return true
+      const v = k.trim().toLowerCase()
+      return v === '' || v === 'unknown' || v === 'null' || v === 'n/a'
+    }
 
     const sumBy = (keyFn: (d: DeviceRow) => string | null): Array<[string, number]> => {
       const m = new Map<string, number>()
       for (const d of devices) {
-        const k = keyFn(d) || 'Unknown'
-        m.set(k, (m.get(k) ?? 0) + d.totalHours)
+        const raw = keyFn(d)
+        if (isUnknown(raw)) continue
+        const k = raw as string
+        m.set(k, (m.get(k) ?? 0) + valueOf(d))
       }
-      return [...m.entries()].sort((a, b) => b[1] - a[1])
+      return [...m.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
     }
 
     const byLocation = sumBy(d => d.location).slice(0, 10)
@@ -134,21 +144,34 @@ export default function ApplicationUsageByDevicePage() {
     const byArea = sumBy(d => d.department).slice(0, 10)
     const byFleet = sumBy(d => d.fleet)
 
-    // Hours distribution: histogram bins
-    const bins: Array<{ label: string; count: number; min: number; max: number }> = [
-      { label: '0–10h', count: 0, min: 0, max: 10 },
-      { label: '10–50h', count: 0, min: 10, max: 50 },
-      { label: '50–100h', count: 0, min: 50, max: 100 },
-      { label: '100–250h', count: 0, min: 100, max: 250 },
-      { label: '250h+', count: 0, min: 250, max: Infinity },
-    ]
+    // Distribution: histogram bins (units depend on metric)
+    const binDefs = metric === 'hours'
+      ? [
+          { label: '0–10h', min: 0, max: 10 },
+          { label: '10–50h', min: 10, max: 50 },
+          { label: '50–100h', min: 50, max: 100 },
+          { label: '100–250h', min: 100, max: 250 },
+          { label: '250h+', min: 250, max: Infinity },
+        ]
+      : [
+          { label: '0–10', min: 0, max: 10 },
+          { label: '10–50', min: 10, max: 50 },
+          { label: '50–250', min: 50, max: 250 },
+          { label: '250–1000', min: 250, max: 1000 },
+          { label: '1000+', min: 1000, max: Infinity },
+        ]
+    const bins = binDefs.map(b => ({ ...b, count: 0 }))
     for (const d of devices) {
-      const bin = bins.find(b => d.totalHours >= b.min && d.totalHours < b.max)
+      const v = valueOf(d)
+      const bin = bins.find(b => v >= b.min && v < b.max)
       if (bin) bin.count += 1
     }
 
-    return { grandTotalHours, byLocation, byCatalog, byUsage, byArea, byFleet, bins }
-  }, [data])
+    return { grandTotal, byLocation, byCatalog, byUsage, byArea, byFleet, bins }
+  }, [data, metric])
+
+  const fmtVal = (v: number) => metric === 'hours' ? `${v.toFixed(0)}h` : v.toLocaleString()
+  const metricLabel = metric === 'hours' ? 'Hours' : 'Launches'
 
   const palette = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#ef4444']
 
@@ -163,6 +186,15 @@ export default function ApplicationUsageByDevicePage() {
           break
         case 'location':
           cmp = (a.location || '').localeCompare(b.location || '')
+          break
+        case 'usage':
+          cmp = (a.usage || '').localeCompare(b.usage || '')
+          break
+        case 'catalog':
+          cmp = (a.catalog || '').localeCompare(b.catalog || '')
+          break
+        case 'area':
+          cmp = (a.department || '').localeCompare(b.department || '')
           break
         case 'totalHours':
           cmp = a.totalHours - b.totalHours
@@ -196,13 +228,14 @@ export default function ApplicationUsageByDevicePage() {
 
   const exportCSV = () => {
     if (!sortedDevices.length) return
-    const header = ['Device', 'Serial', 'Location', 'Catalog', 'Usage', 'Asset Tag', 'Hours', 'Launches', 'Users', 'Variants', 'First Used', 'Last Used']
+    const header = ['Usage', 'Catalog', 'Area', 'Location', 'Device', 'Serial', 'Asset Tag', 'Hours', 'Launches', 'Users', 'Variants', 'First Used', 'Last Used']
     const rows = sortedDevices.map(d => [
+      d.usage || '',
+      d.catalog || '',
+      d.department || '',
+      d.location || '',
       d.deviceName,
       d.serialNumber,
-      d.location || '',
-      d.catalog || '',
-      d.usage || '',
       d.assetTag || '',
       d.totalHours.toFixed(2),
       d.launchCount,
@@ -305,212 +338,224 @@ export default function ApplicationUsageByDevicePage() {
                 className="w-full flex items-center justify-between px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-900/50 transition-colors"
               >
                 <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    Aggregate stats across {data.summary.deviceCount} {data.summary.deviceCount === 1 ? 'device' : 'devices'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={() => setMetric('launches')}
+                      className={`px-3 py-1 ${metric === 'launches' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      Launches
+                    </button>
+                    <button
+                      onClick={() => setMetric('hours')}
+                      className={`px-3 py-1 ${metric === 'hours' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                    >
+                      Hours
+                    </button>
+                  </div>
                   <svg
-                    className={`w-4 h-4 text-gray-500 transition-transform ${widgetsExpanded ? 'rotate-90' : ''}`}
+                    className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${widgetsExpanded ? 'rotate-90' : 'rotate-180'}`}
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Widgets</span>
-                  <span className="text-xs text-gray-500 dark:text-gray-400">
-                    Aggregate stats across {data.summary.deviceCount} {data.summary.deviceCount === 1 ? 'device' : 'devices'}
-                  </span>
                 </div>
-                <span className="text-xs text-gray-400">{widgetsExpanded ? 'Click to collapse' : 'Click to expand'}</span>
               </button>
               <CollapsibleSection expanded={widgetsExpanded}>
-                <div className="px-6 pb-5 grid grid-cols-1 md:grid-cols-2 gap-5">
-                  {/* Hours by Location (top 10) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Hours by Location <span className="text-xs font-normal text-gray-500">(top 10)</span>
-                    </h3>
-                    {aggregates.byLocation.length === 0 ? (
-                      <p className="text-xs text-gray-500">No location data.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {(() => {
-                          const max = aggregates.byLocation[0][1] || 1
-                          return aggregates.byLocation.map(([name, hours]) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-blue-500" style={{ width: `${(hours / max) * 100}%` }} />
-                              </div>
-                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                                {hours.toFixed(0)}h
-                              </div>
-                            </div>
-                          ))
-                        })()}
+                <div className="px-6 pb-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {/* Row 1: By Usage | By Catalog | Distribution */}
+
+                  {/* By Usage Type */}
+                  {aggregates.byUsage.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{metricLabel} by Usage Type</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {aggregates.byUsage.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / aggregates.grandTotal) * 100}%`,
+                              backgroundColor: palette[i % palette.length],
+                            }}
+                            title={`${name}: ${fmtVal(val)}`}
+                          />
+                        ))}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Hours by Catalog (stacked + legend) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Catalog</h3>
-                    {aggregates.byCatalog.length === 0 ? (
-                      <p className="text-xs text-gray-500">No catalog data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {aggregates.byCatalog.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / aggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: palette[i % palette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {aggregates.byUsage.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: palette[i % palette.length] }}
                             />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {aggregates.byCatalog.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: palette[i % palette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / aggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Hours by Usage Type */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Usage Type</h3>
-                    {aggregates.byUsage.length === 0 ? (
-                      <p className="text-xs text-gray-500">No usage-type data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {aggregates.byUsage.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / aggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: palette[i % palette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
-                            />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {aggregates.byUsage.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: palette[i % palette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / aggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Hours by Area (top 10) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Hours by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
-                    </h3>
-                    {aggregates.byArea.length === 0 ? (
-                      <p className="text-xs text-gray-500">No area data.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {(() => {
-                          const max = aggregates.byArea[0][1] || 1
-                          return aggregates.byArea.map(([name, hours]) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-emerald-500" style={{ width: `${(hours / max) * 100}%` }} />
-                              </div>
-                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                                {hours.toFixed(0)}h
-                              </div>
-                            </div>
-                          ))
-                        })()}
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtVal(val)} ({((val / aggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Hours by Fleet (stacked + legend) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Fleet</h3>
-                    {aggregates.byFleet.length === 0 ? (
-                      <p className="text-xs text-gray-500">No fleet data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {aggregates.byFleet.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / aggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: palette[i % palette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
+                  {/* By Catalog */}
+                  {aggregates.byCatalog.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{metricLabel} by Catalog</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {aggregates.byCatalog.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / aggregates.grandTotal) * 100}%`,
+                              backgroundColor: palette[i % palette.length],
+                            }}
+                            title={`${name}: ${fmtVal(val)}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {aggregates.byCatalog.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: palette[i % palette.length] }}
                             />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {aggregates.byFleet.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: palette[i % palette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / aggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtVal(val)} ({((val / aggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Hours Distribution (histogram of devices by usage bucket) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Device Hours Distribution
-                    </h3>
-                    {(() => {
-                      const max = Math.max(...aggregates.bins.map(b => b.count), 1)
-                      return (
-                        <div className="space-y-1.5">
-                          {aggregates.bins.map(b => (
-                            <div key={b.label} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 text-gray-700 dark:text-gray-300">{b.label}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
+                  {/* Device Distribution (histogram by metric bucket) */}
+                  {aggregates.bins.some(b => b.count > 0) && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        Device {metricLabel} Distribution
+                      </h3>
+                      {(() => {
+                        const max = Math.max(...aggregates.bins.map(b => b.count), 1)
+                        return (
+                          <div className="space-y-1.5">
+                            {aggregates.bins.map(b => (
+                              <div key={b.label} className="flex items-center gap-2 text-xs">
+                                <div className="w-20 text-gray-700 dark:text-gray-300">{b.label}</div>
+                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
+                                </div>
+                                <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
+                                </div>
                               </div>
-                              <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
-                                {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    })()}
-                  </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Row 2: By Fleet | By Area | By Location */}
+
+                  {/* By Fleet */}
+                  {aggregates.byFleet.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{metricLabel} by Fleet</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {aggregates.byFleet.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / aggregates.grandTotal) * 100}%`,
+                              backgroundColor: palette[i % palette.length],
+                            }}
+                            title={`${name}: ${fmtVal(val)}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {aggregates.byFleet.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: palette[i % palette.length] }}
+                            />
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtVal(val)} ({((val / aggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* By Area (top 10) */}
+                  {aggregates.byArea.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {metricLabel} by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                      </h3>
+                      {(() => {
+                        const max = aggregates.byArea[0][1] || 1
+                        return (
+                          <div className="grid grid-cols-[minmax(0,max-content)_1fr_auto] gap-x-2 gap-y-1.5 items-center text-xs">
+                            {aggregates.byArea.map(([name, val]) => (
+                              <React.Fragment key={name}>
+                                <div className="whitespace-nowrap text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                                <div className="bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: `${(val / max) * 100}%` }} />
+                                </div>
+                                <div className="text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {fmtVal(val)}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* By Location (top 10) */}
+                  {aggregates.byLocation.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {metricLabel} by Location <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                      </h3>
+                      {(() => {
+                        const max = aggregates.byLocation[0][1] || 1
+                        return (
+                          <div className="grid grid-cols-[minmax(0,max-content)_1fr_auto] gap-x-2 gap-y-1.5 items-center text-xs">
+                            {aggregates.byLocation.map(([name, val]) => (
+                              <React.Fragment key={name}>
+                                <div className="whitespace-nowrap text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                                <div className="bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-blue-500" style={{ width: `${(val / max) * 100}%` }} />
+                                </div>
+                                <div className="text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {fmtVal(val)}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
             </div>
@@ -536,9 +581,21 @@ export default function ApplicationUsageByDevicePage() {
                   <tr>
                     <th
                       className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
-                      onClick={() => toggleSort('deviceName')}
+                      onClick={() => toggleSort('usage')}
                     >
-                      Device{sortArrow('deviceName')}
+                      Usage{sortArrow('usage')}
+                    </th>
+                    <th
+                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => toggleSort('catalog')}
+                    >
+                      Catalog{sortArrow('catalog')}
+                    </th>
+                    <th
+                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => toggleSort('area')}
+                    >
+                      Area{sortArrow('area')}
                     </th>
                     <th
                       className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
@@ -546,11 +603,11 @@ export default function ApplicationUsageByDevicePage() {
                     >
                       Location{sortArrow('location')}
                     </th>
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Catalog
-                    </th>
-                    <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                      Usage
+                    <th
+                      className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
+                      onClick={() => toggleSort('deviceName')}
+                    >
+                      Device{sortArrow('deviceName')}
                     </th>
                     <th
                       className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none"
@@ -581,6 +638,18 @@ export default function ApplicationUsageByDevicePage() {
                 <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {sortedDevices.map((d) => (
                     <tr key={d.serialNumber} className="hover:bg-blue-50 dark:hover:bg-blue-900/10">
+                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
+                        {d.usage || '-'}
+                      </td>
+                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
+                        {d.catalog || '-'}
+                      </td>
+                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
+                        {d.department || '-'}
+                      </td>
+                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
+                        {d.location || '-'}
+                      </td>
                       <td className="px-4 lg:px-6 py-3">
                         <Link
                           href={`/device/${encodeURIComponent(d.serialNumber)}`}
@@ -594,15 +663,6 @@ export default function ApplicationUsageByDevicePage() {
                             {d.appVariantCount} variants
                           </div>
                         )}
-                      </td>
-                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
-                        {d.location || '-'}
-                      </td>
-                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
-                        {d.catalog || '-'}
-                      </td>
-                      <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
-                        {d.usage || '-'}
                       </td>
                       <td className="px-4 lg:px-6 py-3">
                         <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
