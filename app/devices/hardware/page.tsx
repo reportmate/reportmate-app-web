@@ -846,17 +846,6 @@ function HardwarePageContent() {
                     </div>
                   </div>
                 )}
-                {/* Area Filter */}
-                {filterOptions.areas.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.areas.map(area => (
-                        <button key={area} onClick={() => toggleArea(area)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedAreas.includes(area) ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{area}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
                 {/* Fleet Filter */}
                 {filterOptions.fleets.length > 0 && (
                   <div>
@@ -864,6 +853,17 @@ function HardwarePageContent() {
                     <div className="flex flex-wrap gap-2">
                       {filterOptions.fleets.map(fleet => (
                         <button key={fleet} onClick={() => toggleFleet(fleet)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedFleets.includes(fleet) ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{fleet}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Area Filter - Full width row above Location */}
+                {filterOptions.areas.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.areas.map(area => (
+                        <button key={area} onClick={() => toggleArea(area)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedAreas.includes(area) ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{area}</button>
                       ))}
                     </div>
                   </div>

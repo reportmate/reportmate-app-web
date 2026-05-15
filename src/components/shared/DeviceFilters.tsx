@@ -205,28 +205,29 @@ export default function DeviceFilters({
               </div>
             )}
 
-            {/* Area Filter - When available */}
-            {filterOptions.areas.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
-                <div className="flex flex-wrap gap-2">
-                  {filterOptions.areas.map(area => (
-                    <button
-                      key={area}
-                      onClick={() => onAreaToggle(area)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                        selectedAreas.includes(area)
-                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {area}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
+
+          {/* Area Filter - Full width row above Location */}
+          {filterOptions.areas.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.areas.map(area => (
+                  <button
+                    key={area}
+                    onClick={() => onAreaToggle(area)}
+                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                      selectedAreas.includes(area)
+                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
+                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                    }`}
+                  >
+                    {area}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Location Filter - Full width due to many options */}
           {filterOptions.locations.length > 0 && (
