@@ -434,8 +434,8 @@ export default function ApplicationUsageByDevicePage() {
                               <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
                                 <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
                               </div>
-                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                                {b.count} {b.count === 1 ? 'device' : 'devices'}
+                              <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
                               </div>
                             </div>
                           ))}
