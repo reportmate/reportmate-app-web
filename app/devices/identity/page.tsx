@@ -9,6 +9,7 @@ import { formatRelativeTime } from "../../../src/lib/time"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface IdentityDevice {
   id: string
@@ -53,6 +54,13 @@ interface IdentityDevice {
     avgSessionMinutes: number
     medianSessionMinutes: number
   } | null
+  // Inventory dimensions (for Selections accordion)
+  usage?: string | null
+  catalog?: string | null
+  location?: string | null
+  area?: string | null
+  department?: string | null
+  fleet?: string | null
 }
 
 function LoadingSkeleton() {
@@ -129,11 +137,26 @@ function IdentityPageContent() {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
   const [adminFilter, setAdminFilter] = useState('all')
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
   const [showUtilizationReport, setShowUtilizationReport] = useState(false)
   // Widget click filters
   const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
   const [authFilter, setAuthFilter] = useState<string | null>(null)
+  // Selections accordion state
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const toggleUsage = (u: string) => setSelectedUsages(p => p.includes(u) ? p.filter(x => x !== u) : [...p, u])
+  const toggleCatalog = (c: string) => setSelectedCatalogs(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])
+  const toggleLocation = (l: string) => setSelectedLocations(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l])
+  const toggleArea = (a: string) => setSelectedAreas(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a])
+  const toggleFleet = (f: string) => setSelectedFleets(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])
+  const clearAllSelections = () => {
+    setSelectedUsages([]); setSelectedCatalogs([]); setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+  }
   // Expandable legend categories
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const toggleCategory = (label: string) => {
@@ -147,8 +170,8 @@ function IdentityPageContent() {
   const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null
   const clearWidgetFilters = () => { setDirectoryFilter(null); setAuthFilter(null) }
 
-  const { tableContainerRef, effectiveWidgetsExpanded } = useScrollCollapse(
-    { widgets: widgetsExpanded },
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading }
   )
   
@@ -235,6 +258,12 @@ function IdentityPageContent() {
       }
     }
     
+    if (selectedUsages.length > 0 && !selectedUsages.includes(d.usage || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(d.catalog || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(d.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
@@ -244,7 +273,7 @@ function IdentityPageContent() {
         d.loggedInUsernames?.some(u => u?.toLowerCase().includes(query))
       )
     }
-    
+
     return true
   }).sort((a, b) => {
     let aValue: string | number = ''
@@ -476,6 +505,43 @@ function IdentityPageContent() {
               </button>
             </div>
           )}
+
+          {/* Selections accordion (shared component) */}
+          {(() => {
+            const sharedFilterOptions: FilterOptions = {
+              statuses: [],
+              usages: Array.from(new Set(platformFilteredDevices.map(d => d.usage).filter(Boolean) as string[])).sort(),
+              catalogs: Array.from(new Set(platformFilteredDevices.map(d => d.catalog).filter(Boolean) as string[])).sort(),
+              areas: Array.from(new Set(platformFilteredDevices.map(d => d.area || d.department).filter(Boolean) as string[])).sort(),
+              locations: Array.from(new Set(platformFilteredDevices.map(d => d.location).filter(Boolean) as string[])).sort(),
+              fleets: Array.from(new Set(platformFilteredDevices.map(d => d.fleet).filter(Boolean) as string[])).sort(),
+            }
+            const locCounts: Record<string, number> = {}
+            platformFilteredDevices.forEach(d => { if (d.location) locCounts[d.location] = (locCounts[d.location] || 0) + 1 })
+            return (
+              <DeviceFilters
+                filterOptions={sharedFilterOptions}
+                selectedStatuses={[]}
+                selectedCatalogs={selectedCatalogs}
+                selectedAreas={selectedAreas}
+                selectedLocations={selectedLocations}
+                selectedFleets={selectedFleets}
+                selectedUsages={selectedUsages}
+                onStatusToggle={() => { /* no statuses on /identity */ }}
+                onCatalogToggle={toggleCatalog}
+                onAreaToggle={toggleArea}
+                onLocationToggle={toggleLocation}
+                onFleetToggle={toggleFleet}
+                onUsageToggle={toggleUsage}
+                onClearAll={clearAllSelections}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                expanded={effectiveFiltersExpanded}
+                onToggle={() => setFiltersExpanded(!filtersExpanded)}
+                locationCounts={locCounts}
+              />
+            )
+          })()}
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
