@@ -116,8 +116,19 @@ export async function GET(request: Request) {
             isAdmin: u.isAdmin,
             lastLogon: u.lastLogon
           })),
-          
-          loggedInUsernames: item.loggedInUsernames || []
+
+          loggedInUsernames: item.loggedInUsernames || [],
+
+          // Inventory dimensions for the Selections accordion. FastAPI bulk
+          // endpoint returns these straight from inv.data; pass them through
+          // so the page's filter options aren't empty.
+          usage: item.usage || null,
+          catalog: item.catalog || null,
+          location: item.location || null,
+          room: item.room || null,
+          area: item.area || item.department || null,
+          department: item.department || null,
+          fleet: item.fleet || null,
         };
       }) : [];
       

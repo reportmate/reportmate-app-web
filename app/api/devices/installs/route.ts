@@ -24,6 +24,7 @@ export async function GET(request: Request) {
     const selectedCatalogs = searchParams.getAll('catalogs').map(c => c.toLowerCase());
     const selectedRooms = searchParams.getAll('rooms');
     const selectedFleets = searchParams.getAll('fleets');
+    const selectedAreas = searchParams.getAll('areas');
     const _selectedPlatforms = searchParams.getAll('platforms').map(p => p.toLowerCase());
     
         
@@ -128,16 +129,18 @@ export async function GET(request: Request) {
         const usage = parsedInventory?.usage || '';
         const catalog = parsedInventory?.catalog || '';
         const room = parsedInventory?.location || '';
-        const fleet = parsedInventory?.fleet || parsedInventory?.department || '';
+        const fleet = parsedInventory?.fleet || '';
+        const area = parsedInventory?.area || parsedInventory?.department || '';
         const assetTag = parsedInventory?.assetTag || '';
         const deviceName = parsedInventory?.deviceName || device.deviceName || device.serialNumber || 'Unknown Device';
-        
+
         // Apply inventory filters
         if (selectedUsages.length > 0 && !selectedUsages.includes(usage.toLowerCase())) continue;
         if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(catalog.toLowerCase())) continue;
         if (selectedRooms.length > 0 && !selectedRooms.includes(room)) continue;
         if (selectedFleets.length > 0 && !selectedFleets.includes(fleet)) continue;
-        
+        if (selectedAreas.length > 0 && !selectedAreas.includes(area)) continue;
+
         installRecords.push({
           id: `${device.serialNumber}-${item.id || item.itemName}`,
           deviceId: device.deviceId,
@@ -153,6 +156,8 @@ export async function GET(request: Request) {
           catalog,
           room,
           fleet,
+          area,
+          department: area,
           platform: (() => {
             const p = device.modules?.system?.operatingSystem?.platform || device.modules?.inventory?.platform || device.platform || '';
             if (p === 'Windows NT' || p.toLowerCase().includes('windows')) return 'Windows';

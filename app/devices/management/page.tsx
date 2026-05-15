@@ -33,6 +33,8 @@ interface Management {
   assetTag?: string
   location?: string
   department?: string
+  area?: string
+  fleet?: string
   autopilotConfig?: any
   osName?: string
 }
@@ -137,7 +139,6 @@ function ManagementPageContent() {
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   
   // Sorting state - default to Device column ascending
@@ -200,12 +201,6 @@ function ManagementPageContent() {
     )
   }
   
-  const togglePlatform = (platform: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platform) ? prev.filter(p => p !== platform) : [...prev, platform]
-    )
-  }
-  
   const toggleUsage = (usage: string) => {
     setSelectedUsages(prev => 
       prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
@@ -218,7 +213,6 @@ function ManagementPageContent() {
     setSelectedAreas([])
     setSelectedLocations([])
     setSelectedFleets([])
-    setSelectedPlatforms([])
     setSelectedUsages([])
     setProviderFilter('all')
     setEnrollmentStatusFilter('all')
@@ -343,14 +337,14 @@ function ManagementPageContent() {
   }, {} as Record<string, number>)
 
   // Create filter options for shared DeviceFilters component
+  const isStr = (x: string | undefined | null): x is string => !!x
   const filterOptions: FilterOptions = {
-    statuses: [...new Set(management.map(m => m.status).filter(Boolean))].sort(),
-    catalogs: [...new Set(management.map(m => m.catalog).filter(Boolean))].sort(),
-    areas: [], // Add areas when available in data
-    locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
-    fleets: [], // Add fleets when available in data  
-    platforms: [...new Set(management.map(m => m.osName || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
-    usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
+    statuses: [...new Set(management.map(m => m.status).filter(isStr))].sort(),
+    catalogs: [...new Set(management.map(m => m.catalog).filter(isStr))].sort(),
+    areas: [...new Set(management.map(m => m.area || m.department).filter(isStr))].sort(),
+    locations: [...new Set(management.map(m => m.location).filter(isStr))].sort(),
+    fleets: [...new Set(management.map(m => m.fleet).filter(isStr))].sort(),
+    usages: [...new Set(management.map(m => m.usage).filter(isStr))].sort()
   }
 
   // Compute device count per location for proportional pill sizing
@@ -456,10 +450,8 @@ function ManagementPageContent() {
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(m.catalog || '')) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(m.usage || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(m.location || '')) return false
-    if (selectedPlatforms.length > 0) {
-      const platform = m.osName || ''
-      if (!selectedPlatforms.includes(platform)) return false
-    }
+    if (selectedAreas.length > 0 && !selectedAreas.includes(m.area || m.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(m.fleet || '')) return false
     return true
   }).sort((a, b) => {
     // Apply sorting
@@ -907,7 +899,6 @@ function ManagementPageContent() {
             selectedAreas.length > 0 ||
             selectedLocations.length > 0 ||
             selectedFleets.length > 0 ||
-            selectedPlatforms.length > 0 ||
             selectedUsages.length > 0) && (
             <div className="px-6 py-3 bg-yellow-50 dark:bg-yellow-900/20 border-b border-yellow-200 dark:border-yellow-800 flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm text-yellow-800 dark:text-yellow-200">
@@ -939,14 +930,12 @@ function ManagementPageContent() {
             selectedAreas={selectedAreas}
             selectedLocations={selectedLocations}
             selectedFleets={selectedFleets}
-            selectedPlatforms={selectedPlatforms}
             selectedUsages={selectedUsages}
             onStatusToggle={toggleStatus}
             onCatalogToggle={toggleCatalog}
             onAreaToggle={toggleArea}
             onLocationToggle={toggleLocation}
             onFleetToggle={toggleFleet}
-            onPlatformToggle={togglePlatform}
             onUsageToggle={toggleUsage}
             onClearAll={clearAllFilters}
             searchQuery={searchQuery}
