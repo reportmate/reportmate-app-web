@@ -1700,6 +1700,7 @@ function ApplicationsPageContent() {
                   >
                     <option value={7}>Last 7 days</option>
                     <option value={30}>Last 30 days</option>
+                    <option value={45}>Last 45 days</option>
                     <option value={90}>Last 90 days</option>
                     <option value={365}>Last year</option>
                   </select>
