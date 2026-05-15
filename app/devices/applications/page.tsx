@@ -118,12 +118,26 @@ interface VersionDistribution {
   [appName: string]: AppVersionDistribution
 }
 
+interface DeviceAggregate {
+  serialNumber: string
+  deviceName: string
+  usage: string | null
+  catalog: string | null
+  location: string | null
+  department: string | null
+  fleet: string | null
+  totalSeconds: number
+  totalHours: number
+  launchCount: number
+}
+
 interface UtilizationData {
   status: string
   applications: UtilizationApp[]
   topUsers: TopUser[]
   singleUserApps: SingleUserApp[]
   unusedApps: UnusedApp[]
+  devicesAggregate?: DeviceAggregate[]
   versionDistribution?: VersionDistribution
   summary: UtilizationSummary
   filters: {
@@ -1429,21 +1443,61 @@ function ApplicationsPageContent() {
   // Uses baseFilteredApplications (without version filter) so widgets always show all versions
   const versionAnalysis = useMemo(() => {
     const analysis: VersionAnalysis = {}
-    
+
     baseFilteredApplications.forEach(app => {
       // Use normalized name as the key (same as what's in filterOptions.applicationNames)
       const normalizedName = normalizeAppName(app.name)
       if (!normalizedName) return // Skip if normalization results in empty string
-      
+
       if (!analysis[normalizedName]) {
         analysis[normalizedName] = {}
       }
       const version = app.version || 'Unknown'
       analysis[normalizedName][version] = (analysis[normalizedName][version] || 0) + 1
     })
-    
+
     return analysis
   }, [baseFilteredApplications])
+
+  // Multi-app utilization aggregates: per-device rows across all selected apps
+  // get rolled up by inventory dimension so the widget grid mirrors the
+  // single-app view. Each device's hours flow once into its bucket regardless
+  // of how many of the selected apps it touched.
+  const utilizationAggregates = useMemo(() => {
+    const devices = utilizationData?.devicesAggregate ?? []
+    const grandTotalHours = devices.reduce((s, d) => s + d.totalHours, 0) || 1
+
+    const sumBy = (keyFn: (d: DeviceAggregate) => string | null): Array<[string, number]> => {
+      const m = new Map<string, number>()
+      for (const d of devices) {
+        const k = keyFn(d) || 'Unknown'
+        m.set(k, (m.get(k) ?? 0) + d.totalHours)
+      }
+      return [...m.entries()].sort((a, b) => b[1] - a[1])
+    }
+
+    const byLocation = sumBy(d => d.location).slice(0, 10)
+    const byCatalog = sumBy(d => d.catalog)
+    const byUsage = sumBy(d => d.usage)
+    const byArea = sumBy(d => d.department).slice(0, 10)
+    const byFleet = sumBy(d => d.fleet)
+
+    const bins: Array<{ label: string; count: number; min: number; max: number }> = [
+      { label: '0–10h', count: 0, min: 0, max: 10 },
+      { label: '10–50h', count: 0, min: 10, max: 50 },
+      { label: '50–100h', count: 0, min: 50, max: 100 },
+      { label: '100–250h', count: 0, min: 100, max: 250 },
+      { label: '250h+', count: 0, min: 250, max: Infinity },
+    ]
+    for (const d of devices) {
+      const bin = bins.find(b => d.totalHours >= b.min && d.totalHours < b.max)
+      if (bin) bin.count += 1
+    }
+
+    return { grandTotalHours, byLocation, byCatalog, byUsage, byArea, byFleet, bins }
+  }, [utilizationData])
+
+  const widgetPalette = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#ef4444']
 
   /* Commented out full-page error - using inline table error instead
   if (error) {
@@ -1525,8 +1579,8 @@ function ApplicationsPageContent() {
                 {reportType === 'usage' ? 'Applications Usage Report' : 'Applications Report'}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                {reportType === 'usage' && utilizationData 
-                  ? `${utilizationData.summary.totalAppsTracked} apps tracked across ${utilizationData.summary.uniqueDevices} devices`
+                {reportType === 'usage' && utilizationData
+                  ? `${utilizationData.summary.totalAppsTracked.toLocaleString()} apps · ${utilizationData.summary.uniqueDevices.toLocaleString()} devices · ${utilizationData.summary.totalUsageHours.toLocaleString()} hours · ${utilizationData.summary.totalLaunches.toLocaleString()} launches · ${utilizationData.summary.uniqueUsers.toLocaleString()} unique users`
                   : reportType === 'versions' && sortedApplications.length > 0
                   ? `${sortedApplications.length} applications across ${new Set(sortedApplications.map(app => app.serialNumber)).size} devices`
                   : 'Generate report to see application inventory across your fleet'
@@ -2487,193 +2541,229 @@ function ApplicationsPageContent() {
                   </div>
                 </div>
               )}
-              {/* Widgets Accordion - Collapsible section - ONLY for Usage Report */}
-              {(utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0) && (
+              {/* Widgets accordion — aggregate stats across the selected apps,
+                  rolled up by inventory dimension. Mirrors the per-app view at
+                  /devices/applications/usage/[appName]. */}
+              {(utilizationData.devicesAggregate?.length ?? 0) > 0 && (
                 <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>
-                  {/* Widgets Accordion Header */}
                   <button
                     onClick={() => setWidgetsExpanded(!effectiveWidgetsExpanded)}
                     className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-2">
-                      <svg 
-                        className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`} 
-                        fill="none" 
-                        stroke="currentColor" 
+                      <svg
+                        className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`}
+                        fill="none"
+                        stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Usage Analytics</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">Widgets</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {(() => {
+                          const dCount = utilizationData.devicesAggregate?.length ?? 0
+                          return `Aggregate stats across ${dCount.toLocaleString()} ${dCount === 1 ? 'device' : 'devices'}`
+                        })()}
+                      </span>
                     </div>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {effectiveWidgetsExpanded ? 'Click to collapse' : 'Click to expand'}
-                    </span>
+                    <span className="text-xs text-gray-400">{effectiveWidgetsExpanded ? 'Click to collapse' : 'Click to expand'}</span>
                   </button>
                 </div>
               )}
 
-              {/* Widgets Content - Collapsible */}
-              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.topUsers.length > 0 || utilizationData.singleUserApps.length > 0 || utilizationData.unusedApps.length > 0 || utilizationData.applications.length > 0)}>
-              <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-              
-              {/* Summary Cards - Inside Widgets Accordion */}
-              <div className="px-6 py-4 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-100 dark:border-gray-700">
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                      {utilizationData.summary.totalAppsTracked}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Apps Tracked</div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="text-2xl font-bold text-orange-600 dark:text-orange-400">
-                      {utilizationData.summary.uniqueUsers}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Unique Users</div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
-                      {utilizationData.summary.uniqueDevices}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Devices</div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
-                      {utilizationData.summary.singleUserAppCount}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Single-User Apps</div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <div className="text-2xl font-bold text-red-600 dark:text-red-400">
-                      {utilizationData.summary.unusedAppCount}
-                    </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400">Unused Apps</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Widgets Grid */}
-              <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Top Users Widget */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                    </svg>
-                    Top Users by Usage
-                  </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {utilizationData.topUsers.slice(0, 10).map((user, idx) => (
-                      <div key={user.username} className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                          <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                            idx < 3 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300'
-                          }`}>
-                            {idx + 1}
-                          </span>
-                          <span className="text-sm text-gray-900 dark:text-white truncate">{user.username}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                            {formatDuration(user.totalSeconds)}
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {user.appsUsed} apps
-                          </span>
-                        </div>
+              <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.devicesAggregate?.length ?? 0) > 0}>
+                <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  {/* Hours by Location (top 10) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Hours by Location <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                    </h3>
+                    {utilizationAggregates.byLocation.length === 0 ? (
+                      <p className="text-xs text-gray-500">No location data.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(() => {
+                          const max = utilizationAggregates.byLocation[0][1] || 1
+                          return utilizationAggregates.byLocation.map(([name, hours]) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                <div className="h-full bg-blue-500" style={{ width: `${(hours / max) * 100}%` }} />
+                              </div>
+                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                                {hours.toFixed(0)}h
+                              </div>
+                            </div>
+                          ))
+                        })()}
                       </div>
-                    ))}
-                    {utilizationData.topUsers.length === 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">No user data available</p>
                     )}
                   </div>
-                </div>
 
-                {/* Single-User Apps Widget */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
-                    Single-User Applications
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Apps used by only one person - may indicate specialized tools or license inefficiency</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {utilizationData.singleUserApps.slice(0, 15).map((app) => (
-                      <div key={app.name} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
-                        <span className="text-sm font-medium text-yellow-600 dark:text-yellow-400 ml-2">
-                          {app.totalHours.toFixed(1)}h
-                        </span>
-                      </div>
-                    ))}
-                    {utilizationData.singleUserApps.length === 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">No single-user apps detected</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Unused Apps Widget */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
-                    </svg>
-                    Unused Applications ({utilizationDays} days)
-                  </h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Installed but not used - candidates for removal or license reclamation</p>
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
-                    {utilizationData.unusedApps.slice(0, 15).map((app) => (
-                      <div key={app.name} className="flex items-center justify-between">
-                        <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
-                        <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                          {app.deviceCount} devices
-                        </span>
-                      </div>
-                    ))}
-                    {utilizationData.unusedApps.length === 0 && (
-                      <p className="text-sm text-gray-500 dark:text-gray-400">All installed apps have been used</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Top Apps by Time Widget */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-600 p-4">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                    <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    Most Used by Time
-                  </h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto">
-                    {utilizationData.applications.slice(0, 10).map((app) => (
-                      <div key={app.name} className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-900 dark:text-white truncate flex-1">{app.name}</span>
-                          <span className="text-sm font-medium text-blue-600 dark:text-blue-400 ml-2">
-                            {formatDuration(app.totalSeconds)}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                            <div 
-                              className="bg-blue-500 h-2 rounded-full"
-                              style={{ 
-                                width: `${utilizationData.applications[0]?.totalSeconds ? (app.totalSeconds / utilizationData.applications[0].totalSeconds) * 100 : 0}%` 
+                  {/* Hours by Catalog (stacked + legend) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Catalog</h3>
+                    {utilizationAggregates.byCatalog.length === 0 ? (
+                      <p className="text-xs text-gray-500">No catalog data.</p>
+                    ) : (
+                      <>
+                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                          {utilizationAggregates.byCatalog.map(([name, hours], i) => (
+                            <div
+                              key={name}
+                              style={{
+                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
+                                backgroundColor: widgetPalette[i % widgetPalette.length],
                               }}
+                              title={`${name}: ${hours.toFixed(0)}h`}
                             />
-                          </div>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 w-16 text-right">
-                            {app.deviceCount} dev
-                          </span>
+                          ))}
                         </div>
+                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                          {utilizationAggregates.byCatalog.map(([name, hours], i) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
+                              />
+                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                              <span className="ml-auto tabular-nums text-gray-500">
+                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Hours by Usage Type */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Usage Type</h3>
+                    {utilizationAggregates.byUsage.length === 0 ? (
+                      <p className="text-xs text-gray-500">No usage-type data.</p>
+                    ) : (
+                      <>
+                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                          {utilizationAggregates.byUsage.map(([name, hours], i) => (
+                            <div
+                              key={name}
+                              style={{
+                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
+                                backgroundColor: widgetPalette[i % widgetPalette.length],
+                              }}
+                              title={`${name}: ${hours.toFixed(0)}h`}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                          {utilizationAggregates.byUsage.map(([name, hours], i) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
+                              />
+                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                              <span className="ml-auto tabular-nums text-gray-500">
+                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Hours by Area (top 10) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Hours by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                    </h3>
+                    {utilizationAggregates.byArea.length === 0 ? (
+                      <p className="text-xs text-gray-500">No area data.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(() => {
+                          const max = utilizationAggregates.byArea[0][1] || 1
+                          return utilizationAggregates.byArea.map(([name, hours]) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                <div className="h-full bg-emerald-500" style={{ width: `${(hours / max) * 100}%` }} />
+                              </div>
+                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                                {hours.toFixed(0)}h
+                              </div>
+                            </div>
+                          ))
+                        })()}
                       </div>
-                    ))}
+                    )}
+                  </div>
+
+                  {/* Hours by Fleet (stacked + legend) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Fleet</h3>
+                    {utilizationAggregates.byFleet.length === 0 ? (
+                      <p className="text-xs text-gray-500">No fleet data.</p>
+                    ) : (
+                      <>
+                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                          {utilizationAggregates.byFleet.map(([name, hours], i) => (
+                            <div
+                              key={name}
+                              style={{
+                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
+                                backgroundColor: widgetPalette[i % widgetPalette.length],
+                              }}
+                              title={`${name}: ${hours.toFixed(0)}h`}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                          {utilizationAggregates.byFleet.map(([name, hours], i) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
+                              />
+                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                              <span className="ml-auto tabular-nums text-gray-500">
+                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Device Hours Distribution */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Device Hours Distribution
+                    </h3>
+                    {(() => {
+                      const max = Math.max(...utilizationAggregates.bins.map(b => b.count), 1)
+                      return (
+                        <div className="space-y-1.5">
+                          {utilizationAggregates.bins.map(b => (
+                            <div key={b.label} className="flex items-center gap-2 text-xs">
+                              <div className="w-20 text-gray-700 dark:text-gray-300">{b.label}</div>
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
+                              </div>
+                              <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    })()}
                   </div>
                 </div>
-              </div>
-              </div>
               </CollapsibleSection>
 
               {/* Utilization Data Table */}
