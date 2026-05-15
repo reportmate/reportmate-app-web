@@ -16,6 +16,7 @@ interface DeviceRow {
   location: string | null
   room: string | null
   department: string | null
+  area: string | null
   fleet: string | null
   assetTag: string | null
   totalSeconds: number
@@ -141,7 +142,7 @@ export default function ApplicationUsageByDevicePage() {
     const byLocation = sumBy(d => d.location).slice(0, 10)
     const byCatalog = sumBy(d => d.catalog)
     const byUsage = sumBy(d => d.usage)
-    const byArea = sumBy(d => d.department).slice(0, 10)
+    const byArea = sumBy(d => d.area || d.department).slice(0, 10)
     const byFleet = sumBy(d => d.fleet)
 
     // Distribution: histogram bins (units depend on metric)
@@ -194,7 +195,7 @@ export default function ApplicationUsageByDevicePage() {
           cmp = (a.catalog || '').localeCompare(b.catalog || '')
           break
         case 'area':
-          cmp = (a.department || '').localeCompare(b.department || '')
+          cmp = ((a.area || a.department || '')).localeCompare(b.area || b.department || '')
           break
         case 'totalHours':
           cmp = a.totalHours - b.totalHours
@@ -232,7 +233,7 @@ export default function ApplicationUsageByDevicePage() {
     const rows = sortedDevices.map(d => [
       d.usage || '',
       d.catalog || '',
-      d.department || '',
+      d.area || d.department || '',
       d.location || '',
       d.deviceName,
       d.serialNumber,
@@ -645,7 +646,7 @@ export default function ApplicationUsageByDevicePage() {
                         {d.catalog || '-'}
                       </td>
                       <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
-                        {d.department || '-'}
+                        {d.area || d.department || '-'}
                       </td>
                       <td className="px-4 lg:px-6 py-3 text-sm text-gray-900 dark:text-white">
                         {d.location || '-'}

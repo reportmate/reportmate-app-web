@@ -200,14 +200,6 @@ function InstallsPageContent() {
     )
   }
 
-  const togglePlatform = (platform: string) => {
-    setSelectedPlatforms(prev => 
-      prev.includes(platform) 
-        ? prev.filter(p => p !== platform)
-        : [...prev, platform]
-    )
-  }
-
   const clearAllFilters = () => {
     setSelectedInstalls([])
     setSelectedUsages([])

@@ -517,7 +517,6 @@ function SystemPageContent() {
     if (loc) acc[loc] = (acc[loc] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
 
   // Filter systems
   const filteredSystems = systems.filter(s => {

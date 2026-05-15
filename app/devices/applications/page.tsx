@@ -128,6 +128,7 @@ interface DeviceAggregate {
   catalog: string | null
   location: string | null
   department: string | null
+  area: string | null
   fleet: string | null
   totalSeconds: number
   totalHours: number
@@ -701,16 +702,25 @@ function ApplicationsPageContent() {
   // and usage endpoints accept a server-side platform filter; for versions the
   // client-side filter already scopes the table, so an extra refetch keeps
   // device-set assumptions (which apps belong to which platform) tight.
+  //
+  // Track the platform that produced the currently-loaded report so a flip
+  // during an in-flight request isn't dropped — once the request settles and
+  // `loading` clears, the effect runs again, notices the mismatch, and
+  // re-fetches.
+  const reportPlatformRef = useRef<string | null>(null)
   useEffect(() => {
     if (!hydratedRef.current) return
+    if (!reportType) return
     if (loading) return
+    if (reportPlatformRef.current === platformFilter) return
+    reportPlatformRef.current = platformFilter
     if (reportType === 'usage') {
       handleLoadUtilization()
     } else if (reportType === 'versions') {
       handleLoadVersionsReport()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [platformFilter])
+  }, [platformFilter, loading, reportType])
 
   // Sync state → URL whenever selections, period, reportType, or reportMode
   // change. Skipped during hydration to avoid clobbering the incoming URL.
@@ -1069,6 +1079,11 @@ function ApplicationsPageContent() {
   const handleLoadUtilization = async (daysOverride?: number | React.MouseEvent) => {
     // Handle case where MouseEvent is passed from button onClick
     const effectiveDays = typeof daysOverride === 'number' ? daysOverride : utilizationDays
+    // Capture the platform value at the moment of fetch so the
+    // refetch-on-platform-change effect compares against what THIS fetch
+    // actually queried, not whatever platform the user may have flipped to
+    // mid-flight.
+    const fetchPlatform = platformFilter
     try {
       setLoading(true)
       setError(null)
@@ -1172,6 +1187,11 @@ function ApplicationsPageContent() {
         setError(data.message || 'Usage tracking not yet deployed')
         setUtilizationData(null)
       } else {
+        // Pin the platform the data was fetched for so the refetch-on-platform
+        // effect doesn't see a stale ref and re-trigger immediately after this
+        // load completes. Use the captured fetchPlatform (not current
+        // platformFilter) in case the user flipped while the fetch was in flight.
+        reportPlatformRef.current = fetchPlatform
         setUtilizationData(data)
         setReportType('usage')
         setWidgetsExpanded(true)
@@ -1207,6 +1227,7 @@ function ApplicationsPageContent() {
 
   // Load versions-only report (inventory data with version distribution, no usage analytics)
   const handleLoadVersionsReport = async () => {
+    const fetchPlatform = platformFilter
     try {
       setLoading(true)
       setError(null)
@@ -1252,6 +1273,9 @@ function ApplicationsPageContent() {
       const inventoryData = await inventoryResponse.json()
       
       if (Array.isArray(inventoryData)) {
+        // Pin the platform the data was fetched for so the refetch-on-platform
+        // effect doesn't fire immediately after this load completes.
+        reportPlatformRef.current = fetchPlatform
         setApplications(inventoryData)
         setReportType('versions')
         setSelectionsExpanded(false)
@@ -1557,6 +1581,7 @@ function ApplicationsPageContent() {
     setSelectedCatalogs([])
     setSelectedRooms([])
     setSelectedFleets([])
+    setSelectedAreas([])
     setSelectedVersions([])
     setSearchQuery('')
     // Don't clear applications data - just clear error state
@@ -1574,6 +1599,7 @@ function ApplicationsPageContent() {
     setSelectedLocations([])
     setSelectedRooms([])
     setSelectedFleets([])
+    setSelectedAreas([])
     setSelectedVersions([])
     setSearchQuery('')
     setError(null)
@@ -1732,7 +1758,7 @@ function ApplicationsPageContent() {
     const byLocation = sumBy(d => d.location).slice(0, 10)
     const byCatalog = sumBy(d => d.catalog)
     const byUsage = sumBy(d => d.usage)
-    const byArea = sumBy(d => d.department).slice(0, 10)
+    const byArea = sumBy(d => d.area || d.department).slice(0, 10)
     const byFleet = sumBy(d => d.fleet)
 
     const binDefs = widgetMetric === 'hours'
@@ -2267,7 +2293,7 @@ function ApplicationsPageContent() {
                 onLocationToggle={toggleRoom}
                 onFleetToggle={toggleFleet}
                 onUsageToggle={(u) => toggleUsage(u.toLowerCase())}
-                onClearAll={() => { /* page-specific clear handled elsewhere */ }}
+                onClearAll={clearAllFilters}
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 locationCounts={locCounts}
@@ -3520,8 +3546,8 @@ function ApplicationsPageContent() {
                             bVal = b.catalog || ''
                             break
                           case 'area':
-                            aVal = a.department || ''
-                            bVal = b.department || ''
+                            aVal = (a as any).area || a.department || ''
+                            bVal = (b as any).area || b.department || ''
                             break
                           case 'location':
                             aVal = a.location || ''
