@@ -8,7 +8,7 @@ interface AccordionStates {
 }
 
 interface UseScrollCollapseOptions {
-  /** Scroll threshold in px before collapsing (default: 30) */
+  /** Scroll threshold in px before collapsing (default: 150) */
   threshold?: number
   /** Whether the hook is active (disable during loading etc.) */
   enabled?: boolean
@@ -43,7 +43,7 @@ export function useScrollCollapse(
   manualStates: AccordionStates,
   options: UseScrollCollapseOptions = {}
 ): UseScrollCollapseReturn {
-  const { threshold = 30, enabled = true } = options
+  const { threshold = 150, enabled = true } = options
   const tableContainerRef = useRef<HTMLDivElement>(null!)
 
   // Track the current element for callback ref pattern
