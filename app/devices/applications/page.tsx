@@ -421,30 +421,6 @@ function ApplicationsPageContent() {
   const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
-  // Collection health (audit-readiness): per-device coverage of application
-  // usage data. Surfaces "dark" devices that aren't collecting so the fleet
-  // utilization numbers can be defended.
-  const [collectionHealth, setCollectionHealth] = useState<{
-    summary: { totalDevices: number; healthy: number; stale: number; dark: number; never: number; freshDays: number; staleDays: number }
-    byPlatform: Record<string, { healthy: number; stale: number; dark: number; never: number; total: number }>
-    darkDevices: Array<{
-      serialNumber: string
-      deviceName: string
-      platform: string | null
-      osName: string | null
-      lastSeen: string | null
-      usage: string | null
-      catalog: string | null
-      location: string | null
-      lastUsageDate: string | null
-      daysSinceUsage: number | null
-      totalHoursEver: number
-      rowCount: number
-      bucket: 'dark' | 'never'
-    }>
-  } | null>(null)
-  const [collectionHealthExpanded, setCollectionHealthExpanded] = useState(false)
-
   // Report type: 'usage' for full usage analytics, 'versions' for version distribution only
   const [reportType, setReportType] = useState<'usage' | 'versions' | null>(null)
   
@@ -491,25 +467,6 @@ function ApplicationsPageContent() {
   const [linkCopied, setLinkCopied] = useState(false)
 
   // Hydrate state from URL once on mount. See URL_STATE_CONVENTIONS.md for the
-  // Collection health: fetched once on mount, independent of report state.
-  // Surfaces fleet-wide audit readiness so dark devices show up before the
-  // user runs any report.
-  useEffect(() => {
-    let cancelled = false
-    fetch('/api/devices/applications/collection-health?freshDays=7&staleDays=30')
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (cancelled || !data || data.error) return
-        setCollectionHealth({
-          summary: data.summary,
-          byPlatform: data.byPlatform || {},
-          darkDevices: data.darkDevices || [],
-        })
-      })
-      .catch(() => { /* non-fatal */ })
-    return () => { cancelled = true }
-  }, [])
-
   // param contract. Auto-triggers a report load if `type` is in the URL so deep
   // links like ?type=usage&period=30&apps=Houdini render the report directly.
   useEffect(() => {
@@ -1559,110 +1516,6 @@ function ApplicationsPageContent() {
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
       {/* Main Content */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8 flex flex-col min-h-0">
-        {/* Collection-health banner: surfaces "dark" devices that aren't reporting
-            application usage data, so utilization numbers can be defended. */}
-        {collectionHealth && collectionHealth.summary.totalDevices > 0 && (() => {
-          const s = collectionHealth.summary
-          const darkTotal = s.dark + s.never
-          const pct = s.totalDevices ? Math.round((darkTotal / s.totalDevices) * 100) : 0
-          const severity =
-            darkTotal === 0 ? 'ok' :
-            pct < 5 ? 'low' :
-            pct < 20 ? 'medium' : 'high'
-          const tone = {
-            ok:     'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100',
-            low:    'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-900 dark:text-yellow-100',
-            medium: 'bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800 text-orange-900 dark:text-orange-100',
-            high:   'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100',
-          }[severity]
-          return (
-            <div className={`mb-4 rounded-xl border ${tone}`}>
-              <button
-                type="button"
-                onClick={() => setCollectionHealthExpanded(v => !v)}
-                className="w-full flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-left"
-                aria-expanded={collectionHealthExpanded}
-              >
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                  <span className="font-semibold">Usage data coverage</span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-                    {s.healthy} healthy
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
-                    {s.stale} stale
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-orange-500"></span>
-                    {s.dark} dark
-                  </span>
-                  <span className="inline-flex items-center gap-1">
-                    <span className="inline-block w-2 h-2 rounded-full bg-red-500"></span>
-                    {s.never} never
-                  </span>
-                  <span className="text-xs opacity-75">
-                    of {s.totalDevices} devices
-                    {darkTotal > 0 && ` • ${darkTotal} not collecting (${pct}%)`}
-                  </span>
-                </div>
-                {darkTotal > 0 && (
-                  <span className="text-xs font-medium underline">
-                    {collectionHealthExpanded ? 'Hide details' : 'Show details'}
-                  </span>
-                )}
-              </button>
-              {collectionHealthExpanded && darkTotal > 0 && (
-                <div className="border-t border-current/10 max-h-72 overflow-auto">
-                  <table className="w-full text-xs">
-                    <thead className="sticky top-0 bg-inherit">
-                      <tr className="text-left">
-                        <th className="px-4 py-2 font-medium">Status</th>
-                        <th className="px-4 py-2 font-medium">Device</th>
-                        <th className="px-4 py-2 font-medium">Platform</th>
-                        <th className="px-4 py-2 font-medium">Usage</th>
-                        <th className="px-4 py-2 font-medium">Location</th>
-                        <th className="px-4 py-2 font-medium">Last seen</th>
-                        <th className="px-4 py-2 font-medium">Last usage</th>
-                        <th className="px-4 py-2 font-medium text-right">Days dark</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {collectionHealth.darkDevices.map(dev => (
-                        <tr key={dev.serialNumber} className="border-t border-current/10 hover:bg-current/5">
-                          <td className="px-4 py-2 whitespace-nowrap">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
-                              dev.bucket === 'never' ? 'bg-red-200/60 text-red-900 dark:bg-red-900/40 dark:text-red-100' :
-                              'bg-orange-200/60 text-orange-900 dark:bg-orange-900/40 dark:text-orange-100'
-                            }`}>
-                              {dev.bucket}
-                            </span>
-                          </td>
-                          <td className="px-4 py-2">
-                            <Link href={`/device/${dev.serialNumber}`} className="font-medium hover:underline">
-                              {dev.deviceName || dev.serialNumber}
-                            </Link>
-                            <div className="text-[10px] opacity-60 font-mono">{dev.serialNumber}</div>
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap">{dev.platform || '—'}</td>
-                          <td className="px-4 py-2 whitespace-nowrap">{dev.usage || '—'}</td>
-                          <td className="px-4 py-2 whitespace-nowrap">{dev.location || '—'}</td>
-                          <td className="px-4 py-2 whitespace-nowrap" suppressHydrationWarning>
-                            {dev.lastSeen ? formatRelativeTime(dev.lastSeen) : '—'}
-                          </td>
-                          <td className="px-4 py-2 whitespace-nowrap">{dev.lastUsageDate || 'never'}</td>
-                          <td className="px-4 py-2 text-right whitespace-nowrap">
-                            {dev.daysSinceUsage !== null ? `${dev.daysSinceUsage}d` : '—'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )
-        })()}
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
 
           {/* Header Section */}
