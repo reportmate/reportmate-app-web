@@ -92,44 +92,52 @@ export default function DeviceFilters({
         <div className="px-6 pb-4">
           {/* Smart Grid Layout - maximizes space usage */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-8 gap-y-4">
-            {/* Status Filter - Always show */}
-            <div>
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Status</div>
-              <div className="flex flex-wrap gap-2">
-                {filterOptions.statuses.map(status => (
-                  <button
-                    key={status}
-                    onClick={() => onStatusToggle(status)}
-                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                      selectedStatuses.includes(status)
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
-                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </button>
-                ))}
+            {/* Status Filter - When available */}
+            {filterOptions.statuses.length > 0 && (
+              <div>
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Status</div>
+                <div className="flex flex-wrap gap-2">
+                  {filterOptions.statuses.map(status => {
+                    const isSelected = selectedStatuses.some(s => s.toLowerCase() === status.toLowerCase())
+                    return (
+                      <button
+                        key={status}
+                        onClick={() => onStatusToggle(status)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          isSelected
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Usage Filter - When available */}
             {filterOptions.usages.length > 0 && (
               <div>
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
                 <div className="flex flex-wrap gap-2">
-                  {filterOptions.usages.map(usage => (
-                    <button
-                      key={usage}
-                      onClick={() => onUsageToggle(usage)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                        selectedUsages.includes(usage)
-                          ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {usage}
-                    </button>
-                  ))}
+                  {filterOptions.usages.map(usage => {
+                    const isSelected = selectedUsages.some(s => s.toLowerCase() === usage.toLowerCase())
+                    return (
+                      <button
+                        key={usage}
+                        onClick={() => onUsageToggle(usage)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          isSelected
+                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {usage}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -139,19 +147,22 @@ export default function DeviceFilters({
               <div>
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
                 <div className="flex flex-wrap gap-2">
-                  {filterOptions.catalogs.map(catalog => (
-                    <button
-                      key={catalog}
-                      onClick={() => onCatalogToggle(catalog)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                        selectedCatalogs.includes(catalog)
-                          ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {catalog}
-                    </button>
-                  ))}
+                  {filterOptions.catalogs.map(catalog => {
+                    const isSelected = selectedCatalogs.some(s => s.toLowerCase() === catalog.toLowerCase())
+                    return (
+                      <button
+                        key={catalog}
+                        onClick={() => onCatalogToggle(catalog)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          isSelected
+                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {catalog}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -161,19 +172,22 @@ export default function DeviceFilters({
               <div>
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Fleet</div>
                 <div className="flex flex-wrap gap-2">
-                  {filterOptions.fleets.map(fleet => (
-                    <button
-                      key={fleet}
-                      onClick={() => onFleetToggle(fleet)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                        selectedFleets.includes(fleet)
-                          ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {fleet}
-                    </button>
-                  ))}
+                  {filterOptions.fleets.map(fleet => {
+                    const isSelected = selectedFleets.some(s => s.toLowerCase() === fleet.toLowerCase())
+                    return (
+                      <button
+                        key={fleet}
+                        onClick={() => onFleetToggle(fleet)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                          isSelected
+                            ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {fleet}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -185,19 +199,22 @@ export default function DeviceFilters({
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
               <div className="flex flex-wrap gap-2">
-                {filterOptions.areas.map(area => (
-                  <button
-                    key={area}
-                    onClick={() => onAreaToggle(area)}
-                    className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                      selectedAreas.includes(area)
-                        ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                        : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    {area}
-                  </button>
-                ))}
+                {filterOptions.areas.map(area => {
+                  const isSelected = selectedAreas.some(s => s.toLowerCase() === area.toLowerCase())
+                  return (
+                    <button
+                      key={area}
+                      onClick={() => onAreaToggle(area)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        isSelected
+                          ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
+                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {area}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
@@ -217,12 +234,13 @@ export default function DeviceFilters({
                     : scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold'
                     : scale > 0.3 ? 'px-3 py-1 text-xs font-medium'
                     : 'px-2.5 py-0.5 text-[11px]'
+                  const isSelected = selectedLocations.some(s => s.toLowerCase() === location.toLowerCase())
                   return (
                     <button
                       key={location}
                       onClick={() => onLocationToggle(location)}
                       className={`rounded-full border transition-colors ${sizeClass} ${
-                        selectedLocations.includes(location)
+                        isSelected
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
                           : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
                       }`}
