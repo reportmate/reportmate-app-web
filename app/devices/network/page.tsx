@@ -107,10 +107,6 @@ function NetworkPageContent() {
     setSearchQuery('')
   }
 
-  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
-    selectedAreas.length + selectedFleets.length +
-    (connectionFilter !== 'all' ? 1 : 0)
-
   // Use useDeviceData hook to get devices with inventory data
   const { devices } = useDeviceData({
     includeModuleData: false
@@ -214,7 +210,6 @@ function NetworkPageContent() {
     if (loc) acc[loc] = (acc[loc] || 0) + 1
     return acc
   }, {} as Record<string, number>)
-  const maxLocationCount = Math.max(...Object.values(locationCounts).map(Number), 1)
 
   // Calculate wireless statistics for widgets (uses platform-filtered data)
   const wirelessStats = {
