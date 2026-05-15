@@ -3,7 +3,7 @@
 // Force dynamic rendering and disable caching for applications page
 export const dynamic = 'force-dynamic'
 
-import { useEffect, useState, Suspense, useMemo, useRef } from "react"
+import React, { useEffect, useState, Suspense, useMemo, useRef } from "react"
 import Link from "next/link"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import { formatRelativeTime } from "../../../src/lib/time"
@@ -406,6 +406,110 @@ function shouldIncludeApplication(appName: string): boolean {
   return !excludePatterns.some(pattern => pattern.test(trimmed))
 }
 
+// Chip-cloud accordion that lives inside the multi-app Usage Report. Lets the
+// user click apps to include/exclude them from the table without regenerating
+// the whole report. Widget aggregates are device-level and unaffected.
+function UsageReportAppFilter({
+  apps,
+  enabled,
+  onToggle,
+  onSelectAll,
+  onClear,
+}: {
+  apps: string[]
+  enabled: Set<string> | null
+  onToggle: (name: string) => void
+  onSelectAll: () => void
+  onClear: () => void
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const [query, setQuery] = useState('')
+  const sortedApps = useMemo(() => [...apps].sort((a, b) => a.localeCompare(b)), [apps])
+  const visibleApps = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return sortedApps
+    return sortedApps.filter(n => n.toLowerCase().includes(q))
+  }, [sortedApps, query])
+  const activeCount = enabled ? enabled.size : apps.length
+  const totalCount = apps.length
+
+  return (
+    <div className="border-b border-gray-200 dark:border-gray-700">
+      <button
+        onClick={() => setExpanded(prev => !prev)}
+        className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Applications</span>
+          <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+            {activeCount} / {totalCount} active
+          </span>
+        </div>
+        <svg
+          className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${expanded ? 'rotate-90' : 'rotate-180'}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+        </svg>
+      </button>
+      <CollapsibleSection expanded={expanded}>
+        <div className="px-6 pb-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="relative flex-1 min-w-[12rem] max-w-md">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter chips…"
+                className="block w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <button
+              onClick={onSelectAll}
+              className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+            >
+              Select All
+            </button>
+            <button
+              onClick={onClear}
+              className="px-2 py-1 text-xs bg-red-100 hover:bg-red-200 dark:bg-red-900 dark:hover:bg-red-800 text-red-700 dark:text-red-200 rounded-lg transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2 max-h-64 overflow-y-auto">
+            {visibleApps.map(name => {
+              const isOn = enabled ? enabled.has(name) : true
+              return (
+                <button
+                  key={name}
+                  onClick={() => onToggle(name)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                    isOn
+                      ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
+                      : 'bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-400 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                  }`}
+                  title={name}
+                >
+                  {name}
+                </button>
+              )
+            })}
+            {visibleApps.length === 0 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">No apps match &quot;{query}&quot;</span>
+            )}
+          </div>
+        </div>
+      </CollapsibleSection>
+    </div>
+  )
+}
+
 function ApplicationsPageContent() {
   const [applications, setApplications] = useState<ApplicationItem[]>([])
   const [filterOptions, setFilterOptions] = useState<FilterOptions>({
@@ -425,6 +529,9 @@ function ApplicationsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [filtersExpanded, setFiltersExpanded] = useState(true)
   const [widgetsExpanded, setWidgetsExpanded] = useState(false)
+  // Selections accordion is open by default while building a report, then
+  // collapsed once a report is generated so it doesn't shove the data down.
+  const [selectionsExpanded, setSelectionsExpanded] = useState(true)
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -589,6 +696,21 @@ function ApplicationsPageContent() {
     return () => clearTimeout(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingReport])
+
+  // Re-run the active report when the global platform filter flips. The bulk
+  // and usage endpoints accept a server-side platform filter; for versions the
+  // client-side filter already scopes the table, so an extra refetch keeps
+  // device-set assumptions (which apps belong to which platform) tight.
+  useEffect(() => {
+    if (!hydratedRef.current) return
+    if (loading) return
+    if (reportType === 'usage') {
+      handleLoadUtilization()
+    } else if (reportType === 'versions') {
+      handleLoadVersionsReport()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [platformFilter])
 
   // Sync state → URL whenever selections, period, reportType, or reportMode
   // change. Skipped during hydration to avoid clobbering the incoming URL.
@@ -998,7 +1120,7 @@ function ApplicationsPageContent() {
       // Build query params for utilization endpoint - 30-90%
       const params = new URLSearchParams()
       params.set('days', effectiveDays.toString())
-      
+
       if (selectedApplications.length > 0) {
         params.set('applicationNames', selectedApplications.join(','))
       }
@@ -1010,6 +1132,18 @@ function ApplicationsPageContent() {
       }
       if (selectedLocations.length > 0) {
         params.set('locations', selectedLocations.join(','))
+      }
+      if (selectedAreas.length > 0) {
+        params.set('areas', selectedAreas.join(','))
+      }
+      if (selectedFleets.length > 0) {
+        params.set('fleets', selectedFleets.join(','))
+      }
+      if (selectedRooms.length > 0) {
+        params.set('rooms', selectedRooms.join(','))
+      }
+      if (platformFilter !== 'all') {
+        params.set('platforms', platformFilter)
       }
       
       const url = `/api/devices/applications/usage?${params.toString()}`
@@ -1040,9 +1174,11 @@ function ApplicationsPageContent() {
       } else {
         setUtilizationData(data)
         setReportType('usage')
+        setWidgetsExpanded(true)
+        setSelectionsExpanded(false)
         // Version distribution is now included in the utilization API response
         // No need for separate inventory fetch
-                
+
         setLoadingProgress({ current: 100, total: 100 })
         setLoadingMessage('Complete!')
       }
@@ -1079,17 +1215,27 @@ function ApplicationsPageContent() {
       setLoadingProgress({ current: 0, total: 100 })
       setLoadingMessage('Loading version distribution data...')
       
-      const selectedAppsParam = selectedApplications.length > 0 
-        ? selectedApplications.join(',') 
+      const selectedAppsParam = selectedApplications.length > 0
+        ? selectedApplications.join(',')
         : ''
-      
+
       // Load inventory data for version analysis
       setLoadingProgress({ current: 20, total: 100 })
       const inventoryParams = new URLSearchParams()
       if (selectedAppsParam) {
         inventoryParams.set('applicationNames', selectedAppsParam)
       }
-      
+      if (selectedUsages.length) inventoryParams.set('usages', selectedUsages.join(','))
+      if (selectedCatalogs.length) inventoryParams.set('catalogs', selectedCatalogs.join(','))
+      if (selectedAreas.length) inventoryParams.set('areas', selectedAreas.join(','))
+      if (selectedFleets.length) inventoryParams.set('fleets', selectedFleets.join(','))
+      if (selectedRooms.length) inventoryParams.set('rooms', selectedRooms.join(','))
+      if (selectedLocations.length) inventoryParams.set('locations', selectedLocations.join(','))
+      if (platformFilter !== 'all') inventoryParams.set('platforms', platformFilter)
+      // Without an applicationNames filter, raise the per-page cap so the broader
+      // scope (e.g. area=Animation) still surfaces enough apps to render the report.
+      if (!selectedAppsParam) inventoryParams.set('limit', '5000')
+
       const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
       
       const inventoryResponse = await fetch(inventoryUrl, {
@@ -1108,6 +1254,7 @@ function ApplicationsPageContent() {
       if (Array.isArray(inventoryData)) {
         setApplications(inventoryData)
         setReportType('versions')
+        setSelectionsExpanded(false)
         setUtilizationData(null) // Clear any previous usage data
         setLoadingProgress({ current: 100, total: 100 })
         setLoadingMessage('Complete!')
@@ -1135,11 +1282,64 @@ function ApplicationsPageContent() {
     }
   }
 
-  // Sort utilization applications
+  // Per-report app inclusion filter. When the user clicks chips in the
+  // report's Applications accordion, we narrow the displayed app rows + widget
+  // device-set without having to regenerate the report.
+  const [enabledApps, setEnabledApps] = useState<Set<string> | null>(null)
+
+  // Reset enabledApps whenever a fresh report payload arrives so the chip
+  // cloud always starts with every app in the report enabled.
+  useEffect(() => {
+    if (reportType === 'usage' && utilizationData?.applications) {
+      setEnabledApps(new Set(utilizationData.applications.map(a => a.name)))
+    } else if (reportType === 'versions' && applications.length > 0) {
+      const names = new Set<string>()
+      for (const a of applications) {
+        if (shouldIncludeApplication(a.name)) names.add(a.name)
+      }
+      setEnabledApps(names)
+    } else if (!reportType) {
+      setEnabledApps(null)
+    }
+  }, [reportType, utilizationData, applications])
+
+  const toggleEnabledApp = (name: string) => {
+    setEnabledApps(prev => {
+      const next = new Set(prev ?? [])
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+
+  // Distinct app names in the active report — drives the chip cloud.
+  const appsInReport = useMemo(() => {
+    if (reportType === 'usage' && utilizationData?.applications) {
+      return utilizationData.applications.map(a => a.name)
+    }
+    if (reportType === 'versions') {
+      const seen = new Set<string>()
+      const names: string[] = []
+      for (const a of applications) {
+        if (!shouldIncludeApplication(a.name)) continue
+        if (seen.has(a.name)) continue
+        seen.add(a.name)
+        names.push(a.name)
+      }
+      return names
+    }
+    return []
+  }, [reportType, utilizationData, applications])
+
+  // Sort utilization applications, filtered by which apps the user has enabled
+  // in the report's Applications chip cloud.
   const sortedUtilizationApps = useMemo(() => {
     if (!utilizationData?.applications) return []
-    
-    return [...utilizationData.applications].sort((a, b) => {
+    const filtered = enabledApps
+      ? utilizationData.applications.filter(a => enabledApps.has(a.name))
+      : utilizationData.applications
+
+    return [...filtered].sort((a, b) => {
       let compareResult = 0
       
       switch (utilizationSortColumn) {
@@ -1167,7 +1367,7 @@ function ApplicationsPageContent() {
       
       return utilizationSortDirection === 'asc' ? compareResult : -compareResult
     })
-  }, [utilizationData?.applications, utilizationSortColumn, utilizationSortDirection])
+  }, [utilizationData?.applications, utilizationSortColumn, utilizationSortDirection, enabledApps])
 
   // Handle device table sorting
   const handleDeviceTableSort = (column: typeof deviceTableSortColumn) => {
@@ -1201,7 +1401,10 @@ function ApplicationsPageContent() {
   const baseFilteredApplications = applications.filter(app => {
     // First filter: exclude junk applications
     if (!shouldIncludeApplication(app.name)) return false
-    
+
+    // Per-report app inclusion (versions report chip cloud)
+    if (reportType === 'versions' && enabledApps && !enabledApps.has(app.name)) return false
+
     // Global platform filter
     if (platformFilter !== 'all' && !isPlatformVisible(app.platform || '')) return false
     
@@ -1216,13 +1419,15 @@ function ApplicationsPageContent() {
     const matchesUsages = selectedUsages.length === 0 || selectedUsages.includes(app.usage?.toLowerCase() || '')
     const matchesCatalogs = selectedCatalogs.length === 0 || selectedCatalogs.includes(app.catalog?.toLowerCase() || '')
     const matchesLocations = selectedLocations.length === 0 || selectedLocations.includes(app.location?.toLowerCase() || '')
-    const matchesRooms = selectedRooms.length === 0 || 
-      selectedRooms.some(room => 
-        app.location?.toLowerCase().includes(room.toLowerCase()) || 
+    const matchesRooms = selectedRooms.length === 0 ||
+      selectedRooms.some(room =>
+        app.location?.toLowerCase().includes(room.toLowerCase()) ||
         app.room?.toLowerCase().includes(room.toLowerCase())
       )
-    const matchesFleets = selectedFleets.length === 0 || selectedFleets.includes(app.fleet || '')
-    const matchesAreas = selectedAreas.length === 0 || selectedAreas.includes((app.department || '') as string)
+    const appFleet = (app.fleet || '').toLowerCase()
+    const matchesFleets = selectedFleets.length === 0 || selectedFleets.some(f => f.toLowerCase() === appFleet)
+    const appArea = (app.department || (app as any).area || '').toLowerCase()
+    const matchesAreas = selectedAreas.length === 0 || selectedAreas.some(a => a.toLowerCase() === appArea)
 
     return matchesSearch && matchesUsages && matchesCatalogs && matchesLocations && matchesRooms && matchesFleets && matchesAreas
   })
@@ -1479,21 +1684,49 @@ function ApplicationsPageContent() {
     return analysis
   }, [baseFilteredApplications])
 
+  const [widgetMetric, setWidgetMetric] = useState<'hours' | 'launches'>('launches')
+
   // Multi-app utilization aggregates: per-device rows across all selected apps
   // get rolled up by inventory dimension so the widget grid mirrors the
-  // single-app view. Each device's hours flow once into its bucket regardless
+  // single-app view. Each device's value flows once into its bucket regardless
   // of how many of the selected apps it touched.
   const utilizationAggregates = useMemo(() => {
-    const devices = utilizationData?.devicesAggregate ?? []
-    const grandTotalHours = devices.reduce((s, d) => s + d.totalHours, 0) || 1
+    const allDevices = utilizationData?.devicesAggregate ?? []
+    // Narrow the device set to those that touched at least one of the enabled
+    // apps, so toggling chips in the Applications cloud reshapes the widget
+    // aggregates. This is an approximation: a device's totalHours/launchCount
+    // here still includes other apps' time on that device, but the device-set
+    // shift is what most users want when "focusing" on a subset.
+    let enabledDeviceSet: Set<string> | null = null
+    if (enabledApps && utilizationData?.applications) {
+      enabledDeviceSet = new Set()
+      for (const app of utilizationData.applications) {
+        if (enabledApps.has(app.name)) {
+          for (const sn of app.devices ?? []) enabledDeviceSet.add(sn)
+        }
+      }
+    }
+    const devices = enabledDeviceSet
+      ? allDevices.filter(d => enabledDeviceSet!.has(d.serialNumber))
+      : allDevices
+    const valueOf = (d: DeviceAggregate) => widgetMetric === 'hours' ? d.totalHours : d.launchCount
+    const grandTotal = devices.reduce((s, d) => s + valueOf(d), 0) || 1
+
+    const isUnknown = (k: string | null | undefined) => {
+      if (!k) return true
+      const v = k.trim().toLowerCase()
+      return v === '' || v === 'unknown' || v === 'null' || v === 'n/a'
+    }
 
     const sumBy = (keyFn: (d: DeviceAggregate) => string | null): Array<[string, number]> => {
       const m = new Map<string, number>()
       for (const d of devices) {
-        const k = keyFn(d) || 'Unknown'
-        m.set(k, (m.get(k) ?? 0) + d.totalHours)
+        const raw = keyFn(d)
+        if (isUnknown(raw)) continue
+        const k = raw as string
+        m.set(k, (m.get(k) ?? 0) + valueOf(d))
       }
-      return [...m.entries()].sort((a, b) => b[1] - a[1])
+      return [...m.entries()].filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1])
     }
 
     const byLocation = sumBy(d => d.location).slice(0, 10)
@@ -1502,20 +1735,33 @@ function ApplicationsPageContent() {
     const byArea = sumBy(d => d.department).slice(0, 10)
     const byFleet = sumBy(d => d.fleet)
 
-    const bins: Array<{ label: string; count: number; min: number; max: number }> = [
-      { label: '0–10h', count: 0, min: 0, max: 10 },
-      { label: '10–50h', count: 0, min: 10, max: 50 },
-      { label: '50–100h', count: 0, min: 50, max: 100 },
-      { label: '100–250h', count: 0, min: 100, max: 250 },
-      { label: '250h+', count: 0, min: 250, max: Infinity },
-    ]
+    const binDefs = widgetMetric === 'hours'
+      ? [
+          { label: '0–10h', min: 0, max: 10 },
+          { label: '10–50h', min: 10, max: 50 },
+          { label: '50–100h', min: 50, max: 100 },
+          { label: '100–250h', min: 100, max: 250 },
+          { label: '250h+', min: 250, max: Infinity },
+        ]
+      : [
+          { label: '0–10', min: 0, max: 10 },
+          { label: '10–50', min: 10, max: 50 },
+          { label: '50–250', min: 50, max: 250 },
+          { label: '250–1000', min: 250, max: 1000 },
+          { label: '1000+', min: 1000, max: Infinity },
+        ]
+    const bins = binDefs.map(b => ({ ...b, count: 0 }))
     for (const d of devices) {
-      const bin = bins.find(b => d.totalHours >= b.min && d.totalHours < b.max)
+      const v = valueOf(d)
+      const bin = bins.find(b => v >= b.min && v < b.max)
       if (bin) bin.count += 1
     }
 
-    return { grandTotalHours, byLocation, byCatalog, byUsage, byArea, byFleet, bins }
-  }, [utilizationData])
+    return { grandTotal, byLocation, byCatalog, byUsage, byArea, byFleet, bins, deviceCount: devices.length }
+  }, [utilizationData, widgetMetric, enabledApps])
+
+  const widgetMetricLabel = widgetMetric === 'hours' ? 'Hours' : 'Launches'
+  const fmtWidgetVal = (v: number) => widgetMetric === 'hours' ? `${v.toFixed(0)}h` : v.toLocaleString()
 
   const widgetPalette = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#ef4444']
 
@@ -1593,8 +1839,8 @@ function ApplicationsPageContent() {
         <div className="flex-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col min-h-0 overflow-hidden">
 
           {/* Header Section */}
-          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between sm:flex-wrap gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="min-w-0 sm:flex-1">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                 {reportType === 'usage' ? 'Applications Usage Report' : 'Applications Report'}
               </h2>
@@ -1608,7 +1854,35 @@ function ApplicationsPageContent() {
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-col items-stretch sm:items-end gap-3 sm:flex-shrink-0">
+              {/* Search Input — pinned to the top-right above the action row so it
+                  doesn't wrap to a third row on report views. */}
+              <div className="relative w-full sm:w-64">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search applications..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="block w-full pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  >
+                    <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center justify-end gap-3">
               {/* Time Period Selector - Only show for usage reports */}
               {reportType === 'usage' && utilizationData && (
                 <div className="flex items-center gap-2">
@@ -1866,14 +2140,16 @@ function ApplicationsPageContent() {
                     } else {
                       // Export installed applications report (existing behavior)
                       const csvContent = [
-                        ['Device', 'Serial Number', 'Application', 'Version', 'Catalog', 'Location'].join(','),
+                        ['Application', 'Version', 'Usage', 'Catalog', 'Area', 'Location', 'Device', 'Serial Number'].join(','),
                         ...sortedApplications.map(app => [
-                          app.deviceName || app.serialNumber,
-                          app.serialNumber,
                           app.name,
                           app.version,
+                          app.usage || '',
                           app.catalog || '',
-                          app.location || ''
+                          app.department || app.area || '',
+                          app.location || '',
+                          app.deviceName || app.serialNumber,
+                          app.serialNumber,
                         ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
                       ].join('\n')
                       
@@ -1895,30 +2171,6 @@ function ApplicationsPageContent() {
                 </button>
               )}
               
-              {/* Search Input */}
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search applications..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="block w-64 pl-10 pr-8 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  >
-                    <svg className="h-4 w-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -2019,38 +2271,39 @@ function ApplicationsPageContent() {
                 searchQuery={searchQuery}
                 onSearchChange={setSearchQuery}
                 locationCounts={locCounts}
+                expanded={selectionsExpanded}
+                onToggle={() => setSelectionsExpanded(prev => !prev)}
               />
             )
           })()}
 
-          {/* Applications report-builder accordion (page-specific) */}
-          {!filtersLoading && (
+          {/* Applications report-builder accordion (page-specific).
+              Only shown before a report has been generated — once we have a
+              versions or usage report, the in-report chip cloud (below the
+              Widgets accordion) replaces this big picker. */}
+          {!filtersLoading && !reportType && (
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Collapsible Header */}
               <button
                 onClick={() => setFiltersExpanded(!effectiveFiltersExpanded)}
-                className="w-full px-6 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-between"
+                className="w-full px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 flex items-center justify-between transition-colors"
               >
-                <div className="flex items-center gap-3">
-                  <svg
-                    className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Applications {selectedApplications.length > 0 && (
-                      <span className="ml-2 text-blue-600 dark:text-blue-400">
-                        ({selectedApplications.length} active)
-                      </span>
-                    )}
-                  </h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Applications</span>
+                  {selectedApplications.length > 0 && (
+                    <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
+                      {selectedApplications.length} active
+                    </span>
+                  )}
                 </div>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  {effectiveFiltersExpanded ? 'Click to collapse' : 'Click to expand'}
-                </span>
+                <svg
+                  className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : 'rotate-180'}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
               </button>
               
               {/* Cool Progress View - Show when generating report */}
@@ -2492,220 +2745,244 @@ function ApplicationsPageContent() {
                     className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors border-b border-gray-200 dark:border-gray-700"
                   >
                     <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Widgets</span>
+                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                        {(() => {
+                          const dCount = utilizationAggregates.deviceCount
+                          return `Aggregate stats across ${dCount.toLocaleString()} ${dCount === 1 ? 'device' : 'devices'}`
+                        })()}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden text-xs"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          onClick={() => setWidgetMetric('launches')}
+                          className={`px-3 py-1 ${widgetMetric === 'launches' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        >
+                          Launches
+                        </button>
+                        <button
+                          onClick={() => setWidgetMetric('hours')}
+                          className={`px-3 py-1 ${widgetMetric === 'hours' ? 'bg-blue-600 text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'}`}
+                        >
+                          Hours
+                        </button>
+                      </div>
                       <svg
-                        className={`w-4 h-4 text-gray-500 dark:text-gray-400 transition-transform ${effectiveWidgetsExpanded ? 'rotate-90' : ''}`}
+                        className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveWidgetsExpanded ? 'rotate-90' : 'rotate-180'}`}
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
                       >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                       </svg>
-                      <span className="text-sm font-semibold text-gray-900 dark:text-white">Widgets</span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {(() => {
-                          const dCount = utilizationData.devicesAggregate?.length ?? 0
-                          return `Aggregate stats across ${dCount.toLocaleString()} ${dCount === 1 ? 'device' : 'devices'}`
-                        })()}
-                      </span>
                     </div>
-                    <span className="text-xs text-gray-400">{effectiveWidgetsExpanded ? 'Click to collapse' : 'Click to expand'}</span>
                   </button>
                 </div>
               )}
 
               <CollapsibleSection expanded={effectiveWidgetsExpanded && (utilizationData.devicesAggregate?.length ?? 0) > 0}>
-                <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 gap-5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                  {/* Hours by Location (top 10) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Hours by Location <span className="text-xs font-normal text-gray-500">(top 10)</span>
-                    </h3>
-                    {utilizationAggregates.byLocation.length === 0 ? (
-                      <p className="text-xs text-gray-500">No location data.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {(() => {
-                          const max = utilizationAggregates.byLocation[0][1] || 1
-                          return utilizationAggregates.byLocation.map(([name, hours]) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-blue-500" style={{ width: `${(hours / max) * 100}%` }} />
-                              </div>
-                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                                {hours.toFixed(0)}h
-                              </div>
-                            </div>
-                          ))
-                        })()}
+                <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                  {/* Row 1: By Usage | By Catalog | Distribution */}
+
+                  {/* By Usage Type */}
+                  {utilizationAggregates.byUsage.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{widgetMetricLabel} by Usage Type</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {utilizationAggregates.byUsage.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / utilizationAggregates.grandTotal) * 100}%`,
+                              backgroundColor: widgetPalette[i % widgetPalette.length],
+                            }}
+                            title={`${name}: ${fmtWidgetVal(val)}`}
+                          />
+                        ))}
                       </div>
-                    )}
-                  </div>
-
-                  {/* Hours by Catalog (stacked + legend) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Catalog</h3>
-                    {utilizationAggregates.byCatalog.length === 0 ? (
-                      <p className="text-xs text-gray-500">No catalog data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {utilizationAggregates.byCatalog.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: widgetPalette[i % widgetPalette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {utilizationAggregates.byUsage.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
                             />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {utilizationAggregates.byCatalog.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Hours by Usage Type */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Usage Type</h3>
-                    {utilizationAggregates.byUsage.length === 0 ? (
-                      <p className="text-xs text-gray-500">No usage-type data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {utilizationAggregates.byUsage.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: widgetPalette[i % widgetPalette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
-                            />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {utilizationAggregates.byUsage.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Hours by Area (top 10) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Hours by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
-                    </h3>
-                    {utilizationAggregates.byArea.length === 0 ? (
-                      <p className="text-xs text-gray-500">No area data.</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {(() => {
-                          const max = utilizationAggregates.byArea[0][1] || 1
-                          return utilizationAggregates.byArea.map(([name, hours]) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-emerald-500" style={{ width: `${(hours / max) * 100}%` }} />
-                              </div>
-                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                                {hours.toFixed(0)}h
-                              </div>
-                            </div>
-                          ))
-                        })()}
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
-                  {/* Hours by Fleet (stacked + legend) */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Fleet</h3>
-                    {utilizationAggregates.byFleet.length === 0 ? (
-                      <p className="text-xs text-gray-500">No fleet data.</p>
-                    ) : (
-                      <>
-                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
-                          {utilizationAggregates.byFleet.map(([name, hours], i) => (
-                            <div
-                              key={name}
-                              style={{
-                                width: `${(hours / utilizationAggregates.grandTotalHours) * 100}%`,
-                                backgroundColor: widgetPalette[i % widgetPalette.length],
-                              }}
-                              title={`${name}: ${hours.toFixed(0)}h`}
+                  {/* By Catalog */}
+                  {utilizationAggregates.byCatalog.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{widgetMetricLabel} by Catalog</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {utilizationAggregates.byCatalog.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / utilizationAggregates.grandTotal) * 100}%`,
+                              backgroundColor: widgetPalette[i % widgetPalette.length],
+                            }}
+                            title={`${name}: ${fmtWidgetVal(val)}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {utilizationAggregates.byCatalog.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
                             />
-                          ))}
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
-                          {utilizationAggregates.byFleet.map(([name, hours], i) => (
-                            <div key={name} className="flex items-center gap-2 text-xs">
-                              <span
-                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
-                                style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
-                              />
-                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                              <span className="ml-auto tabular-nums text-gray-500">
-                                {hours.toFixed(0)}h ({((hours / utilizationAggregates.grandTotalHours) * 100).toFixed(0)}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-                  {/* Device Hours Distribution */}
-                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
-                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
-                      Device Hours Distribution
-                    </h3>
-                    {(() => {
-                      const max = Math.max(...utilizationAggregates.bins.map(b => b.count), 1)
-                      return (
-                        <div className="space-y-1.5">
-                          {utilizationAggregates.bins.map(b => (
-                            <div key={b.label} className="flex items-center gap-2 text-xs">
-                              <div className="w-20 text-gray-700 dark:text-gray-300">{b.label}</div>
-                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
-                                <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
+                  {/* Device Distribution */}
+                  {utilizationAggregates.bins.some(b => b.count > 0) && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        Device {widgetMetricLabel} Distribution
+                      </h3>
+                      {(() => {
+                        const max = Math.max(...utilizationAggregates.bins.map(b => b.count), 1)
+                        return (
+                          <div className="space-y-1.5">
+                            {utilizationAggregates.bins.map(b => (
+                              <div key={b.label} className="flex items-center gap-2 text-xs">
+                                <div className="w-20 text-gray-700 dark:text-gray-300">{b.label}</div>
+                                <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-purple-500" style={{ width: `${(b.count / max) * 100}%` }} />
+                                </div>
+                                <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
+                                </div>
                               </div>
-                              <div className="w-28 text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
-                                {b.count.toLocaleString()} {b.count === 1 ? 'device' : 'devices'}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    })()}
-                  </div>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Row 2: By Fleet | By Area | By Location */}
+
+                  {/* By Fleet */}
+                  {utilizationAggregates.byFleet.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{widgetMetricLabel} by Fleet</h3>
+                      <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                        {utilizationAggregates.byFleet.map(([name, val], i) => (
+                          <div
+                            key={name}
+                            style={{
+                              width: `${(val / utilizationAggregates.grandTotal) * 100}%`,
+                              backgroundColor: widgetPalette[i % widgetPalette.length],
+                            }}
+                            title={`${name}: ${fmtWidgetVal(val)}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                        {utilizationAggregates.byFleet.map(([name, val], i) => (
+                          <div key={name} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                              style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
+                            />
+                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500">
+                              {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* By Area (top 10) */}
+                  {utilizationAggregates.byArea.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {widgetMetricLabel} by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                      </h3>
+                      {(() => {
+                        const max = utilizationAggregates.byArea[0][1] || 1
+                        return (
+                          <div className="grid grid-cols-[minmax(0,max-content)_1fr_auto] gap-x-2 gap-y-1.5 items-center text-xs">
+                            {utilizationAggregates.byArea.map(([name, val]) => (
+                              <React.Fragment key={name}>
+                                <div className="whitespace-nowrap text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                                <div className="bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-emerald-500" style={{ width: `${(val / max) * 100}%` }} />
+                                </div>
+                                <div className="text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {fmtWidgetVal(val)}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {/* By Location (top 10) */}
+                  {utilizationAggregates.byLocation.length > 0 && (
+                    <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                      <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                        {widgetMetricLabel} by Location <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                      </h3>
+                      {(() => {
+                        const max = utilizationAggregates.byLocation[0][1] || 1
+                        return (
+                          <div className="grid grid-cols-[minmax(0,max-content)_1fr_auto] gap-x-2 gap-y-1.5 items-center text-xs">
+                            {utilizationAggregates.byLocation.map(([name, val]) => (
+                              <React.Fragment key={name}>
+                                <div className="whitespace-nowrap text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                                <div className="bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                  <div className="h-full bg-blue-500" style={{ width: `${(val / max) * 100}%` }} />
+                                </div>
+                                <div className="text-right tabular-nums whitespace-nowrap text-gray-700 dark:text-gray-300">
+                                  {fmtWidgetVal(val)}
+                                </div>
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
                 </div>
               </CollapsibleSection>
+
+              {/* Applications chip cloud — narrow the table + widget device-set
+                  to a subset of the apps in the report. */}
+              {appsInReport.length > 0 && (
+                <UsageReportAppFilter
+                  apps={appsInReport}
+                  enabled={enabledApps}
+                  onToggle={toggleEnabledApp}
+                  onSelectAll={() => setEnabledApps(new Set(appsInReport))}
+                  onClear={() => setEnabledApps(new Set())}
+                />
+              )}
 
               {/* Utilization Data Table */}
               <div>
@@ -2836,8 +3113,9 @@ function ApplicationsPageContent() {
                         const fromQs = searchParams.toString()
                         const fromUrl = `${pathname}${fromQs ? `?${fromQs}` : ''}`
                         const drillHref = `/devices/applications/usage/${encodeURIComponent(app.name)}?days=${utilizationDays}&from=${encodeURIComponent(fromUrl)}`
+                        const noData = (app.deviceCount ?? 0) === 0 && (app.launchCount ?? 0) === 0 && (app.totalSeconds ?? 0) === 0
                         return (
-                        <tr key={app.name} className="hover:bg-blue-50 dark:hover:bg-blue-900/10">
+                        <tr key={app.name} className={`hover:bg-blue-50 dark:hover:bg-blue-900/10 ${noData ? 'opacity-60' : ''}`}>
                           <td className="px-4 lg:px-6 py-4">
                             <Link
                               href={drillHref}
@@ -2917,7 +3195,14 @@ function ApplicationsPageContent() {
                             </div>
                           </td>
                           <td className="px-4 lg:px-6 py-4">
-                            {app.isSingleUser ? (
+                            {noData ? (
+                              <span
+                                className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300"
+                                title="No usage records in the selected time window"
+                              >
+                                No data
+                              </span>
+                            ) : app.isSingleUser ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
                                 Single User
                               </span>
@@ -2939,6 +3224,19 @@ function ApplicationsPageContent() {
                 </table>
               </div>
             </div>
+          )}
+
+          {/* Applications chip cloud — versions report. Sits below the
+              Version Distribution widget so the user can narrow the table to
+              a subset of apps in the report. */}
+          {reportType === 'versions' && appsInReport.length > 0 && (
+            <UsageReportAppFilter
+              apps={appsInReport}
+              enabled={enabledApps}
+              onToggle={toggleEnabledApp}
+              onSelectAll={() => setEnabledApps(new Set(appsInReport))}
+              onClear={() => setEnabledApps(new Set())}
+            />
           )}
 
           {/* Missing Devices Table - Shown when report mode is 'missing' */}
@@ -3126,20 +3424,46 @@ function ApplicationsPageContent() {
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
-                        onClick={() => handleDeviceTableSort('deviceName')}
+                        onClick={() => handleDeviceTableSort('usage' as any)}
                       >
                         <div className="flex items-center gap-1">
-                          Device
-                          {deviceTableSortColumn === 'deviceName' && (
+                          Usage
+                          {(deviceTableSortColumn as string) === 'usage' && (
                             <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                             </svg>
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('catalog')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Catalog
+                          {deviceTableSortColumn === 'catalog' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
+                        onClick={() => handleDeviceTableSort('area' as any)}
+                      >
+                        <div className="flex items-center gap-1">
+                          Area
+                          {(deviceTableSortColumn as string) === 'area' && (
+                            <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
                         onClick={() => handleDeviceTableSort('location')}
                       >
@@ -3152,13 +3476,13 @@ function ApplicationsPageContent() {
                           )}
                         </div>
                       </th>
-                      <th 
+                      <th
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800 select-none"
-                        onClick={() => handleDeviceTableSort('catalog')}
+                        onClick={() => handleDeviceTableSort('deviceName')}
                       >
                         <div className="flex items-center gap-1">
-                          Catalog
-                          {deviceTableSortColumn === 'catalog' && (
+                          Device
+                          {deviceTableSortColumn === 'deviceName' && (
                             <svg className={`w-4 h-4 transition-transform ${deviceTableSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
                             </svg>
@@ -3174,7 +3498,7 @@ function ApplicationsPageContent() {
                         let aVal: string | undefined
                         let bVal: string | undefined
                         
-                        switch (deviceTableSortColumn) {
+                        switch (deviceTableSortColumn as string) {
                           case 'deviceName':
                             aVal = a.deviceName || a.serialNumber
                             bVal = b.deviceName || b.serialNumber
@@ -3187,13 +3511,21 @@ function ApplicationsPageContent() {
                             aVal = a.version
                             bVal = b.version
                             break
-                          case 'location':
-                            aVal = a.location || ''
-                            bVal = b.location || ''
+                          case 'usage':
+                            aVal = a.usage || ''
+                            bVal = b.usage || ''
                             break
                           case 'catalog':
                             aVal = a.catalog || ''
                             bVal = b.catalog || ''
+                            break
+                          case 'area':
+                            aVal = a.department || ''
+                            bVal = b.department || ''
+                            break
+                          case 'location':
+                            aVal = a.location || ''
+                            bVal = b.location || ''
                             break
                           default:
                             aVal = a.name
@@ -3212,6 +3544,18 @@ function ApplicationsPageContent() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             v{app.version}
                           </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {app.usage || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {app.catalog || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {(app as any).department || (app as any).area || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {app.location || '-'}
+                          </td>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <Link
@@ -3222,12 +3566,6 @@ function ApplicationsPageContent() {
                               </Link>
                               <PlatformBadge platform={app.platform || ''} size="sm" />
                             </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {app.location || '-'}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {app.catalog || '-'}
                           </td>
                         </tr>
                       ))
