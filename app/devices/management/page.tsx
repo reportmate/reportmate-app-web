@@ -345,14 +345,15 @@ function ManagementPageContent() {
   }, {} as Record<string, number>)
 
   // Create filter options for shared DeviceFilters component
+  const isStr = (x: string | undefined | null): x is string => !!x
   const filterOptions: FilterOptions = {
-    statuses: [...new Set(management.map(m => m.status).filter(Boolean))].sort(),
-    catalogs: [...new Set(management.map(m => m.catalog).filter(Boolean))].sort(),
-    areas: [...new Set(management.map(m => m.area || m.department).filter(Boolean))].sort() as string[],
-    locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
-    fleets: [...new Set(management.map(m => m.fleet).filter(Boolean))].sort() as string[],
+    statuses: [...new Set(management.map(m => m.status).filter(isStr))].sort(),
+    catalogs: [...new Set(management.map(m => m.catalog).filter(isStr))].sort(),
+    areas: [...new Set(management.map(m => m.area || m.department).filter(isStr))].sort(),
+    locations: [...new Set(management.map(m => m.location).filter(isStr))].sort(),
+    fleets: [...new Set(management.map(m => m.fleet).filter(isStr))].sort(),
     platforms: [...new Set(management.map(m => m.osName || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
-    usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
+    usages: [...new Set(management.map(m => m.usage).filter(isStr))].sort()
   }
 
   // Compute device count per location for proportional pill sizing
