@@ -2115,30 +2115,6 @@ function ApplicationsPageContent() {
                     </div>
                   </div>
 
-                  {/* Area Filter - Only show if areas exist */}
-                  {filterOptions.areas.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {filterOptions.areas.map(area => (
-                        <button
-                          key={area}
-                          onClick={() => toggleArea(area)}
-                          className={`px-2 py-1 text-xs rounded-full border ${
-                            selectedAreas.includes(area)
-                              ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {area}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
                   {/* Fleet Filter - Only show if fleets exist */}
                   {filterOptions.fleets.length > 0 && (
                   <div>
@@ -2164,6 +2140,32 @@ function ApplicationsPageContent() {
                   )}
 
                 </div>
+
+                {/* Area Filter - Full width row above Locations */}
+                {filterOptions.areas.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
+                    </h3>
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {filterOptions.areas.map(area => (
+                      <button
+                        key={area}
+                        onClick={() => toggleArea(area)}
+                        className={`px-2 py-1 text-xs rounded-full border ${
+                          selectedAreas.includes(area)
+                            ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
+                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
+                        }`}
+                      >
+                        {area}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                )}
 
                 {/* Locations Filter Cloud - Full Width */}
                 <div>

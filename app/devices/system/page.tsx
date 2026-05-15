@@ -901,162 +901,6 @@ function SystemPageContent() {
             
             <CollapsibleSection expanded={effectiveFiltersExpanded}>
               <div className="px-6 pb-4 space-y-4">
-                {/* OS Version Filter */}
-                {osVersionFilter && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OS Version</div>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => router.push('/devices/system')}
-                        className="px-3 py-1 text-xs font-medium rounded-full border transition-colors bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700 flex items-center gap-1 group"
-                      >
-                        {decodeURIComponent(osVersionFilter)}
-                        <svg className="w-3 h-3 group-hover:text-blue-600 dark:group-hover:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {/* Edition Filter */}
-                {filterOptions.editions.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Edition</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.editions.map(edition => (
-                        <button
-                          key={edition}
-                          onClick={() => toggleEdition(edition)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedEditions.includes(edition)
-                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {edition}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Architecture Filter */}
-                {filterOptions.architectures.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Architecture</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.architectures.map(arch => (
-                        <button
-                          key={arch}
-                          onClick={() => toggleArchitecture(arch)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedArchitectures.includes(arch)
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {arch}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Pending Updates Filter */}
-                {systems.some(s => s.pendingUpdatesCount != null) && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Pending Updates</div>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        { key: 'up-to-date', label: 'Up to date' },
-                        { key: '1-5', label: '1-5 pending' },
-                        { key: '6-10', label: '6-10 pending' },
-                        { key: '10+', label: '10+ pending' },
-                      ].map(bucket => (
-                        <button
-                          key={bucket.key}
-                          onClick={() => togglePendingBucket(bucket.key)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedPendingBuckets.includes(bucket.key)
-                              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {bucket.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* License Source Filter */}
-                {filterOptions.licenseSources.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">License Source</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.licenseSources.map(src => (
-                        <button
-                          key={src}
-                          onClick={() => toggleLicenseSource(src)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedLicenseSources.includes(src)
-                              ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {src}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Activation Status Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Activation Status</div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Activated', 'Not Activated'].map(status => (
-                      <button
-                        key={status}
-                        onClick={() => toggleActivationStatus(status)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          selectedActivationStatus.includes(status)
-                            ? status === 'Activated' 
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                              : 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200 border-red-300 dark:border-red-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                {/* License Type Filter */}
-                <div>
-                  <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">OEM License</div>
-                  <div className="flex flex-wrap gap-2">
-                    {['Has OEM License', 'No OEM License'].map(type => (
-                      <button
-                        key={type}
-                        onClick={() => toggleLicenseType(type)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          selectedLicenseType.includes(type)
-                            ? type === 'Has OEM License'
-                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200 border-emerald-300 dark:border-emerald-700'
-                              : 'bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 border-amber-300 dark:border-amber-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                        title={type === 'Has OEM License' 
-                          ? 'Has usable firmware-embedded (UEFI/BIOS) Pro/Enterprise license' 
-                          : 'No usable OEM license - may lose activation when migrating from AD to Entra ID'}
-                      >
-                        {type}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
                 {/* Usage Filter */}
                 {filterOptions.usages.length > 0 && (
                   <div>
@@ -1101,28 +945,6 @@ function SystemPageContent() {
                   </div>
                 )}
 
-                {/* Area Filter */}
-                {filterOptions.areas.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.areas.map(area => (
-                        <button
-                          key={area}
-                          onClick={() => toggleArea(area)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedAreas.includes(area)
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {area}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
                 {/* Fleet Filter */}
                 {filterOptions.fleets.length > 0 && (
                   <div>
@@ -1139,6 +961,28 @@ function SystemPageContent() {
                           }`}
                         >
                           {fleet}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Area Filter - Full width row above Location */}
+                {filterOptions.areas.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.areas.map(area => (
+                        <button
+                          key={area}
+                          onClick={() => toggleArea(area)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedAreas.includes(area)
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {area}
                         </button>
                       ))}
                     </div>
