@@ -65,6 +65,9 @@ interface SecurityDevice {
   usage?: string
   location?: string
   assetTag?: string
+  department?: string
+  area?: string
+  fleet?: string
 }
 
 interface CertificateResult {
@@ -478,6 +481,8 @@ function SecurityPageContent() {
     if (selectedStatuses.length > 0 && d.status && !selectedStatuses.includes(d.status)) return false
     if (selectedCatalogs.length > 0 && d.catalog && !selectedCatalogs.includes(d.catalog)) return false
     if (selectedLocations.length > 0 && d.location && !selectedLocations.includes(d.location)) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
     if (selectedUsages.length > 0 && d.usage && !selectedUsages.includes(d.usage)) return false
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
@@ -514,9 +519,9 @@ function SecurityPageContent() {
   const filterOptions: FilterOptions = {
     statuses: [...new Set(devices.map(d => d.status).filter(Boolean))].sort() as string[],
     catalogs: [...new Set(devices.map(d => d.catalog).filter(Boolean))].sort() as string[],
-    areas: [],
+    areas: [...new Set(devices.map(d => d.area || d.department).filter(Boolean))].sort() as string[],
     locations: [...new Set(devices.map(d => d.location).filter(Boolean))].sort() as string[],
-    fleets: [],
+    fleets: [...new Set(devices.map(d => d.fleet).filter(Boolean))].sort() as string[],
     platforms: [...new Set(devices.map(d => normalizePlatform(d.platform)).filter(p => p !== 'Unknown'))].sort(),
     usages: [...new Set(devices.map(d => d.usage).filter(Boolean))].sort() as string[],
   }
@@ -536,6 +541,8 @@ function SecurityPageContent() {
     if (selectedStatuses.length > 0 && d.status && !selectedStatuses.includes(d.status)) return false
     if (selectedCatalogs.length > 0 && d.catalog && !selectedCatalogs.includes(d.catalog)) return false
     if (selectedLocations.length > 0 && d.location && !selectedLocations.includes(d.location)) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(normalizePlatform(d.platform))) return false
     if (selectedUsages.length > 0 && d.usage && !selectedUsages.includes(d.usage)) return false
     // Widget filters
