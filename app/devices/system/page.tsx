@@ -16,6 +16,7 @@ import { useDeviceData } from "../../../src/hooks/useDeviceData"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface SystemDevice {
   id: string
@@ -500,6 +501,16 @@ function SystemPageContent() {
     )).sort() as string[],
   }
 
+  // FilterOptions slice fed to the shared DeviceFilters component (inventory dimensions only)
+  const selectionFilterOptions: FilterOptions = {
+    statuses: [],
+    usages: filterOptions.usages,
+    catalogs: filterOptions.catalogs,
+    areas: filterOptions.areas,
+    locations: filterOptions.locations,
+    fleets: filterOptions.fleets,
+  }
+
   // Compute location counts for proportional pill sizing
   const locationCounts = devices.reduce((acc: Record<string, number>, d: any) => {
     const loc = d.modules?.inventory?.location
@@ -875,162 +886,28 @@ function SystemPageContent() {
             </div>
           </div>
 
-          {/* Selections Accordion Section - First */}
-          <div className="border-b border-gray-200 dark:border-gray-700">
-            <button
-              onClick={() => setFiltersExpanded(!effectiveFiltersExpanded)}
-              className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Selections</span>
-                {totalActiveFilters > 0 && (
-                  <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
-                    {totalActiveFilters} active
-                  </span>
-                )}
-              </div>
-              <svg 
-                className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${effectiveFiltersExpanded ? 'rotate-90' : ''}`} 
-                fill="none" 
-                stroke="currentColor" 
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-            
-            <CollapsibleSection expanded={effectiveFiltersExpanded}>
-              <div className="px-6 pb-4 space-y-4">
-                {/* Usage Filter */}
-                {filterOptions.usages.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Usage</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.usages.map(usage => (
-                        <button
-                          key={usage}
-                          onClick={() => toggleUsage(usage)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedUsages.includes(usage)
-                              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {usage}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Catalog Filter */}
-                {filterOptions.catalogs.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.catalogs.map(catalog => (
-                        <button
-                          key={catalog}
-                          onClick={() => toggleCatalog(catalog)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedCatalogs.includes(catalog)
-                              ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {catalog}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Fleet Filter */}
-                {filterOptions.fleets.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Fleet</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.fleets.map(fleet => (
-                        <button
-                          key={fleet}
-                          onClick={() => toggleFleet(fleet)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedFleets.includes(fleet)
-                              ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {fleet}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Area Filter - Full width row above Location */}
-                {filterOptions.areas.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.areas.map(area => (
-                        <button
-                          key={area}
-                          onClick={() => toggleArea(area)}
-                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                            selectedAreas.includes(area)
-                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {area}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Location Filter */}
-                {filterOptions.locations.length > 0 && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-                    <div className="flex flex-wrap gap-2">
-                      {filterOptions.locations.map(location => {
-                        const count = locationCounts[location] || 0
-                        const scale = count / maxLocationCount
-                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                        return (
-                        <button
-                          key={location}
-                          onClick={() => toggleLocation(location)}
-                          title={`${location} (${count} devices)`}
-                          className={`${sizeClass} rounded-full border transition-colors ${
-                            selectedLocations.includes(location)
-                              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 border-green-300 dark:border-green-700'
-                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                          }`}
-                        >
-                          {location}
-                        </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-                
-                {/* Clear All Selections */}
-                {totalActiveFilters > 0 && (
-                  <div className="pt-2">
-                    <button
-                      onClick={clearAllFilters}
-                      className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
-                    >
-                      Clear all selections
-                    </button>
-                  </div>
-                )}
-              </div>
-            </CollapsibleSection>
-          </div>
+          {/* Selections accordion (shared component) */}
+          <DeviceFilters
+            filterOptions={selectionFilterOptions}
+            selectedStatuses={[]}
+            selectedCatalogs={selectedCatalogs}
+            selectedAreas={selectedAreas}
+            selectedLocations={selectedLocations}
+            selectedFleets={selectedFleets}
+            selectedUsages={selectedUsages}
+            onStatusToggle={() => { /* no statuses on /system */ }}
+            onCatalogToggle={toggleCatalog}
+            onAreaToggle={toggleArea}
+            onLocationToggle={toggleLocation}
+            onFleetToggle={toggleFleet}
+            onUsageToggle={toggleUsage}
+            onClearAll={clearAllFilters}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            expanded={effectiveFiltersExpanded}
+            onToggle={() => setFiltersExpanded(!filtersExpanded)}
+            locationCounts={locationCounts}
+          />
 
           {/* Widgets Accordion - OS Version Charts */}
           <div className={widgetsExpanded ? '' : 'border-b border-gray-200 dark:border-gray-700'}>

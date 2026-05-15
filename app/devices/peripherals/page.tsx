@@ -9,6 +9,7 @@ import { formatRelativeTime } from "../../../src/lib/time"
 import { usePlatformFilterSafe, normalizePlatform } from "../../../src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "../../../src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "../../../src/hooks/useScrollCollapse"
+import DeviceFilters, { FilterOptions } from "../../../src/components/shared/DeviceFilters"
 
 interface Peripheral {
   id: string
@@ -27,6 +28,13 @@ interface Peripheral {
   inputDevices: any[]
   storageDevices: any[]
   lastUpdated: string
+  // Inventory dimensions (for Selections accordion)
+  usage?: string | null
+  catalog?: string | null
+  location?: string | null
+  area?: string | null
+  department?: string | null
+  fleet?: string | null
 }
 
 function LoadingSkeleton() {
@@ -113,9 +121,24 @@ function PeripheralsPageContent() {
   const [sortColumn, setSortColumn] = useState<'device' | 'total' | 'lastSeen'>('device')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
+  // Selections accordion state
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const toggleUsage = (u: string) => setSelectedUsages(p => p.includes(u) ? p.filter(x => x !== u) : [...p, u])
+  const toggleCatalog = (c: string) => setSelectedCatalogs(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])
+  const toggleLocation = (l: string) => setSelectedLocations(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l])
+  const toggleArea = (a: string) => setSelectedAreas(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a])
+  const toggleFleet = (f: string) => setSelectedFleets(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])
+  const clearAllSelections = () => {
+    setSelectedUsages([]); setSelectedCatalogs([]); setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+  }
 
-  const { tableContainerRef, effectiveWidgetsExpanded } = useScrollCollapse(
-    { widgets: widgetsExpanded },
+  const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+    { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading }
   )
   
@@ -198,6 +221,12 @@ function PeripheralsPageContent() {
       (deviceTypeFilter === 'input' && getDeviceCount(peripheral.inputDevices) > 0) ||
       (deviceTypeFilter === 'storage' && getDeviceCount(peripheral.storageDevices) > 0)
     )
+
+    if (selectedUsages.length > 0 && !selectedUsages.includes(peripheral.usage || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(peripheral.catalog || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(peripheral.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(peripheral.area || peripheral.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(peripheral.fleet || '')) return false
 
     return matchesSearch && matchesFilter
   }).sort((a, b) => {
@@ -317,6 +346,43 @@ function PeripheralsPageContent() {
               </div>
             </div>
           </div>
+
+          {/* Selections accordion (shared component) */}
+          {(() => {
+            const sharedFilterOptions: FilterOptions = {
+              statuses: [],
+              usages: Array.from(new Set(peripherals.map(p => p.usage).filter(Boolean) as string[])).sort(),
+              catalogs: Array.from(new Set(peripherals.map(p => p.catalog).filter(Boolean) as string[])).sort(),
+              areas: Array.from(new Set(peripherals.map(p => p.area || p.department).filter(Boolean) as string[])).sort(),
+              locations: Array.from(new Set(peripherals.map(p => p.location).filter(Boolean) as string[])).sort(),
+              fleets: Array.from(new Set(peripherals.map(p => p.fleet).filter(Boolean) as string[])).sort(),
+            }
+            const locCounts: Record<string, number> = {}
+            peripherals.forEach(p => { if (p.location) locCounts[p.location] = (locCounts[p.location] || 0) + 1 })
+            return (
+              <DeviceFilters
+                filterOptions={sharedFilterOptions}
+                selectedStatuses={[]}
+                selectedCatalogs={selectedCatalogs}
+                selectedAreas={selectedAreas}
+                selectedLocations={selectedLocations}
+                selectedFleets={selectedFleets}
+                selectedUsages={selectedUsages}
+                onStatusToggle={() => { /* no statuses on /peripherals */ }}
+                onCatalogToggle={toggleCatalog}
+                onAreaToggle={toggleArea}
+                onLocationToggle={toggleLocation}
+                onFleetToggle={toggleFleet}
+                onUsageToggle={toggleUsage}
+                onClearAll={clearAllSelections}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                expanded={effectiveFiltersExpanded}
+                onToggle={() => setFiltersExpanded(!filtersExpanded)}
+                locationCounts={locCounts}
+              />
+            )
+          })()}
 
           {/* Widgets Accordion */}
           <div className="border-b border-gray-200 dark:border-gray-700">
