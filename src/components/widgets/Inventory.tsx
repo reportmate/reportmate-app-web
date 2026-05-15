@@ -28,6 +28,7 @@ interface Device {
     assetTag?: string
     serialNumber?: string
     uuid?: string
+    fleet?: string
   }
   // Modular data from modules
   modules?: {
@@ -43,6 +44,7 @@ interface Device {
       serialNumber?: string
       serial_number?: string
       uuid?: string
+      fleet?: string
     }
   }
 }
@@ -57,7 +59,7 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
   const inventory = rawInventory ? normalizeKeys(rawInventory) as any : {}
   
   // Check if we have any assignment details for the right column
-  const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location
+  const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location || inventory.fleet
   
   return (
     <StatBlock 
@@ -125,6 +127,11 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
               {/* Location */}
               {inventory.location && (
                 <Stat label="Location" value={inventory.location} />
+              )}
+
+              {/* Fleet */}
+              {inventory.fleet && (
+                <Stat label="Fleet" value={inventory.fleet} />
               )}
             </div>
           )}
