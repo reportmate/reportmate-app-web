@@ -15,6 +15,8 @@ interface DeviceRow {
   catalog: string | null
   location: string | null
   room: string | null
+  department: string | null
+  fleet: string | null
   assetTag: string | null
   totalSeconds: number
   totalHours: number
@@ -129,6 +131,8 @@ export default function ApplicationUsageByDevicePage() {
     const byLocation = sumBy(d => d.location).slice(0, 10)
     const byCatalog = sumBy(d => d.catalog)
     const byUsage = sumBy(d => d.usage)
+    const byArea = sumBy(d => d.department).slice(0, 10)
+    const byFleet = sumBy(d => d.fleet)
 
     // Hours distribution: histogram bins
     const bins: Array<{ label: string; count: number; min: number; max: number }> = [
@@ -143,7 +147,7 @@ export default function ApplicationUsageByDevicePage() {
       if (bin) bin.count += 1
     }
 
-    return { grandTotalHours, byLocation, byCatalog, byUsage, bins }
+    return { grandTotalHours, byLocation, byCatalog, byUsage, byArea, byFleet, bins }
   }, [data])
 
   const palette = ['#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16', '#ef4444']
@@ -403,6 +407,70 @@ export default function ApplicationUsageByDevicePage() {
                         </div>
                         <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
                           {aggregates.byUsage.map(([name, hours], i) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <span
+                                className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
+                                style={{ backgroundColor: palette[i % palette.length] }}
+                              />
+                              <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
+                              <span className="ml-auto tabular-nums text-gray-500">
+                                {hours.toFixed(0)}h ({((hours / aggregates.grandTotalHours) * 100).toFixed(0)}%)
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Hours by Area (top 10) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">
+                      Hours by Area <span className="text-xs font-normal text-gray-500">(top 10)</span>
+                    </h3>
+                    {aggregates.byArea.length === 0 ? (
+                      <p className="text-xs text-gray-500">No area data.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {(() => {
+                          const max = aggregates.byArea[0][1] || 1
+                          return aggregates.byArea.map(([name, hours]) => (
+                            <div key={name} className="flex items-center gap-2 text-xs">
+                              <div className="w-20 truncate text-gray-700 dark:text-gray-300" title={name}>{name}</div>
+                              <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded h-3 overflow-hidden">
+                                <div className="h-full bg-emerald-500" style={{ width: `${(hours / max) * 100}%` }} />
+                              </div>
+                              <div className="w-16 text-right tabular-nums text-gray-700 dark:text-gray-300">
+                                {hours.toFixed(0)}h
+                              </div>
+                            </div>
+                          ))
+                        })()}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Hours by Fleet (stacked + legend) */}
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 p-4 bg-gray-50/50 dark:bg-gray-900/30">
+                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Hours by Fleet</h3>
+                    {aggregates.byFleet.length === 0 ? (
+                      <p className="text-xs text-gray-500">No fleet data.</p>
+                    ) : (
+                      <>
+                        <div className="flex h-4 rounded overflow-hidden bg-gray-200 dark:bg-gray-700">
+                          {aggregates.byFleet.map(([name, hours], i) => (
+                            <div
+                              key={name}
+                              style={{
+                                width: `${(hours / aggregates.grandTotalHours) * 100}%`,
+                                backgroundColor: palette[i % palette.length],
+                              }}
+                              title={`${name}: ${hours.toFixed(0)}h`}
+                            />
+                          ))}
+                        </div>
+                        <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                          {aggregates.byFleet.map(([name, hours], i) => (
                             <div key={name} className="flex items-center gap-2 text-xs">
                               <span
                                 className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
