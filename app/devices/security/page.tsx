@@ -267,7 +267,6 @@ function SecurityPageContent() {
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
 
   // Widget click-filters
@@ -411,12 +410,11 @@ function SecurityPageContent() {
   const toggleArea = (a: string) => setSelectedAreas(prev => prev.includes(a) ? prev.filter(x => x !== a) : [...prev, a])
   const toggleLocation = (l: string) => setSelectedLocations(prev => prev.includes(l) ? prev.filter(x => x !== l) : [...prev, l])
   const toggleFleet = (f: string) => setSelectedFleets(prev => prev.includes(f) ? prev.filter(x => x !== f) : [...prev, f])
-  const togglePlatform = (p: string) => setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p])
   const toggleUsage = (u: string) => setSelectedUsages(prev => prev.includes(u) ? prev.filter(x => x !== u) : [...prev, u])
 
   const clearAllFilters = () => {
     setSelectedStatuses([]); setSelectedCatalogs([]); setSelectedAreas([])
-    setSelectedLocations([]); setSelectedFleets([]); setSelectedPlatforms([]); setSelectedUsages([])
+    setSelectedLocations([]); setSelectedFleets([]); setSelectedUsages([])
     setEncryptionFilter(''); setProtectionFilter(''); setDetectionFilter('')
     setFirewallFilter(''); setTamperingFilter(''); setRemoteFilter('')
     setCertFilter(''); setCveFilter(''); setSearchQuery('')
@@ -477,7 +475,6 @@ function SecurityPageContent() {
 
   const selectionFiltered = devices.filter(d => {
     if (globalPlatformFilter !== 'all' && !isPlatformVisible(normalizePlatform(d.platform))) return false
-    if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(normalizePlatform(d.platform))) return false
     if (selectedStatuses.length > 0 && d.status && !selectedStatuses.includes(d.status)) return false
     if (selectedCatalogs.length > 0 && d.catalog && !selectedCatalogs.includes(d.catalog)) return false
     if (selectedLocations.length > 0 && d.location && !selectedLocations.includes(d.location)) return false
@@ -522,7 +519,6 @@ function SecurityPageContent() {
     areas: [...new Set(devices.map(d => d.area || d.department).filter(Boolean))].sort() as string[],
     locations: [...new Set(devices.map(d => d.location).filter(Boolean))].sort() as string[],
     fleets: [...new Set(devices.map(d => d.fleet).filter(Boolean))].sort() as string[],
-    platforms: [...new Set(devices.map(d => normalizePlatform(d.platform)).filter(p => p !== 'Unknown'))].sort(),
     usages: [...new Set(devices.map(d => d.usage).filter(Boolean))].sort() as string[],
   }
 
@@ -543,7 +539,6 @@ function SecurityPageContent() {
     if (selectedLocations.length > 0 && d.location && !selectedLocations.includes(d.location)) return false
     if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
     if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
-    if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(normalizePlatform(d.platform))) return false
     if (selectedUsages.length > 0 && d.usage && !selectedUsages.includes(d.usage)) return false
     // Widget filters
     if (encryptionFilter && (d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted') !== encryptionFilter) return false
@@ -683,14 +678,12 @@ function SecurityPageContent() {
             selectedAreas={selectedAreas}
             selectedLocations={selectedLocations}
             selectedFleets={selectedFleets}
-            selectedPlatforms={selectedPlatforms}
             selectedUsages={selectedUsages}
             onStatusToggle={toggleStatus}
             onCatalogToggle={toggleCatalog}
             onAreaToggle={toggleArea}
             onLocationToggle={toggleLocation}
             onFleetToggle={toggleFleet}
-            onPlatformToggle={togglePlatform}
             onUsageToggle={toggleUsage}
             onClearAll={clearAllFilters}
             searchQuery={searchQuery}

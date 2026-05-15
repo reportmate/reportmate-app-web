@@ -9,7 +9,6 @@ export interface FilterOptions {
   areas: string[]
   locations: string[]
   fleets: string[]
-  platforms: string[]
   usages: string[]
 }
 
@@ -20,14 +19,12 @@ interface DeviceFiltersProps {
   selectedAreas: string[]
   selectedLocations: string[]
   selectedFleets: string[]
-  selectedPlatforms: string[]
   selectedUsages: string[]
   onStatusToggle: (status: string) => void
   onCatalogToggle: (catalog: string) => void
   onAreaToggle: (area: string) => void
   onLocationToggle: (location: string) => void
   onFleetToggle: (fleet: string) => void
-  onPlatformToggle: (platform: string) => void
   onUsageToggle: (usage: string) => void
   onClearAll: () => void
   searchQuery: string
@@ -47,14 +44,12 @@ export default function DeviceFilters({
   selectedAreas,
   selectedLocations,
   selectedFleets,
-  selectedPlatforms,
   selectedUsages,
   onStatusToggle,
   onCatalogToggle,
   onAreaToggle,
   onLocationToggle,
   onFleetToggle,
-  onPlatformToggle,
   onUsageToggle,
   expanded: externalExpanded,
   onToggle,
@@ -63,9 +58,9 @@ export default function DeviceFilters({
   const [internalExpanded, setInternalExpanded] = useState(false)
   const filtersExpanded = externalExpanded !== undefined ? externalExpanded : internalExpanded
   const setFiltersExpanded = (val: boolean) => setInternalExpanded(val)
-  
-  const totalActiveFilters = selectedStatuses.length + selectedCatalogs.length + selectedAreas.length + 
-    selectedLocations.length + selectedFleets.length + selectedPlatforms.length + selectedUsages.length
+
+  const totalActiveFilters = selectedStatuses.length + selectedCatalogs.length + selectedAreas.length +
+    selectedLocations.length + selectedFleets.length + selectedUsages.length
 
   return (
     <div className="border-b border-gray-200 dark:border-gray-700">
@@ -116,28 +111,6 @@ export default function DeviceFilters({
                 ))}
               </div>
             </div>
-
-            {/* Platform Filter - When available */}
-            {filterOptions.platforms.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Platform</div>
-                <div className="flex flex-wrap gap-2">
-                  {filterOptions.platforms.map(platform => (
-                    <button
-                      key={platform}
-                      onClick={() => onPlatformToggle(platform)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                        selectedPlatforms.includes(platform)
-                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200 border-orange-300 dark:border-orange-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {platform}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Usage Filter - When available */}
             {filterOptions.usages.length > 0 && (
@@ -233,7 +206,7 @@ export default function DeviceFilters({
           {filterOptions.locations.length > 0 && (
             <div className="mt-4">
               <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Location</div>
-              <div className="flex flex-wrap gap-2 items-center">
+              <div className="flex flex-wrap gap-2 items-center max-h-32 overflow-y-auto">
                 {filterOptions.locations.map(location => {
                   const count = locationCounts?.[location] ?? 0
                   const maxCount = locationCounts ? Math.max(...Object.values(locationCounts), 1) : 1
