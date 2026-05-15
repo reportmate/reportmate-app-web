@@ -15,6 +15,9 @@ export interface InventoryInfo {
   model?: string
   serialNumber?: string
   description?: string
+  fleet?: string
+  usage?: string
+  catalog?: string
 }
 
 /**
@@ -55,6 +58,9 @@ export function extractInventory(inventoryData: any): InventoryInfo {
   if (inventory.model) inventoryInfo.model = inventory.model
   if (serialNumber) inventoryInfo.serialNumber = serialNumber
   if (inventory.description) inventoryInfo.description = inventory.description
+  if (inventory.fleet) inventoryInfo.fleet = inventory.fleet
+  if (inventory.usage) inventoryInfo.usage = inventory.usage
+  if (inventory.catalog) inventoryInfo.catalog = inventory.catalog
 
     return inventoryInfo
 }
