@@ -11,6 +11,7 @@ import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
 import { usePlatformFilterSafe } from '../../../src/providers/PlatformFilterProvider'
 import { CollapsibleSection } from '../../../src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '../../../src/hooks/useScrollCollapse'
+import DeviceFilters, { FilterOptions as SharedFilterOptions } from '../../../src/components/shared/DeviceFilters'
 
 interface ApplicationItem {
   id: string
@@ -1987,7 +1988,42 @@ function ApplicationsPageContent() {
             </div>
           )}
 
-          {/* Filter Clouds Section */}
+          {/* Selections accordion (shared inventory dimensions) */}
+          {!filtersLoading && (() => {
+            const sharedFilterOptions: SharedFilterOptions = {
+              statuses: [],
+              usages: filterOptions.usages,
+              catalogs: filterOptions.catalogs,
+              areas: filterOptions.areas,
+              locations: filterOptions.rooms,
+              fleets: filterOptions.fleets,
+            }
+            const locCounts: Record<string, number> = {}
+            allDevices.forEach(d => { if (d.room) locCounts[d.room] = (locCounts[d.room] || 0) + 1 })
+            return (
+              <DeviceFilters
+                filterOptions={sharedFilterOptions}
+                selectedStatuses={[]}
+                selectedCatalogs={selectedCatalogs}
+                selectedAreas={selectedAreas}
+                selectedLocations={selectedRooms}
+                selectedFleets={selectedFleets}
+                selectedUsages={selectedUsages}
+                onStatusToggle={() => { /* no statuses on /applications */ }}
+                onCatalogToggle={(c) => toggleCatalog(c.toLowerCase())}
+                onAreaToggle={toggleArea}
+                onLocationToggle={toggleRoom}
+                onFleetToggle={toggleFleet}
+                onUsageToggle={(u) => toggleUsage(u.toLowerCase())}
+                onClearAll={() => { /* page-specific clear handled elsewhere */ }}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                locationCounts={locCounts}
+              />
+            )
+          })()}
+
+          {/* Applications report-builder accordion (page-specific) */}
           {!filtersLoading && (
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Collapsible Header */}
@@ -1996,18 +2032,18 @@ function ApplicationsPageContent() {
                 className="w-full px-6 py-3 bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center justify-between"
               >
                 <div className="flex items-center gap-3">
-                  <svg 
+                  <svg
                     className={`w-5 h-5 text-gray-600 dark:text-gray-300 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : ''}`}
-                    fill="none" 
-                    stroke="currentColor" 
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                   <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-                    Selections {(selectedApplications.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0) && (
+                    Applications {selectedApplications.length > 0 && (
                       <span className="ml-2 text-blue-600 dark:text-blue-400">
-                        ({[selectedApplications, selectedUsages, selectedCatalogs, selectedLocations, selectedRooms, selectedFleets, selectedAreas].reduce((sum, arr) => sum + arr.length, 0)} active)
+                        ({selectedApplications.length} active)
                       </span>
                     )}
                   </h3>
@@ -2068,146 +2104,6 @@ function ApplicationsPageContent() {
                 <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700">
                   <div className="space-y-4">
                 
-                {/* Inventory Filter Sections - Top */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  
-                  {/* Usage Filter */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Usage {selectedUsages.length > 0 && `(${selectedUsages.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {filterOptions.usages.map(usage => (
-                        <button
-                          key={usage}
-                          onClick={() => toggleUsage(usage.toLowerCase())}
-                          className={`px-2 py-1 text-xs rounded-full border ${
-                            selectedUsages.includes(usage.toLowerCase())
-                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {usage}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Catalog Filter */}
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Catalog {selectedCatalogs.length > 0 && `(${selectedCatalogs.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {filterOptions.catalogs.map(catalog => (
-                        <button
-                          key={catalog}
-                          onClick={() => toggleCatalog(catalog.toLowerCase())}
-                          className={`px-2 py-1 text-xs rounded-full border ${
-                            selectedCatalogs.includes(catalog.toLowerCase())
-                              ? 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900 dark:text-teal-200 dark:border-teal-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {catalog}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Fleet Filter - Only show if fleets exist */}
-                  {filterOptions.fleets.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Fleet {selectedFleets.length > 0 && `(${selectedFleets.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {filterOptions.fleets.map(fleet => (
-                        <button
-                          key={fleet}
-                          onClick={() => toggleFleet(fleet)}
-                          className={`px-2 py-1 text-xs rounded-full border ${
-                            selectedFleets.includes(fleet)
-                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {fleet}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                </div>
-
-                {/* Area Filter - Full width row above Locations */}
-                {filterOptions.areas.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
-                    </h3>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {filterOptions.areas.map(area => (
-                      <button
-                        key={area}
-                        onClick={() => toggleArea(area)}
-                        className={`px-2 py-1 text-xs rounded-full border ${
-                          selectedAreas.includes(area)
-                            ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        {area}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                )}
-
-                {/* Locations Filter Cloud - Full Width */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Locations {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
-                    </h3>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                      {(() => {
-                        const roomCountsMap: Record<string, number> = {}
-                        allDevices.forEach(d => { if (d.room) roomCountsMap[d.room] = (roomCountsMap[d.room] || 0) + 1 })
-                        const filteredRooms = filterOptions.rooms.filter(room => room.toLowerCase().includes(searchQuery.toLowerCase()))
-                        const maxCount = Math.max(...filteredRooms.map(r => roomCountsMap[r] || 0), 1)
-                        return filteredRooms.map(room => {
-                          const count = roomCountsMap[room] || 0
-                          const scale = count / maxCount
-                          const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                          return (
-                        <button
-                          key={room}
-                          onClick={() => toggleRoom(room)}
-                          title={`${room} (${count} devices)`}
-                          className={`${sizeClass} rounded-full border transition-colors ${
-                            selectedRooms.includes(room)
-                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {room}
-                        </button>
-                          )
-                        })
-                      })()}
-                      {filterOptions.rooms.length === 0 && (
-                        <span className="px-2 py-1 text-xs text-gray-500 dark:text-gray-400">
-                          No location data available
-                        </span>
-                      )}
-                  </div>
-                </div>
-
                 {/* Applications Filter Cloud */}
                 <div>
                   <div className="flex items-center justify-between mb-2">

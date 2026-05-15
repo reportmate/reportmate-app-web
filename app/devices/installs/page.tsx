@@ -12,6 +12,7 @@ import { PlatformBadge } from '../../../src/components/ui/PlatformBadge'
 import { getDevicePlatform, usePlatformFilterSafe } from '../../../src/providers/PlatformFilterProvider'
 import { CollapsibleSection } from '../../../src/components/ui/CollapsibleSection'
 import { useScrollCollapse } from '../../../src/hooks/useScrollCollapse'
+import DeviceFilters, { FilterOptions as SharedFilterOptions } from '../../../src/components/shared/DeviceFilters'
 
 // Force dynamic rendering
 export const dynamic = 'force-dynamic'
@@ -3210,7 +3211,41 @@ function InstallsPageContent() {
             </div>
           )}
 
-          {/* Filters Accordion - Hide when in generate report mode since items are already expanded */}
+          {/* Selections accordion (shared inventory dimensions) */}
+          {!filtersLoading && (() => {
+            const activeFilters = installs.length > 0 ? reportFilterOptions : filterOptions
+            const sharedFilterOptions: SharedFilterOptions = {
+              statuses: [],
+              usages: activeFilters.usages || [],
+              catalogs: activeFilters.catalogs || [],
+              areas: (activeFilters as any).areas || [],
+              locations: (activeFilters as any).rooms || [],
+              fleets: activeFilters.fleets || [],
+            }
+            return (
+              <DeviceFilters
+                filterOptions={sharedFilterOptions}
+                selectedStatuses={[]}
+                selectedCatalogs={selectedCatalogs}
+                selectedAreas={selectedAreas}
+                selectedLocations={selectedRooms}
+                selectedFleets={selectedFleets}
+                selectedUsages={selectedUsages}
+                onStatusToggle={() => { /* no statuses on /installs */ }}
+                onCatalogToggle={toggleCatalog}
+                onAreaToggle={toggleArea}
+                onLocationToggle={toggleRoom}
+                onFleetToggle={toggleFleet}
+                onUsageToggle={toggleUsage}
+                onClearAll={clearAllFilters}
+                searchQuery={searchQuery}
+                onSearchChange={setSearchQuery}
+                locationCounts={roomCounts}
+              />
+            )
+          })()}
+
+          {/* Installs report-builder accordion (page-specific) */}
           {!filtersLoading && (
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Accordion Header - Hide button when in generate report mode */}
@@ -3221,7 +3256,7 @@ function InstallsPageContent() {
               >
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Filters
+                    Installs
                   </span>
                   {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0) && (
                     <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
@@ -3291,195 +3326,6 @@ function InstallsPageContent() {
                   </div>
                 </div>
                 )}
-
-                {/* Inventory Filter Sections - Show from report data when report exists, otherwise from all data */}
-                {(() => {
-                  // Use report-specific filters when report is generated, otherwise use all filter options
-                  // Show filters when: has report data, OR is generating report, OR is in config report mode
-                  if (installs.length === 0 && !isGeneratingReport && !isConfigReport) return null
-                  
-                  const activeFilters = installs.length > 0 ? reportFilterOptions : filterOptions
-                  const hasAnyFilter = (activeFilters.usages?.length > 0) ||
-                    (activeFilters.catalogs?.length > 0) ||
-                    (activeFilters.fleets?.length > 0) ||
-                    (activeFilters.platforms?.length > 0)
-                  
-                  if (!hasAnyFilter) return null
-                  
-                  return (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  
-                  {/* Usage Filter - Only show if data exists */}
-                  {activeFilters.usages && activeFilters.usages.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Usage {selectedUsages.length > 0 && `(${selectedUsages.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {activeFilters.usages.map((usage: string) => (
-                        <button
-                          key={usage}
-                          onClick={() => toggleUsage(usage)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedUsages.includes(usage.toLowerCase())
-                              ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {usage}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Catalog Filter - Only show if data exists */}
-                  {activeFilters.catalogs && activeFilters.catalogs.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Catalog {selectedCatalogs.length > 0 && `(${selectedCatalogs.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {activeFilters.catalogs.map((catalog: string) => (
-                        <button
-                          key={catalog}
-                          onClick={() => toggleCatalog(catalog)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedCatalogs.includes(catalog.toLowerCase())
-                              ? 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900 dark:text-teal-200 dark:border-teal-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {catalog}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Fleet Filter - Only show if data exists */}
-                  {activeFilters.fleets && activeFilters.fleets.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Fleet {selectedFleets.length > 0 && `(${selectedFleets.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {activeFilters.fleets.map((fleet: string) => (
-                        <button
-                          key={fleet}
-                          onClick={() => toggleFleet(fleet)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedFleets.includes(fleet)
-                              ? 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900 dark:text-indigo-200 dark:border-indigo-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {fleet}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                  {/* Platform Filter - Only show if data exists */}
-                  {activeFilters.platforms && activeFilters.platforms.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Platform {selectedPlatforms.length > 0 && `(${selectedPlatforms.length} selected)`}
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      {activeFilters.platforms.map((platform: string) => (
-                        <button
-                          key={platform}
-                          onClick={() => togglePlatform(platform)}
-                          className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                            selectedPlatforms.includes(platform)
-                              ? 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900 dark:text-blue-200 dark:border-blue-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {platform}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  )}
-
-                </div>
-                  )
-                })()}
-
-                {/* Area Filter - Full width row above Locations */}
-                {(() => {
-                  const activeAreas = installs.length > 0 ? reportFilterOptions.areas : filterOptions.areas
-                  if (!activeAreas || activeAreas.length === 0) return null
-                  return (
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                          Area {selectedAreas.length > 0 && `(${selectedAreas.length} selected)`}
-                        </h3>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {activeAreas.map((area: string) => (
-                          <button
-                            key={area}
-                            onClick={() => toggleArea(area)}
-                            className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
-                              selectedAreas.includes(area)
-                                ? 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900 dark:text-purple-200 dark:border-purple-600'
-                                : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                            }`}
-                          >
-                            {area}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )
-                })()}
-
-                {/* Locations Filter Cloud - Only show if report data exists AND has locations */}
-                {(() => {
-                  // Only show locations when there's report data
-                  if (installs.length === 0 && !isGeneratingReport) return null
-                  
-                  const activeRooms = installs.length > 0 ? reportFilterOptions.rooms : filterOptions.rooms
-                  const filteredRooms = activeRooms?.filter((room: string) => room.toLowerCase().includes(searchQuery.toLowerCase())) || []
-                  
-                  if (filteredRooms.length === 0) return null
-                  
-                  return (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Locations {selectedRooms.length > 0 && `(${selectedRooms.length} selected)`}
-                    </h3>
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                      {(() => { const maxCount = Math.max(...filteredRooms.map((r: string) => roomCounts[r] || 0), 1); return filteredRooms.map((room: string) => {
-                        const count = roomCounts[room] || 0
-                        const scale = count / maxCount
-                        const sizeClass = scale > 0.7 ? 'px-4 py-1.5 text-sm font-semibold' : scale > 0.3 ? 'px-3 py-1 text-xs font-medium' : 'px-2.5 py-0.5 text-[11px]'
-                        return (
-                        <button
-                          key={room}
-                          onClick={() => toggleRoom(room)}
-                          title={`${room} (${count} devices)`}
-                          className={`${sizeClass} rounded-full border transition-colors ${
-                            selectedRooms.includes(room)
-                              ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                              : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                          }`}
-                        >
-                          {room}
-                        </button>
-                        )
-                      })})()}
-                  </div>
-                </div>
-                  )
-                })()}
 
                 {/* Device Status and Install Status Filters - Only show after report is generated */}
                 {!isGeneratingReport && (installs.length > 0 || (isConfigReport && configReportData.length > 0)) && (
