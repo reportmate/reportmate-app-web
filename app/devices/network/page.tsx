@@ -52,6 +52,8 @@ function NetworkPageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   const [speedFilter, setSpeedFilter] = useState<'excellent' | 'good' | 'fair' | 'poor' | 'nodata' | null>(null)
   
   const handleSort = (column: typeof sortColumn) => {
@@ -77,20 +79,35 @@ function NetworkPageContent() {
   }
   
   const toggleLocation = (location: string) => {
-    setSelectedLocations(prev => 
+    setSelectedLocations(prev =>
       prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
     )
   }
-  
+
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev =>
+      prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area]
+    )
+  }
+
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev =>
+      prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet]
+    )
+  }
+
   const _clearAllFilters = () => {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedAreas([])
+    setSelectedFleets([])
     setConnectionFilter('all')
     setSearchQuery('')
   }
-  
-  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length + 
+
+  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
+    selectedAreas.length + selectedFleets.length +
     (connectionFilter !== 'all' ? 1 : 0)
 
   // Use useDeviceData hook to get devices with inventory data
@@ -180,7 +197,13 @@ function NetworkPageContent() {
     )).sort() as string[],
     locations: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.location).filter(Boolean)
-    )).sort() as string[]
+    )).sort() as string[],
+    areas: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.area || d.modules?.inventory?.department).filter(Boolean)
+    )).sort() as string[],
+    fleets: Array.from(new Set(
+      devices.map(d => d.modules?.inventory?.fleet).filter(Boolean)
+    )).sort() as string[],
   }
 
   // Compute location counts for proportional pill sizing
@@ -306,6 +329,8 @@ function NetworkPageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(inventory?.area || inventory?.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(inventory?.fleet || '')) return false
 
     // Network quality widget filter
     if (speedFilter) {
@@ -725,7 +750,51 @@ function NetworkPageContent() {
                     </div>
                   </div>
                 )}
-                
+
+                {/* Area Filter */}
+                {filterOptions.areas.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.areas.map(area => (
+                        <button
+                          key={area}
+                          onClick={() => toggleArea(area)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedAreas.includes(area)
+                              ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {area}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Fleet Filter */}
+                {filterOptions.fleets.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Fleet</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.fleets.map(fleet => (
+                        <button
+                          key={fleet}
+                          onClick={() => toggleFleet(fleet)}
+                          className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                            selectedFleets.includes(fleet)
+                              ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
+                              : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                          }`}
+                        >
+                          {fleet}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Location Filter */}
                 {filterOptions.locations.length > 0 && (
                   <div>

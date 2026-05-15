@@ -33,6 +33,8 @@ interface Management {
   assetTag?: string
   location?: string
   department?: string
+  area?: string
+  fleet?: string
   autopilotConfig?: any
   osName?: string
 }
@@ -346,9 +348,9 @@ function ManagementPageContent() {
   const filterOptions: FilterOptions = {
     statuses: [...new Set(management.map(m => m.status).filter(Boolean))].sort(),
     catalogs: [...new Set(management.map(m => m.catalog).filter(Boolean))].sort(),
-    areas: [], // Add areas when available in data
+    areas: [...new Set(management.map(m => m.area || m.department).filter(Boolean))].sort() as string[],
     locations: [...new Set(management.map(m => m.location).filter(Boolean))].sort(),
-    fleets: [], // Add fleets when available in data  
+    fleets: [...new Set(management.map(m => m.fleet).filter(Boolean))].sort() as string[],
     platforms: [...new Set(management.map(m => m.osName || 'Unknown').filter(p => p !== 'Unknown'))].sort(),
     usages: [...new Set(management.map(m => m.usage).filter(Boolean))].sort()
   }
@@ -456,6 +458,8 @@ function ManagementPageContent() {
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(m.catalog || '')) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(m.usage || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(m.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(m.area || m.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(m.fleet || '')) return false
     if (selectedPlatforms.length > 0) {
       const platform = m.osName || ''
       if (!selectedPlatforms.includes(platform)) return false

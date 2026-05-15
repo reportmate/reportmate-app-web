@@ -92,6 +92,8 @@ function HardwarePageContent() {
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
   
   // Main devices (with inventory) from the devices API
   const { devices: allDevices } = useDeviceData()
@@ -106,6 +108,12 @@ function HardwarePageContent() {
     )).sort() as string[],
     locations: Array.from(new Set(
       allDevices.map((d: any) => d.modules?.inventory?.location).filter(Boolean)
+    )).sort() as string[],
+    areas: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.area || d.modules?.inventory?.department).filter(Boolean)
+    )).sort() as string[],
+    fleets: Array.from(new Set(
+      allDevices.map((d: any) => d.modules?.inventory?.fleet).filter(Boolean)
     )).sort() as string[],
     locationCounts: allDevices.reduce((acc: Record<string, number>, d: any) => {
       const loc = d.modules?.inventory?.location
@@ -172,22 +180,31 @@ function HardwarePageContent() {
   const toggleLocation = (location: string) => {
     setSelectedLocations(prev => prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location])
   }
+  const toggleArea = (area: string) => {
+    setSelectedAreas(prev => prev.includes(area) ? prev.filter(a => a !== area) : [...prev, area])
+  }
+  const toggleFleet = (fleet: string) => {
+    setSelectedFleets(prev => prev.includes(fleet) ? prev.filter(f => f !== fleet) : [...prev, fleet])
+  }
 
   const _hasActiveFilters = () => {
     return selectedModels.length > 0 || selectedMemoryRanges.length > 0 || selectedStorageRanges.length > 0 ||
            selectedArchitectures.length > 0 || selectedDeviceTypes.length > 0 || selectedProcessors.length > 0 ||
            selectedGraphics.length > 0 || selectedPlatforms.length > 0 || selectedStatuses.length > 0 ||
-           selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0
+           selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedLocations.length > 0 ||
+           selectedAreas.length > 0 || selectedFleets.length > 0
   }
 
   // Count for Selections accordion (inventory filters only)
-  const totalSelectionsFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length + selectedLocations.length
-  
+  const totalSelectionsFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length +
+    selectedLocations.length + selectedAreas.length + selectedFleets.length
+
   // Count for all active filters (for Clear button)
-  const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length + 
-    selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length + 
+  const totalActiveFilters = selectedModels.length + selectedMemoryRanges.length + selectedStorageRanges.length +
+    selectedArchitectures.length + selectedDeviceTypes.length + selectedProcessors.length +
     selectedGraphics.length + selectedPlatforms.length + selectedChipConfigs.length + selectedStatuses.length +
-    selectedUsages.length + selectedCatalogs.length + selectedLocations.length
+    selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
+    selectedAreas.length + selectedFleets.length
 
   const clearAllFilters = () => {
     setSelectedModels([])
@@ -203,6 +220,8 @@ function HardwarePageContent() {
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
+    setSelectedAreas([])
+    setSelectedFleets([])
     setSearchQuery('')
   }
   
@@ -641,6 +660,8 @@ function HardwarePageContent() {
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes((inventory as any).area || (inventory as any).department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes((inventory as any).fleet || '')) return false
 
     // Hardware-specific filters (from widget charts)
     if (selectedPlatforms.length > 0 && !selectedPlatforms.includes(getDevicePlatform(h))) return false
@@ -821,6 +842,28 @@ function HardwarePageContent() {
                     <div className="flex flex-wrap gap-2">
                       {filterOptions.catalogs.map(catalog => (
                         <button key={catalog} onClick={() => toggleCatalog(catalog)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedCatalogs.includes(catalog) ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{catalog}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Area Filter */}
+                {filterOptions.areas.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Area</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.areas.map(area => (
+                        <button key={area} onClick={() => toggleArea(area)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedAreas.includes(area) ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200 border-purple-300 dark:border-purple-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{area}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* Fleet Filter */}
+                {filterOptions.fleets.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Fleet</div>
+                    <div className="flex flex-wrap gap-2">
+                      {filterOptions.fleets.map(fleet => (
+                        <button key={fleet} onClick={() => toggleFleet(fleet)} className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${selectedFleets.includes(fleet) ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700' : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}>{fleet}</button>
                       ))}
                     </div>
                   </div>
