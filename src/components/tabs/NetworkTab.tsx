@@ -277,9 +277,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
             <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
               {(() => {
                 const primary = sortedActiveInterfaces[0]
-                const isWiFi = primary.type?.toLowerCase().includes('wifi') || 
-                              primary.type?.toLowerCase().includes('wireless') ||
-                              (primary.name === 'en0' && !primary.type?.toLowerCase().includes('ethernet'))
+                const isWiFi = primary.type?.toLowerCase().includes('wifi') ||
+                              primary.type?.toLowerCase().includes('wireless')
                 return isWiFi ? 'Wireless' : 'Ethernet'
               })()}
             </div>
@@ -307,9 +306,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
           )}
           {sortedActiveInterfaces.length > 0 ? (
             sortedActiveInterfaces.map((iface: any, index: number) => {
-              const isWiFi = iface.type?.toLowerCase().includes('wifi') || 
-                            iface.type?.toLowerCase().includes('wireless') ||
-                            (iface.name === 'en0' && !iface.type?.toLowerCase().includes('ethernet'))
+              const isWiFi = iface.type?.toLowerCase().includes('wifi') ||
+                            iface.type?.toLowerCase().includes('wireless')
               return (
                 <ActiveConnectionCard
                   key={iface.name || index}
