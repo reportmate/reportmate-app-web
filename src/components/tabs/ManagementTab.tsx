@@ -75,20 +75,43 @@ function parseMdmCertificate(mdmCertificate: any): {
   }
 }
 
-// Detect MDM provider from certificate data first, then server URL
+// Detect the MDM provider for the device's CURRENT enrollment.
+// The active server/check-in URL is authoritative: the MDM identity certificate
+// lingers in the System keychain after a device migrates between MDMs, so its
+// issuer can name a provider the device has already left. URL wins; the
+// certificate is only a fallback.
 function detectMdmProvider(serverUrl?: string, certificateData?: ReturnType<typeof parseMdmCertificate>): string | undefined {
-  // PRIORITY 1: Explicit provider from certificate (most reliable)
+  // PRIORITY 1: Active enrollment server/check-in URL (reflects the live MDM)
+  if (serverUrl) {
+    const url = serverUrl.toLowerCase()
+    // Open-source MDMs first - check for explicit micromdm/nanomdm in URL
+    if (url.includes('micromdm')) return 'MicroMDM'
+    if (url.includes('nanomdm')) return 'NanoMDM'
+    // Commercial MDMs - be specific with patterns
+    if (url.includes('jamf') || url.includes('jamfcloud')) return 'Jamf Pro'
+    if (url.includes('manage.microsoft.com') || url.includes('intune')) return 'Microsoft Intune'
+    if (url.includes('mosyle')) return 'Mosyle'
+    if (url.includes('kandji')) return 'Kandji'
+    if (url.includes('addigy')) return 'Addigy'
+    if (url.includes('simplemdm')) return 'SimpleMDM'
+    if (url.includes('airwatch.com') || url.includes('workspaceone')) return 'Workspace ONE'
+    if (url.includes('meraki')) return 'Cisco Meraki'
+    if (url.includes('maas360')) return 'MaaS360'
+    if (url.includes('mobileiron') || url.includes('ivanti')) return 'Ivanti'
+  }
+
+  // PRIORITY 2: Explicit provider from certificate data (set by the client)
   if (certificateData?.mdm_provider) {
     return certificateData.mdm_provider
   }
-  
-  // PRIORITY 2: Certificate issuer (very reliable for open-source MDMs)
+
+  // PRIORITY 3: Certificate issuer (fallback - can be stale after a migration)
   if (certificateData?.certificate_issuer) {
     const issuer = certificateData.certificate_issuer.toLowerCase()
     if (issuer.includes('micromdm')) return 'MicroMDM'
     if (issuer.includes('nanomdm')) return 'NanoMDM'
     if (issuer.includes('jamf')) return 'Jamf Pro'
-    if (issuer.includes('microsoft')) return 'Microsoft Intune'
+    if (issuer.includes('microsoft') || issuer.includes('intune')) return 'Microsoft Intune'
     if (issuer.includes('mosyle')) return 'Mosyle'
     if (issuer.includes('kandji')) return 'Kandji'
     if (issuer.includes('addigy')) return 'Addigy'
@@ -96,30 +119,8 @@ function detectMdmProvider(serverUrl?: string, certificateData?: ReturnType<type
     if (issuer.includes('workspace one') || issuer.includes('vmware')) return 'Workspace ONE'
     if (issuer.includes('meraki')) return 'Cisco Meraki'
   }
-  
-  // PRIORITY 3: Server URL patterns (fallback)
-  if (!serverUrl) return undefined
-  const url = serverUrl.toLowerCase()
-  
-  // Open-source MDMs first - check for explicit micromdm/nanomdm in URL
-  if (url.includes('micromdm')) return 'MicroMDM'
-  if (url.includes('nanomdm')) return 'NanoMDM'
-  
-  // Commercial MDMs - be more specific with patterns
-  if (url.includes('jamf') || url.includes('jamfcloud')) return 'Jamf Pro'
-  if (url.includes('manage.microsoft.com') || url.includes('intune')) return 'Microsoft Intune'
-  if (url.includes('mosyle')) return 'Mosyle'
-  if (url.includes('kandji')) return 'Kandji'
-  if (url.includes('addigy')) return 'Addigy'
-  if (url.includes('simplemdm')) return 'SimpleMDM'
-  // NOTE: Removed 'awsmdm' pattern - it's too generic and causes false positives
-  // Only match explicit AirWatch/Workspace ONE patterns
-  if (url.includes('airwatch.com') || url.includes('workspaceone')) return 'Workspace ONE'
-  if (url.includes('meraki')) return 'Cisco Meraki'
-  if (url.includes('maas360')) return 'MaaS360'
-  if (url.includes('mobileiron') || url.includes('ivanti')) return 'Ivanti'
-  
-  // No provider detected from URL - return undefined instead of guessing
+
+  // No provider detected - return undefined instead of guessing
   return undefined
 }
 
@@ -263,8 +264,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                      parseBool(mdmEnrollment.isEnrolled) || 
                      false
   
-  // Get server URL and detect provider (certificate data takes priority)
-  const serverUrl = mdmEnrollment.server_url || mdmEnrollment.serverUrl
+  // Get server/check-in URL and detect provider (active URL takes priority
+  // over the certificate, which can be stale after an MDM migration)
+  const serverUrl = mdmEnrollment.server_url || mdmEnrollment.serverUrl ||
+                    mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl
   const provider = detectMdmProvider(serverUrl, mdmCertificate) || mdmEnrollment.provider
   
   // Enrollment type - Mac uses ADE/User Approved, Windows uses Entra/Domain Join
