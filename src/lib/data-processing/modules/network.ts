@@ -435,10 +435,11 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       }
       
       if (wifiDetails) {
-        // Find the WiFi interface (en0 on Mac, or type=Wireless)
-        const wifiInterface = physicalInterfaces.find((iface: NetworkInterface) => 
-          iface.name === 'en0' || 
-          iface.type === 'Wireless' || 
+        // Find the WiFi interface by the name the Wi-Fi collector reported, or by
+        // type. Never assume en0 - it is Ethernet on desktop Macs.
+        const wifiInterface = physicalInterfaces.find((iface: NetworkInterface) =>
+          (wifiDetails.interface && iface.name === wifiDetails.interface) ||
+          iface.type === 'Wireless' ||
           iface.type === 'WiFi' ||
           iface.type?.toLowerCase().includes('wifi') ||
           iface.type?.toLowerCase().includes('wireless')
