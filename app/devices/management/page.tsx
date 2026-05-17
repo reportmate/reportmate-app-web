@@ -256,7 +256,7 @@ function ManagementPageContent() {
           const status = calculateDeviceStatus(mgmt.lastSeen)
           
           // Normalize provider - "Microsoft Intune (Co-managed)" -> "Microsoft Intune"
-          let provider = mgmt.provider || 'Unknown'
+          let provider = mgmt.provider || 'Unmanaged'
           if (provider.startsWith('Microsoft Intune')) {
             provider = 'Microsoft Intune'
           }
@@ -361,12 +361,13 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  // Get unique providers with counts (filter out Unknown)
+  // Get unique providers with counts. "Unmanaged" (no provider detected) is
+  // included so it shows as its own bar in the Providers widget.
   const providers = Array.from(new Set(
-    platformFilteredManagement.map(m => m.provider).filter(p => p && p !== 'Unknown')
+    platformFilteredManagement.map(m => m.provider).filter(Boolean)
   )).sort()
 
-  // Calculate provider counts (exclude Unknown)
+  // Calculate provider counts
   const providerCounts = providers.reduce((acc, provider) => {
     acc[provider] = platformFilteredManagement.filter(m => m.provider === provider).length
     return acc
