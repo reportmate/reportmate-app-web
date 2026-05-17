@@ -196,10 +196,12 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
     !(iface.isActive === true || iface.status === 'Active' || iface.status === 'Connected')
   )
 
-  // Sort active interfaces: Ethernet first, then WiFi
+  // Sort active interfaces: Ethernet first, then WiFi.
+  // Rely on the type reported by the client - interface names are not reliable
+  // (en0 is Ethernet on desktop Macs, WiFi on laptops).
   const sortedActiveInterfaces = [...activeInterfaces].sort((a: any, b: any) => {
-    const aIsEthernet = a.type?.toLowerCase().includes('ethernet') || a.type?.toLowerCase().includes('wired') || a.name === 'en1'
-    const bIsEthernet = b.type?.toLowerCase().includes('ethernet') || b.type?.toLowerCase().includes('wired') || b.name === 'en1'
+    const aIsEthernet = a.type?.toLowerCase().includes('ethernet') || a.type?.toLowerCase().includes('wired')
+    const bIsEthernet = b.type?.toLowerCase().includes('ethernet') || b.type?.toLowerCase().includes('wired')
     if (aIsEthernet && !bIsEthernet) return -1
     if (!aIsEthernet && bIsEthernet) return 1
     return 0
@@ -275,9 +277,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
             <div className="text-2xl font-bold text-teal-600 dark:text-teal-400">
               {(() => {
                 const primary = sortedActiveInterfaces[0]
-                const isWiFi = primary.type?.toLowerCase().includes('wifi') || 
-                              primary.type?.toLowerCase().includes('wireless') ||
-                              (primary.name === 'en0' && !primary.type?.toLowerCase().includes('ethernet'))
+                const isWiFi = primary.type?.toLowerCase().includes('wifi') ||
+                              primary.type?.toLowerCase().includes('wireless')
                 return isWiFi ? 'Wireless' : 'Ethernet'
               })()}
             </div>
@@ -305,9 +306,8 @@ export const NetworkTab: React.FC<NetworkTabProps> = ({ device, data, isLoading 
           )}
           {sortedActiveInterfaces.length > 0 ? (
             sortedActiveInterfaces.map((iface: any, index: number) => {
-              const isWiFi = iface.type?.toLowerCase().includes('wifi') || 
-                            iface.type?.toLowerCase().includes('wireless') ||
-                            (iface.name === 'en0' && !iface.type?.toLowerCase().includes('ethernet'))
+              const isWiFi = iface.type?.toLowerCase().includes('wifi') ||
+                            iface.type?.toLowerCase().includes('wireless')
               return (
                 <ActiveConnectionCard
                   key={iface.name || index}

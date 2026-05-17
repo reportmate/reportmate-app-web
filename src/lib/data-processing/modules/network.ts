@@ -118,14 +118,12 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     const isVpnTunnel = primaryInterface?.startsWith('utun') || primaryInterface?.startsWith('ppp')
     
     if (isVpnTunnel && network.interfaces && Array.isArray(network.interfaces)) {
-      // Find the primary physical interface (en0 for Mac, or first active ethernet/wifi)
+      // Find the primary physical interface by client-reported type
       const physicalInterface = network.interfaces.find((iface: any) => {
-        const name = iface.name || iface.interface
-        const hasIP = iface.addresses?.some((addr: any) => 
+        const hasIP = iface.addresses?.some((addr: any) =>
           addr.family === 'IPv4' && addr.address && !addr.address.startsWith('127.')
         ) || (iface.address && !iface.address.startsWith('127.'))
-        const isPhysical = name === 'en0' || 
-          (iface.type === 'Ethernet' || iface.type === 'WiFi' || iface.type === 'Wireless')
+        const isPhysical = iface.type === 'Ethernet' || iface.type === 'WiFi' || iface.type === 'Wireless'
         return hasIP && isPhysical
       })
       
@@ -160,11 +158,12 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
         iface.interface === networkInfo.interfaceName
       )
       
-      // If active interface is a VPN tunnel (utun*), get MAC from the primary physical interface (en0)
+      // If active interface is a VPN tunnel (utun*), get MAC from a physical interface
       if (!activeIface?.macAddress && !activeIface?.mac_address && !activeIface?.mac) {
-        // VPN tunnels don't have MAC addresses - look for en0 (primary ethernet/wifi on Mac)
-        activeIface = network.interfaces.find((iface: any) => 
-          iface.name === 'en0' || iface.interface === 'en0'
+        // VPN tunnels have no MAC - fall back to a physical interface that has one
+        activeIface = network.interfaces.find((iface: any) =>
+          (iface.macAddress || iface.mac_address || iface.mac) &&
+          (iface.type === 'Ethernet' || iface.type === 'WiFi' || iface.type === 'Wireless')
         )
       }
       
@@ -435,10 +434,11 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
       }
       
       if (wifiDetails) {
-        // Find the WiFi interface (en0 on Mac, or type=Wireless)
-        const wifiInterface = physicalInterfaces.find((iface: NetworkInterface) => 
-          iface.name === 'en0' || 
-          iface.type === 'Wireless' || 
+        // Find the WiFi interface by the name the Wi-Fi collector reported, or by
+        // type. Never assume en0 - it is Ethernet on desktop Macs.
+        const wifiInterface = physicalInterfaces.find((iface: NetworkInterface) =>
+          (wifiDetails.interface && iface.name === wifiDetails.interface) ||
+          iface.type === 'Wireless' ||
           iface.type === 'WiFi' ||
           iface.type?.toLowerCase().includes('wifi') ||
           iface.type?.toLowerCase().includes('wireless')
