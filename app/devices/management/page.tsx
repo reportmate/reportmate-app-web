@@ -250,7 +250,7 @@ function ManagementPageContent() {
           const status = calculateDeviceStatus(mgmt.lastSeen)
           
           // Normalize provider - "Microsoft Intune (Co-managed)" -> "Microsoft Intune"
-          let provider = mgmt.provider || 'Unknown'
+          let provider = mgmt.provider || 'Unmanaged'
           if (provider.startsWith('Microsoft Intune')) {
             provider = 'Microsoft Intune'
           }
@@ -355,12 +355,13 @@ function ManagementPageContent() {
     return acc
   }, {} as Record<string, number>)
 
-  // Get unique providers with counts (filter out Unknown)
+  // Get unique providers with counts. "Unmanaged" (no provider detected) is
+  // included so it shows as its own bar in the Providers widget.
   const providers = Array.from(new Set(
-    platformFilteredManagement.map(m => m.provider).filter(p => p && p !== 'Unknown')
+    platformFilteredManagement.map(m => m.provider).filter(Boolean)
   )).sort()
 
-  // Calculate provider counts (exclude Unknown)
+  // Calculate provider counts
   const providerCounts = providers.reduce((acc, provider) => {
     acc[provider] = platformFilteredManagement.filter(m => m.provider === provider).length
     return acc
@@ -392,29 +393,30 @@ function ManagementPageContent() {
     // Enrollment Status filter
     if (enrollmentStatusFilter !== 'all' && m.enrollmentStatus !== enrollmentStatusFilter) return false
 
-    // Type filter - Automated vs Manual enrollment method
+    // Type filter - Automated vs Manual enrollment method.
+    // Mirrors the Enrollment Type widget counts (mdmBootstrapCounts) exactly so
+    // the table and the widget always agree. Platform-agnostic: an earlier
+    // version detected Mac from m.osName, which the API never populated, so
+    // every device fell through the Windows path and ADE Macs leaked into the
+    // Manual filter.
     if (typeFilter !== 'all') {
       const autopilot = m.autopilotConfig
-      const platform = m.osName || ''
-      const isMac = platform.toLowerCase().includes('macos') || platform.toLowerCase().includes('mac os')
-      
+      const et = m.enrollmentType || ''
+      const isAutomated = autopilot?.activated === true || autopilot?.activated === 'true' ||
+        et === 'Automated Device Enrollment'
+      const isUserApproved = !isAutomated && et === 'User Approved Enrollment'
+      const isManual = !isAutomated && !isUserApproved &&
+        (et === 'MDM Enrolled' ||
+          (m.enrollmentStatus === 'Enrolled' && et !== 'N/A' && et !== 'Unknown'))
+
       if (typeFilter === 'Unmanaged') {
         if (m.enrollmentType !== 'Unmanaged') return false
       } else if (typeFilter === 'Automated') {
-        if (isMac) {
-          if (m.enrollmentType !== 'Automated Device Enrollment') return false
-        } else {
-          if (!(autopilot?.activated === true || autopilot?.activated === 'true')) return false
-        }
+        if (!isAutomated) return false
       } else if (typeFilter === 'User Approved') {
-        if (m.enrollmentType !== 'User Approved Enrollment') return false
+        if (!isUserApproved) return false
       } else if (typeFilter === 'Manual') {
-        if (isMac) {
-          if (m.enrollmentType !== 'MDM Enrolled') return false
-        } else {
-          if (autopilot?.activated === true || autopilot?.activated === 'true') return false
-          if (!m.enrollmentStatus || m.enrollmentStatus === 'Not Enrolled') return false
-        }
+        if (!isManual) return false
       } else {
         // Other filter value
         return false
