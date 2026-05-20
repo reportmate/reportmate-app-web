@@ -110,8 +110,9 @@ export default function DeviceFilters({
       {/* Accordion Content */}
       <CollapsibleSection expanded={filtersExpanded}>
         <div className="px-6 pb-4">
-          {/* Smart Grid Layout - maximizes space usage */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-x-8 gap-y-4">
+          {/* Top row: short-pill dimensions share a single line. Catalog grows to fill the
+              empty space to the right of Status/Usage (which have only 2-3 pills each). */}
+          <div className="flex flex-wrap gap-x-8 gap-y-4">
             {/* Status Filter - When available */}
             {filterOptions.statuses.length > 0 && (
               <div>
@@ -148,7 +149,7 @@ export default function DeviceFilters({
                       <button
                         key={usage}
                         onClick={() => onUsageToggle(usage)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        className={`px-3 py-1 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
                           isSelected
                             ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700'
                             : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
@@ -162,32 +163,31 @@ export default function DeviceFilters({
               </div>
             )}
 
-          </div>
-
-          {/* Catalog Filter - Full width row so all 6 values fit on one line */}
-          {filterOptions.catalogs.length > 0 && (
-            <div className="mt-4">
-              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-              <div className="flex flex-wrap gap-2">
-                {filterOptions.catalogs.map(catalog => {
-                  const isSelected = selectedCatalogs.some(s => s.toLowerCase() === catalog.toLowerCase())
-                  return (
-                    <button
-                      key={catalog}
-                      onClick={() => onCatalogToggle(catalog)}
-                      className={`px-3 py-1 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
-                        isSelected
-                          ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      {catalog}
-                    </button>
-                  )
-                })}
+            {/* Catalog Filter - flex-1 fills the remaining row width so its 6 pills sit on one line */}
+            {filterOptions.catalogs.length > 0 && (
+              <div className="flex-1 min-w-[260px]">
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
+                <div className="flex flex-wrap gap-2">
+                  {filterOptions.catalogs.map(catalog => {
+                    const isSelected = selectedCatalogs.some(s => s.toLowerCase() === catalog.toLowerCase())
+                    return (
+                      <button
+                        key={catalog}
+                        onClick={() => onCatalogToggle(catalog)}
+                        className={`px-3 py-1 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+                          isSelected
+                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {catalog}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Fleet Filter - Full width row (labels are long, e.g. "Digital Output Centre Print Room") */}
           {filterOptions.fleets.length > 0 && (() => {
