@@ -189,7 +189,11 @@ export async function GET(request: Request) {
       locations: data.locations || [],
       rooms: data.rooms || [],
       areas: data.areas || [],
-      fleets: data.fleets || [],
+      fleets: Array.from(new Set(
+        ((data.fleets || []) as string[])
+          .map(f => (typeof f === 'string' ? f.replace(/[,;]+\s*$/, '').trim() : ''))
+          .filter(Boolean)
+      )).sort(),
       devicesWithData: data.devicesWithData || 0
     }
     
