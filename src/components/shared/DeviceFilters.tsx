@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { CollapsibleSection } from '../ui/CollapsibleSection'
 
+// Inventory YAMLs occasionally ship values with trailing commas/semicolons
+// (e.g. "Foundation Studio,"). Strip them so pills don't render the punctuation.
+const cleanLabel = (s: string) => s.replace(/[,;]+\s*$/, '').trim()
+
 export interface FilterOptions {
   statuses: string[]
   catalogs: string[]
@@ -183,18 +187,22 @@ export default function DeviceFilters({
               </div>
             )}
 
-            {/* Fleet Filter - When available */}
-            {filterOptions.fleets.length > 0 && (
-              <div>
+          </div>
+
+          {/* Fleet Filter - Full width row (labels are long, e.g. "Digital Output Centre Print Room") */}
+          {filterOptions.fleets.length > 0 && (() => {
+            const dedupedFleets = Array.from(new Set(filterOptions.fleets.map(cleanLabel).filter(Boolean))).sort()
+            return (
+              <div className="mt-4">
                 <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Fleet</div>
                 <div className="flex flex-wrap gap-2">
-                  {filterOptions.fleets.map(fleet => {
-                    const isSelected = selectedFleets.some(s => s.toLowerCase() === fleet.toLowerCase())
+                  {dedupedFleets.map(fleet => {
+                    const isSelected = selectedFleets.some(s => cleanLabel(s).toLowerCase() === fleet.toLowerCase())
                     return (
                       <button
                         key={fleet}
                         onClick={() => onFleetToggle(fleet)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
+                        className={`px-3 py-1 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
                           isSelected
                             ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-800 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700'
                             : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
@@ -206,9 +214,8 @@ export default function DeviceFilters({
                   })}
                 </div>
               </div>
-            )}
-
-          </div>
+            )
+          })()}
 
           {/* Area Filter - Full width row above Location */}
           {filterOptions.areas.length > 0 && (

@@ -2830,15 +2830,15 @@ function ApplicationsPageContent() {
                           />
                         ))}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="mt-3 flex flex-col gap-1">
                         {utilizationAggregates.byUsage.map(([name, val], i) => (
                           <div key={name} className="flex items-center gap-2 text-xs">
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                               style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
                             />
-                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                            <span className="ml-auto tabular-nums text-gray-500">
+                            <span className="text-gray-700 dark:text-gray-300 break-words min-w-0" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500 shrink-0 whitespace-nowrap">
                               {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
                             </span>
                           </div>
@@ -2863,15 +2863,15 @@ function ApplicationsPageContent() {
                           />
                         ))}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="mt-3 flex flex-col gap-1">
                         {utilizationAggregates.byCatalog.map(([name, val], i) => (
                           <div key={name} className="flex items-center gap-2 text-xs">
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                               style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
                             />
-                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                            <span className="ml-auto tabular-nums text-gray-500">
+                            <span className="text-gray-700 dark:text-gray-300 break-words min-w-0" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500 shrink-0 whitespace-nowrap">
                               {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
                             </span>
                           </div>
@@ -2925,15 +2925,15 @@ function ApplicationsPageContent() {
                           />
                         ))}
                       </div>
-                      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1">
+                      <div className="mt-3 flex flex-col gap-1">
                         {utilizationAggregates.byFleet.map(([name, val], i) => (
                           <div key={name} className="flex items-center gap-2 text-xs">
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                               style={{ backgroundColor: widgetPalette[i % widgetPalette.length] }}
                             />
-                            <span className="truncate text-gray-700 dark:text-gray-300" title={name}>{name}</span>
-                            <span className="ml-auto tabular-nums text-gray-500">
+                            <span className="text-gray-700 dark:text-gray-300 break-words min-w-0" title={name}>{name}</span>
+                            <span className="ml-auto tabular-nums text-gray-500 shrink-0 whitespace-nowrap">
                               {fmtWidgetVal(val)} ({((val / utilizationAggregates.grandTotal) * 100).toFixed(0)}%)
                             </span>
                           </div>
@@ -3564,8 +3564,8 @@ function ApplicationsPageContent() {
                       
                       return sorted.map((app, index) => (
                         <tr key={`${app.serialNumber}-${app.name}-${index}`} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                            {app.name}
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                            <div className="truncate max-w-xs" title={app.name}>{app.name}</div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                             v{app.version}
