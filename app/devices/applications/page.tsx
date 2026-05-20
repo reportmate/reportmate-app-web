@@ -441,7 +441,7 @@ function UsageReportAppFilter({
         className="w-full px-6 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Applications</span>
+          <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Filter applications</span>
           <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full">
             {activeCount} / {totalCount} active
           </span>
