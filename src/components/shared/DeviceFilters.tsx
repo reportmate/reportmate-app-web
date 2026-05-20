@@ -162,32 +162,32 @@ export default function DeviceFilters({
               </div>
             )}
 
-            {/* Catalog Filter - When available */}
-            {filterOptions.catalogs.length > 0 && (
-              <div>
-                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
-                <div className="flex flex-wrap gap-2">
-                  {filterOptions.catalogs.map(catalog => {
-                    const isSelected = selectedCatalogs.some(s => s.toLowerCase() === catalog.toLowerCase())
-                    return (
-                      <button
-                        key={catalog}
-                        onClick={() => onCatalogToggle(catalog)}
-                        className={`px-3 py-1 text-xs font-medium rounded-full border transition-colors ${
-                          isSelected
-                            ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
-                            : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
-                        }`}
-                      >
-                        {catalog}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
           </div>
+
+          {/* Catalog Filter - Full width row so all 6 values fit on one line */}
+          {filterOptions.catalogs.length > 0 && (
+            <div className="mt-4">
+              <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Catalog</div>
+              <div className="flex flex-wrap gap-2">
+                {filterOptions.catalogs.map(catalog => {
+                  const isSelected = selectedCatalogs.some(s => s.toLowerCase() === catalog.toLowerCase())
+                  return (
+                    <button
+                      key={catalog}
+                      onClick={() => onCatalogToggle(catalog)}
+                      className={`px-3 py-1 text-xs font-medium rounded-full border whitespace-nowrap transition-colors ${
+                        isSelected
+                          ? 'bg-teal-100 dark:bg-teal-900/30 text-teal-800 dark:text-teal-200 border-teal-300 dark:border-teal-700'
+                          : 'bg-white dark:bg-gray-700 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      {catalog}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Fleet Filter - Full width row (labels are long, e.g. "Digital Output Centre Print Room") */}
           {filterOptions.fleets.length > 0 && (() => {
