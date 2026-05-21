@@ -108,6 +108,9 @@ export async function GET(request: Request) {
           
           // Session utilization summary (TerminalServices RDP data)
           sessionSummary: item.sessionSummary || null,
+
+          // macOS Bootstrap Token (from security module, surfaced here for identity page)
+          bootstrapToken: item.bootstrapToken || null,
           
           // User previews (top 5, pre-sliced by API)
           users: users.map((u: any) => ({
@@ -116,6 +119,9 @@ export async function GET(request: Request) {
             isAdmin: u.isAdmin,
             lastLogon: u.lastLogon
           })),
+
+          // Full list of admin usernames on this device (not capped at 5)
+          adminUsernames: Array.isArray(item.adminUsernames) ? item.adminUsernames : [],
 
           loggedInUsernames: item.loggedInUsernames || [],
 
