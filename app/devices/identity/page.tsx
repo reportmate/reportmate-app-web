@@ -36,6 +36,7 @@ interface IdentityDevice {
   adDomain?: string | null
   ldapBound?: boolean
   users?: { username: string; realName?: string; isAdmin?: boolean; lastLogon?: string }[]
+  adminUsernames?: string[]
   loggedInUsernames?: string[]
   // Enrollment type (migrated from Management - Identity is authoritative)
   enrollmentType?: string
@@ -140,9 +141,12 @@ function IdentityPageContent() {
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
   const [showUtilizationReport, setShowUtilizationReport] = useState(false)
+  // Local Admins report mode (flat admin x device view)
+  const [showAdminsReport, setShowAdminsReport] = useState(false)
   // Widget click filters
   const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
   const [authFilter, setAuthFilter] = useState<string | null>(null)
+  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(null)
   // Selections accordion state
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
@@ -167,8 +171,10 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null
-  const clearWidgetFilters = () => { setDirectoryFilter(null); setAuthFilter(null) }
+  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null || adminAccountFilter !== null
+  const clearWidgetFilters = () => { setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null) }
+  const matchesAdminFilter = (d: IdentityDevice, name: string) =>
+    (d.adminUsernames || []).some(u => u.toLowerCase() === name.toLowerCase())
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -247,6 +253,11 @@ function IdentityPageContent() {
       }
     }
     
+    // Widget click: admin account filter
+    if (adminAccountFilter) {
+      if (!matchesAdminFilter(d, adminAccountFilter)) return false
+    }
+
     // Widget click: auth filter
     if (authFilter) {
       if (authFilter === 'Modern') {
@@ -322,15 +333,24 @@ function IdentityPageContent() {
 
   // Calculate identity widget stats (from platform-filtered set)
   const identityStats = {
-    adminNames: platformFilteredDevices.reduce((acc, d) => {
-      if (d.users) {
-        d.users.filter(u => u.isAdmin).forEach(u => {
-          const name = u.username || 'Unknown'
-          acc[name] = (acc[name] || 0) + 1
-        })
+    // adminNames is keyed by canonical (lowercase) username so that the same
+    // admin account is counted once across case variations. value stores the
+    // display name + device count.
+    adminNames: (() => {
+      const acc: Record<string, { display: string; count: number }> = {}
+      for (const d of platformFilteredDevices) {
+        const seen = new Set<string>()
+        for (const raw of (d.adminUsernames || [])) {
+          if (!raw) continue
+          const key = raw.toLowerCase()
+          if (seen.has(key)) continue
+          seen.add(key)
+          if (!acc[key]) acc[key] = { display: raw, count: 0 }
+          acc[key].count += 1
+        }
       }
       return acc
-    }, {} as Record<string, number>),
+    })(),
     
     enrollmentTypes: platformFilteredDevices.reduce((acc, d) => {
       const type = d.enrollmentType || 'Unknown'
@@ -494,7 +514,11 @@ function IdentityPageContent() {
                 </svg>
                 <span className="font-medium">Filters Active</span>
                 <span className="text-yellow-600 dark:text-yellow-300">
-                  {[directoryFilter, authFilter].filter(Boolean).join(', ')}
+                  {[
+                    directoryFilter,
+                    authFilter,
+                    adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,
+                  ].filter(Boolean).join(', ')}
                 </span>
               </div>
               <button
@@ -700,9 +724,69 @@ function IdentityPageContent() {
                     })()}
                   </div>
 
-                  {/* Widget 2: Authentication Donut - Modern / Legacy / Standard */}
+                  {/* Widget 2: macOS Security stack (SecureToken / Platform SSO / BTMDB)
+                       when global platform filter is macOS; otherwise Authentication donut. */}
+                  {globalPlatformFilter === 'macOS' ? (
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Authentication</h3>
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">macOS Security</h3>
+                    {(() => {
+                      const macDevices = platformFilteredDevices
+                      const totalMac = macDevices.length
+                      if (totalMac === 0) return <div className="text-center text-gray-500 py-8">No data available</div>
+
+                      const ssoRegistered = macDevices.filter(d => d.platformSSORegistered).length
+                      const ssoMissing = totalMac - ssoRegistered
+                      const tokenHolders = macDevices.reduce((sum, d) => sum + (d.secureTokenUsers || 0), 0)
+                      const tokenMissing = macDevices.reduce((sum, d) => sum + (d.secureTokenMissing || 0), 0)
+                      const devicesWithMissingTokens = macDevices.filter(d => (d.secureTokenMissing || 0) > 0).length
+                      const btmdbBroken = macDevices.filter(d => d.btmdbStatus && d.btmdbStatus.toLowerCase() !== 'healthy' && d.btmdbStatus.toLowerCase() !== 'ok').length
+                      const btmdbHealthy = macDevices.filter(d => d.btmdbStatus && (d.btmdbStatus.toLowerCase() === 'healthy' || d.btmdbStatus.toLowerCase() === 'ok')).length
+
+                      const Row = ({ label, value, hint, color = 'text-gray-900 dark:text-white' }: { label: string; value: string | number; hint?: string; color?: string }) => (
+                        <div className="flex items-center justify-between py-1.5">
+                          <div className="min-w-0">
+                            <div className="text-sm text-gray-600 dark:text-gray-300">{label}</div>
+                            {hint && <div className="text-xs text-gray-400 dark:text-gray-500">{hint}</div>}
+                          </div>
+                          <div className={`text-sm font-semibold tabular-nums shrink-0 ml-3 ${color}`}>{value}</div>
+                        </div>
+                      )
+
+                      return (
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">SecureToken</div>
+                            <Row label="Token holders" value={tokenHolders.toLocaleString()} />
+                            <Row
+                              label="Users missing token"
+                              value={tokenMissing.toLocaleString()}
+                              hint={devicesWithMissingTokens > 0 ? `${devicesWithMissingTokens} device${devicesWithMissingTokens === 1 ? '' : 's'}` : undefined}
+                              color={tokenMissing > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}
+                            />
+                          </div>
+                          <div className="border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Platform SSO</div>
+                            <Row label="Devices registered" value={`${ssoRegistered}/${totalMac}`} color={ssoRegistered === totalMac ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'} />
+                            {ssoMissing > 0 && (
+                              <Row label="Not registered" value={ssoMissing} color="text-amber-700 dark:text-amber-300" />
+                            )}
+                          </div>
+                          <div className="border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Background Task Mgmt (BTMDB)</div>
+                            <Row label="Healthy" value={btmdbHealthy} color={btmdbHealthy > 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-gray-900 dark:text-white'} />
+                            {btmdbBroken > 0 && (
+                              <Row label="Issues detected" value={btmdbBroken} color="text-red-700 dark:text-red-300" />
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })()}
+                  </div>
+                  ) : (
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
+                      {globalPlatformFilter === 'Windows' ? 'Windows Authentication' : 'Authentication'}
+                    </h3>
                     {(() => {
                       // Modern = has authMethod (Platform SSO or Hello for Business)
                       const modernCount = platformFilteredDevices.filter(d => d.authMethod).length
@@ -774,26 +858,51 @@ function IdentityPageContent() {
                       )
                     })()}
                   </div>
+                  )}
 
-                  {/* Widget 3: Administrator Accounts */}
+                  {/* Widget 3: Administrator Accounts (click to filter) */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Administrator Accounts</h3>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-medium text-gray-900 dark:text-white">Administrator Accounts</h3>
+                      <button
+                        onClick={() => setShowAdminsReport(!showAdminsReport)}
+                        className={`text-xs px-2 py-1 rounded-md border transition-colors ${
+                          showAdminsReport
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
+                            : 'border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                        title="Toggle a flat per-admin report for security review"
+                      >
+                        {showAdminsReport ? 'Back to List' : 'Admins Report'}
+                      </button>
+                    </div>
                     <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-                      {Object.entries(identityStats.adminNames).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => {
-                        const total = Object.values(identityStats.adminNames).reduce((sum, v) => sum + v, 0)
-                        const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-                        return (
-                          <div key={name}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={name}>{name}</span>
-                              <span className="text-sm text-gray-500 dark:text-gray-400">{count}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                              <div className="h-2 rounded-full bg-yellow-500 transition-all duration-300" style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        )
-                      })}
+                      {(() => {
+                        const entries = Object.entries(identityStats.adminNames).sort((a, b) => b[1].count - a[1].count)
+                        const maxCount = entries[0]?.[1].count || 0
+                        return entries.slice(0, 10).map(([key, { display, count }]) => {
+                          const percentage = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
+                          const isActive = adminAccountFilter?.toLowerCase() === key
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => setAdminAccountFilter(isActive ? null : display)}
+                              className={`block w-full text-left rounded px-1 py-0.5 transition-colors ${
+                                isActive ? 'bg-yellow-50 dark:bg-yellow-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                              }`}
+                              title={`Filter devices with admin "${display}"`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`text-sm font-medium truncate ${isActive ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'}`} title={display}>{display}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2 shrink-0 tabular-nums">{count}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div className={`h-2 rounded-full transition-all duration-300 ${isActive ? 'bg-yellow-600' : 'bg-yellow-500'}`} style={{ width: `${percentage}%` }} />
+                              </div>
+                            </button>
+                          )
+                        })
+                      })()}
                       {Object.keys(identityStats.adminNames).length === 0 && (
                         <div className="text-center text-gray-500 py-4">No admin accounts found</div>
                       )}
@@ -805,7 +914,114 @@ function IdentityPageContent() {
           </div>
 
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
-            {showUtilizationReport ? (
+            {showAdminsReport ? (
+              /* Local Admins Report View — flat per-(admin,device) listing for security review */
+              (() => {
+                type AdminRow = { admin: string; device: IdentityDevice }
+                const rows: AdminRow[] = []
+                for (const d of filteredDevices) {
+                  for (const a of (d.adminUsernames || [])) {
+                    rows.push({ admin: a, device: d })
+                  }
+                }
+                rows.sort((a, b) => {
+                  const c = a.admin.toLowerCase().localeCompare(b.admin.toLowerCase())
+                  if (c !== 0) return c
+                  return (a.device.deviceName || '').toLowerCase().localeCompare((b.device.deviceName || '').toLowerCase())
+                })
+
+                const exportCsv = () => {
+                  const headers = ['Admin Account', 'Device Name', 'Serial Number', 'Platform', 'Last Seen']
+                  const csvRows = rows.map(r => [
+                    r.admin,
+                    r.device.deviceName || '',
+                    r.device.serialNumber || '',
+                    r.device.platform || '',
+                    r.device.lastSeen || '',
+                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  const csv = [headers.join(','), ...csvRows].join('\n')
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `local-admins-${new Date().toISOString().split('T')[0]}.csv`
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                  URL.revokeObjectURL(url)
+                }
+
+                return (
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Local Administrators Report</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {rows.length.toLocaleString()} admin assignments across {filteredDevices.length.toLocaleString()} devices.
+                          {adminAccountFilter && <span className="ml-2 text-yellow-700 dark:text-yellow-300">Filtered to: <code>{adminAccountFilter}</code></span>}
+                        </p>
+                      </div>
+                      <button
+                        onClick={exportCsv}
+                        className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Export CSV
+                      </button>
+                    </div>
+
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Admin Account</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Platform</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {rows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                              No local admin accounts found.
+                            </td>
+                          </tr>
+                        ) : rows.map((r, i) => {
+                          const isFiltered = adminAccountFilter && r.admin.toLowerCase() === adminAccountFilter.toLowerCase()
+                          return (
+                            <tr key={`${r.device.id}-${r.admin}-${i}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-6 py-3">
+                                <button
+                                  onClick={() => setAdminAccountFilter(adminAccountFilter?.toLowerCase() === r.admin.toLowerCase() ? null : r.admin)}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                    isFiltered
+                                      ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-900/60 dark:text-yellow-100 dark:border-yellow-600'
+                                      : 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-900/60'
+                                  }`}
+                                  title="Click to filter by this admin"
+                                >
+                                  {r.admin}
+                                </button>
+                              </td>
+                              <td className="px-6 py-3">
+                                <Link href={`/device/${r.device.serialNumber}#identity`} className="group block">
+                                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">{r.device.deviceName}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{r.device.serialNumber}</div>
+                                </Link>
+                              </td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.platform}</td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.lastSeen ? formatRelativeTime(r.device.lastSeen) : '-'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()
+            ) : showUtilizationReport ? (
               /* Utilization Report View */
               (() => {
                 const devicesWithSessions = filteredDevices
@@ -1076,6 +1292,25 @@ function IdentityPageContent() {
                           <div className={`text-xs ${device.adminUsers === 0 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
                             {device.adminUsers === 0 ? 'no admins' : `${device.adminUsers} admin${device.adminUsers === 1 ? '' : 's'}`}
                           </div>
+                          {adminAccountFilter && (() => {
+                            const matched = (device.adminUsernames || []).filter(
+                              u => u.toLowerCase() === adminAccountFilter.toLowerCase()
+                            )
+                            if (matched.length === 0) return null
+                            return (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {matched.map(u => (
+                                  <span
+                                    key={u}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700"
+                                    title={`Admin account: ${u}`}
+                                  >
+                                    {u}
+                                  </span>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-2">

@@ -117,6 +117,9 @@ export async function GET(request: Request) {
             lastLogon: u.lastLogon
           })),
 
+          // Full list of admin usernames on this device (not capped at 5)
+          adminUsernames: Array.isArray(item.adminUsernames) ? item.adminUsernames : [],
+
           loggedInUsernames: item.loggedInUsernames || [],
 
           // Inventory dimensions for the Selections accordion. FastAPI bulk
