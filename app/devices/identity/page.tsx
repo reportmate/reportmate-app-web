@@ -30,12 +30,14 @@ interface IdentityDevice {
   btmdbSizeMB?: number | null
   secureTokenUsers?: number | null
   secureTokenMissing?: number | null
+  bootstrapToken?: { status?: string | null; escrowed?: boolean | null; supported?: boolean | null } | null
   platformSSORegistered?: boolean
   platformSSOUserCount?: number
   adBound?: boolean
   adDomain?: string | null
   ldapBound?: boolean
   users?: { username: string; realName?: string; isAdmin?: boolean; lastLogon?: string }[]
+  adminUsernames?: string[]
   loggedInUsernames?: string[]
   // Enrollment type (migrated from Management - Identity is authoritative)
   enrollmentType?: string
@@ -140,9 +142,16 @@ function IdentityPageContent() {
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Utilization report mode
   const [showUtilizationReport, setShowUtilizationReport] = useState(false)
+  // Local Admins report mode (flat admin x device view)
+  const [showAdminsReport, setShowAdminsReport] = useState(false)
   // Widget click filters
   const [directoryFilter, setDirectoryFilter] = useState<string | null>(null)
   const [authFilter, setAuthFilter] = useState<string | null>(null)
+  const [adminAccountFilter, setAdminAccountFilter] = useState<string | null>(null)
+  // Mac-only filter chips. Values: 'with-token' | 'missing-token' | null, and
+  // 'escrowed' | 'not-escrowed' | null. Each operates independently.
+  const [secureTokenFilter, setSecureTokenFilter] = useState<'with-token' | 'missing-token' | null>(null)
+  const [bootstrapTokenFilter, setBootstrapTokenFilter] = useState<'escrowed' | 'not-escrowed' | null>(null)
   // Selections accordion state
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
@@ -167,8 +176,13 @@ function IdentityPageContent() {
       return next
     })
   }
-  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null
-  const clearWidgetFilters = () => { setDirectoryFilter(null); setAuthFilter(null) }
+  const hasActiveWidgetFilter = directoryFilter !== null || authFilter !== null || adminAccountFilter !== null || showAdminsReport || secureTokenFilter !== null || bootstrapTokenFilter !== null
+  const clearWidgetFilters = () => {
+    setDirectoryFilter(null); setAuthFilter(null); setAdminAccountFilter(null); setShowAdminsReport(false)
+    setSecureTokenFilter(null); setBootstrapTokenFilter(null)
+  }
+  const matchesAdminFilter = (d: IdentityDevice, name: string) =>
+    (d.adminUsernames || []).some(u => u.toLowerCase() === name.toLowerCase())
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -247,6 +261,24 @@ function IdentityPageContent() {
       }
     }
     
+    // Widget click: admin account filter
+    if (adminAccountFilter) {
+      if (!matchesAdminFilter(d, adminAccountFilter)) return false
+    }
+
+    // Mac SecureToken / BootstrapToken filters
+    if (secureTokenFilter === 'with-token') {
+      if ((d.secureTokenUsers || 0) === 0) return false
+    } else if (secureTokenFilter === 'missing-token') {
+      if ((d.secureTokenMissing || 0) === 0) return false
+    }
+    if (bootstrapTokenFilter === 'escrowed') {
+      if (!d.bootstrapToken || !d.bootstrapToken.escrowed) return false
+    } else if (bootstrapTokenFilter === 'not-escrowed') {
+      // Have bootstrap data but token is not escrowed (escrowed is falsy: 0/false/null)
+      if (!d.bootstrapToken || d.bootstrapToken.escrowed) return false
+    }
+
     // Widget click: auth filter
     if (authFilter) {
       if (authFilter === 'Modern') {
@@ -322,15 +354,24 @@ function IdentityPageContent() {
 
   // Calculate identity widget stats (from platform-filtered set)
   const identityStats = {
-    adminNames: platformFilteredDevices.reduce((acc, d) => {
-      if (d.users) {
-        d.users.filter(u => u.isAdmin).forEach(u => {
-          const name = u.username || 'Unknown'
-          acc[name] = (acc[name] || 0) + 1
-        })
+    // adminNames is keyed by canonical (lowercase) username so that the same
+    // admin account is counted once across case variations. value stores the
+    // display name + device count.
+    adminNames: (() => {
+      const acc: Record<string, { display: string; count: number }> = {}
+      for (const d of platformFilteredDevices) {
+        const seen = new Set<string>()
+        for (const raw of (d.adminUsernames || [])) {
+          if (!raw) continue
+          const key = raw.toLowerCase()
+          if (seen.has(key)) continue
+          seen.add(key)
+          if (!acc[key]) acc[key] = { display: raw, count: 0 }
+          acc[key].count += 1
+        }
       }
       return acc
-    }, {} as Record<string, number>),
+    })(),
     
     enrollmentTypes: platformFilteredDevices.reduce((acc, d) => {
       const type = d.enrollmentType || 'Unknown'
@@ -396,10 +437,33 @@ function IdentityPageContent() {
           {/* Filters */}
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center gap-4">
-              {/* No Admin Users toggle - only shown when there are devices with no admins */}
-              {platformFilteredDevices.some(d => d.adminUsers === 0) && (
+              {/* Local Admins Report toggle (acts as a filter; active state = solid fill) */}
               <button
-                onClick={() => setAdminFilter(adminFilter === 'no-admins' ? 'all' : 'no-admins')}
+                onClick={() => setShowAdminsReport(!showAdminsReport)}
+                className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
+                  showAdminsReport
+                    ? 'border-indigo-600 bg-indigo-600 text-white hover:bg-indigo-700 dark:border-indigo-500 dark:bg-indigo-600'
+                    : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                }`}
+                title="Flat per-(admin, device) report for security review"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+                Admins Report
+              </button>
+
+              {/* No Admin Users toggle - only shown while the Admins Report is
+                  active (it's a security-review pivot: "which devices have no
+                  managed admin"). Activating switches back to the device list
+                  since the per-admin report has no rows for zero-admin devices. */}
+              {showAdminsReport && (
+              <button
+                onClick={() => {
+                  const turningOn = adminFilter !== 'no-admins'
+                  setAdminFilter(turningOn ? 'no-admins' : 'all')
+                  if (turningOn) setShowAdminsReport(false)
+                }}
                 className={`px-3 py-1.5 text-sm rounded-lg border transition-colors flex items-center gap-2 ${
                   adminFilter === 'no-admins'
                     ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
@@ -494,7 +558,14 @@ function IdentityPageContent() {
                 </svg>
                 <span className="font-medium">Filters Active</span>
                 <span className="text-yellow-600 dark:text-yellow-300">
-                  {[directoryFilter, authFilter].filter(Boolean).join(', ')}
+                  {[
+                    directoryFilter,
+                    authFilter,
+                    adminAccountFilter ? `Admin: ${adminAccountFilter}` : null,
+                    showAdminsReport ? 'Admins Report' : null,
+                    secureTokenFilter === 'with-token' ? 'SecureToken: holders' : secureTokenFilter === 'missing-token' ? 'SecureToken: missing' : null,
+                    bootstrapTokenFilter === 'escrowed' ? 'Bootstrap: escrowed' : bootstrapTokenFilter === 'not-escrowed' ? 'Bootstrap: not escrowed' : null,
+                  ].filter(Boolean).join(', ')}
                 </span>
               </div>
               <button
@@ -700,7 +771,8 @@ function IdentityPageContent() {
                     })()}
                   </div>
 
-                  {/* Widget 2: Authentication Donut - Modern / Legacy / Standard */}
+                  {/* Widget 2: Authentication donut (same design on all platforms).
+                       On Mac, append SecureToken / BootstrapToken filter rows below the donut. */}
                   <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Authentication</h3>
                     {(() => {
@@ -773,30 +845,116 @@ function IdentityPageContent() {
                         </div>
                       )
                     })()}
+
+                    {/* Mac-only: SecureToken / BootstrapToken summary, each row clickable as a filter */}
+                    {globalPlatformFilter === 'macOS' && (() => {
+                      const macDevices = platformFilteredDevices
+                      if (macDevices.length === 0) return null
+                      const tokenHolderDevices = macDevices.filter(d => (d.secureTokenUsers || 0) > 0).length
+                      const tokenMissingDevices = macDevices.filter(d => (d.secureTokenMissing || 0) > 0).length
+                      // bootstrapToken.escrowed arrives as boolean OR 0/1 depending on
+                      // client version, so treat as truthy/falsy rather than strict equality.
+                      const btEscrowed = macDevices.filter(d => d.bootstrapToken && !!d.bootstrapToken.escrowed).length
+                      const btNotEscrowed = macDevices.filter(d => d.bootstrapToken && !d.bootstrapToken.escrowed).length
+                      const hasAnyBootstrapData = macDevices.some(d => d.bootstrapToken)
+
+                      const FilterRow = ({
+                        label, value, isActive, onClick, valueColor = 'text-gray-900 dark:text-white',
+                      }: { label: string; value: number; isActive: boolean; onClick: () => void; valueColor?: string }) => (
+                        <button
+                          onClick={onClick}
+                          className={`flex items-center justify-between w-full text-sm rounded px-1 py-0.5 transition-colors ${
+                            isActive ? 'bg-yellow-50 dark:bg-yellow-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                          }`}
+                          title={`Filter to ${label}`}
+                        >
+                          <span className="text-gray-600 dark:text-gray-300">{label}</span>
+                          <span className={`font-medium tabular-nums shrink-0 ml-3 ${valueColor}`}>{value.toLocaleString()}</span>
+                        </button>
+                      )
+
+                      return (
+                        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700/50 space-y-3">
+                          <div>
+                            <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">SecureToken</div>
+                            <FilterRow
+                              label="Token holders"
+                              value={tokenHolderDevices}
+                              isActive={secureTokenFilter === 'with-token'}
+                              onClick={() => setSecureTokenFilter(secureTokenFilter === 'with-token' ? null : 'with-token')}
+                              valueColor="text-emerald-700 dark:text-emerald-300"
+                            />
+                            <FilterRow
+                              label="Users missing token"
+                              value={tokenMissingDevices}
+                              isActive={secureTokenFilter === 'missing-token'}
+                              onClick={() => setSecureTokenFilter(secureTokenFilter === 'missing-token' ? null : 'missing-token')}
+                              valueColor={tokenMissingDevices > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}
+                            />
+                          </div>
+                          {hasAnyBootstrapData && (
+                            <div>
+                              <div className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Bootstrap Token</div>
+                              <FilterRow
+                                label="Escrowed"
+                                value={btEscrowed}
+                                isActive={bootstrapTokenFilter === 'escrowed'}
+                                onClick={() => setBootstrapTokenFilter(bootstrapTokenFilter === 'escrowed' ? null : 'escrowed')}
+                                valueColor="text-emerald-700 dark:text-emerald-300"
+                              />
+                              <FilterRow
+                                label="Not escrowed"
+                                value={btNotEscrowed}
+                                isActive={bootstrapTokenFilter === 'not-escrowed'}
+                                onClick={() => setBootstrapTokenFilter(bootstrapTokenFilter === 'not-escrowed' ? null : 'not-escrowed')}
+                                valueColor={btNotEscrowed > 0 ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
-                  {/* Widget 3: Administrator Accounts */}
-                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700">
-                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Administrator Accounts</h3>
-                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-                      {Object.entries(identityStats.adminNames).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => {
-                        const total = Object.values(identityStats.adminNames).reduce((sum, v) => sum + v, 0)
-                        const percentage = total > 0 ? Math.round((count / total) * 100) : 0
-                        return (
-                          <div key={name}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium text-gray-900 dark:text-white truncate" title={name}>{name}</span>
-                              <span className="text-sm text-gray-500 dark:text-gray-400">{count}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                              <div className="h-2 rounded-full bg-yellow-500 transition-all duration-300" style={{ width: `${percentage}%` }} />
-                            </div>
-                          </div>
-                        )
-                      })}
+                  {/* Widget 3: Administrator Accounts (click to filter).
+                       Card matches the row's tallest sibling — the inner scroll
+                       region uses absolute positioning so the admin list's natural
+                       content height does not drive the card taller than its peers. */}
+                  <div className="bg-white dark:bg-gray-800 rounded-lg p-6 border border-gray-200 dark:border-gray-700 flex flex-col min-h-0">
+                    <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4 shrink-0">Administrator Accounts</h3>
+                    <div className="relative flex-1 min-h-[12rem]">
+                      <div className="absolute inset-0 overflow-y-auto space-y-2 pr-2">
+                      {(() => {
+                        const entries = Object.entries(identityStats.adminNames).sort((a, b) => b[1].count - a[1].count)
+                        const maxCount = entries[0]?.[1].count || 0
+                        // No slice — the scrollable container shows all admin names.
+                        return entries.map(([key, { display, count }]) => {
+                          const percentage = maxCount > 0 ? Math.round((count / maxCount) * 100) : 0
+                          const isActive = adminAccountFilter?.toLowerCase() === key
+                          return (
+                            <button
+                              key={key}
+                              onClick={() => setAdminAccountFilter(isActive ? null : display)}
+                              className={`block w-full text-left rounded px-1 py-0.5 transition-colors ${
+                                isActive ? 'bg-yellow-50 dark:bg-yellow-900/30' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                              }`}
+                              title={`Filter devices with admin "${display}"`}
+                            >
+                              <div className="flex items-center justify-between mb-1">
+                                <span className={`text-sm font-medium truncate ${isActive ? 'text-yellow-800 dark:text-yellow-200' : 'text-gray-900 dark:text-white'}`} title={display}>{display}</span>
+                                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2 shrink-0 tabular-nums">{count}</span>
+                              </div>
+                              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                                <div className={`h-2 rounded-full transition-all duration-300 ${isActive ? 'bg-yellow-600' : 'bg-yellow-500'}`} style={{ width: `${percentage}%` }} />
+                              </div>
+                            </button>
+                          )
+                        })
+                      })()}
                       {Object.keys(identityStats.adminNames).length === 0 && (
                         <div className="text-center text-gray-500 py-4">No admin accounts found</div>
                       )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -805,7 +963,120 @@ function IdentityPageContent() {
           </div>
 
           <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
-            {showUtilizationReport ? (
+            {showAdminsReport ? (
+              /* Local Admins Report View — flat per-(admin,device) listing for security review */
+              (() => {
+                type AdminRow = { admin: string; device: IdentityDevice }
+                const rows: AdminRow[] = []
+                const adminFilterLc = adminAccountFilter?.toLowerCase() || null
+                for (const d of filteredDevices) {
+                  for (const a of (d.adminUsernames || [])) {
+                    // When an admin filter is active, only emit rows for that
+                    // exact admin — otherwise the report shows every admin on
+                    // every matched device, which buries the account the user
+                    // was actually hunting for.
+                    if (adminFilterLc && a.toLowerCase() !== adminFilterLc) continue
+                    rows.push({ admin: a, device: d })
+                  }
+                }
+                rows.sort((a, b) => {
+                  const c = a.admin.toLowerCase().localeCompare(b.admin.toLowerCase())
+                  if (c !== 0) return c
+                  return (a.device.deviceName || '').toLowerCase().localeCompare((b.device.deviceName || '').toLowerCase())
+                })
+
+                const exportCsv = () => {
+                  const headers = ['Admin Account', 'Device Name', 'Serial Number', 'Platform', 'Last Seen']
+                  const csvRows = rows.map(r => [
+                    r.admin,
+                    r.device.deviceName || '',
+                    r.device.serialNumber || '',
+                    r.device.platform || '',
+                    r.device.lastSeen || '',
+                  ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+                  const csv = [headers.join(','), ...csvRows].join('\n')
+                  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+                  const url = URL.createObjectURL(blob)
+                  const link = document.createElement('a')
+                  link.href = url
+                  link.download = `local-admins-${new Date().toISOString().split('T')[0]}.csv`
+                  document.body.appendChild(link)
+                  link.click()
+                  document.body.removeChild(link)
+                  URL.revokeObjectURL(url)
+                }
+
+                return (
+                  <div className="p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Local Administrators Report</h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400">
+                          {rows.length.toLocaleString()} admin assignments across {filteredDevices.length.toLocaleString()} devices.
+                          {adminAccountFilter && <span className="ml-2 text-yellow-700 dark:text-yellow-300">Filtered to: <code>{adminAccountFilter}</code></span>}
+                        </p>
+                      </div>
+                      <button
+                        onClick={exportCsv}
+                        className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                        </svg>
+                        Export CSV
+                      </button>
+                    </div>
+
+                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                      <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Admin Account</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Device</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Platform</th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Last Seen</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                        {rows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
+                              No local admin accounts found.
+                            </td>
+                          </tr>
+                        ) : rows.map((r, i) => {
+                          const isFiltered = adminAccountFilter && r.admin.toLowerCase() === adminAccountFilter.toLowerCase()
+                          return (
+                            <tr key={`${r.device.id}-${r.admin}-${i}`} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                              <td className="px-6 py-3">
+                                <button
+                                  onClick={() => setAdminAccountFilter(adminAccountFilter?.toLowerCase() === r.admin.toLowerCase() ? null : r.admin)}
+                                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                    isFiltered
+                                      ? 'bg-yellow-200 text-yellow-900 border-yellow-400 dark:bg-yellow-900/60 dark:text-yellow-100 dark:border-yellow-600'
+                                      : 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700 hover:bg-yellow-200 dark:hover:bg-yellow-900/60'
+                                  }`}
+                                  title="Click to filter by this admin"
+                                >
+                                  {r.admin}
+                                </button>
+                              </td>
+                              <td className="px-6 py-3">
+                                <Link href={`/device/${r.device.serialNumber}#identity`} className="group block">
+                                  <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">{r.device.deviceName}</div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-400 font-mono">{r.device.serialNumber}</div>
+                                </Link>
+                              </td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.platform}</td>
+                              <td className="px-6 py-3 text-sm text-gray-700 dark:text-gray-300">{r.device.lastSeen ? formatRelativeTime(r.device.lastSeen) : '-'}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })()
+            ) : showUtilizationReport ? (
               /* Utilization Report View */
               (() => {
                 const devicesWithSessions = filteredDevices
@@ -912,9 +1183,9 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('directory')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-1/2 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Directory
@@ -925,9 +1196,9 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('auth')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-1/2 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Auth
@@ -938,9 +1209,9 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('users')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-[1%] whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Users
@@ -951,9 +1222,9 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('loggedIn')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-[1%] whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Current
@@ -964,9 +1235,9 @@ function IdentityPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th
                     onClick={() => handleSort('lastSeen')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-[1%] whitespace-nowrap px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Last Seen
@@ -1072,32 +1343,57 @@ function IdentityPageContent() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm font-medium text-gray-900 dark:text-white">{device.totalUsers}</div>
-                          <div className={`text-xs ${device.adminUsers === 0 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
-                            {device.adminUsers === 0 ? 'no admins' : `${device.adminUsers} admin${device.adminUsers === 1 ? '' : 's'}`}
+                          <div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                            <span className="font-medium">{device.totalUsers}</span>
+                            <span className={`ml-2 text-xs ${device.adminUsers === 0 ? 'text-yellow-600 dark:text-yellow-400 font-medium' : 'text-gray-500 dark:text-gray-400'}`}>
+                              ({device.adminUsers === 0 ? 'no admins' : `${device.adminUsers} admin${device.adminUsers === 1 ? '' : 's'}`})
+                            </span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            {device.currentlyLoggedIn > 0 ? (
-                              <>
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1 animate-pulse"></span>
-                                  {device.currentlyLoggedIn}
-                                </span>
-                                {device.loggedInUsernames && device.loggedInUsernames.length > 0 && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[100px]" title={device.loggedInUsernames.join(', ')}>
-                                    {device.loggedInUsernames[0]}
-                                    {device.loggedInUsernames.length > 1 && ` +${device.loggedInUsernames.length - 1}`}
+                          {adminAccountFilter && (() => {
+                            const matched = (device.adminUsernames || []).filter(
+                              u => u.toLowerCase() === adminAccountFilter.toLowerCase()
+                            )
+                            if (matched.length === 0) return null
+                            return (
+                              <div className="mt-1 flex flex-wrap gap-1">
+                                {matched.map(u => (
+                                  <span
+                                    key={u}
+                                    className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-200 dark:border-yellow-700"
+                                    title={`Admin account: ${u}`}
+                                  >
+                                    {u}
                                   </span>
-                                )}
-                              </>
-                            ) : (
-                              <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
-                            )}
-                          </div>
+                                ))}
+                              </div>
+                            )
+                          })()}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {device.currentlyLoggedIn > 0 && device.loggedInUsernames && device.loggedInUsernames.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {device.loggedInUsernames.map(name => (
+                                <span
+                                  key={name}
+                                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200"
+                                  title={`Currently logged in: ${name}`}
+                                >
+                                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          ) : device.currentlyLoggedIn > 0 ? (
+                            // Have a count but no usernames (data gap) — fall back to count pill
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                              <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse"></span>
+                              {device.currentlyLoggedIn} logged in
+                            </span>
+                          ) : (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 dark:text-white whitespace-nowrap">
                           {device.lastSeen ? formatRelativeTime(device.lastSeen) : '-'}
                         </td>
                       </tr>
