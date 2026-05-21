@@ -108,6 +108,9 @@ export async function GET(request: Request) {
           
           // Session utilization summary (TerminalServices RDP data)
           sessionSummary: item.sessionSummary || null,
+
+          // macOS Bootstrap Token (from security module, surfaced here for identity page)
+          bootstrapToken: item.bootstrapToken || null,
           
           // User previews (top 5, pre-sliced by API)
           users: users.map((u: any) => ({
