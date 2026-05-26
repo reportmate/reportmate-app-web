@@ -545,6 +545,14 @@ function ApplicationsPageContent() {
   // Utilization report state (unified report - includes both inventory and usage data)
   const [utilizationData, setUtilizationData] = useState<UtilizationData | null>(null)
   const [utilizationDays, setUtilizationDays] = useState<number>(30)
+
+  // Server-aggregated version distribution for the versions report. Populated
+  // by /api/devices/applications/distribution, which counts in SQL and so
+  // isn't bounded by the bulk endpoint's per-page cap. Keyed by the requested
+  // app name; renderer prefers this over the client-side versionAnalysis fold
+  // when present so the chart totals match the real fleet, not just the page.
+  const [versionDistributionServer, setVersionDistributionServer] =
+    useState<{ [appName: string]: { totalDevices: number; versions: { [version: string]: number } } } | null>(null)
   const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
@@ -1258,25 +1266,63 @@ function ApplicationsPageContent() {
       if (!selectedAppsParam) inventoryParams.set('limit', '5000')
 
       const inventoryUrl = `/api/devices/applications?${inventoryParams.toString()}`
-      
-      const inventoryResponse = await fetch(inventoryUrl, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      })
-      
+
+      // Distribution endpoint only makes sense with explicit app picks — the
+      // server can't bucket "everything" without an O(distinct-app-names)
+      // explosion. When no apps are selected, the chart falls back to
+      // client-side fold over the bulk list (capped at 5000).
+      const distributionUrl = selectedAppsParam
+        ? (() => {
+            const dp = new URLSearchParams()
+            dp.set('applicationNames', selectedAppsParam)
+            if (selectedUsages.length) dp.set('usages', selectedUsages.join(','))
+            if (selectedCatalogs.length) dp.set('catalogs', selectedCatalogs.join(','))
+            if (selectedAreas.length) dp.set('areas', selectedAreas.join(','))
+            if (selectedFleets.length) dp.set('fleets', selectedFleets.join(','))
+            if (selectedRooms.length) dp.set('rooms', selectedRooms.join(','))
+            if (selectedLocations.length) dp.set('locations', selectedLocations.join(','))
+            if (platformFilter !== 'all') dp.set('platforms', platformFilter)
+            return `/api/devices/applications/distribution?${dp.toString()}`
+          })()
+        : null
+
+      const [inventoryResponse, distributionResponse] = await Promise.all([
+        fetch(inventoryUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } }),
+        distributionUrl
+          ? fetch(distributionUrl, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } })
+          : Promise.resolve(null),
+      ])
+
       setLoadingProgress({ current: 60, total: 100 })
-      
+
       if (!inventoryResponse.ok) {
         throw new Error(`Failed to load version data: ${inventoryResponse.status}`)
       }
-      
+
       const inventoryData = await inventoryResponse.json()
-      
+
+      // Distribution failure is non-fatal — the chart falls back to the
+      // client-side fold (capped totals, but still functional).
+      let distributionData: typeof versionDistributionServer = null
+      if (distributionResponse && distributionResponse.ok) {
+        try {
+          const parsed = await distributionResponse.json()
+          if (parsed && typeof parsed === 'object' && !parsed.error) {
+            distributionData = parsed
+          }
+        } catch (e) {
+          console.warn('Failed to parse distribution response, falling back to client fold:', e)
+        }
+      } else if (distributionResponse) {
+        console.warn(`Distribution endpoint returned ${distributionResponse.status}, falling back to client fold`)
+      }
+
       if (Array.isArray(inventoryData)) {
         // Pin the platform the data was fetched for so the refetch-on-platform
         // effect doesn't fire immediately after this load completes.
         reportPlatformRef.current = fetchPlatform
         setApplications(inventoryData)
+        setVersionDistributionServer(distributionData)
         setReportType('versions')
         setSelectionsExpanded(false)
         setUtilizationData(null) // Clear any previous usage data
@@ -1591,6 +1637,7 @@ function ApplicationsPageContent() {
   const resetReport = () => {
     setApplications([])
     setUtilizationData(null)
+    setVersionDistributionServer(null)
     setReportType(null)
     setReportMode('has') // Reset to default mode
     setSelectedApplications([])
@@ -1691,10 +1738,23 @@ function ApplicationsPageContent() {
   }, [allDevices, baseFilteredApplications, selectedApplications, selectedUsages, selectedCatalogs, selectedLocations, selectedRooms, reportMode, missingTableSortColumn, missingTableSortDirection])
 
   // Version analysis - group by NORMALIZED application name and version
-  // Uses baseFilteredApplications (without version filter) so widgets always show all versions
+  // Uses baseFilteredApplications (without version filter) so widgets always show all versions.
+  //
+  // When the server-aggregated distribution is available (versions report with
+  // explicit app picks), prefer it: the bulk applications endpoint paginates at
+  // 500 rows, which silently truncated the chart on large fleets. The server
+  // endpoint counts per (app, version) in SQL so totals reflect the whole
+  // fleet regardless of pagination.
   const versionAnalysis = useMemo(() => {
-    const analysis: VersionAnalysis = {}
+    if (versionDistributionServer && Object.keys(versionDistributionServer).length > 0) {
+      const analysis: VersionAnalysis = {}
+      for (const [appName, bucket] of Object.entries(versionDistributionServer)) {
+        analysis[appName] = { ...bucket.versions }
+      }
+      return analysis
+    }
 
+    const analysis: VersionAnalysis = {}
     baseFilteredApplications.forEach(app => {
       // Use normalized name as the key (same as what's in filterOptions.applicationNames)
       const normalizedName = normalizeAppName(app.name)
@@ -1708,7 +1768,7 @@ function ApplicationsPageContent() {
     })
 
     return analysis
-  }, [baseFilteredApplications])
+  }, [baseFilteredApplications, versionDistributionServer])
 
   const [widgetMetric, setWidgetMetric] = useState<'hours' | 'launches'>('launches')
 
