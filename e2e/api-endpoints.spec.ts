@@ -149,6 +149,21 @@ test.describe('Next.js /api/devices/* Sub-Routes', () => {
       expect(res.status()).toBe(200)
     })
   }
+
+  // /distribution requires applicationNames; smoke-test with a token unlikely
+  // to match anything so the response shape (object with bucket entry) is what
+  // we assert on, not the counts.
+  test('GET /api/devices/applications/distribution?applicationNames=__nonexistent__ - responds 200', async ({ request }) => {
+    const res = await request.get('/api/devices/applications/distribution?applicationNames=__nonexistent__')
+    expect(res.status()).toBe(200)
+    const body = await res.json()
+    expect(body).toBeTruthy()
+    expect(typeof body).toBe('object')
+    expect(Array.isArray(body)).toBe(false)
+    expect(body.__nonexistent__).toBeDefined()
+    expect(typeof body.__nonexistent__.totalDevices).toBe('number')
+    expect(typeof body.__nonexistent__.versions).toBe('object')
+  })
 })
 
 test.describe('Next.js Stats Routes', () => {
