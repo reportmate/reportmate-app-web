@@ -1302,13 +1302,35 @@ function ApplicationsPageContent() {
       const inventoryData = await inventoryResponse.json()
 
       // Distribution failure is non-fatal — the chart falls back to the
-      // client-side fold (capped totals, but still functional).
+      // client-side fold (capped totals, but still functional). Validate the
+      // shape strictly so a malformed payload (e.g. an array, or buckets
+      // missing `.versions`) can't crash the version-analysis fold downstream.
       let distributionData: typeof versionDistributionServer = null
       if (distributionResponse && distributionResponse.ok) {
         try {
-          const parsed = await distributionResponse.json()
-          if (parsed && typeof parsed === 'object' && !parsed.error) {
-            distributionData = parsed
+          const parsed: unknown = await distributionResponse.json()
+          if (
+            parsed &&
+            typeof parsed === 'object' &&
+            !Array.isArray(parsed) &&
+            !('error' in (parsed as Record<string, unknown>))
+          ) {
+            const validated: NonNullable<typeof versionDistributionServer> = {}
+            for (const [appName, rawBucket] of Object.entries(parsed as Record<string, unknown>)) {
+              if (!rawBucket || typeof rawBucket !== 'object' || Array.isArray(rawBucket)) continue
+              const bucket = rawBucket as Record<string, unknown>
+              const versionsRaw = bucket.versions
+              if (!versionsRaw || typeof versionsRaw !== 'object' || Array.isArray(versionsRaw)) continue
+              const versions: { [v: string]: number } = {}
+              for (const [v, c] of Object.entries(versionsRaw as Record<string, unknown>)) {
+                if (typeof c === 'number' && Number.isFinite(c)) versions[v] = c
+              }
+              const totalDevices = typeof bucket.totalDevices === 'number' && Number.isFinite(bucket.totalDevices)
+                ? bucket.totalDevices
+                : Object.values(versions).reduce((s, n) => s + n, 0)
+              validated[appName] = { totalDevices, versions }
+            }
+            if (Object.keys(validated).length > 0) distributionData = validated
           }
         } catch (e) {
           console.warn('Failed to parse distribution response, falling back to client fold:', e)
@@ -1747,9 +1769,21 @@ function ApplicationsPageContent() {
   // fleet regardless of pagination.
   const versionAnalysis = useMemo(() => {
     if (versionDistributionServer && Object.keys(versionDistributionServer).length > 0) {
+      // Normalize server-provided keys with the same rule the client fold uses
+      // (and the downstream version-chip filter assumes): without this, an
+      // app like "Houdini Launcher" returned by the server would render under
+      // its raw name on the chart, but `selectedVersions` would store
+      // `"Houdini Launcher:21.0.440"` and the table-filter compare against
+      // `normalizeAppName(app.name)` (which yields "Houdini") would never
+      // match. Collisions sum per-version so two raw apps that normalize to
+      // the same name behave identically to the client fold.
       const analysis: VersionAnalysis = {}
       for (const [appName, bucket] of Object.entries(versionDistributionServer)) {
-        analysis[appName] = { ...bucket.versions }
+        const key = normalizeAppName(appName) || appName
+        const target = analysis[key] || (analysis[key] = {})
+        for (const [version, count] of Object.entries(bucket.versions)) {
+          target[version] = (target[version] || 0) + count
+        }
       }
       return analysis
     }
