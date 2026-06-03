@@ -39,6 +39,11 @@ interface SecurityDevice {
   secureBootEnabled: boolean
   sipEnabled?: boolean
   gatekeeperEnabled: boolean
+  // Firmware password
+  firmwarePassword?: {
+    statusDisplay?: string
+    isSet?: boolean
+  } | null
   // Protection (Windows)
   memoryIntegrityEnabled: boolean
   coreIsolationEnabled: boolean
@@ -90,7 +95,7 @@ interface CertificateResult {
   isSelfSigned: boolean
 }
 
-type SortColumn = 'device' | 'encryption' | 'protection' | 'detection' | 'firewall' | 'tampering' | 'remote' | 'certificates' | 'cve'
+type SortColumn = 'device' | 'encryption' | 'protection' | 'detection' | 'firewall' | 'tampering' | 'firmware' | 'remote' | 'certificates' | 'cve'
 
 // ============ LOADING SKELETON ============
 
@@ -275,6 +280,7 @@ function SecurityPageContent() {
   const [detectionFilter, setDetectionFilter] = useState('')
   const [firewallFilter, setFirewallFilter] = useState('')
   const [tamperingFilter, setTamperingFilter] = useState('')
+  const [firmwarePwFilter, setFirmwarePwFilter] = useState('')
   const [remoteFilter, setRemoteFilter] = useState('')
   const [certFilter, setCertFilter] = useState('')
   const [cveFilter, setCveFilter] = useState('')
@@ -301,7 +307,7 @@ function SecurityPageContent() {
   const [certSearchPerformed, setCertSearchPerformed] = useState(false)
   const [selectedCertName, setSelectedCertName] = useState<string | null>(null)
 
-  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter)
+  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || firmwarePwFilter || remoteFilter || certFilter || cveFilter)
 
   const clearWidgetFilters = () => {
     setEncryptionFilter('')
@@ -309,6 +315,7 @@ function SecurityPageContent() {
     setDetectionFilter('')
     setFirewallFilter('')
     setTamperingFilter('')
+    setFirmwarePwFilter('')
     setRemoteFilter('')
     setCertFilter('')
     setCveFilter('')
@@ -416,7 +423,7 @@ function SecurityPageContent() {
     setSelectedStatuses([]); setSelectedCatalogs([]); setSelectedAreas([])
     setSelectedLocations([]); setSelectedFleets([]); setSelectedUsages([])
     setEncryptionFilter(''); setProtectionFilter(''); setDetectionFilter('')
-    setFirewallFilter(''); setTamperingFilter(''); setRemoteFilter('')
+    setFirewallFilter(''); setTamperingFilter(''); setFirmwarePwFilter(''); setRemoteFilter('')
     setCertFilter(''); setCveFilter(''); setSearchQuery('')
     setSelectedCertName(null); setCertResults([]); setCertSearchQuery(''); setCertSearchPerformed(false)
   }
@@ -465,6 +472,14 @@ function SecurityPageContent() {
     return 'Valid'
   }
 
+  const getFirmwarePwLabel = (d: SecurityDevice): string => {
+    const s = d.firmwarePassword?.statusDisplay
+    if (s === 'Set') return 'Set'
+    if (s === 'Not Set') return 'Not Set'
+    if (s === 'Not Implemented') return 'Not Supported'
+    return 'Unknown'
+  }
+
   const getCveLabel = (d: SecurityDevice): string => {
     if (d.criticalCveCount > 0) return 'Critical'
     if (d.cveCount > 0) return 'Has CVEs'
@@ -507,6 +522,7 @@ function SecurityPageContent() {
   const detectionCounts = countBy(d => (d.detectionCount ?? 0) > 0 ? 'Threats Detected' : 'Clean')
   const firewallCounts = countBy(d => d.firewallEnabled ? 'Enabled' : 'Disabled')
   const tamperingCounts = countBy(getTamperLabel)
+  const firmwarePwCounts = countBy(getFirmwarePwLabel)
   const remoteCounts = countBy(getRemoteLabel)
   const certCounts = countBy(getCertLabel)
   const cveCounts = countBy(getCveLabel)
@@ -546,6 +562,7 @@ function SecurityPageContent() {
     if (detectionFilter && ((d.detectionCount ?? 0) > 0 ? 'Threats Detected' : 'Clean') !== detectionFilter) return false
     if (firewallFilter && (d.firewallEnabled ? 'Enabled' : 'Disabled') !== firewallFilter) return false
     if (tamperingFilter && getTamperLabel(d) !== tamperingFilter) return false
+    if (firmwarePwFilter && getFirmwarePwLabel(d) !== firmwarePwFilter) return false
     if (remoteFilter && getRemoteLabel(d) !== remoteFilter) return false
     if (certFilter && getCertLabel(d) !== certFilter) return false
     if (cveFilter && getCveLabel(d) !== cveFilter) return false
@@ -571,6 +588,7 @@ function SecurityPageContent() {
       case 'detection': av = String(a.detectionCount ?? 0).padStart(5, '0'); bv = String(b.detectionCount ?? 0).padStart(5, '0'); break
       case 'firewall': av = a.firewallEnabled ? '1' : '0'; bv = b.firewallEnabled ? '1' : '0'; break
       case 'tampering': av = getTamperLabel(a); bv = getTamperLabel(b); break
+      case 'firmware': av = getFirmwarePwLabel(a); bv = getFirmwarePwLabel(b); break
       case 'remote': av = getRemoteLabel(a); bv = getRemoteLabel(b); break
       case 'certificates': av = String(a.expiredCertCount + a.expiringSoonCertCount).padStart(5, '0'); bv = String(b.expiredCertCount + b.expiringSoonCertCount).padStart(5, '0'); break
       case 'cve': av = String(a.cveCount).padStart(5, '0'); bv = String(b.cveCount).padStart(5, '0'); break
@@ -582,13 +600,14 @@ function SecurityPageContent() {
 
   const exportCSV = () => {
     const esc = (v: string) => `"${(v || '').replace(/"/g, '""')}"`
-    const headers = ['Device Name','Serial Number','Platform','Encryption','Protection Name','Protection Status','Detections','Tampering','Firewall','Access','Expired Certs','Expiring Certs','Vulnerabilities','Critical Vulnerabilities']
+    const headers = ['Device Name','Serial Number','Platform','Encryption','Protection Name','Protection Status','Detections','Tampering','Firmware Password','Firewall','Access','Expired Certs','Expiring Certs','Vulnerabilities','Critical Vulnerabilities']
     const rows = filteredDevices.map(d => [
       esc(d.deviceName), esc(d.serialNumber), esc(normalizePlatform(d.platform)),
       d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
       esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
       d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
       isWin(d) ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}` : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`,
+      esc(getFirmwarePwLabel(d)),
       d.firewallEnabled ? 'On' : 'Off',
       [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
       String(d.expiredCertCount), String(d.expiringSoonCertCount),
@@ -606,6 +625,7 @@ function SecurityPageContent() {
 
   const greenRed: Record<string, string> = { 'Encrypted': '#22c55e', 'Not Encrypted': '#ef4444', 'Enabled': '#22c55e', 'Disabled': '#ef4444', 'Active': '#22c55e', 'Inactive': '#ef4444', 'Secured': '#22c55e', 'Unsecured': '#ef4444' }
   const tamperingColors: Record<string, string> = { 'Secured': '#22c55e', 'Insecure': '#ef4444' }
+  const firmwarePwColors: Record<string, string> = { 'Set': '#22c55e', 'Not Set': '#ef4444', 'Not Supported': '#94a3b8', 'Unknown': '#cbd5e1' }
   const detectionColors: Record<string, string> = { 'Clean': '#22c55e', 'Threats Detected': '#ef4444' }
   const firewallColors: Record<string, string> = { 'Enabled': '#22c55e', 'Disabled': '#94a3b8' }
   const protColors: Record<string, string> = { 'Current': '#22c55e', 'Out of Date': '#f59e0b', 'Disabled': '#ef4444' }
@@ -702,7 +722,7 @@ function SecurityPageContent() {
                 </svg>
                 <span className="font-medium">Filters Active</span>
                 <span className="text-yellow-600 dark:text-yellow-300">
-                  {[encryptionFilter, protectionFilter, detectionFilter, firewallFilter, tamperingFilter, remoteFilter, certFilter, cveFilter].filter(Boolean).join(', ')}
+                  {[encryptionFilter, protectionFilter, detectionFilter, firewallFilter, tamperingFilter, firmwarePwFilter, remoteFilter, certFilter, cveFilter].filter(Boolean).join(', ')}
                 </span>
               </div>
               <button
@@ -733,6 +753,7 @@ function SecurityPageContent() {
                   <MiniDonut title="Detection" data={Object.entries(detectionCounts).map(([label, value]) => ({ label, value }))} colors={detectionColors} onFilter={setDetectionFilter} activeFilter={detectionFilter} />
                   <MiniDonut title="Firewall" data={Object.entries(firewallCounts).map(([label, value]) => ({ label, value }))} colors={firewallColors} onFilter={setFirewallFilter} activeFilter={firewallFilter} />
                   <MiniDonut title="Tampering" data={Object.entries(tamperingCounts).map(([label, value]) => ({ label, value }))} colors={tamperingColors} onFilter={setTamperingFilter} activeFilter={tamperingFilter} />
+                  <MiniDonut title="Firmware Password" data={Object.entries(firmwarePwCounts).map(([label, value]) => ({ label, value }))} colors={firmwarePwColors} onFilter={setFirmwarePwFilter} activeFilter={firmwarePwFilter} />
                   <MiniDonut title="Access" data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />
                   <MiniDonut title="Certificates" data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />
                   <MiniDonut title="Vulnerabilities" data={Object.entries(cveCounts).map(([label, value]) => ({ label, value }))} colors={cveColors} onFilter={setCveFilter} activeFilter={cveFilter} />
@@ -921,6 +942,7 @@ function SecurityPageContent() {
                   <SortHeader label="Protection" column="protection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortHeader label="Detection" column="detection" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortHeader label="Tampering" column="tampering" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
+                  <SortHeader label="Firmware PW" column="firmware" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortHeader label="Firewall" column="firewall" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortHeader label="Access" column="remote" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
                   <SortHeader label="Certs" column="certificates" sortColumn={sortColumn} sortDirection={sortDirection} onSort={handleSort} />
@@ -930,7 +952,7 @@ function SecurityPageContent() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -947,7 +969,7 @@ function SecurityPageContent() {
                   </tr>
                 ) : filteredDevices.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="px-6 py-12 text-center">
+                    <td colSpan={10} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -1020,6 +1042,16 @@ function SecurityPageContent() {
                               </>
                             )}
                           </div>
+                        </td>
+                        {/* Firmware Password */}
+                        <td className="px-3 py-3">
+                          {(() => {
+                            const label = getFirmwarePwLabel(d)
+                            const cls = label === 'Set' ? greenBadge
+                              : label === 'Not Set' ? redBadge
+                              : grayBadge
+                            return <Badge className={cls}>{label}</Badge>
+                          })()}
                         </td>
                         {/* Firewall */}
                         <td className="px-3 py-3">
