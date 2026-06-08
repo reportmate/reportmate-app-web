@@ -39,6 +39,11 @@ interface SecurityDevice {
   secureBootEnabled: boolean
   sipEnabled?: boolean
   gatekeeperEnabled: boolean
+  // Firmware password
+  firmwarePassword?: {
+    statusDisplay?: string
+    isSet?: boolean
+  } | null
   // Protection (Windows)
   memoryIntegrityEnabled: boolean
   coreIsolationEnabled: boolean
@@ -588,7 +593,12 @@ function SecurityPageContent() {
       d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
       esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
       d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
-      isWin(d) ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}` : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`,
+      esc(
+        (isWin(d) ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}` : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`)
+        + (d.firmwarePassword?.statusDisplay === 'Set' || d.firmwarePassword?.statusDisplay === 'Not Set'
+            ? ` / FW PW ${d.firmwarePassword.statusDisplay}`
+            : '')
+      ),
       d.firewallEnabled ? 'On' : 'Off',
       [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
       String(d.expiredCertCount), String(d.expiringSoonCertCount),
@@ -1018,6 +1028,11 @@ function SecurityPageContent() {
                                   SB {d.secureBootEnabled ? 'On' : 'Off'}
                                 </Badge>
                               </>
+                            )}
+                            {(d.firmwarePassword?.statusDisplay === 'Set' || d.firmwarePassword?.statusDisplay === 'Not Set') && (
+                              <Badge className={d.firmwarePassword.statusDisplay === 'Set' ? greenBadge : redBadge}>
+                                FW PW {d.firmwarePassword.statusDisplay === 'Set' ? 'On' : 'Off'}
+                              </Badge>
                             )}
                           </div>
                         </td>
