@@ -18,6 +18,175 @@ export interface SecurityInfo {
   secureShell?: SecureShellInfo
   policies: PolicyInfo[]
   summary: SecuritySummary
+  // Phase 2 — protection posture (per-device, raw passthrough; null on platforms / older clients that don't emit them)
+  lsaProtection?: LsaProtectionInfo
+  tamperProtection?: TamperProtectionInfo
+  uac?: UacInfo
+  pendingReboot?: PendingRebootInfo
+  asrRules?: AsrRuleState[]
+  defenderVersions?: DefenderVersionsInfo
+  defenderExclusions?: DefenderExclusionsInfo
+  joinState?: JoinStateInfo
+  // Phase 3 — compliance / inventory
+  localAdmins?: LocalAdminMember[]
+  laps?: LapsInfo
+  appLocker?: AppLockerInfo
+  smartScreen?: SmartScreenInfo
+  auditPolicy?: AuditPolicyInfo
+  edrProducts?: EdrProductInfo[]
+  windowsHello?: WindowsHelloInfo
+  tpmOwnership?: TpmOwnershipInfo
+  passwordPolicy?: PasswordPolicyInfo
+  autoLogin?: AutoLoginInfo
+}
+
+// ====== Phase 2 — protection posture sub-objects (passthrough from client payload) ======
+
+export interface LsaProtectionInfo {
+  enabled?: boolean | null
+  runAsPpl?: number | null   // 0 = off, 1 = PPL, 2 = PPL with UEFI lock
+  mode?: string              // "Disabled" / "PPL" / "PPLBoot"
+}
+
+export interface TamperProtectionInfo {
+  isTamperProtected?: boolean | null
+  source?: string
+}
+
+export interface UacInfo {
+  enableLua?: boolean | null
+  consentPromptBehaviorAdmin?: number | null
+  promptOnSecureDesktop?: number | null
+  level?: string  // "AlwaysNotify" / "NotifyChangesSecure" / "NotifyChangesNoDim" / "NeverNotify" / "Disabled" / "Custom"
+}
+
+export interface PendingRebootInfo {
+  cbsServicing?: boolean
+  windowsUpdate?: boolean
+  fileRename?: boolean
+  required?: boolean
+}
+
+export interface AsrRuleState {
+  id: string
+  name: string
+  action: number  // 0=Off, 1=Block, 2=Audit, 6=Warn
+  state: string   // "Off" / "Block" / "Audit" / "Warn"
+}
+
+export interface DefenderVersionsInfo {
+  amEngineVersion?: string
+  amProductVersion?: string
+  amServiceVersion?: string
+  nisEngineVersion?: string
+  antivirusSignatureVersion?: string
+  antispywareSignatureVersion?: string
+}
+
+export interface DefenderExclusionsInfo {
+  paths?: string[]
+  extensions?: string[]
+  processes?: string[]
+  ipAddresses?: string[]
+  totalCount?: number
+}
+
+export interface JoinStateInfo {
+  azureAdJoined?: boolean | null
+  domainJoined?: boolean | null
+  workplaceJoined?: boolean | null
+  enterpriseJoined?: boolean | null
+  tenantName?: string
+  tenantId?: string
+  deviceId?: string
+  domainName?: string
+  raw?: Record<string, string>
+  errorMessage?: string
+}
+
+// ====== Phase 3 — compliance / inventory ======
+
+export interface LocalAdminMember {
+  name: string
+  sid?: string
+  principalSource?: string   // Local / ActiveDirectory / AzureAD
+  objectClass?: string       // User / Group
+}
+
+export interface LapsInfo {
+  windowsLapsConfigured?: boolean
+  legacyLapsInstalled?: boolean
+  backupDirectory?: string   // "Active Directory" / "Azure AD" / "Configured" / ""
+  adminAccountName?: string
+}
+
+export interface AppLockerInfo {
+  serviceRunning?: boolean
+  serviceStartType?: string
+  policyConfigured?: boolean
+  effectivePolicySummary?: string
+  wdacEnabled?: boolean
+  wdacAuditMode?: boolean
+}
+
+export interface SmartScreenInfo {
+  windowsState?: string
+  edgeEnabled?: boolean | null
+  edgePuaProtection?: boolean | null
+}
+
+export interface AuditPolicyInfo {
+  categories?: AuditCategorySetting[]
+  errorMessage?: string
+}
+
+export interface AuditCategorySetting {
+  category: string
+  subcategory: string
+  setting: string
+}
+
+export interface EdrProductInfo {
+  name: string
+  vendor?: string
+  source?: string
+  serviceRunning?: boolean
+  version?: string
+  sid?: string
+}
+
+export interface WindowsHelloInfo {
+  faceSensorPresent?: boolean
+  fingerprintSensorPresent?: boolean
+  pinConfigured?: boolean | null
+  passportForWorkEnabled?: boolean | null
+}
+
+export interface TpmOwnershipInfo {
+  isOwned?: boolean | null
+  isReady?: boolean | null
+  autoProvisioning?: boolean | null
+  manufacturerIdTxt?: string
+  managedAuthLevel?: string
+}
+
+export interface PasswordPolicyInfo {
+  minPasswordLength?: number | null
+  maxPasswordAgeDays?: number | null
+  minPasswordAgeDays?: number | null
+  passwordHistoryLength?: number | null
+  lockoutThreshold?: number | null
+  lockoutDurationMinutes?: number | null
+  complexityRequired?: boolean | null
+  errorMessage?: string
+}
+
+export interface AutoLoginInfo {
+  autoAdminLogon?: boolean
+  hasDefaultUserName?: boolean
+  hasDefaultPassword?: boolean       // PRESENCE ONLY — value is never read or transmitted
+  hasDefaultDomainName?: boolean
+  defaultUserName?: string
 }
 
 export interface DetectionAlert {
@@ -166,9 +335,30 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     
     // Read policy compliance
     policies: security.policies ? security.policies.map(mapPolicy) : [],
-    
+
     // Read device-calculated summary
-    summary: security.summary || createEmptySummary()
+    summary: security.summary || createEmptySummary(),
+
+    // Phase 2/3 — raw passthrough (sub-objects already arrive in the desired shape from the client).
+    // We don't normalize here because the device computes these and the schema is stable.
+    lsaProtection: security.lsaProtection,
+    tamperProtection: security.tamperProtection,
+    uac: security.uac,
+    pendingReboot: security.pendingReboot,
+    asrRules: security.asrRules,
+    defenderVersions: security.defenderVersions,
+    defenderExclusions: security.defenderExclusions,
+    joinState: security.joinState,
+    localAdmins: security.localAdmins,
+    laps: security.laps,
+    appLocker: security.appLocker,
+    smartScreen: security.smartScreen,
+    auditPolicy: security.auditPolicy,
+    edrProducts: security.edrProducts,
+    windowsHello: security.windowsHello,
+    tpmOwnership: security.tpmOwnership,
+    passwordPolicy: security.passwordPolicy,
+    autoLogin: security.autoLogin,
   }
 
   
