@@ -39,6 +39,11 @@ interface SecurityDevice {
   secureBootEnabled: boolean
   sipEnabled?: boolean
   gatekeeperEnabled: boolean
+  // Firmware password
+  firmwarePassword?: {
+    statusDisplay?: string
+    isSet?: boolean
+  } | null
   // Protection (Windows)
   memoryIntegrityEnabled: boolean
   coreIsolationEnabled: boolean
@@ -588,7 +593,15 @@ function SecurityPageContent() {
       d.encryptionEnabled ? 'Encrypted' : 'Not Encrypted',
       esc(d.antivirusName), d.antivirusEnabled ? (d.antivirusUpToDate ? 'Current' : 'Out of Date') : 'Disabled',
       d.detectionCount != null ? (d.detectionCount > 0 ? `${d.detectionCount} threat${d.detectionCount !== 1 ? 's' : ''}` : 'Clean') : '',
-      isWin(d) ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}` : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`,
+      esc((() => {
+        const main = isWin(d)
+          ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
+          : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
+        const fwStatus = d.firmwarePassword?.statusDisplay
+        if (fwStatus === 'Set') return `${main} / FW PW On`
+        if (fwStatus === 'Not Set') return `${main} / FW PW Off`
+        return main
+      })()),
       d.firewallEnabled ? 'On' : 'Off',
       [d.secureShell?.isServiceRunning ? 'SSH' : '', isWin(d) && d.rdpEnabled ? 'RDP' : ''].filter(Boolean).join('+') || 'None',
       String(d.expiredCertCount), String(d.expiringSoonCertCount),
@@ -1019,6 +1032,16 @@ function SecurityPageContent() {
                                 </Badge>
                               </>
                             )}
+                            {(() => {
+                              const fwStatus = d.firmwarePassword?.statusDisplay
+                              if (fwStatus !== 'Set' && fwStatus !== 'Not Set') return null
+                              const isSet = fwStatus === 'Set'
+                              return (
+                                <Badge className={isSet ? greenBadge : redBadge}>
+                                  FW PW {isSet ? 'On' : 'Off'}
+                                </Badge>
+                              )
+                            })()}
                           </div>
                         </td>
                         {/* Firewall */}
