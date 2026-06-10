@@ -650,8 +650,8 @@ function SecurityPageContent() {
           ? `TPM ${d.tpmPresent && d.tpmEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
           : `SIP ${d.sipEnabled ? 'On' : 'Off'} / SB ${d.secureBootEnabled ? 'On' : 'Off'}`
         const fwStatus = d.firmwarePassword?.statusDisplay
-        if (fwStatus === 'Set') return `${main} / FW PW On`
-        if (fwStatus === 'Not Set') return `${main} / FW PW Off`
+        if (fwStatus === 'Set') return `${main} / FW On`
+        if (fwStatus === 'Not Set') return `${main} / FW Off`
         return main
       })()),
       d.firewallEnabled ? 'On' : 'Off',
@@ -1090,7 +1090,7 @@ function SecurityPageContent() {
                               const isSet = fwStatus === 'Set'
                               return (
                                 <Badge className={isSet ? greenBadge : redBadge}>
-                                  FW PW {isSet ? 'On' : 'Off'}
+                                  FW {isSet ? 'On' : 'Off'}
                                 </Badge>
                               )
                             })()}
