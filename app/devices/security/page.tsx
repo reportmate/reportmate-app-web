@@ -325,13 +325,6 @@ function SecurityPageContent() {
   const [remoteFilter, setRemoteFilter] = useState('')
   const [certFilter, setCertFilter] = useState('')
   const [cveFilter, setCveFilter] = useState('')
-  // Phase 2/3 widget filters
-  const [postureFilter, setPostureFilter] = useState('')
-  const [rebootFilter, setRebootFilter] = useState('')
-  const [uacFilter, setUacFilter] = useState('')
-  const [joinFilter, setJoinFilter] = useState('')
-  const [lapsFilter, setLapsFilter] = useState('')
-  const [edrFilter, setEdrFilter] = useState('')
 
   // Sorting
   const [sortColumn, setSortColumn] = useState<SortColumn>('device')
@@ -355,7 +348,7 @@ function SecurityPageContent() {
   const [certSearchPerformed, setCertSearchPerformed] = useState(false)
   const [selectedCertName, setSelectedCertName] = useState<string | null>(null)
 
-  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter || postureFilter || rebootFilter || uacFilter || joinFilter || lapsFilter || edrFilter)
+  const hasActiveWidgetFilter = !!(encryptionFilter || protectionFilter || detectionFilter || firewallFilter || tamperingFilter || remoteFilter || certFilter || cveFilter)
 
   const clearWidgetFilters = () => {
     setEncryptionFilter('')
@@ -366,12 +359,6 @@ function SecurityPageContent() {
     setRemoteFilter('')
     setCertFilter('')
     setCveFilter('')
-    setPostureFilter('')
-    setRebootFilter('')
-    setUacFilter('')
-    setJoinFilter('')
-    setLapsFilter('')
-    setEdrFilter('')
   }
 
   // ============ DATA FETCHING ============
@@ -528,61 +515,11 @@ function SecurityPageContent() {
     return 'Valid'
   }
 
-  // ===== Phase 2/3 widget label helpers =====
-
   // Detection: prefer active-threat count (excludes ASR blocks which are protection working).
   // Falls back to legacy detectionCount when activeThreatCount isn't in the payload.
   const getDetectionLabel = (d: SecurityDevice): string => {
     const active = d.activeThreatCount ?? d.detectionCount ?? 0
     return active > 0 ? 'Threats Detected' : 'Clean'
-  }
-
-  // Hardening posture: combines LSA + Tamper into a 3-way bucket.
-  const getPostureLabel = (d: SecurityDevice): string => {
-    if (d.lsaProtectionEnabled === undefined && d.tamperProtected === undefined && d.tamperProtected !== null) return 'Unknown'
-    const lsa = d.lsaProtectionEnabled === true
-    const tamper = d.tamperProtected === true
-    if (lsa && tamper) return 'Hardened'
-    if (lsa || tamper) return 'Partial'
-    if (d.lsaProtectionEnabled === false && d.tamperProtected === false) return 'Weak'
-    return 'Unknown'
-  }
-
-  const getRebootLabel = (d: SecurityDevice): string => {
-    if (d.pendingReboot === undefined) return 'Unknown'
-    return d.pendingReboot ? 'Reboot Required' : 'Up to date'
-  }
-
-  const getUacLabel = (d: SecurityDevice): string => {
-    const v = d.uacLevel
-    if (!v) return 'Unknown'
-    if (v === 'Disabled' || v === 'NeverNotify') return 'Weakened'
-    if (v === 'AlwaysNotify' || v === 'NotifyChangesSecure') return 'Strict'
-    if (v === 'NotifyChangesNoDim') return 'Relaxed'
-    return 'Custom'
-  }
-
-  const getJoinLabel = (d: SecurityDevice): string => {
-    const entra = d.entraJoined === true
-    const ad = d.domainJoined === true
-    if (entra && ad) return 'Hybrid'
-    if (entra) return 'Entra Joined'
-    if (ad) return 'Domain Joined'
-    if (d.entraJoined === false && d.domainJoined === false) return 'Workgroup'
-    return 'Unknown'
-  }
-
-  const getLapsLabel = (d: SecurityDevice): string => {
-    if (d.lapsConfigured === undefined) return 'Unknown'
-    return d.lapsConfigured ? 'Configured' : 'Not Configured'
-  }
-
-  const getEdrLabel = (d: SecurityDevice): string => {
-    const n = d.edrProductCount
-    if (n === undefined) return 'Unknown'
-    if (n === 0) return 'None'
-    if (n === 1) return 'Single'
-    return 'Multiple'
   }
 
   const getCveLabel = (d: SecurityDevice): string => {
@@ -630,13 +567,6 @@ function SecurityPageContent() {
   const remoteCounts = countBy(getRemoteLabel)
   const certCounts = countBy(getCertLabel)
   const cveCounts = countBy(getCveLabel)
-  // Phase 2/3 widgets
-  const postureCounts = countBy(getPostureLabel)
-  const rebootCounts = countBy(getRebootLabel)
-  const uacCounts = countBy(getUacLabel)
-  const joinCounts = countBy(getJoinLabel)
-  const lapsCounts = countBy(getLapsLabel)
-  const edrCounts = countBy(getEdrLabel)
 
   // ============ FILTER OPTIONS ============
 
@@ -676,12 +606,6 @@ function SecurityPageContent() {
     if (remoteFilter && getRemoteLabel(d) !== remoteFilter) return false
     if (certFilter && getCertLabel(d) !== certFilter) return false
     if (cveFilter && getCveLabel(d) !== cveFilter) return false
-    if (postureFilter && getPostureLabel(d) !== postureFilter) return false
-    if (rebootFilter && getRebootLabel(d) !== rebootFilter) return false
-    if (uacFilter && getUacLabel(d) !== uacFilter) return false
-    if (joinFilter && getJoinLabel(d) !== joinFilter) return false
-    if (lapsFilter && getLapsLabel(d) !== lapsFilter) return false
-    if (edrFilter && getEdrLabel(d) !== edrFilter) return false
     // Certificate search filter (from grouped cert results)
     if (certFilterSerials && !certFilterSerials.has(d.serialNumber)) return false
     // Search
@@ -753,13 +677,6 @@ function SecurityPageContent() {
   const remoteColors: Record<string, string> = { 'SSH + RDP': '#3b82f6', 'SSH Only': '#22c55e', 'RDP Only': '#f59e0b', 'SSH Enabled': '#22c55e', 'Disabled': '#94a3b8' }
   const certColors: Record<string, string> = { 'Valid': '#22c55e', 'Expiring Soon': '#f59e0b', 'Has Expired': '#ef4444' }
   const cveColors: Record<string, string> = { 'None': '#22c55e', 'Has CVEs': '#f59e0b', 'Critical': '#ef4444' }
-  // Phase 2/3 colors
-  const postureColors: Record<string, string> = { 'Hardened': '#22c55e', 'Partial': '#f59e0b', 'Weak': '#ef4444', 'Unknown': '#cbd5e1' }
-  const rebootColors: Record<string, string> = { 'Up to date': '#22c55e', 'Reboot Required': '#f59e0b', 'Unknown': '#cbd5e1' }
-  const uacColors: Record<string, string> = { 'Strict': '#22c55e', 'Relaxed': '#f59e0b', 'Weakened': '#ef4444', 'Custom': '#94a3b8', 'Unknown': '#cbd5e1' }
-  const joinColors: Record<string, string> = { 'Entra Joined': '#22c55e', 'Hybrid': '#3b82f6', 'Domain Joined': '#94a3b8', 'Workgroup': '#f59e0b', 'Unknown': '#cbd5e1' }
-  const lapsColors: Record<string, string> = { 'Configured': '#22c55e', 'Not Configured': '#ef4444', 'Unknown': '#cbd5e1' }
-  const edrColors: Record<string, string> = { 'Single': '#22c55e', 'Multiple': '#3b82f6', 'None': '#ef4444', 'Unknown': '#cbd5e1' }
 
   // ============ RENDER ============
 
@@ -884,12 +801,6 @@ function SecurityPageContent() {
                   <MiniDonut title="Access" data={Object.entries(remoteCounts).map(([label, value]) => ({ label, value }))} colors={remoteColors} onFilter={setRemoteFilter} activeFilter={remoteFilter} />
                   <MiniDonut title="Certificates" data={Object.entries(certCounts).map(([label, value]) => ({ label, value }))} colors={certColors} onFilter={setCertFilter} activeFilter={certFilter} />
                   <MiniDonut title="Vulnerabilities" data={Object.entries(cveCounts).map(([label, value]) => ({ label, value }))} colors={cveColors} onFilter={setCveFilter} activeFilter={cveFilter} />
-                  <MiniDonut title="Posture (LSA + Tamper)" data={Object.entries(postureCounts).map(([label, value]) => ({ label, value }))} colors={postureColors} onFilter={setPostureFilter} activeFilter={postureFilter} />
-                  <MiniDonut title="Pending Reboot" data={Object.entries(rebootCounts).map(([label, value]) => ({ label, value }))} colors={rebootColors} onFilter={setRebootFilter} activeFilter={rebootFilter} />
-                  <MiniDonut title="UAC Level" data={Object.entries(uacCounts).map(([label, value]) => ({ label, value }))} colors={uacColors} onFilter={setUacFilter} activeFilter={uacFilter} />
-                  <MiniDonut title="Join State" data={Object.entries(joinCounts).map(([label, value]) => ({ label, value }))} colors={joinColors} onFilter={setJoinFilter} activeFilter={joinFilter} />
-                  <MiniDonut title="LAPS" data={Object.entries(lapsCounts).map(([label, value]) => ({ label, value }))} colors={lapsColors} onFilter={setLapsFilter} activeFilter={lapsFilter} />
-                  <MiniDonut title="EDR Products" data={Object.entries(edrCounts).map(([label, value]) => ({ label, value }))} colors={edrColors} onFilter={setEdrFilter} activeFilter={edrFilter} />
                 </div>
               </div>
             </CollapsibleSection>
