@@ -281,19 +281,24 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
   }, [device, data])
   
   // Split audio devices into outputs and microphones
-  const audioOutputs = useMemo(() => 
-    (peripherals.audioDevices || []).filter(d => d.isOutput || d.type === 'Output'),
+  const audioDevices = useMemo(() =>
+    Array.isArray(peripherals.audioDevices) ? peripherals.audioDevices : [],
     [peripherals.audioDevices]
   )
-  
-  const microphones = useMemo(() => 
-    (peripherals.audioDevices || []).filter(d => d.isInput || d.type === 'Input'),
-    [peripherals.audioDevices]
+
+  const audioOutputs = useMemo(() =>
+    audioDevices.filter(d => d.isOutput || d.type === 'Output'),
+    [audioDevices]
   )
-  
+
+  const microphones = useMemo(() =>
+    audioDevices.filter(d => d.isInput || d.type === 'Input'),
+    [audioDevices]
+  )
+
   // Filter Bluetooth devices - only actual BT peripherals, not WiFi devices like HomePods or Apple Watch
   const filteredBluetoothDevices = useMemo(() => {
-    const btDevices = peripherals.bluetoothDevices || []
+    const btDevices = Array.isArray(peripherals.bluetoothDevices) ? peripherals.bluetoothDevices : []
     return btDevices.filter(d => {
       const name = (d.name || '').toLowerCase()
       const category = (d.deviceCategory || '').toLowerCase()
