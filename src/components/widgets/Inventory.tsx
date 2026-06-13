@@ -1,12 +1,19 @@
 /**
  * Inventory Widget
- * Displays inventory information including device name, usage, catalog, department, location, asset tag, and serial number
+ * Displays device identity plus assignment details. Assignment fields (usage,
+ * catalog, department, area, location, fleet, owner) are rendered from the org's
+ * configurable inventory field mapping; identity fields stay fixed.
  */
+
+"use client"
 
 import React from 'react'
 import { StatBlock, Stat, Icons, WidgetColors } from './shared'
 import { formatRelativeTime } from '../../lib/time'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
+import { useSettingsOptional } from '../../providers/SettingsProvider'
+import { mapInventory } from '../../lib/rules/inventoryMapping'
+import { DEFAULT_INVENTORY_FIELDS } from '../../lib/settings/defaults'
 
 interface Device {
   id: string
@@ -57,10 +64,16 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
   // Normalize inventory module data to camelCase (API returns snake_case)
   const rawInventory = device.modules?.inventory
   const inventory = rawInventory ? normalizeKeys(rawInventory) as any : {}
-  
-  // Check if we have any assignment details for the right column
-  const hasAssignmentDetails = inventory.usage || inventory.catalog || inventory.department || inventory.location || inventory.fleet
-  
+
+  // Assignment fields come from the org's configurable mapping (falls back to
+  // defaults outside the provider). Asset tag stays in the identity column.
+  const settings = useSettingsOptional()
+  const fields = settings?.inventoryFields?.length ? settings.inventoryFields : DEFAULT_INVENTORY_FIELDS
+  const assignmentRows = mapInventory(rawInventory as Record<string, unknown>, fields)
+    .filter((row) => row.key !== 'assetTag')
+
+  const hasAssignmentDetails = assignmentRows.length > 0
+
   return (
     <StatBlock 
       title="Inventory" 
@@ -106,33 +119,12 @@ export const InventoryWidget: React.FC<InventoryWidgetProps> = ({ device }) => {
             )}
           </div>
           
-          {/* Right Column - Assignment Details (40% width) */}
+          {/* Right Column - Assignment Details (40% width), config-driven order/labels */}
           {hasAssignmentDetails && (
             <div className="space-y-4 col-span-2">
-              {/* Usage */}
-              {inventory.usage && (
-                <Stat label="Usage" value={inventory.usage} />
-              )}
-              
-              {/* Catalog */}
-              {inventory.catalog && (
-                <Stat label="Catalog" value={inventory.catalog} />
-              )}
-              
-              {/* Department */}
-              {inventory.department && (
-                <Stat label="Department" value={inventory.department} />
-              )}
-              
-              {/* Location */}
-              {inventory.location && (
-                <Stat label="Location" value={inventory.location} />
-              )}
-
-              {/* Fleet */}
-              {inventory.fleet && (
-                <Stat label="Fleet" value={inventory.fleet} />
-              )}
+              {assignmentRows.map((row) => (
+                <Stat key={row.key} label={row.label} value={row.value} />
+              ))}
             </div>
           )}
         </div>
