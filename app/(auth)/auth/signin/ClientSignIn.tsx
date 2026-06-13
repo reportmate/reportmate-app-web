@@ -95,7 +95,7 @@ function SignInContent() {
                 alt="ReportMate"
                 width={240}
                 height={96}
-                className="h-24 w-auto dark:brightness-0 dark:invert"
+                className="h-24 w-auto"
                 priority
               />
             </div>
@@ -147,7 +147,7 @@ function SignInContent() {
               alt="ReportMate"
               width={240}
               height={96}
-              className="h-24 w-auto dark:brightness-0 dark:invert"
+              className="h-24 w-auto"
               priority
             />
           </div>
