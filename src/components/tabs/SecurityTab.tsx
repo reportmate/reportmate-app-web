@@ -12,21 +12,38 @@
  * 6. Remote Access - SecureShell + RDP (Win) / SecureShell + Screen Sharing (Mac)
  */
 
+"use client"
+
 import React from 'react'
 import { convertPowerShellObjects, normalizeKeys, isPowerShellTrue } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
 import { Lock, BrickWall, HardDrive, Cpu, Terminal, Shield, ShieldCheck, Search, Award, AlertTriangle, CheckCircle, XCircle, ChevronDown } from 'lucide-react'
+import { useSettingsOptional } from '../../providers/SettingsProvider'
+import { DEFAULT_SECURITY_CONFIG, DEFAULT_INVENTORY_FIELDS } from '../../lib/settings/defaults'
+import { evaluateSecurity } from '../../lib/rules/evaluateSecurity'
+import { getDeviceInventoryContext } from '../../lib/rules/inventoryMapping'
+import type { Severity } from '../../lib/settings/types'
 
 interface SecurityTabProps {
   device: any
 }
 
-const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled', neutral, danger }: { 
-  enabled: boolean | undefined, 
-  activeLabel?: string, 
+// Text classes for the portable severity vocabulary. `unknown` falls through to
+// the caller's default treatment.
+const SEVERITY_TEXT: Record<Exclude<Severity, 'unknown'>, string> = {
+  ok: 'text-green-600 dark:text-green-400',
+  danger: 'text-red-600 dark:text-red-400',
+  warning: 'text-amber-600 dark:text-amber-400',
+  neutral: 'text-gray-900 dark:text-gray-100',
+}
+
+const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabled', neutral, danger, severity }: {
+  enabled: boolean | undefined,
+  activeLabel?: string,
   inactiveLabel?: string,
   neutral?: boolean,
-  danger?: boolean
+  danger?: boolean,
+  severity?: Severity
 }) => {
   if (enabled === undefined) {
     return (
@@ -35,7 +52,17 @@ const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabl
       </span>
     )
   }
-  
+
+  // When a settings-derived severity is supplied, it takes precedence over the
+  // legacy neutral/danger booleans.
+  if (severity && severity !== 'unknown') {
+    return (
+      <span className={`text-sm font-medium ${SEVERITY_TEXT[severity]}`}>
+        {enabled ? activeLabel : inactiveLabel}
+      </span>
+    )
+  }
+
   if (!enabled) {
     if (danger) {
       return (
@@ -59,7 +86,7 @@ const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabl
       </span>
     )
   }
-  
+
   return (
     <span className="text-sm font-medium text-green-600 dark:text-green-400">
       {activeLabel}
@@ -67,22 +94,23 @@ const StatusBadge = ({ enabled, activeLabel = 'Enabled', inactiveLabel = 'Disabl
   )
 }
 
-const DetailRow = ({ label, value, activeLabel, inactiveLabel, isStatus, enabled, mono, neutral, danger, tooltip }: { 
-  label: string, 
-  value?: string, 
+const DetailRow = ({ label, value, activeLabel, inactiveLabel, isStatus, enabled, mono, neutral, danger, severity, tooltip }: {
+  label: string,
+  value?: string,
   activeLabel?: string,
   inactiveLabel?: string,
-  isStatus?: boolean, 
+  isStatus?: boolean,
   enabled?: boolean,
   mono?: boolean,
   neutral?: boolean,
   danger?: boolean,
+  severity?: Severity,
   tooltip?: string
 }) => (
   <div className="flex items-center justify-between py-1">
     <span className="text-sm text-gray-500 dark:text-gray-400">{label}</span>
     {isStatus ? (
-      <StatusBadge enabled={enabled} activeLabel={activeLabel || value || 'Yes'} inactiveLabel={inactiveLabel || value || 'No'} neutral={neutral} danger={danger} />
+      <StatusBadge enabled={enabled} activeLabel={activeLabel || value || 'Yes'} inactiveLabel={inactiveLabel || value || 'No'} neutral={neutral} danger={danger} severity={severity} />
     ) : (
       <span 
         className={`text-sm font-medium text-gray-900 dark:text-white ${mono ? 'font-mono' : ''} ${tooltip ? 'cursor-help' : ''}`}
@@ -112,6 +140,16 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
   const secureShell = security?.secureShell
   const isMac = isMacOS(device)
+
+  // Settings-driven, usage-aware severity. `sev(check, enabled)` returns the
+  // severity to color a check, applying org rules (e.g. shared/lab devices with
+  // encryption off shouldn't be red) on top of the historical defaults.
+  const settings = useSettingsOptional()
+  const securityConfig = settings?.securityConfig ?? DEFAULT_SECURITY_CONFIG
+  const inventoryFields = settings?.inventoryFields?.length ? settings.inventoryFields : DEFAULT_INVENTORY_FIELDS
+  const inventoryCtx = getDeviceInventoryContext(device?.modules?.inventory as Record<string, unknown>, inventoryFields)
+  const sev = (check: string, enabled: boolean | undefined): Severity =>
+    evaluateSecurity(check, enabled, inventoryCtx, securityConfig)
   
   // Certificate filter state
   const [certFilter, setCertFilter] = React.useState<'all' | 'valid' | 'expiringsoon' | 'expired'>('all')
@@ -249,7 +287,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             {isMac ? (
               // macOS: SIP + Secure Enclave + Root User + Secure Boot
               <>
-                <DetailRow label="System Integrity Protection" isStatus danger enabled={sipEnabled} activeLabel="Enabled" inactiveLabel="Disabled" />
+                <DetailRow label="System Integrity Protection" isStatus severity={sev('sip', sipEnabled)} enabled={sipEnabled} activeLabel="Enabled" inactiveLabel="Disabled" />
                 {/* Secure Enclave - no divider */}
                 <DetailRow 
                   label="Secure Enclave" 
@@ -792,7 +830,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     ? security.fileVault.encryptedVolumes.map((v: any) => v.name || v.volumeName || v).join(', ')
                     : fileVaultEnabled ? 'System Volume' : 'None'
                 } />
-                <DetailRow label="Status" isStatus enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
+                <DetailRow label="Status" isStatus severity={sev('encryption', fileVaultEnabled)} enabled={fileVaultEnabled} value={fileVaultEnabled ? 'Encrypted' : 'Not Encrypted'} />
               </>
             ) : (
               // Windows BitLocker (now all camelCase after normalization)
@@ -806,7 +844,7 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   <DetailRow label="Drives" value="None encrypted" />
                 )}
                 <DetailRow label="Method" value={security?.encryption?.encryptedVolumes?.[0]?.encryptionMethod || 'XTS-AES'} />
-                <DetailRow label="Status" value={security?.encryption?.bitLocker?.status || (security?.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
+                <DetailRow label="Status" isStatus severity={sev('encryption', Boolean(security?.encryption?.bitLocker?.isEnabled))} enabled={Boolean(security?.encryption?.bitLocker?.isEnabled)} value={security?.encryption?.bitLocker?.status || (security?.encryption?.bitLocker?.isEnabled ? 'Enabled' : 'Disabled')} />
               </>
             )}
           </div>
@@ -825,12 +863,12 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
             {isMac ? (
               // macOS Firewall
               <>
-                <DetailRow 
-                  label="Global State" 
+                <DetailRow
+                  label="Global State"
                   isStatus
-                  neutral
+                  severity={sev('firewall', firewallEnabled)}
                   enabled={firewallEnabled}
-                  value={firewallEnabled ? 'On' : 'Off'} 
+                  value={firewallEnabled ? 'On' : 'Off'}
                 />
                 <DetailRow 
                   label="Stealth Mode" 
@@ -882,15 +920,17 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               // macOS: Secure Shell + Screen Sharing + ARD
               <>
                 {/* Secure Shell/Remote Login - use collected SSH data */}
-                <DetailRow 
-                  label="Secure Shell (Remote Login)" 
-                  isStatus 
-                  neutral
-                  enabled={isPowerShellTrue(security?.ssh?.enabled) || 
-                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) || 
+                <DetailRow
+                  label="Secure Shell (Remote Login)"
+                  isStatus
+                  severity={sev('ssh', isPowerShellTrue(security?.ssh?.enabled) ||
+                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) ||
+                          isPowerShellTrue(remoteManagement?.remote_login_enabled))}
+                  enabled={isPowerShellTrue(security?.ssh?.enabled) ||
+                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) ||
                           isPowerShellTrue(remoteManagement?.remote_login_enabled)}
-                  value={(isPowerShellTrue(security?.ssh?.enabled) || 
-                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) || 
+                  value={(isPowerShellTrue(security?.ssh?.enabled) ||
+                          isPowerShellTrue(remoteManagement?.remoteLoginEnabled) ||
                           isPowerShellTrue(remoteManagement?.remote_login_enabled)) ? 'Enabled' : 'Disabled'}
                 />
                 {(security?.ssh?.enabled === 1 || security?.ssh?.enabled === true) && (
@@ -952,10 +992,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
               // Windows: RDP + Secure Shell
               <>
                 {/* RDP */}
-                <DetailRow 
-                  label="Remote Desktop (RDP)" 
-                  isStatus 
-                  enabled={security?.rdp?.isEnabled || security?.rdp?.is_enabled} 
+                <DetailRow
+                  label="Remote Desktop (RDP)"
+                  isStatus
+                  severity={sev('rdp', Boolean(security?.rdp?.isEnabled || security?.rdp?.is_enabled))}
+                  enabled={security?.rdp?.isEnabled || security?.rdp?.is_enabled}
                 />
                 <DetailRow 
                   label="RDP Port" 

@@ -3,9 +3,27 @@
  * Displays security information with simple status messages
  */
 
+"use client"
+
 import React from 'react'
 import { StatBlock, StatusBadge, EmptyState, Icons, WidgetColors } from './shared'
 import { convertPowerShellObjects, normalizeKeys } from '../../lib/utils/powershell-parser'
+import { useSettingsOptional } from '../../providers/SettingsProvider'
+import { DEFAULT_SECURITY_CONFIG, DEFAULT_INVENTORY_FIELDS } from '../../lib/settings/defaults'
+import { evaluateSecurity } from '../../lib/rules/evaluateSecurity'
+import { getDeviceInventoryContext } from '../../lib/rules/inventoryMapping'
+import type { Severity } from '../../lib/settings/types'
+
+/** Map the portable severity vocabulary onto the widget's StatusBadge types. */
+function severityToWidgetType(sev: Severity): 'success' | 'error' | 'warning' | 'info' {
+  switch (sev) {
+    case 'ok': return 'success'
+    case 'danger': return 'error'
+    case 'warning': return 'warning'
+    case 'neutral': return 'info'
+    default: return 'warning'
+  }
+}
 
 interface Device {
   id: string
@@ -15,8 +33,15 @@ interface Device {
   osName?: string
   security?: any
   securityFeatures?: any
+  metadata?: any
+  management?: any
   modules?: {
     security?: any
+    system?: any
+    metadata?: any
+    inventory?: any
+    management?: any
+    hardware?: any
   }
 }
 
@@ -46,6 +71,16 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   const isWindows = platform.includes('windows')
   const isMacOS = platform.includes('mac') || platform.includes('darwin')
   const isLinux = platform.includes('linux')
+
+  // Settings-driven, usage-aware coloring. The device's inventory context (e.g.
+  // usage=Shared) lets org rules downgrade severities — e.g. shared/lab devices
+  // with disk encryption off aren't flagged red.
+  const settings = useSettingsOptional()
+  const securityConfig = settings?.securityConfig ?? DEFAULT_SECURITY_CONFIG
+  const inventoryFields = settings?.inventoryFields?.length ? settings.inventoryFields : DEFAULT_INVENTORY_FIELDS
+  const inventoryCtx = getDeviceInventoryContext(device?.modules?.inventory as Record<string, unknown>, inventoryFields)
+  const encryptionSeverity = (enabled?: boolean) =>
+    severityToWidgetType(evaluateSecurity('encryption', enabled, inventoryCtx, securityConfig))
   
   // Get remote management data from Management module (Mac collects screen sharing there)
   const rawManagement = device?.modules?.management || device?.management
@@ -169,9 +204,8 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
             <StatusBadge
               label="FileVault"
               status={encryptionInfo.status}
-              type={getStatusType(
-                security?.fileVault?.enabled === true || security?.fileVault?.enabled === 1,
-                encryptionInfo.status
+              type={encryptionSeverity(
+                security?.fileVault?.enabled === true || security?.fileVault?.enabled === 1
               )}
             />
             
@@ -300,11 +334,10 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
             <StatusBadge
               label={isWindows ? "BitLocker" : "Encryption"}
               status={security?.encryption?.statusDisplay || encryptionInfo.status}
-              type={getStatusType(
-                isWindows ? security?.encryption?.bitLocker?.isEnabled :
-                isLinux ? security?.encryption?.luks?.isEnabled :
-                false,
-                encryptionInfo.status
+              type={encryptionSeverity(
+                isWindows ? Boolean(security?.encryption?.bitLocker?.isEnabled) :
+                isLinux ? Boolean(security?.encryption?.luks?.isEnabled) :
+                false
               )}
             />
 
