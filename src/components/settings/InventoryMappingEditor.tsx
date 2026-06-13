@@ -7,7 +7,7 @@ import { InventoryFieldMapping, SettingsDocument } from "../../lib/settings/type
 /** Editable table for how raw inventory keys map to ReportMate's canonical
  * fields (label, source key, order, visibility, known values). Saves the full
  * settings document via the admin-gated PUT proxy. */
-export function InventoryMappingEditor() {
+export function InventoryMappingEditor({ readOnly = false }: { readOnly?: boolean }) {
   const { settings, inventoryFields, refresh } = useSettings()
   const [fields, setFields] = useState<InventoryFieldMapping[]>(() =>
     [...inventoryFields].sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
@@ -55,7 +55,12 @@ export function InventoryMappingEditor() {
   }
 
   return (
-    <div className="space-y-4">
+    <fieldset disabled={readOnly} className="space-y-4 min-w-0 border-0 m-0 p-0">
+      {readOnly && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          Read-only preview. Sign in as an administrator on a non-demo instance to edit.
+        </p>
+      )}
       <p className="text-gray-600 dark:text-gray-400">
         Map the keys from each device&apos;s <code className="font-mono text-sm">Inventory.yaml</code> to
         ReportMate&apos;s fields. Adjust the label, source key, order, and visibility. Known values for
@@ -118,7 +123,7 @@ export function InventoryMappingEditor() {
         {status.type === "saved" && <span className="text-sm text-green-600 dark:text-green-400">{status.message}</span>}
         {status.type === "error" && <span className="text-sm text-red-600 dark:text-red-400">{status.message}</span>}
       </div>
-    </div>
+    </fieldset>
   )
 }
 
