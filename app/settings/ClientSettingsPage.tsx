@@ -1,17 +1,21 @@
 "use client"
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
 import { useDemoMode } from '../../src/providers/DemoModeProvider'
 import { useHasRole } from '../../hooks/useAuth'
 import { ADMIN_ROLE } from '../../lib/auth-roles'
+import Link from 'next/link'
+import { InventoryMappingEditor } from '../../src/components/settings/InventoryMappingEditor'
+import { SecurityRulesEditor } from '../../src/components/settings/SecurityRulesEditor'
+import { useSettings } from '../../src/providers/SettingsProvider'
 
 type MaintStatus = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string }
 
 export default function ClientSettingsPage() {
-  const [activeSection, setActiveSection] = useState<'general' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
+  const { isFirstTime } = useSettings()
+  const [activeSection, setActiveSection] = useState<'general' | 'inventory' | 'rules' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
   const [clearDays, setClearDays] = useState(10)
   const [clearStatus, setClearStatus] = useState<MaintStatus>({ type: 'idle' })
   const [deleteSerial, setDeleteSerial] = useState('')
@@ -20,21 +24,24 @@ export default function ClientSettingsPage() {
   const [bulkStatus, setBulkStatus] = useState<MaintStatus & { results?: Array<{ serialNumber: string; ok: boolean; detail?: string }> }>({ type: 'idle' })
   const { isDemoMode } = useDemoMode()
   const isAdmin = useHasRole(ADMIN_ROLE)
-  const router = useRouter()
+  // Only admins on a real instance may change anything; demo is read-only.
+  const canEdit = isAdmin && !isDemoMode
 
-  // Redirect to dashboard in demo mode
-  if (isDemoMode) {
-    router.replace('/dashboard')
-    return null
-  }
-
-  const menuItems = [
+  // In demo, expose only the read-only-safe sections so the configurable
+  // settings are visible to an audience without surfacing destructive
+  // maintenance actions.
+  const allMenuItems = [
     { id: 'general', name: 'General', icon: '' },
+    { id: 'inventory', name: 'Inventory Mapping', icon: '' },
+    { id: 'rules', name: 'Security Rules', icon: '' },
     { id: 'modules', name: 'Modules', icon: '' },
     { id: 'security', name: 'Security', icon: '' },
     { id: 'integrations', name: 'Integrations', icon: '' },
     { id: 'maintenance', name: 'Maintenance', icon: '' },
   ]
+  const menuItems = isDemoMode
+    ? allMenuItems.filter((i) => ['general', 'inventory', 'rules'].includes(i.id))
+    : allMenuItems
 
   async function handleClearInstallsErrors() {
     if (clearStatus.type === 'loading') return
@@ -135,23 +142,20 @@ export default function ClientSettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {/* Draft Implementation Banner */}
-        <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg p-4">
-          <div className="flex items-start">
-            <svg className="w-5 h-5 text-amber-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-            </svg>
+        {isFirstTime && canEdit && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 flex items-center justify-between">
             <div>
-              <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
-                Settings Page - Draft Implementation
-              </h3>
-              <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
-                This settings page is currently a user interface prototype and does not save or apply any configurations yet. 
-                All settings displayed here are for preview purposes only. Actual settings functionality will be implemented in future updates.
+              <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Finish setting up ReportMate</h3>
+              <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+                Run the one-time setup to auto-discover your inventory fields and seed security rules.
               </p>
             </div>
+            <Link href="/settings/onboarding"
+              className="ml-4 flex-shrink-0 px-4 py-2 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
+              Run setup
+            </Link>
           </div>
-        </div>
+        )}
 
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Settings</h2>
@@ -274,6 +278,24 @@ export default function ClientSettingsPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {activeSection === 'inventory' && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Inventory Mapping
+                  </h2>
+                  <InventoryMappingEditor readOnly={!canEdit} />
+                </div>
+              )}
+
+              {activeSection === 'rules' && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Security Rules
+                  </h2>
+                  <SecurityRulesEditor readOnly={!canEdit} />
                 </div>
               )}
 
@@ -620,21 +642,6 @@ export default function ClientSettingsPage() {
                   </>)}
                 </div>
               )}
-            </div>
-            
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                className="bg-white dark:bg-gray-800 py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Save Changes
-              </button>
             </div>
           </div>
         </div>

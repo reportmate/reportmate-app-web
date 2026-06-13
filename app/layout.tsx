@@ -10,6 +10,7 @@ import { SWRProvider } from "../src/providers/SWRProvider";
 import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
 import { DebugModeProvider } from "../src/providers/DebugModeProvider";
 import { DemoModeProvider } from "../src/providers/DemoModeProvider";
+import { SettingsProvider } from "../src/providers/SettingsProvider";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
 // Force dynamic rendering to ensure middleware runs
@@ -170,6 +171,7 @@ export default async function RootLayout({
         />
         <AuthProvider>
           <SWRProvider>
+            <SettingsProvider>
             <PlatformFilterProvider>
               <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
                 <DebugModeProvider>
@@ -194,6 +196,7 @@ export default async function RootLayout({
                 </DebugModeProvider>
               </ThemeProvider>
             </PlatformFilterProvider>
+            </SettingsProvider>
           </SWRProvider>
         </AuthProvider>
       </body>
