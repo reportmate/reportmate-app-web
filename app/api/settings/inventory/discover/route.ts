@@ -1,39 +1,15 @@
 import { NextResponse } from "next/server"
 import { getInternalApiHeaders } from "@/lib/api-auth"
+import { requireAdmin } from "@/lib/auth-roles"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
 
-const ADMIN_ROLES = (process.env.SETTINGS_ADMIN_ROLES || "admin,administrator,owner")
-  .split(",")
-  .map((r) => r.trim().toLowerCase())
-  .filter(Boolean)
-
-function hasAdminRole(roles: unknown): boolean {
-  if (!Array.isArray(roles)) return false
-  return roles.some((r) => typeof r === "string" && ADMIN_ROLES.includes(r.toLowerCase()))
-}
-
-// Lazy so `@/lib/auth` (which evaluates the Entra provider at import) isn't run
-// during build when its env vars are absent.
-async function getSession() {
-  const { getServerSession } = await import("next-auth")
-  const { authOptions } = await import("@/lib/auth")
-  return getServerSession(authOptions)
-}
-
 export async function GET(request: Request) {
   try {
-    const isDemoOrDev =
-      process.env.NEXT_PUBLIC_DEMO_MODE === "true" || process.env.NODE_ENV === "development"
-
-    if (!isDemoOrDev) {
-      const session = await getSession()
-      if (!session) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
-      if (!hasAdminRole((session.user as { roles?: unknown })?.roles)) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-      }
-    }
+    // Discovery exposes inventory values, so it's admin-only.
+    const guard = await requireAdmin(request)
+    if (guard instanceof NextResponse) return guard
 
     const apiBaseUrl = process.env.API_BASE_URL
     if (!apiBaseUrl) {
