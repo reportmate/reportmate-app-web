@@ -1,7 +1,6 @@
 "use client"
 
 import React, { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { ModuleManager } from '../../src/components/ModuleManager'
 import { ThemeToggle } from '../../src/components/theme-toggle'
 import { useDemoMode } from '../../src/providers/DemoModeProvider'
@@ -25,15 +24,13 @@ export default function ClientSettingsPage() {
   const [bulkStatus, setBulkStatus] = useState<MaintStatus & { results?: Array<{ serialNumber: string; ok: boolean; detail?: string }> }>({ type: 'idle' })
   const { isDemoMode } = useDemoMode()
   const isAdmin = useHasRole(ADMIN_ROLE)
-  const router = useRouter()
+  // Only admins on a real instance may change anything; demo is read-only.
+  const canEdit = isAdmin && !isDemoMode
 
-  // Redirect to dashboard in demo mode
-  if (isDemoMode) {
-    router.replace('/dashboard')
-    return null
-  }
-
-  const menuItems = [
+  // In demo, expose only the read-only-safe sections so the configurable
+  // settings are visible to an audience without surfacing destructive
+  // maintenance actions.
+  const allMenuItems = [
     { id: 'general', name: 'General', icon: '' },
     { id: 'inventory', name: 'Inventory Mapping', icon: '' },
     { id: 'rules', name: 'Security Rules', icon: '' },
@@ -42,6 +39,9 @@ export default function ClientSettingsPage() {
     { id: 'integrations', name: 'Integrations', icon: '' },
     { id: 'maintenance', name: 'Maintenance', icon: '' },
   ]
+  const menuItems = isDemoMode
+    ? allMenuItems.filter((i) => ['general', 'inventory', 'rules'].includes(i.id))
+    : allMenuItems
 
   async function handleClearInstallsErrors() {
     if (clearStatus.type === 'loading') return
@@ -142,7 +142,7 @@ export default function ClientSettingsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-black">
       <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        {isFirstTime && (
+        {isFirstTime && canEdit && (
           <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4 flex items-center justify-between">
             <div>
               <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200">Finish setting up ReportMate</h3>
@@ -286,7 +286,7 @@ export default function ClientSettingsPage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                     Inventory Mapping
                   </h2>
-                  <InventoryMappingEditor />
+                  <InventoryMappingEditor readOnly={!canEdit} />
                 </div>
               )}
 
@@ -295,7 +295,7 @@ export default function ClientSettingsPage() {
                   <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
                     Security Rules
                   </h2>
-                  <SecurityRulesEditor />
+                  <SecurityRulesEditor readOnly={!canEdit} />
                 </div>
               )}
 

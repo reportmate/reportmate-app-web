@@ -32,7 +32,7 @@ function SeveritySelect({ value, onChange }: { value: Severity; onChange: (v: Se
 
 let ruleSeq = 0
 
-export function SecurityRulesEditor() {
+export function SecurityRulesEditor({ readOnly = false }: { readOnly?: boolean }) {
   const { settings, securityConfig, inventoryFields, refresh } = useSettings()
   const [config, setConfig] = useState<SecurityConfig>(() => ({
     defaults: { ...securityConfig.defaults },
@@ -103,7 +103,12 @@ export function SecurityRulesEditor() {
     knownUsage.length > 0 && ruleUsageValues(r).some((v) => !knownUsage.includes(v))
 
   return (
-    <div className="space-y-8">
+    <fieldset disabled={readOnly} className="space-y-8 min-w-0 border-0 m-0 p-0">
+      {readOnly && (
+        <p className="text-sm text-amber-600 dark:text-amber-400">
+          Read-only preview. Sign in as an administrator on a non-demo instance to edit.
+        </p>
+      )}
       {/* Baseline defaults */}
       <div>
         <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-3">Baseline severities</h3>
@@ -203,7 +208,7 @@ export function SecurityRulesEditor() {
         {status.type === "saved" && <span className="text-sm text-green-600 dark:text-green-400">{status.message}</span>}
         {status.type === "error" && <span className="text-sm text-red-600 dark:text-red-400">{status.message}</span>}
       </div>
-    </div>
+    </fieldset>
   )
 }
 
