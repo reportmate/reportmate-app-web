@@ -66,19 +66,21 @@ export const STARTER_SECURITY_RULES = [
 /** Merge a (possibly null/partial) stored document with defaults so consumers
  * always get a complete config. */
 export function withDefaults(doc: SettingsDocument | null | undefined): SettingsDocument {
-  if (!doc) return DEFAULT_SETTINGS
+  // Always build fresh objects/arrays — never hand back the shared DEFAULT_*
+  // singletons, so a consumer mutating the result can't leak across the module.
+  if (!doc) return structuredClone(DEFAULT_SETTINGS)
   return {
     schemaVersion: doc.schemaVersion ?? CURRENT_SCHEMA_VERSION,
     general: { ...DEFAULT_SETTINGS.general, ...(doc.general ?? {}) },
     inventory: {
       fields:
         doc.inventory?.fields && doc.inventory.fields.length > 0
-          ? doc.inventory.fields
-          : DEFAULT_INVENTORY_FIELDS,
+          ? structuredClone(doc.inventory.fields)
+          : structuredClone(DEFAULT_INVENTORY_FIELDS),
     },
     security: {
-      defaults: { ...DEFAULT_SECURITY_CONFIG.defaults, ...(doc.security?.defaults ?? {}) },
-      rules: doc.security?.rules ?? [],
+      defaults: { ...structuredClone(DEFAULT_SECURITY_CONFIG.defaults), ...(doc.security?.defaults ?? {}) },
+      rules: doc.security?.rules ? structuredClone(doc.security.rules) : [],
     },
   }
 }
