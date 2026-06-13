@@ -10,6 +10,7 @@ const publicRoutes = [
   '/api/health',        // Alternative health check endpoint
   '/api/version',       // Build/version metadata endpoint for status widgets
   '/api/dashboard',     // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/settings',      // BFF route - GET proxies via X-Internal-Secret; PUT/discover gated by requireAdmin
   '/api/device',        // BFF route - authenticated via X-Internal-Secret to FastAPI
   '/api/devices',       // BFF route - authenticated via X-Internal-Secret to FastAPI
   '/api/modules',       // BFF route - authenticated via X-Internal-Secret to FastAPI
@@ -251,6 +252,6 @@ export const config = {
      * except for static assets, authentication endpoints, health endpoints,
      * and internal API routes (which handle their own authentication)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sw.js|offline.html|swe-worker|manifest.json|api/auth|api/healthz|api/health|api/device|api/devices|api/modules|api/stats|api/events|api/dashboard).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw.js|offline.html|swe-worker|manifest.json|api/auth|api/healthz|api/health|api/device|api/devices|api/modules|api/stats|api/events|api/dashboard|api/settings).*)',
   ],
 }
