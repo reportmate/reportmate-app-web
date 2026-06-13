@@ -1,5 +1,16 @@
+import withSerwistInit from "@serwist/next"
+
+const withSerwist = withSerwistInit({
+  swSrc: "app/sw.ts",
+  swDest: "public/sw.js",
+  // Disable the SW in development so HMR isn't fighting a cache.
+  disable: process.env.NODE_ENV === "development",
+  // Reload open clients once a new SW takes control.
+  reloadOnOnline: true,
+})
+
 /** @type {import("next").NextConfig} */
-export default {
+const nextConfig = {
   // Minimal dev configuration
   eslint: {
     ignoreDuringBuilds: true,
@@ -53,3 +64,5 @@ export default {
     return config
   }
 }
+
+export default withSerwist(nextConfig)
