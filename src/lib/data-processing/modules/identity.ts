@@ -29,7 +29,56 @@ export interface IdentityInfo {
   enrollmentInfo: EnrollmentInfo | null  // Enrollment type (Entra/Domain/Hybrid)
   sessionHistory: SessionHistoryEntry[]  // TerminalServices RDP session history
   sessionSummary: SessionSummary | null  // Aggregated session utilization stats
+  // Sign-in / access posture (Windows; consolidated from the Security module).
+  uac: UacInfo | null
+  laps: LapsInfo | null
+  passwordPolicy: PasswordPolicyInfo | null
+  tpmOwnership: TpmOwnershipInfo | null
+  autoLogin: AutoLoginInfo | null
   summary: IdentitySummary
+}
+
+// ====== Sign-in / access posture sub-objects (raw passthrough from client) ======
+
+export interface UacInfo {
+  enableLua?: boolean | null
+  consentPromptBehaviorAdmin?: number | null
+  promptOnSecureDesktop?: number | null
+  level?: string  // "AlwaysNotify" / "NotifyChangesSecure" / "NotifyChangesNoDim" / "NeverNotify" / "Disabled" / "Custom"
+}
+
+export interface LapsInfo {
+  windowsLapsConfigured?: boolean
+  legacyLapsInstalled?: boolean
+  backupDirectory?: string   // "Active Directory" / "Azure AD" / "Configured" / ""
+  adminAccountName?: string
+}
+
+export interface PasswordPolicyInfo {
+  minPasswordLength?: number | null
+  maxPasswordAgeDays?: number | null
+  minPasswordAgeDays?: number | null
+  passwordHistoryLength?: number | null
+  lockoutThreshold?: number | null
+  lockoutDurationMinutes?: number | null
+  complexityRequired?: boolean | null
+  errorMessage?: string
+}
+
+export interface TpmOwnershipInfo {
+  isOwned?: boolean | null
+  isReady?: boolean | null
+  autoProvisioning?: boolean | null
+  manufacturerIdTxt?: string
+  managedAuthLevel?: string
+}
+
+export interface AutoLoginInfo {
+  autoAdminLogon?: boolean
+  hasDefaultUserName?: boolean
+  hasDefaultPassword?: boolean       // PRESENCE ONLY — value is never read or transmitted
+  hasDefaultDomainName?: boolean
+  defaultUserName?: string
 }
 
 export interface UserAccount {
@@ -289,6 +338,12 @@ export function extractIdentity(deviceModules: any): IdentityInfo {
     enrollmentInfo: enrollmentInfo,
     sessionHistory: identity.sessionHistory ? identity.sessionHistory.map(mapSessionHistory) : [],
     sessionSummary: identity.sessionSummary ? mapSessionSummary(identity.sessionSummary) : null,
+    // Raw passthrough — device computes these in the desired shape.
+    uac: identity.uac ?? null,
+    laps: identity.laps ?? null,
+    passwordPolicy: identity.passwordPolicy ?? null,
+    tpmOwnership: identity.tpmOwnership ?? null,
+    autoLogin: identity.autoLogin ?? null,
     summary: identity.summary ? mapIdentitySummary(identity.summary) : createEmptySummary()
   }
 }
@@ -575,6 +630,11 @@ function createEmptyIdentityInfo(): IdentityInfo {
     enrollmentInfo: null,
     sessionHistory: [],
     sessionSummary: null,
+    uac: null,
+    laps: null,
+    passwordPolicy: null,
+    tpmOwnership: null,
+    autoLogin: null,
     summary: createEmptySummary()
   }
 }
