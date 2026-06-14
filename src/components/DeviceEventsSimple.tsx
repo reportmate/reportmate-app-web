@@ -86,8 +86,10 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const EVENTS_PER_LOAD = 10;
 
-  // Valid event categories - filter out everything else
-  const VALID_EVENT_KINDS = ['info', 'error', 'warning', 'success'];
+  // Valid event categories - filter out everything else.
+  // Must match the fleet /events list (app/api/events/route.ts); omitting
+  // 'system'/'data_collection' here hid system events on the device tab.
+  const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection'];
   
   // Filter events to only include valid categories
   const filteredEvents = events.filter(event => 
