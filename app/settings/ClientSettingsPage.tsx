@@ -34,9 +34,6 @@ export default function ClientSettingsPage() {
     { id: 'general', name: 'General', icon: '' },
     { id: 'inventory', name: 'Inventory Mapping', icon: '' },
     { id: 'rules', name: 'Security Rules', icon: '' },
-    { id: 'modules', name: 'Modules', icon: '' },
-    { id: 'security', name: 'Security', icon: '' },
-    { id: 'integrations', name: 'Integrations', icon: '' },
     { id: 'maintenance', name: 'Maintenance', icon: '' },
   ]
   const menuItems = isDemoMode
@@ -196,85 +193,15 @@ export default function ClientSettingsPage() {
                     General Settings
                   </h2>
                   <div className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Organization Name
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Your Organization"
-                          defaultValue="ReportMate Organization"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Time Zone
-                        </label>
-                        <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                          <option value="UTC">UTC</option>
-                          <option value="America/New_York">Eastern Time</option>
-                          <option value="America/Chicago">Central Time</option>
-                          <option value="America/Denver">Mountain Time</option>
-                          <option value="America/Los_Angeles">Pacific Time</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Date Format
-                        </label>
-                        <select className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
-                          <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                          <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                          <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                          Theme Preference
-                        </label>
-                        <div className="flex items-center gap-4">
-                          <ThemeToggle />
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            Current theme setting
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-                      <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-                        Container Information
-                      </h3>
-                      <div className="grid grid-cols-1 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Image Tag
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              readOnly
-                              value="reportmateacr.azurecr.io/reportmate:20250902152337-e8e4c2d"
-                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 font-mono text-sm"
-                            />
-                            <button
-                              className="px-4 py-2 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600"
-                              onClick={() => {
-                                navigator.clipboard.writeText("reportmateacr.azurecr.io/reportmate:20250902152337-e8e4c2d")
-                              }}
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                            Current running container version
-                          </p>
-                        </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Theme Preference
+                      </label>
+                      <div className="flex items-center gap-4">
+                        <ThemeToggle />
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          Light, dark, or follow system
+                        </span>
                       </div>
                     </div>
                   </div>
