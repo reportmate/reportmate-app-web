@@ -23,8 +23,9 @@ export async function GET(
     const limit = Math.min(parseInt(searchParams.get('limit') || '1000'), 1000) // Max 1000, default 1000
     const offset = Math.max(parseInt(searchParams.get('offset') || '0'), 0)
     
-    // Valid event categories - filter out everything else
-    const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success']
+    // Valid event categories - filter out everything else.
+    // Keep in sync with app/api/events/route.ts (must include 'data_collection').
+    const VALID_EVENT_KINDS = ['system', 'info', 'error', 'warning', 'success', 'data_collection']
 
     // Use server-side API base URL configuration
     const apiBaseUrl = process.env.API_BASE_URL
