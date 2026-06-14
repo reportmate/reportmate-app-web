@@ -18,26 +18,21 @@ export interface SecurityInfo {
   secureShell?: SecureShellInfo
   policies: PolicyInfo[]
   summary: SecuritySummary
-  // Phase 2 — protection posture (per-device, raw passthrough; null on platforms / older clients that don't emit them)
+  // Protection posture (per-device, raw passthrough; null on platforms / older
+  // clients that don't emit them). NOTE: identity-domain signals (UAC, join
+  // state, local admins, LAPS, Windows Hello, TPM ownership, password policy,
+  // auto-login) are owned by the Identity module — see modules/identity.ts.
   lsaProtection?: LsaProtectionInfo
   tamperProtection?: TamperProtectionInfo
-  uac?: UacInfo
   pendingReboot?: PendingRebootInfo
   asrRules?: AsrRuleState[]
   defenderVersions?: DefenderVersionsInfo
   defenderExclusions?: DefenderExclusionsInfo
-  joinState?: JoinStateInfo
-  // Phase 3 — compliance / inventory
-  localAdmins?: LocalAdminMember[]
-  laps?: LapsInfo
+  // Compliance / inventory
   appLocker?: AppLockerInfo
   smartScreen?: SmartScreenInfo
   auditPolicy?: AuditPolicyInfo
   edrProducts?: EdrProductInfo[]
-  windowsHello?: WindowsHelloInfo
-  tpmOwnership?: TpmOwnershipInfo
-  passwordPolicy?: PasswordPolicyInfo
-  autoLogin?: AutoLoginInfo
 }
 
 // ====== Phase 2 — protection posture sub-objects (passthrough from client payload) ======
@@ -51,13 +46,6 @@ export interface LsaProtectionInfo {
 export interface TamperProtectionInfo {
   isTamperProtected?: boolean | null
   source?: string
-}
-
-export interface UacInfo {
-  enableLua?: boolean | null
-  consentPromptBehaviorAdmin?: number | null
-  promptOnSecureDesktop?: number | null
-  level?: string  // "AlwaysNotify" / "NotifyChangesSecure" / "NotifyChangesNoDim" / "NeverNotify" / "Disabled" / "Custom"
 }
 
 export interface PendingRebootInfo {
@@ -91,34 +79,7 @@ export interface DefenderExclusionsInfo {
   totalCount?: number
 }
 
-export interface JoinStateInfo {
-  azureAdJoined?: boolean | null
-  domainJoined?: boolean | null
-  workplaceJoined?: boolean | null
-  enterpriseJoined?: boolean | null
-  tenantName?: string
-  tenantId?: string
-  deviceId?: string
-  domainName?: string
-  raw?: Record<string, string>
-  errorMessage?: string
-}
-
-// ====== Phase 3 — compliance / inventory ======
-
-export interface LocalAdminMember {
-  name: string
-  sid?: string
-  principalSource?: string   // Local / ActiveDirectory / AzureAD
-  objectClass?: string       // User / Group
-}
-
-export interface LapsInfo {
-  windowsLapsConfigured?: boolean
-  legacyLapsInstalled?: boolean
-  backupDirectory?: string   // "Active Directory" / "Azure AD" / "Configured" / ""
-  adminAccountName?: string
-}
+// ====== Compliance / inventory ======
 
 export interface AppLockerInfo {
   serviceRunning?: boolean
@@ -153,40 +114,6 @@ export interface EdrProductInfo {
   serviceRunning?: boolean
   version?: string
   sid?: string
-}
-
-export interface WindowsHelloInfo {
-  faceSensorPresent?: boolean
-  fingerprintSensorPresent?: boolean
-  pinConfigured?: boolean | null
-  passportForWorkEnabled?: boolean | null
-}
-
-export interface TpmOwnershipInfo {
-  isOwned?: boolean | null
-  isReady?: boolean | null
-  autoProvisioning?: boolean | null
-  manufacturerIdTxt?: string
-  managedAuthLevel?: string
-}
-
-export interface PasswordPolicyInfo {
-  minPasswordLength?: number | null
-  maxPasswordAgeDays?: number | null
-  minPasswordAgeDays?: number | null
-  passwordHistoryLength?: number | null
-  lockoutThreshold?: number | null
-  lockoutDurationMinutes?: number | null
-  complexityRequired?: boolean | null
-  errorMessage?: string
-}
-
-export interface AutoLoginInfo {
-  autoAdminLogon?: boolean
-  hasDefaultUserName?: boolean
-  hasDefaultPassword?: boolean       // PRESENCE ONLY — value is never read or transmitted
-  hasDefaultDomainName?: boolean
-  defaultUserName?: string
 }
 
 export interface DetectionAlert {
@@ -339,26 +266,18 @@ export function extractSecurity(deviceModules: any): SecurityInfo {
     // Read device-calculated summary
     summary: security.summary || createEmptySummary(),
 
-    // Phase 2/3 — raw passthrough (sub-objects already arrive in the desired shape from the client).
-    // We don't normalize here because the device computes these and the schema is stable.
+    // Protection-posture sub-objects — raw passthrough (already arrive in the
+    // desired shape from the client; identity-domain signals live in identity.ts).
     lsaProtection: security.lsaProtection,
     tamperProtection: security.tamperProtection,
-    uac: security.uac,
     pendingReboot: security.pendingReboot,
     asrRules: security.asrRules,
     defenderVersions: security.defenderVersions,
     defenderExclusions: security.defenderExclusions,
-    joinState: security.joinState,
-    localAdmins: security.localAdmins,
-    laps: security.laps,
     appLocker: security.appLocker,
     smartScreen: security.smartScreen,
     auditPolicy: security.auditPolicy,
     edrProducts: security.edrProducts,
-    windowsHello: security.windowsHello,
-    tpmOwnership: security.tpmOwnership,
-    passwordPolicy: security.passwordPolicy,
-    autoLogin: security.autoLogin,
   }
 
   

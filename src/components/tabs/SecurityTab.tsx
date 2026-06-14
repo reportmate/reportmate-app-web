@@ -160,6 +160,10 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
   const [showOsRoots, setShowOsRoots] = React.useState(false)
   const [cveFilter, setCveFilter] = React.useState<'all' | 'unpatched' | 'patched'>('all')
   const [expandedDetections, setExpandedDetections] = React.useState<Set<number>>(new Set())
+  // Collapse state for security posture lists (ASR rules, audit policy, exclusions)
+  const [expandedAsr, setExpandedAsr] = React.useState(false)
+  const [expandedAudit, setExpandedAudit] = React.useState(false)
+  const [expandedExclusions, setExpandedExclusions] = React.useState(false)
   
   // Get remote management data from Management module (Mac collects screen sharing there)
   const rawManagement = device?.modules?.management || device?.management
@@ -218,14 +222,9 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
 
   // === Windows Security Status ===
   // Support both snake_case (new API) and camelCase (legacy) - all normalized to camelCase now
-  // Windows Hello 
-  const windowsHello = security?.windowsHello
-  const _windowsHelloEnabled = windowsHello?.statusDisplay !== 'Disabled' && (
-    windowsHello?.credentialProviders?.pinEnabled || 
-    windowsHello?.credentialProviders?.faceRecognitionEnabled ||
-    windowsHello?.credentialProviders?.fingerprintEnabled
-  )
-  // TPM 
+  // NOTE: Windows Hello / sign-in posture now lives in the Identity tab (owned by
+  // the identity module). The Security tab keeps protection/detection signals only.
+  // TPM
   const tpm = security?.tpm
   const _tpmActive = tpm?.isPresent && tpm?.isEnabled && tpm?.isActivated
   // SSH (Windows)
@@ -339,7 +338,15 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                 <DetailRow label="Activated" isStatus enabled={tpm?.is_activated || tpm?.isActivated} />
                 <DetailRow label="Version" value={tpm?.version} />
                 <DetailRow label="Manufacturer" value={tpm?.manufacturer} />
-                
+                {security?.tamperProtection?.isTamperProtected != null && (
+                  <DetailRow
+                    label="Tamper Protection"
+                    isStatus
+                    enabled={!!security.tamperProtection.isTamperProtected}
+                    severity={sev('tamperProtection', !!security.tamperProtection.isTamperProtected)}
+                  />
+                )}
+
                 {/* Secure Boot - from security module (not health attestation) */}
                 <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
                   <DetailRow 
@@ -605,13 +612,75 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     />
                   )}
                   {security?.deviceGuard?.exploitProtection?.cfgEnabled !== undefined && (
-                    <DetailRow 
-                      label="CFG" 
-                      isStatus 
+                    <DetailRow
+                      label="CFG"
+                      isStatus
                       enabled={security.deviceGuard.exploitProtection.cfgEnabled}
                     />
                   )}
                 </div>
+                {/* Protection posture: LSA, ASR, App Control, SmartScreen */}
+                {(security?.lsaProtection?.enabled != null || security?.lsaProtection?.mode) && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                    <DetailRow
+                      label="LSA Protection"
+                      isStatus
+                      enabled={!!security.lsaProtection.enabled}
+                      severity={sev('lsaProtection', !!security.lsaProtection.enabled)}
+                      activeLabel={security.lsaProtection.mode === 'PPLBoot' ? 'Enabled (UEFI Lock)' : 'Enabled'}
+                      inactiveLabel="Disabled"
+                    />
+                  </div>
+                )}
+                {Array.isArray(security?.asrRules) && security.asrRules.length > 0 && (() => {
+                  const rules = security.asrRules
+                  const block = rules.filter((r: any) => r.state === 'Block').length
+                  const audit = rules.filter((r: any) => r.state === 'Audit').length
+                  const warn = rules.filter((r: any) => r.state === 'Warn').length
+                  return (
+                    <>
+                      <button
+                        onClick={() => setExpandedAsr(v => !v)}
+                        className="w-full flex items-center justify-between py-1 text-left"
+                      >
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Attack Surface Reduction</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                          {block}/{rules.length} Block{audit > 0 ? `, ${audit} Audit` : ''}{warn > 0 ? `, ${warn} Warn` : ''}
+                          <ChevronDown className={`w-4 h-4 transition-transform ${expandedAsr ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
+                      {expandedAsr && (
+                        <div className="pl-2 space-y-1 mb-1">
+                          {rules.map((r: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={r.name}>{r.name}</span>
+                              <span className={`text-xs font-medium whitespace-nowrap ${r.state === 'Block' ? 'text-green-600 dark:text-green-400' : r.state === 'Audit' ? 'text-amber-600 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'}`}>{r.state}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
+                {security?.appLocker && (security.appLocker.wdacEnabled !== undefined || security.appLocker.policyConfigured !== undefined) && (
+                  <>
+                    <DetailRow
+                      label="App Control (WDAC)"
+                      isStatus
+                      enabled={!!security.appLocker.wdacEnabled}
+                      activeLabel={security.appLocker.wdacAuditMode ? 'Audit Mode' : 'Enforced'}
+                      inactiveLabel="Off"
+                      severity={security.appLocker.wdacEnabled ? (security.appLocker.wdacAuditMode ? 'warning' : 'ok') : 'neutral'}
+                    />
+                    <DetailRow
+                      label="AppLocker"
+                      value={security.appLocker.policyConfigured ? (security.appLocker.effectivePolicySummary || 'Configured') : 'Not Configured'}
+                    />
+                  </>
+                )}
+                {security?.smartScreen?.windowsState && (
+                  <DetailRow label="SmartScreen" value={security.smartScreen.windowsState} />
+                )}
               </>
             )}
           </div>
@@ -786,10 +855,93 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   value={security?.antivirus?.isUpToDate ? 'Up to date' : 'Needs update'} 
                 />
                 <DetailRow label="Last Update" value={formatDate(security?.antivirus?.lastUpdate)} />
-                <DetailRow 
-                  label="Last Scan" 
-                  value={`${formatDate(security?.antivirus?.lastScan)}${security?.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`} 
+                <DetailRow
+                  label="Last Scan"
+                  value={`${formatDate(security?.antivirus?.lastScan)}${security?.antivirus?.scanType ? ` (${security.antivirus.scanType})` : ''}`}
                 />
+                {/* Defender engine / platform / signature versions */}
+                {security?.defenderVersions?.amEngineVersion && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    <DetailRow label="Engine Version" value={security.defenderVersions.amEngineVersion} mono />
+                    {security.defenderVersions.amProductVersion && (
+                      <DetailRow label="Platform Version" value={security.defenderVersions.amProductVersion} mono />
+                    )}
+                    {security.defenderVersions.antivirusSignatureVersion && (
+                      <DetailRow label="Signatures" value={security.defenderVersions.antivirusSignatureVersion} mono />
+                    )}
+                  </div>
+                )}
+                {/* Defender exclusions (collapsible) */}
+                {security?.defenderExclusions && security.defenderExclusions.totalCount > 0 && (
+                  <>
+                    <button
+                      onClick={() => setExpandedExclusions(v => !v)}
+                      className="w-full flex items-center justify-between py-1 text-left"
+                    >
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Defender Exclusions</span>
+                      <span className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                        {security.defenderExclusions.totalCount}
+                        <ChevronDown className={`w-4 h-4 transition-transform ${expandedExclusions ? 'rotate-180' : ''}`} />
+                      </span>
+                    </button>
+                    {expandedExclusions && (
+                      <div className="pl-2 space-y-0.5 mb-1 max-h-64 overflow-y-auto">
+                        {[
+                          ...(security.defenderExclusions.paths || []),
+                          ...(security.defenderExclusions.processes || []),
+                          ...(security.defenderExclusions.extensions || []),
+                          ...(security.defenderExclusions.ipAddresses || []),
+                        ].map((ex: string, i: number) => (
+                          <div key={i} className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={ex}>{ex}</div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                {/* EDR products from service/SecurityCenter2 signature map */}
+                {Array.isArray(security?.edrProducts) && security.edrProducts.length > 0 && (
+                  <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                    {security.edrProducts.map((edr: any, idx: number) => (
+                      <DetailRow
+                        key={idx}
+                        label={edr.name || edr.vendor || 'EDR'}
+                        isStatus
+                        enabled={edr.serviceRunning}
+                        value={edr.serviceRunning ? 'Running' : 'Stopped'}
+                        neutral={!edr.serviceRunning}
+                      />
+                    ))}
+                  </div>
+                )}
+                {/* Audit policy coverage (collapsible) */}
+                {Array.isArray(security?.auditPolicy?.categories) && security.auditPolicy.categories.length > 0 && (() => {
+                  const cats = security.auditPolicy.categories
+                  const audited = cats.filter((c: any) => c.setting && c.setting !== 'No Auditing').length
+                  return (
+                    <>
+                      <button
+                        onClick={() => setExpandedAudit(v => !v)}
+                        className="w-full flex items-center justify-between py-1 text-left border-t border-gray-200 dark:border-gray-700 mt-2 pt-2"
+                      >
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Audit Policy</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                          {audited}/{cats.length} audited
+                          <ChevronDown className={`w-4 h-4 transition-transform ${expandedAudit ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
+                      {expandedAudit && (
+                        <div className="pl-2 space-y-0.5 mb-1 max-h-64 overflow-y-auto">
+                          {cats.map((c: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between gap-2">
+                              <span className="text-xs text-gray-500 dark:text-gray-400 truncate" title={c.subcategory}>{c.subcategory}</span>
+                              <span className={`text-xs font-medium whitespace-nowrap ${c.setting === 'No Auditing' || !c.setting ? 'text-gray-400 dark:text-gray-500' : 'text-green-600 dark:text-green-400'}`}>{c.setting || '—'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 {/* Additional EDR products */}
                 {security?.endpointDetection && security.endpointDetection.length > 0 && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
@@ -1579,17 +1731,28 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                     </p>
                   </div>
                 </div>
-                {hasCves && (
+                {(hasCves || security?.pendingReboot?.required) && (
                   <div className="flex items-center gap-3">
+                    {security?.pendingReboot?.required && (
+                      <span
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400"
+                        title="A reboot is pending to finish applying updates"
+                      >
+                        <AlertTriangle className="w-3 h-3" />
+                        Reboot Required
+                      </span>
+                    )}
                     {exploitedCount > 0 && (
                       <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
                         <XCircle className="w-3 h-3" />
                         {exploitedCount} Actively Exploited
                       </span>
                     )}
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {totalCveCount} total CVEs
-                    </span>
+                    {hasCves && (
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {totalCveCount} total CVEs
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
