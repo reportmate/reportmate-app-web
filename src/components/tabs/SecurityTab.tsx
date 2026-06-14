@@ -872,32 +872,39 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
                   </div>
                 )}
                 {/* Defender exclusions (collapsible) */}
-                {security?.defenderExclusions && security.defenderExclusions.totalCount > 0 && (
-                  <>
-                    <button
-                      onClick={() => setExpandedExclusions(v => !v)}
-                      className="w-full flex items-center justify-between py-1 text-left"
-                    >
-                      <span className="text-sm text-gray-500 dark:text-gray-400">Defender Exclusions</span>
-                      <span className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
-                        {security.defenderExclusions.totalCount}
-                        <ChevronDown className={`w-4 h-4 transition-transform ${expandedExclusions ? 'rotate-180' : ''}`} />
-                      </span>
-                    </button>
-                    {expandedExclusions && (
-                      <div className="pl-2 space-y-0.5 mb-1 max-h-64 overflow-y-auto">
-                        {[
-                          ...(security.defenderExclusions.paths || []),
-                          ...(security.defenderExclusions.processes || []),
-                          ...(security.defenderExclusions.extensions || []),
-                          ...(security.defenderExclusions.ipAddresses || []),
-                        ].map((ex: string, i: number) => (
-                          <div key={i} className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={ex}>{ex}</div>
-                        ))}
-                      </div>
-                    )}
-                  </>
-                )}
+                {security?.defenderExclusions && (() => {
+                  const exclusions = [
+                    ...(security.defenderExclusions.paths || []),
+                    ...(security.defenderExclusions.processes || []),
+                    ...(security.defenderExclusions.extensions || []),
+                    ...(security.defenderExclusions.ipAddresses || []),
+                  ]
+                  // totalCount is optional; fall back to the summed array lengths so
+                  // exclusions are never hidden when the backend omits the count.
+                  const exCount = security.defenderExclusions.totalCount ?? exclusions.length
+                  if (exCount <= 0) return null
+                  return (
+                    <>
+                      <button
+                        onClick={() => setExpandedExclusions(v => !v)}
+                        className="w-full flex items-center justify-between py-1 text-left"
+                      >
+                        <span className="text-sm text-gray-500 dark:text-gray-400">Defender Exclusions</span>
+                        <span className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-1">
+                          {exCount}
+                          <ChevronDown className={`w-4 h-4 transition-transform ${expandedExclusions ? 'rotate-180' : ''}`} />
+                        </span>
+                      </button>
+                      {expandedExclusions && (
+                        <div className="pl-2 space-y-0.5 mb-1 max-h-64 overflow-y-auto">
+                          {exclusions.map((ex: string, i: number) => (
+                            <div key={i} className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={ex}>{ex}</div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )
+                })()}
                 {/* EDR products from service/SecurityCenter2 signature map */}
                 {Array.isArray(security?.edrProducts) && security.edrProducts.length > 0 && (
                   <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
