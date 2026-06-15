@@ -3,6 +3,8 @@
  * Supports individual module repositories following the pattern reportmate-module-NAME
  */
 
+import type { ModuleMount } from './moduleSlots'
+
 export interface ModuleRepository {
   id: string
   name: string
@@ -49,10 +51,14 @@ export interface ModuleManifest {
   // Compatibility
   minVersion: string  // Minimum ReportMate version
   maxVersion?: string
-  
+
   // Security
   checksum?: string
   signature?: string
+
+  // Render mount points — where this module contributes in the UI. Synced into
+  // the slot registry (moduleSlots) so host components can render it.
+  mounts?: ModuleMount[]
 }
 
 export interface ModuleRuntime {
