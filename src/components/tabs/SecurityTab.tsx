@@ -23,6 +23,7 @@ import { DEFAULT_SECURITY_CONFIG, DEFAULT_INVENTORY_FIELDS } from '../../lib/set
 import { evaluateSecurity } from '../../lib/rules/evaluateSecurity'
 import { getDeviceInventoryContext } from '../../lib/rules/inventoryMapping'
 import type { Severity } from '../../lib/settings/types'
+import { ModuleSlot } from '../modules/ModuleSlot'
 
 interface SecurityTabProps {
   device: any
@@ -1178,6 +1179,11 @@ export const SecurityTab: React.FC<SecurityTabProps> = ({ device }) => {
         </div>
 
       </div>
+
+      {/* Security-domain extension modules contributed to this slot
+          (e.g. a managed-risk or endpoint-protection integration). Renders
+          nothing until a module mounts to 'device.security.cards'. */}
+      <ModuleSlot slot="device.security.cards" device={device} />
 
       {/* Certificates Table */}
       {(() => {
