@@ -193,8 +193,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const deviceState = management.device_state || management.deviceState
   const tenantDetails = management.tenant_details || management.tenantDetails || {}
   const deviceDetails = management.device_details || management.deviceDetails || {}
-  // NOTE: compliance_status removed from management module - moved to security module
-  const remoteManagement = management.remote_management || management.remoteManagement || {}
+  // NOTE: compliance_status and remote_management are rendered on the Security tab, not here
   const installedProfiles = management.installed_profiles || management.installedProfiles || []
   const profiles = management.profiles || []
   const managedPolicies = management.managed_policies || management.managedPolicies || []
@@ -341,12 +340,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           day: 'numeric'
         })
       } catch {
-        // Fallback to original string if parsing fails
+        // Fall through to Unknown if parsing fails
       }
     }
-    
-    // If no match or parsing failed, return original
-    return validityString
+
+    // If no match or parsing failed, treat as unknown (matches prior inline behavior)
+    return 'Unknown'
   }
 
   return (
@@ -701,6 +700,60 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                         {mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl}
                       </span>
                       <CopyButton value={mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mac: Device Identifiers */}
+          {isMac && (deviceIdentifiers.uuid || deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_model || deviceIdentifiers.model || deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag || deviceIdentifiers.provisioning_udid) && (
+            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Identifiers</h3>
+              <div className="space-y-3">
+                {deviceIdentifiers.uuid && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">UUID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                        {deviceIdentifiers.uuid}
+                      </span>
+                      <CopyButton value={deviceIdentifiers.uuid} />
+                    </div>
+                  </div>
+                )}
+                {(deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number) && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Serial Number</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                        {deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number}
+                      </span>
+                      <CopyButton value={deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number} />
+                    </div>
+                  </div>
+                )}
+                {(deviceIdentifiers.hardware_model || deviceIdentifiers.model) && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</span>
+                    <span className="text-sm text-gray-900 dark:text-white">{deviceIdentifiers.hardware_model || deviceIdentifiers.model}</span>
+                  </div>
+                )}
+                {(deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag) && (
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Asset Tag</span>
+                    <span className="text-sm text-gray-900 dark:text-white">{deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag}</span>
+                  </div>
+                )}
+                {deviceIdentifiers.provisioning_udid && (
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Provisioning UDID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                        {deviceIdentifiers.provisioning_udid}
+                      </span>
+                      <CopyButton value={deviceIdentifiers.provisioning_udid} />
                     </div>
                   </div>
                 )}
@@ -1137,14 +1190,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                             } catch { return 'text-gray-900 dark:text-white' }
                           })()
                         }`}>
-                          {(() => {
-                            const validityStr = deviceDetails.device_certificate_validity || deviceDetails.deviceCertificateValidity
-                            const match = validityStr.match(/--\s*(\d{4}-\d{2}-\d{2})/)
-                            if (match && match[1]) {
-                              return formatExpiryDate(match[1])
-                            }
-                            return 'Unknown'
-                          })()}
+                          {formatCertificateValidity(deviceDetails.device_certificate_validity || deviceDetails.deviceCertificateValidity)}
                         </div>
                       </div>
                     )}
@@ -1356,6 +1402,18 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                             <svg className="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                             </svg>
+                          )}
+                          {/* Verified Badge */}
+                          {isVerified && (
+                            <span
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                              title="Profile signature verified by the system"
+                            >
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                              </svg>
+                              Verified
+                            </span>
                           )}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
