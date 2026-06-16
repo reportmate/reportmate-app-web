@@ -340,12 +340,12 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           day: 'numeric'
         })
       } catch {
-        // Fallback to original string if parsing fails
+        // Fall through to Unknown if parsing fails
       }
     }
-    
-    // If no match or parsing failed, return original
-    return validityString
+
+    // If no match or parsing failed, treat as unknown (matches prior inline behavior)
+    return 'Unknown'
   }
 
   return (
@@ -708,7 +708,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           )}
 
           {/* Mac: Device Identifiers */}
-          {isMac && (deviceIdentifiers.uuid || deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_model || deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag || deviceIdentifiers.provisioning_udid) && (
+          {isMac && (deviceIdentifiers.uuid || deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_model || deviceIdentifiers.model || deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag || deviceIdentifiers.provisioning_udid) && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Identifiers</h3>
               <div className="space-y-3">
