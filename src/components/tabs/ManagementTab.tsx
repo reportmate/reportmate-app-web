@@ -1285,7 +1285,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       </div>
 
       {/* Configuration Profiles Section (Mac) - Accordion style like SystemTab Background Activity */}
-      {isMac && filteredProfiles.length > 0 && (
+      {isMac && installedProfiles.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1314,6 +1314,11 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           
           {/* Profiles Accordion List */}
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredProfiles.length === 0 && (
+              <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                No profiles match &ldquo;{profileSearch.trim()}&rdquo;.
+              </div>
+            )}
             {filteredProfiles.map((profile: any, index: number) => {
               const identifier = profile.identifier || `profile-${index}`
               const isExpanded = expandedProfiles.has(identifier)
@@ -1508,7 +1513,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       )}
 
       {/* Managed Policies Section (Mac) - Grouped by domain */}
-      {isMac && filteredPolicies.length > 0 && (
+      {isMac && managedPolicies.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -1537,6 +1542,11 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           
           {/* Managed Policies Accordion List */}
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
+            {filteredPolicies.length === 0 && (
+              <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
+                No preferences match &ldquo;{policySearch.trim()}&rdquo;.
+              </div>
+            )}
             {filteredPolicies.map((policy: any, index: number) => {
               const domain = policy.domain || `domain-${index}`
               const isExpanded = expandedPolicies.has(domain)
