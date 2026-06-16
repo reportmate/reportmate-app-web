@@ -1316,7 +1316,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredProfiles.length === 0 && (
               <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                No profiles match &ldquo;{profileSearch}&rdquo;.
+                No profiles match &ldquo;{profileSearch.trim()}&rdquo;.
               </div>
             )}
             {filteredProfiles.map((profile: any, index: number) => {
@@ -1544,7 +1544,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {filteredPolicies.length === 0 && (
               <div className="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-                No preferences match &ldquo;{policySearch}&rdquo;.
+                No preferences match &ldquo;{policySearch.trim()}&rdquo;.
               </div>
             )}
             {filteredPolicies.map((policy: any, index: number) => {
