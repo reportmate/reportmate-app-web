@@ -78,7 +78,7 @@ function DevicesPageContent() {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const response = await fetch('/api/devices', {
+        const response = await fetch('/api/v1/devices', {
           credentials: 'include'
         })
         const data = await response.json()

@@ -83,41 +83,22 @@ test.describe('Next.js Events Routes', () => {
   })
 })
 
-test.describe('Next.js Fleet Module Routes', () => {
-
-  const moduleRoutes = [
-    '/api/applications',
-    '/api/hardware',
-    '/api/network',
-    '/api/security',
-    '/api/system',
-    '/api/peripherals',
-  ]
-
-  for (const route of moduleRoutes) {
-    test(`GET ${route} - responds 200`, async ({ request }) => {
-      const res = await request.get(route)
-      expect(res.status()).toBe(200)
-    })
-  }
-})
-
-test.describe('Next.js /api/modules/* Routes', () => {
+test.describe('Next.js /api/v1/* Routes', () => {
 
   const modulesRoutes = [
-    '/api/modules/applications',
-    '/api/modules/hardware',
-    '/api/modules/installs',
-    '/api/modules/inventory',
-    '/api/modules/management',
-    '/api/modules/network',
-    '/api/modules/security',
-    '/api/modules/system',
-    '/api/modules/peripherals',
-    '/api/modules/identity',
-    '/api/modules/devices-list',
-    '/api/modules/chart-data',
-    '/api/modules/security/certificates',
+    '/api/v1/applications',
+    '/api/v1/hardware',
+    '/api/v1/installs',
+    '/api/v1/inventory',
+    '/api/v1/management',
+    '/api/v1/network',
+    '/api/v1/security',
+    '/api/v1/system',
+    '/api/v1/peripherals',
+    '/api/v1/identity',
+    '/api/v1/devices-list',
+    '/api/v1/chart-data',
+    '/api/v1/security/certificates',
   ]
 
   for (const route of modulesRoutes) {
@@ -128,19 +109,14 @@ test.describe('Next.js /api/modules/* Routes', () => {
   }
 })
 
-test.describe('Next.js /api/devices/* Sub-Routes', () => {
+test.describe('Next.js /api/v1/* Sub-Routes', () => {
 
   const devicesSubRoutes = [
-    '/api/devices/applications',
-    '/api/devices/applications/usage',
-    '/api/devices/applications/filters',
-    '/api/devices/hardware',
-    '/api/devices/installs',
-    '/api/devices/installs/data',
-    '/api/devices/installs/filters',
-    '/api/devices/installs/progress',
-    '/api/devices/events',
-    '/api/devices/management',
+    '/api/v1/applications/usage',
+    '/api/v1/applications/filters',
+    '/api/v1/installs/data',
+    '/api/v1/installs/filters',
+    '/api/v1/installs/progress',
   ]
 
   for (const route of devicesSubRoutes) {
@@ -153,8 +129,8 @@ test.describe('Next.js /api/devices/* Sub-Routes', () => {
   // /distribution requires applicationNames; smoke-test with a token unlikely
   // to match anything so the response shape (object with bucket entry) is what
   // we assert on, not the counts.
-  test('GET /api/devices/applications/distribution?applicationNames=__nonexistent__ - responds 200', async ({ request }) => {
-    const res = await request.get('/api/devices/applications/distribution?applicationNames=__nonexistent__')
+  test('GET /api/v1/applications/distribution?applicationNames=__nonexistent__ - responds 200', async ({ request }) => {
+    const res = await request.get('/api/v1/applications/distribution?applicationNames=__nonexistent__')
     expect(res.status()).toBe(200)
     const body = await res.json()
     expect(body).toBeTruthy()

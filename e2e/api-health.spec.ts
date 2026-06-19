@@ -122,17 +122,17 @@ test.describe('FastAPI Authenticated Endpoints', () => {
 test.describe('FastAPI Fleet Module Endpoints', () => {
 
   const fleetEndpoints = [
-    '/api/devices/applications',
-    '/api/devices/hardware',
-    '/api/devices/installs',
-    '/api/devices/network',
-    '/api/devices/security',
-    '/api/devices/security/certificates',
-    '/api/devices/management',
-    '/api/devices/inventory',
-    '/api/devices/system',
-    '/api/devices/peripherals',
-    '/api/devices/identity',
+    '/api/v1/applications',
+    '/api/v1/hardware',
+    '/api/v1/installs',
+    '/api/v1/network',
+    '/api/v1/security',
+    '/api/v1/security/certificates',
+    '/api/v1/management',
+    '/api/v1/inventory',
+    '/api/v1/system',
+    '/api/v1/peripherals',
+    '/api/v1/identity',
   ]
 
   for (const endpoint of fleetEndpoints) {
@@ -173,8 +173,8 @@ test.describe('FastAPI Device Module Endpoints', () => {
 
 test.describe('FastAPI Application Usage Endpoints', () => {
 
-  test('GET /api/devices/applications/usage - fleet-wide', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/devices/applications/usage`, { headers: authHeaders() })
+  test('GET /api/v1/applications/usage - fleet-wide', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/applications/usage`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
   })
 

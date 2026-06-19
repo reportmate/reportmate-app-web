@@ -100,7 +100,7 @@ export async function resolveDeviceIdentifierServer(identifier: string): Promise
       : 'http://localhost:3000'  // Use the actual dev server port
     
     // Always query the devices API to search for the identifier - don't assume it's already a serial number
-    const response = await fetch(`${baseUrl}/api/devices?limit=1000`, {
+    const response = await fetch(`${baseUrl}/api/v1/devices?limit=1000`, {
       cache: 'no-store',
       headers: {
         'Cache-Control': 'no-cache',

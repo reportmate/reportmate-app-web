@@ -2,7 +2,7 @@
 
 const https = require('https');
 
-const API_URL = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/devices/system?limit=5';
+const API_URL = 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io/api/v1/system?limit=5';
 const API_PASSPHRASE = 'XmZ8Kp3NwQ7YtR9vC2LzH6FgDj4BlMnE';
 
 console.log('Testing System API endpoint...');

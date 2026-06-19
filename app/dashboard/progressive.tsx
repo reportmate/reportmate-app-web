@@ -43,7 +43,7 @@ export default function ProgressiveDashboard() {
   useEffect(() => {
     const loadFastDevices = async () => {
       try {
-        const response = await fetch('/api/modules/devices-list', {
+        const response = await fetch('/api/v1/devices-list', {
           cache: 'no-store'
         })
 
@@ -65,7 +65,7 @@ export default function ProgressiveDashboard() {
   useEffect(() => {
     const loadAllDevicesData = async () => {
       try {
-        const response = await fetch('/api/devices', {
+        const response = await fetch('/api/v1/devices', {
           cache: 'no-store'
         })
 

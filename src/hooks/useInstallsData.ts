@@ -37,7 +37,7 @@ const swrOptions: SWRConfiguration = {
 }
 
 // Cache key for installs filter options - matches the actual API endpoint
-const INSTALLS_FILTER_KEY = '/api/devices/installs/filters'
+const INSTALLS_FILTER_KEY = '/api/v1/installs/filters'
 
 /**
  * Hook for fetching installs filter options with SWR caching
@@ -69,7 +69,7 @@ export function useInstallsFilterOptions() {
 /**
  * Preload installs filter data in the background
  * Call this from the dashboard to start loading data early
- * The data will be cached and available instantly when navigating to /devices/installs
+ * The data will be cached and available instantly when navigating to /installs
  */
 export function preloadInstallsData() {
   // SWR's preload function fetches data and caches it

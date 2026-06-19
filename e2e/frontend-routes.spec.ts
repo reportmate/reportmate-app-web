@@ -48,21 +48,21 @@ test.describe('Device Detail Page', () => {
   })
 })
 
-test.describe('Fleet Pages - /devices/*', () => {
+test.describe('Fleet Pages - top-level module reports', () => {
 
   const fleetPages = [
     '/devices',
-    '/devices/applications',
-    '/devices/hardware',
-    '/devices/installs',
-    '/devices/inventory',
-    '/devices/management',
-    '/devices/network',
-    '/devices/peripherals',
-    '/devices/profiles',
-    '/devices/security',
-    '/devices/system',
-    '/devices/identity',
+    '/applications',
+    '/hardware',
+    '/installs',
+    '/inventory',
+    '/management',
+    '/network',
+    '/peripherals',
+    '/profiles',
+    '/security',
+    '/system',
+    '/identity',
   ]
 
   for (const route of fleetPages) {
@@ -71,6 +71,38 @@ test.describe('Fleet Pages - /devices/*', () => {
       expect(res?.status()).toBeLessThan(500)
     })
   }
+})
+
+test.describe('Legacy /devices/<module> redirects', () => {
+
+  // Module reports moved from /devices/<module> to top-level /<module>.
+  // The old nested URLs must permanently redirect (next.config.mjs redirects()).
+  const moved = [
+    'applications',
+    'hardware',
+    'identity',
+    'installs',
+    'inventory',
+    'management',
+    'network',
+    'peripherals',
+    'profiles',
+    'security',
+    'system',
+  ]
+
+  for (const m of moved) {
+    test(`/devices/${m} - redirects to /${m}`, async ({ page }) => {
+      const res = await page.goto(`/devices/${m}`)
+      expect(res?.status()).toBeLessThan(500)
+      expect(new URL(page.url()).pathname).toBe(`/${m}`)
+    })
+  }
+
+  test('/devices/applications/coverage - redirects preserving sub-path', async ({ page }) => {
+    await page.goto('/devices/applications/coverage')
+    expect(new URL(page.url()).pathname).toBe('/applications/coverage')
+  })
 })
 
 test.describe('No Console Errors on Key Pages', () => {

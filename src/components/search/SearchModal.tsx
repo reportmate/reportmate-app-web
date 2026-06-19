@@ -147,7 +147,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
         devices = preloadedDevices
       } else {
         // Fallback to API call if no preloaded devices
-        const response = await fetch('/api/devices', {
+        const response = await fetch('/api/v1/devices', {
           cache: 'no-store',
           credentials: 'include',
           headers: {

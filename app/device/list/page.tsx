@@ -25,7 +25,7 @@ export default function DeviceListPage() {
   useEffect(() => {
     const fetchDevices = async () => {
       try {
-        const response = await fetch('/api/devices', {
+        const response = await fetch('/api/v1/devices', {
           cache: 'no-store',
           credentials: 'include',
           headers: {
