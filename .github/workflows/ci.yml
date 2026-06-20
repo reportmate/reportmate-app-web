@@ -1,0 +1,59 @@
+name: CI
+
+# Build validation for pushes and PRs to main.
+#
+# next.config.mjs sets typescript.ignoreBuildErrors and eslint.ignoreDuringBuilds
+# to true, so `next build` catches NEITHER type nor lint errors. This repo
+# currently has a backlog of pre-existing tsc/eslint failures, so those two
+# checks run as NON-BLOCKING report steps (continue-on-error) -- they surface
+# the debt in the run summary without red-flagging every PR. The blocking gate
+# is the full production build, which is exactly what ships in the Docker image.
+#
+# TODO: once the tsc + eslint backlog is cleared, drop continue-on-error so they
+# become hard gates.
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (report-only)
+        continue-on-error: true
+        run: pnpm exec tsc --noEmit
+
+      - name: Lint (report-only)
+        continue-on-error: true
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
