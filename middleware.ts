@@ -11,12 +11,10 @@ const publicRoutes = [
   '/api/version',       // Build/version metadata endpoint for status widgets
   '/api/dashboard',     // BFF route - authenticated via X-Internal-Secret to FastAPI
   '/api/settings',      // BFF route - GET proxies via X-Internal-Secret; PUT/discover gated by requireAdmin
-  '/api/device',        // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/devices',       // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/modules',       // BFF route - authenticated via X-Internal-Secret to FastAPI
+  '/api/device',        // BFF route (per-device) - authenticated via X-Internal-Secret to FastAPI
+  '/api/v1',            // BFF routes (consolidated module/fleet proxies) - authenticated via X-Internal-Secret to FastAPI
   '/api/stats',         // BFF route - authenticated via X-Internal-Secret to FastAPI
   '/api/events',        // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/applications',  // BFF route - authenticated via X-Internal-Secret to FastAPI
   '/api/diagnostic',    // Diagnostic endpoint
   '/auth',
   '/_next',

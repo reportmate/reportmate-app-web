@@ -1,7 +1,7 @@
 import React from 'react'
 
 /**
- * InstallsPageSkeleton - Loading skeleton for the /devices/installs page
+ * InstallsPageSkeleton - Loading skeleton for the /installs page
  * 
  * Structure matches the actual page layout:
  * - 3 "Items with" stat cards (Errors, Warnings, Pending) at top
