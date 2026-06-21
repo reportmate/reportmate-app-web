@@ -26,7 +26,26 @@ const nextConfig = {
   outputFileTracingIncludes: {
     '/api/**/*': ['./app/api/**/*'],
   },
-  
+
+  // Module report pages moved from /devices/<module> to top-level /<module>.
+  // Permanent-redirect the old nested URLs (and any nested sub-paths) so
+  // bookmarks and external links keep working. Query strings are preserved.
+  async redirects() {
+    const modules = 'applications|hardware|identity|installs|inventory|management|network|peripherals|profiles|security|system'
+    return [
+      {
+        source: `/devices/:module(${modules})/:rest*`,
+        destination: '/:module/:rest*',
+        permanent: true,
+      },
+      {
+        source: `/devices/:module(${modules})`,
+        destination: '/:module',
+        permanent: true,
+      },
+    ]
+  },
+
   // Set hostname for custom domain support
   env: {
     HOSTNAME: '0.0.0.0',

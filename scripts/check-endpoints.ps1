@@ -129,7 +129,7 @@ if ($Target -eq "api" -or $Target -eq "all") {
     Write-Host "`nStats endpoints:" -ForegroundColor Yellow
     Test-Endpoint "GET /api/v1/stats/installs"           "$ApiBase/api/v1/stats/installs"           -Headers $authHeaders
     Test-Endpoint "GET /api/v1/stats/applications/usage"  "$ApiBase/api/v1/stats/applications/usage"  -Headers $authHeaders
-    Test-Endpoint "GET /api/v1/devices/applications/usage" "$ApiBase/api/v1/devices/applications/usage" -Headers $authHeaders
+    Test-Endpoint "GET /api/v1/applications/usage" "$ApiBase/api/v1/applications/usage" -Headers $authHeaders
     Test-Endpoint "GET /api/v1/device/:serial/applications/usage" "$ApiBase/api/v1/device/$DeviceSerial/applications/usage" -Headers $authHeaders
 
     Write-Host "`nAuth enforcement (should reject):" -ForegroundColor Yellow
@@ -148,10 +148,10 @@ if ($Target -eq "frontend" -or $Target -eq "all") {
     $pages = @(
         "/", "/dashboard", "/events", "/settings",
         "/device/$DeviceSerial",
-        "/devices", "/devices/applications", "/devices/hardware",
-        "/devices/installs", "/devices/inventory", "/devices/management",
-        "/devices/network", "/devices/peripherals",
-        "/devices/security", "/devices/system", "/devices/identity"
+        "/devices", "/applications", "/hardware",
+        "/installs", "/inventory", "/management",
+        "/network", "/peripherals",
+        "/security", "/system", "/identity"
     )
     foreach ($p in $pages) {
         Test-Endpoint "GET $p" "$FrontendBase$p"

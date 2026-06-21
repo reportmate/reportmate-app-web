@@ -62,7 +62,7 @@ async function getDevices() {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
     
-    const response = await fetch(`${apiUrl}/api/devices`, {
+    const response = await fetch(`${apiUrl}/api/v1/devices`, {
       next: { revalidate: 30 },
       signal: controller.signal,
     })

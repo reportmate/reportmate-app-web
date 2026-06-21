@@ -72,7 +72,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
 
   const fetchDevices = useCallback(async () => {
     try {
-      const response = await fetch('/api/devices', {
+      const response = await fetch('/api/v1/devices', {
         cache: 'no-store',
         headers: {
           'Cache-Control': 'no-cache',
@@ -110,7 +110,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
         const startTime = Date.now()
         console.log(`[useDeviceData] Fetching ${moduleType} module data... (attempt ${attempt}/${maxRetries})`)
         
-        const response = await fetch(`/api/modules/${moduleType}`, {
+        const response = await fetch(`/api/v1/`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',

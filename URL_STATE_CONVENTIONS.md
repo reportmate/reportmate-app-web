@@ -78,7 +78,7 @@ const fromUrl = `${pathname}?${searchParams.toString()}`
 The destination page uses a `<BackLink>` component:
 
 ```tsx
-<BackLink fallback="/devices/applications">← Usage Report</BackLink>
+<BackLink fallback="/applications">← Usage Report</BackLink>
 ```
 
 `BackLink` reads `?from=` and uses it; falls back to the supplied default.
@@ -90,13 +90,13 @@ The destination page uses a `<BackLink>` component:
 **Status:** Deployed (2026-05-11). Awaiting in-browser verification.
 
 Scope:
-- [x] `/devices/applications` — Hydrate + sync URL for `type`, `mode`, `period`,
+- [x] `/applications` — Hydrate + sync URL for `type`, `mode`, `period`,
       `q`, `apps`, `usages`, `catalogs`, `locations`, `rooms`, `fleets`, `versions`
 - [x] Auto-trigger report on hydration when `type` is present (via `pendingReport`
       state set during hydration, processed on next tick)
 - [x] Drill-down link passes `from=` carrying the parent's full URL state
-- [x] `/devices/applications/usage/[appName]` — back link honors `?from=`,
-      falls back to `/devices/applications` with `← Applications` label
+- [x] `/applications/usage/[appName]` — back link honors `?from=`,
+      falls back to `/applications` with `← Applications` label
 - [x] Legacy back-compat: `?application=`, `?usage=`, `?catalog=`, `?room=`,
       `?search=` still work (merged into the new param schema during hydration)
 - [ ] **In-browser verification:**
@@ -106,21 +106,21 @@ Scope:
       - Click app row → drill-down → back button returns to populated report
 
 After Phase 1 verification, extract `useUrlState` hook from the patterns used
-in `apps/www/app/devices/applications/page.tsx` (hydration effect + pending-
+in `apps/www/app/applications/page.tsx` (hydration effect + pending-
 report trigger + state→URL sync effect).
 
 ### Phase 2 — Device filter pages
 
 One sweep, same pattern:
-- [ ] `/devices/hardware`
-- [ ] `/devices/installs`
-- [ ] `/devices/inventory`
-- [ ] `/devices/management`
-- [ ] `/devices/network`
-- [ ] `/devices/peripherals`
-- [ ] `/devices/profiles`
-- [ ] `/devices/security`
-- [ ] `/devices/system`
+- [ ] `/hardware`
+- [ ] `/installs`
+- [ ] `/inventory`
+- [ ] `/management`
+- [ ] `/network`
+- [ ] `/peripherals`
+- [ ] `/profiles`
+- [ ] `/security`
+- [ ] `/system`
 - [ ] `/devices` (top-level list)
 
 Each gets: search (`q`), filter selections (`usages`/`catalogs`/`locations`/etc.),

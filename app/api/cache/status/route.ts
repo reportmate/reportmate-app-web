@@ -13,7 +13,7 @@ export async function GET() {
       timestamp,
       caches: {
         devices: {
-          endpoint: '/api/devices',
+          endpoint: '/api/v1/devices',
           status: 'active',
           duration: '60 seconds',
           description: 'Device listings with inventory and system data'
@@ -25,25 +25,25 @@ export async function GET() {
           description: 'Events feed with device name enrichment'
         },
         installs: {
-          endpoint: '/api/devices/installs',
+          endpoint: '/api/v1/installs',
           status: 'active', 
           duration: '30 seconds',
           description: 'Bulk installs data for all devices'
         },
         applications: {
-          endpoint: '/api/devices/applications',
+          endpoint: '/api/v1/applications',
           status: 'active',
           duration: '30 seconds', 
           description: 'Bulk applications data for all devices'
         },
         hardware: {
-          endpoint: '/api/devices/hardware',
+          endpoint: '/api/v1/hardware',
           status: 'active',
           duration: '60 seconds',
           description: 'Bulk hardware data for all devices'
         },
         deviceEvents: {
-          endpoint: '/api/devices/events',
+          endpoint: '/api/events',
           status: 'active',
           duration: '30 seconds',
           description: 'Bulk events data with filtering support'
