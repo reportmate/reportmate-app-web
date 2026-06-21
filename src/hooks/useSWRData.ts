@@ -43,7 +43,7 @@ const swrOptions: SWRConfiguration = {
  */
 export function useDevices() {
   const { data, error, isLoading, isValidating, mutate } = useSWR<{ devices: DeviceSummary[] }>(
-    '/api/devices',
+    '/api/v1/devices',
     fetcher,
     {
       ...swrOptions,

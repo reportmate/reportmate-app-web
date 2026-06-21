@@ -300,7 +300,7 @@ export default function ClientDashboard() {
         // Recover from transient error state on successful fetch
         setConnectionStatus(prev => prev === 'error' ? 'polling' : prev)
         
-        // Prefetch installs data in background for faster navigation to /devices/installs
+        // Prefetch installs data in background for faster navigation to /installs
         // This starts loading the data that will be needed if user clicks on Errors/Warnings
         if (isInitialLoad) {
           preloadInstallsData()

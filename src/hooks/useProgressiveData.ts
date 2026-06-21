@@ -30,7 +30,7 @@ export const useDevicesList = () => {
       setError(null)
 
       try {
-        const response = await fetch('/api/modules/devices-list', {
+        const response = await fetch('/api/v1/devices-list', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate'
@@ -76,7 +76,7 @@ export const useChartData = () => {
       setError(null)
 
       try {
-        const response = await fetch('/api/modules/chart-data', {
+        const response = await fetch('/api/v1/chart-data', {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache, no-store, must-revalidate'
