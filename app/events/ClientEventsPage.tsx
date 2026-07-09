@@ -136,6 +136,71 @@ const getEventMessage = (event: BundledEvent): string => {
   return formatPayloadPreview(originalEvent.payload);
 }
 
+// Payload keys that carry structure/metadata rather than an installed package.
+// Everything else with a string value in a success payload is a "name → version" pair.
+const RESERVED_PAYLOAD_KEYS = new Set([
+  'count', 'errors', 'warnings', 'error_items', 'warning_items', 'failed_items',
+  'error_messages', 'warning_messages', 'module_status', 'warning_count', 'error_count',
+  'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
+])
+
+// Extract human-readable detail lines from a loaded event payload so they can be
+// shown inline in the Message column without expanding the raw payload.
+// Handles the shapes ReportMate actually emits:
+//   Munki:   { errors: "a; b", warnings: "c; d" }         (semicolon-joined string)
+//   Cimian:  { warning_items: ["Name"], error_items: [] }  (array of names)
+//   Installs:{ failed_items: [{ displayName, error }] }    (array of objects)
+//   Generic: { error_messages: [...], warning_messages: [...] }
+//   Success: { "Managed Safari": "15.6.1", "ZoomPrefs": "14.1" }  (name → version)
+const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: string[]; successes: string[] } => {
+  const errors: string[] = []
+  const warnings: string[] = []
+  const successes: string[] = []
+  if (!payload || typeof payload !== 'object') return { errors, warnings, successes }
+  const p = payload as Record<string, any>
+
+  const pushString = (target: string[], val: unknown) => {
+    if (typeof val === 'string' && val.trim()) {
+      val.split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push(s))
+    }
+  }
+  const pushItems = (target: string[], val: unknown) => {
+    if (!Array.isArray(val)) return
+    for (const item of val) {
+      if (typeof item === 'string') {
+        if (item.trim()) target.push(item.trim())
+      } else if (item && typeof item === 'object') {
+        const name = item.displayName || item.name || ''
+        const detail = item.error || item.warning || ''
+        const line = detail ? (name ? `${name}: ${detail}` : detail) : name
+        if (line) target.push(line)
+      }
+    }
+  }
+
+  pushString(errors, p.errors)
+  pushString(warnings, p.warnings)
+  pushItems(errors, p.error_messages)
+  pushItems(warnings, p.warning_messages)
+  pushItems(errors, p.error_items)
+  pushItems(warnings, p.warning_items)
+  pushItems(errors, p.failed_items)
+
+  // Success payloads are a flat "package name → version" map — one line each.
+  for (const [key, value] of Object.entries(p)) {
+    if (RESERVED_PAYLOAD_KEYS.has(key)) continue
+    if (typeof value === 'string' && value.trim()) {
+      successes.push(`${key} ${value.trim()}`)
+    }
+  }
+
+  return {
+    errors: Array.from(new Set(errors)),
+    warnings: Array.from(new Set(warnings)),
+    successes: Array.from(new Set(successes)),
+  }
+}
+
 function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
@@ -662,6 +727,71 @@ function EventsPageContent() {
     }
   }
 
+  // Auto-load payloads for visible success/warning/error events so their real
+  // messages render inline in the table without the user expanding each row.
+  // Count-only success events (e.g. "16 packages installed") carry no per-item
+  // detail in their payload, so we skip fetching those.
+  const autoFetchedRef = useRef<Set<string>>(new Set())
+  const shouldAutoFetch = (event: BundledEvent): boolean => {
+    if (event.isBundle) return false
+    const kind = event.kind?.toLowerCase()
+    if (kind === 'error' || kind === 'warning') return true
+    if (kind === 'success') {
+      // Skip count summaries like "16 packages installed" — no names in payload
+      return !/^\d+\s+packages?\b/i.test(event.message || '')
+    }
+    return false
+  }
+  const autoFetchKey = currentEvents.filter(shouldAutoFetch).map(e => e.id).join(',')
+  useEffect(() => {
+    const queue = currentEvents
+      .filter(shouldAutoFetch)
+      .map(e => e.id)
+      .filter(id => !autoFetchedRef.current.has(id) && !(id in fullPayloads))
+    if (queue.length === 0) return
+    let cancelled = false
+    const CONCURRENCY = 5
+    let cursor = 0
+    const runNext = async (): Promise<void> => {
+      while (!cancelled && cursor < queue.length) {
+        const id = queue[cursor++]
+        autoFetchedRef.current.add(id)
+        await fetchFullPayload(id)
+      }
+    }
+    for (let i = 0; i < Math.min(CONCURRENCY, queue.length); i++) void runNext()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFetchKey])
+
+  // Render the extracted error/warning/success detail lines beneath the summary
+  // message. One line per item. Returns null when there is nothing to add.
+  const renderInlineDetails = (event: BundledEvent): React.ReactNode => {
+    const { errors, warnings, successes } = extractInlineDetails(fullPayloads[event.id])
+    // Success summaries already spell out a single package, so only expand 2+
+    const successLines = successes.length > 1 ? successes : []
+    const hasDetails = errors.length > 0 || warnings.length > 0 || successLines.length > 0
+    if (!hasDetails) {
+      if (shouldAutoFetch(event) && loadingPayloads.has(event.id)) {
+        return <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Loading details…</div>
+      }
+      return null
+    }
+    return (
+      <div className="mt-1 space-y-0.5">
+        {errors.map((m, i) => (
+          <div key={`e-${i}`} className="text-xs text-red-700 dark:text-red-300 break-words">{m}</div>
+        ))}
+        {warnings.map((m, i) => (
+          <div key={`w-${i}`} className="text-xs text-yellow-700 dark:text-yellow-300 break-words">{m}</div>
+        ))}
+        {successLines.map((m, i) => (
+          <div key={`s-${i}`} className="text-xs text-green-700 dark:text-green-300 break-words">{m}</div>
+        ))}
+      </div>
+    )
+  }
+
   const getStatusConfig = (kind: string) => {
     switch (kind.toLowerCase()) {
       case 'error': 
@@ -981,12 +1111,12 @@ function EventsPageContent() {
                               }
                             }}
                           >
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
@@ -1006,19 +1136,20 @@ function EventsPageContent() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-4">
-                              <div className="text-sm text-gray-900 dark:text-white truncate">
+                            <td className="px-4 lg:px-6 py-4 align-top">
+                              <div className="text-sm text-gray-900 dark:text-white break-words">
                                 {getEventMessage(event)}
                               </div>
+                              {renderInlineDetails(event)}
                             </td>
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <div className="font-medium truncate">
                                   {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            <td className="px-4 lg:px-6 py-4 whitespace-nowrap text-sm font-medium align-top">
                               <button
                                 onClick={async (e) => {
                                   e.preventDefault()
@@ -1366,12 +1497,12 @@ function EventsPageContent() {
                               }
                             }}
                           >
-                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div className="flex items-center justify-center">
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
@@ -1391,19 +1522,20 @@ function EventsPageContent() {
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 max-w-xs">
-                              <div className="text-sm text-gray-900 dark:text-white truncate">
+                            <td className="px-4 py-3 max-w-xs align-top">
+                              <div className="text-sm text-gray-900 dark:text-white break-words">
                                 {getEventMessage(event)}
                               </div>
+                              {renderInlineDetails(event)}
                             </td>
-                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <div className="font-medium truncate">
                                   {event.ts ? formatRelativeTime(event.ts) : 'Unknown time'}
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap text-sm font-medium">
+                            <td className="px-4 lg:px-6 py-3 whitespace-nowrap text-sm font-medium align-top">
                               <button
                                 onClick={async (e) => {
                                   e.preventDefault()
@@ -1644,6 +1776,7 @@ function EventsPageContent() {
                       <div className="text-sm text-gray-900 dark:text-white break-words">
                         {getEventMessage(event)}
                       </div>
+                      {renderInlineDetails(event)}
                     </div>
 
                     {/* Time and Actions */}
