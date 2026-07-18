@@ -259,12 +259,7 @@ export function useLiveEvents() {
         
         // Check if WebPubSub is enabled
         const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-        
-        if (!apiBaseUrl) {
-          throw new Error('NEXT_PUBLIC_API_BASE_URL environment variable is not configured')
-        }
-        
+
         if (!isEnabled) {
           if (isActive) {
             if (progressInterval) {
@@ -276,9 +271,10 @@ export function useLiveEvents() {
           return
         }
         
-        // Get negotiate token from API with timeout
+        // Get negotiate token via the session-gated BFF proxy (same-origin,
+        // carries the auth cookie; the proxy adds the internal secret upstream)
         const negotiateResponse = await Promise.race([
-          fetch(`${apiBaseUrl}/api/v1/negotiate?device=dashboard`),
+          fetch('/api/v1/negotiate?device=dashboard'),
           new Promise((_, reject) => 
             setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
           )
