@@ -9,20 +9,18 @@ const publicRoutes = [
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
   '/api/version',       // Build/version metadata endpoint for status widgets
-  '/api/dashboard',     // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/settings',      // BFF route - GET proxies via X-Internal-Secret; PUT/discover gated by requireAdmin
-  '/api/device',        // BFF route (per-device) - authenticated via X-Internal-Secret to FastAPI
-  '/api/v1',            // BFF routes (consolidated module/fleet proxies) - authenticated via X-Internal-Secret to FastAPI
-  '/api/stats',         // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/events',        // BFF route - authenticated via X-Internal-Secret to FastAPI
-  '/api/diagnostic',    // Diagnostic endpoint
   '/auth',
   '/_next',
-  '/favicon.ico',
+  '/favicon',              // favicon.ico + favicon-16x16/32x32/48x48.png
   '/public',
   '/manifest.json',
+  '/browserconfig.xml',
   '/.well-known',
+  '/robots.txt',
   '/reportmate-logo.png',  // ReportMate logo file
+  '/icon-',                // PWA manifest icons (icon-192x192.png etc)
+  '/apple-touch-icon',     // iOS home-screen icons
+  '/mask-icon.svg',
   '/theme-init.js',        // Theme initialization script
   '/sw.js',                // PWA service worker (must be reachable before auth)
   '/offline.html',         // PWA offline fallback (served from SW cache)
@@ -223,7 +221,15 @@ export default async function middleware(request: NextRequest) {
     if (token) {
       return NextResponse.next()
     }
-    
+
+    // API routes answer with JSON 401 rather than an HTML redirect: fetch()
+    // callers with an expired session need a parseable error, and BFF data
+    // routes must not be reachable anonymously — the X-Internal-Secret on the
+    // upstream hop authenticates the proxy to FastAPI, not the user.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
     const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)
@@ -233,6 +239,9 @@ export default async function middleware(request: NextRequest) {
     )
   } catch (error) {
     console.error('[MIDDLEWARE] Error checking session:', error)
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
     // If there's an error checking the session, redirect to sign in without error parameters
     const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
     const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
@@ -250,6 +259,6 @@ export const config = {
      * except for static assets, authentication endpoints, health endpoints,
      * and internal API routes (which handle their own authentication)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sw.js|offline.html|swe-worker|manifest.json|api/auth|api/healthz|api/health|api/device|api/devices|api/modules|api/stats|api/events|api/dashboard|api/settings).*)',
+    '/((?!_next/static|_next/image|favicon|sw.js|offline.html|swe-worker|manifest.json|robots.txt|browserconfig.xml|icon-|apple-touch-icon|mask-icon.svg|reportmate-logo.png|theme-init.js|api/auth|api/healthz|api/health|api/transmission|api/version).*)',
   ],
 }
