@@ -24,8 +24,8 @@ const apiNetworkOnly: RuntimeCaching = {
 // self-contained static file in public/, precached explicitly here (and its
 // logo) so the document fallback works with zero network.
 const offlineFallbacks: (PrecacheEntry | string)[] = [
-  { url: "/offline.html", revision: null },
-  { url: "/reportmate-logo.png", revision: null },
+  { url: "/offline.html", revision: "20260718" },
+  { url: "/reportmate-logo.png", revision: "20260718" },
 ]
 
 const serwist = new Serwist({
