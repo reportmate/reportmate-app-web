@@ -24,8 +24,8 @@ const apiNetworkOnly: RuntimeCaching = {
 // self-contained static file in public/, precached explicitly here (and its
 // logo) so the document fallback works with zero network.
 const offlineFallbacks: (PrecacheEntry | string)[] = [
-  { url: "/offline.html", revision: "20260718" },
-  { url: "/reportmate-logo.png", revision: "20260718" },
+  { url: "/offline.html", revision: "20260722" },
+  { url: "/reportmate-logo.png", revision: "20260722" },
 ]
 
 const serwist = new Serwist({
@@ -46,3 +46,23 @@ const serwist = new Serwist({
 })
 
 serwist.addEventListeners()
+
+// One-time flush of any Serwist runtime image cache that may hold a poisoned
+// entry — back when static assets were auth-gated, an asset request could be
+// answered with a sign-in HTML redirect, and the StaleWhileRevalidate
+// next-image cache stored that HTML *as the image*. The root cause is fixed,
+// but existing clients keep serving the stale bad entry until it is deleted,
+// which is why the header logo intermittently renders as a broken image.
+// Deleting the image caches on activation lets those clients self-heal; they
+// simply repopulate from the (now clean) network on the next request.
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(
+        names
+          .filter((name) => /image/i.test(name))
+          .map((name) => caches.delete(name)),
+      ),
+    ),
+  )
+})
