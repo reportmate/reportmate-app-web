@@ -97,6 +97,8 @@ function SignInContent() {
                 height={96}
                 className="h-24 w-auto"
                 priority
+                unoptimized
+                onError={(e) => { e.currentTarget.style.display = 'none' }}
               />
             </div>
             
