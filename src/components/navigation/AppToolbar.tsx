@@ -63,12 +63,14 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
             <Link href="/dashboard" className="flex items-center gap-4 hover:opacity-80 transition-opacity">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden">
-                  <Image 
-                    src="/reportmate-logo.png" 
-                    alt="ReportMate" 
-                    width={40} 
-                    height={40} 
-                    className="object-contain" 
+                  <Image
+                    src="/reportmate-logo.png"
+                    alt="ReportMate"
+                    width={40}
+                    height={40}
+                    className="object-contain"
+                    unoptimized
+                    onError={(e) => { e.currentTarget.style.display = 'none' }}
                   />
                 </div>
                 <div>
