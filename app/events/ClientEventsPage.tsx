@@ -940,6 +940,10 @@ function EventsPageContent() {
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Real-time activity from fleet
+                    {' · '}
+                    <Link href="/events/failures" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                      Failed check-ins
+                    </Link>
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
@@ -1293,6 +1297,10 @@ function EventsPageContent() {
                   </h2>
                   <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                     Real-time activity from all fleet devices
+                    {' · '}
+                    <Link href="/events/failures" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                      Failed check-ins
+                    </Link>
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
@@ -1657,6 +1665,10 @@ function EventsPageContent() {
                     </h2>
                     <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                       Real-time activity from all fleet devices
+                      {' · '}
+                      <Link href="/events/failures" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">
+                        Failed check-ins
+                      </Link>
                     </p>
                   </div>
                   {/* Date Range Picker */}
