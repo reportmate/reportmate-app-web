@@ -93,9 +93,13 @@ function AuthErrorContent() {
           <div className="text-center text-xs text-gray-500 dark:text-gray-400">
             <p>
               If you continue to experience issues, please{' '}
-              <a href="mailto:support@example.com" className="text-blue-600 dark:text-blue-400 hover:text-blue-500">
-                contact support
-              </a>
+              {process.env.NEXT_PUBLIC_SUPPORT_EMAIL ? (
+                <a href={`mailto:${process.env.NEXT_PUBLIC_SUPPORT_EMAIL}`} className="text-blue-600 dark:text-blue-400 hover:text-blue-500">
+                  contact support
+                </a>
+              ) : (
+                <span>contact your administrator</span>
+              )}
             </p>
           </div>
         </div>

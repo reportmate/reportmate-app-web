@@ -5,7 +5,7 @@ const isStaging = process.env.TEST_ENV === 'staging'
 const isRemote = isProduction || isStaging
 
 const baseURL = isProduction
-  ? 'https://reportmate.example.edu'
+  ? (process.env.E2E_BASE_URL ?? 'http://localhost:3000')
   : isStaging
     ? 'https://reportmate-staging.azurecontainerapps.io'
     : 'http://localhost:3000'

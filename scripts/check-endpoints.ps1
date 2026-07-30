@@ -30,7 +30,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$ApiBase,
 
-    [string]$FrontendBase = "https://reportmate.example.edu",
+    [Parameter(Mandatory = $true)]
+    [string]$FrontendBase,
 
     [string]$DeviceSerial = "TESTSERIAL0001"
 )

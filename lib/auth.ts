@@ -104,20 +104,13 @@ const buildProviders = () => {
           email: { label: "Email", type: "email" },
           password: { label: "Password", type: "password" }
         },
-        async authorize(credentials) {
-          // TODO: Implement your credential validation logic
-          // This is a placeholder for future implementation
-          if (credentials?.email && credentials?.password) {
-            // Replace with actual validation
-            if (credentials.email === "admin@reportmate.example.edu" && credentials.password === "admin") {
-              return {
-                id: "1",
-                name: "Admin User",
-                email: credentials.email,
-                provider: AUTH_PROVIDERS.CREDENTIALS
-              }
-            }
-          }
+        async authorize() {
+          // Not implemented. This provider is only reachable when
+          // AUTH_PROVIDERS includes "credentials"; until real validation
+          // exists it must authenticate nobody. It previously accepted a
+          // hardcoded address and the password "admin", which anyone reading
+          // this repository could use on a deployment that enabled it.
+          console.error('[AUTH] credentials provider is enabled but not implemented; rejecting')
           return null
         }
       })

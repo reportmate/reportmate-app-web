@@ -264,7 +264,7 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialF
         type: 'cimian',
         version: cimianData.version || cimianData.config?.version || '25.8.26.2231',
         duration: duration,
-        softwareRepoURL: cimianData.config?.SoftwareRepoURL || 'https://cimian.example.edu/deployment',
+        softwareRepoURL: cimianData.config?.SoftwareRepoURL || '',
         manifest: cimianData.config?.ClientIdentifier || 'Assigned/Staff/IT/B1115/RodChristiansen',
         runType: 'Manual'
       }

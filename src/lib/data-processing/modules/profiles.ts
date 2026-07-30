@@ -28,7 +28,7 @@ export interface ProfileItem {
 
 /**
  * Parse macOS profiles -C/-P output into profile identifiers
- * Format: "_computerlevel[1] attribute: profileIdentifier: ca.ecuad.macadmin.OfficePrefs _computerlevel[2]..."
+ * Format: "_computerlevel[1] attribute: profileIdentifier: com.example.macadmin.OfficePrefs _computerlevel[2]..."
  */
 function parseMacProfilesOutput(rawText: string): ProfileItem[] {
   if (!rawText || typeof rawText !== 'string') return []
@@ -49,7 +49,7 @@ function parseMacProfilesOutput(rawText: string): ProfileItem[] {
     if (seenIds.has(identifier)) continue
     seenIds.add(identifier)
     
-    // Extract display name from identifier (e.g., ca.ecuad.macadmin.OfficePrefs -> OfficePrefs)
+    // Extract display name from identifier (e.g., com.example.macadmin.OfficePrefs -> OfficePrefs)
     const parts = identifier.split('.')
     const displayName = parts[parts.length - 1] || identifier
     
