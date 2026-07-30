@@ -47,7 +47,10 @@ function getVersionInfo() {
     if (imageTag === 'unknown' && version !== 'unknown') {
       // If version looks like a tag format (YYYYMMDDHHMMSS-hash), use it as image tag
       if (version.match(/^\d{14}-[a-f0-9]+$/)) {
-        imageTag = `reportmateacr.azurecr.io/reportmate:${version}`
+        // Only qualify the tag when the registry is actually known; guessing a
+        // host would show an image reference that does not exist anywhere.
+        const registry = process.env.CONTAINER_REGISTRY
+        imageTag = registry ? `${registry}/reportmate:${version}` : version
       }
     }
     
