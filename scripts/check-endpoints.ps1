@@ -27,7 +27,8 @@ param(
     [ValidateSet("api", "frontend", "all")]
     [string]$Target = "all",
 
-    [string]$ApiBase = "https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io",
+    [Parameter(Mandatory = $true)]
+    [string]$ApiBase,
 
     [string]$FrontendBase = "https://reportmate.example.edu",
 
