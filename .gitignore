@@ -66,3 +66,7 @@ Thumbs.db
 tailwindcss*.log
 
 /.worktrees/
+
+# Lint and build caches — these embed absolute local paths
+.eslintcache
+lint-output.txt
