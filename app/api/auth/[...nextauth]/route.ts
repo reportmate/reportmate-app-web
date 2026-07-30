@@ -11,8 +11,7 @@ const authOptions: NextAuthOptions = {
       tenantId: process.env.AZURE_AD_TENANT_ID!,
       authorization: {
         params: {
-          scope: "openid profile email",
-          redirect_uri: "https://reportmate.example.edu/api/auth/callback/azure-ad"
+          scope: "openid profile email"
         }
       },
       profile(profile) {
@@ -39,28 +38,19 @@ const authOptions: NextAuthOptions = {
       // Always allow sign in - let NextAuth handle any issues
       return true
     },
-    async redirect({ url }) {
-      const correctBaseUrl = 'https://reportmate.example.edu'
-            
+    async redirect({ url, baseUrl }) {
+      // baseUrl is NextAuth's own view of this deployment, derived from
+      // NEXTAUTH_URL. Anything else pins the deployment to one hostname.
       if (url.startsWith("/")) {
-        return `${correctBaseUrl}${url}`
+        return `${baseUrl}${url}`
       }
-      
-      if (url.includes('0.0.0.0:3000') || url.includes('localhost:3000')) {
-        return url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
-      }
-      
+
       try {
         const urlObj = new URL(url)
-        if (urlObj.origin !== correctBaseUrl) {
-          urlObj.hostname = 'reportmate.example.edu'
-          urlObj.protocol = 'https:'
-          urlObj.port = ''
-          return urlObj.toString()
-        }
-        return url
+        // Never hand control to another origin.
+        return urlObj.origin === baseUrl ? url : baseUrl
       } catch {
-        return correctBaseUrl
+        return baseUrl
       }
     }
   }
