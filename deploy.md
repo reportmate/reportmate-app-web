@@ -105,7 +105,7 @@ Before using these scripts, ensure you have:
 
 These scripts integrate with your ReportMate infrastructure:
 
-- **Container Registry**: `reportmateacr.azurecr.io`
+- **Container Registry**: whichever registry the deployment pushes to (`<name>.azurecr.io` on Azure)
 - **Resource Group**: `ReportMate`
 - **Container Apps**: 
   - `reportmate-container-dev` (development)

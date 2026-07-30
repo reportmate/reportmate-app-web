@@ -70,7 +70,7 @@ export function VersionDisplay() {
     version: displayVersion,
     buildId: defaultBuildId,
     buildTime: defaultBuildTime,
-    imageTag: `reportmateacr.azurecr.io/reportmate:${displayVersion}`,
+    imageTag: displayVersion,
     nodeVersion: 'vUnknown',
     platform: 'unknown',
     arch: 'unknown'
