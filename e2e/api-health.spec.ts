@@ -13,7 +13,9 @@ import { test, expect } from '@playwright/test'
  */
 
 const API_BASE = process.env.API_BASE_URL
-  || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+if (!API_BASE) {
+  throw new Error('API_BASE_URL must be set to the deployment under test')
+}
 
 const API_PASSPHRASE = process.env.REPORTMATE_PASSPHRASE || ''
 

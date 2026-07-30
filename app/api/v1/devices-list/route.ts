@@ -9,7 +9,13 @@ export async function GET() {
   try {
     const timestamp = new Date().toISOString()
     
-    const API_BASE_URL = process.env.API_BASE_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+    const API_BASE_URL = process.env.API_BASE_URL
+    if (!API_BASE_URL) {
+      return NextResponse.json(
+        { error: 'API_BASE_URL not configured' },
+        { status: 500 }
+      )
+    }
     
     const headers = getInternalApiHeaders()
     
