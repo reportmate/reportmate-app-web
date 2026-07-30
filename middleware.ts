@@ -162,8 +162,9 @@ export default async function middleware(request: NextRequest) {
   
   // Force correct base URL for callbacks in production
   const getCorrectUrl = (originalUrl: string): string => {
-    if (process.env.NODE_ENV === 'production') {
-      return originalUrl.replace(/(https?:\/\/)[^\/]+/, 'https://reportmate.ecuad.ca')
+    const configuredBase = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL
+    if (process.env.NODE_ENV === 'production' && configuredBase) {
+      return originalUrl.replace(/(https?:\/\/)[^\/]+/, configuredBase)
     }
     return originalUrl
   }
@@ -230,7 +231,7 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
+    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
     const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)
     // Redirect directly to signin without error parameters
@@ -243,7 +244,7 @@ export default async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     // If there's an error checking the session, redirect to sign in without error parameters
-    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || 'https://reportmate.ecuad.ca'
+    const correctBaseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin
     const correctUrl = request.url.replace(/(https?:\/\/)[^\/]+/, correctBaseUrl)
     const callbackUrl = encodeURIComponent(correctUrl)
     return NextResponse.redirect(
