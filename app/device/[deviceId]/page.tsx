@@ -10,7 +10,11 @@ type Props = {
 
 async function getDevice(deviceId: string) {
   // Use internal API URL for server-side fetch (avoids Front Door round trip)
-  const baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'https://reportmate-functions-api.blackdune-79551938.canadacentral.azurecontainerapps.io'
+  const baseUrl = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL
+  if (!baseUrl) {
+    console.error('API_BASE_URL is not configured; cannot fetch device metadata')
+    return null
+  }
   
   try {
     const res = await fetch(`${baseUrl}/api/device/${deviceId}`, {
