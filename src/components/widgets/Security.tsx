@@ -49,6 +49,11 @@ interface SecurityWidgetProps {
   device: Device
 }
 
+// Boolean-ish flags arrive from the collectors as true, 1, "1" or "true" depending on the
+// module, so every read of one goes through here rather than comparing against one shape.
+const isTruthyFlag = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true'
+
 export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   // Access security data from device object, prioritizing the modules structure
   const rawSecurity = device?.modules?.security || device?.security || device?.securityFeatures
@@ -56,7 +61,19 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
   // Parse PowerShell objects and normalize keys to camelCase
   const parsedSecurity = convertPowerShellObjects(rawSecurity)
   const security = parsedSecurity ? normalizeKeys(parsedSecurity) as any : null
-  
+
+  // Platform SSO is collected by the identity module, not security - the mac client no
+  // longer emits security.platformSSO.
+  const rawPlatformSSO = device?.modules?.identity?.platformSSOUsers || device?.identity?.platformSSOUsers
+  const platformSSO = rawPlatformSSO ? normalizeKeys(convertPowerShellObjects(rawPlatformSSO)) as any : null
+
+  // The account holding the registration. users[0] is whichever local account came first
+  // in directory order - typically a Platform-SSO-exempt local admin with no token, which
+  // showed as a permanent "Missing".
+  const platformSSOUser = platformSSO?.users?.find((u: any) => isTruthyFlag(u?.tokensPresent))
+    || platformSSO?.users?.find((u: any) => isTruthyFlag(u?.registered))
+    || null
+
   // Detect platform for platform-aware display - check multiple locations
   const operatingSystem = device?.modules?.system?.operatingSystem || device?.modules?.system?.operating_system
   const platform = device?.platform?.toLowerCase() || 
@@ -232,25 +249,25 @@ export const SecurityWidget: React.FC<SecurityWidgetProps> = ({ device }) => {
             )}
 
             {/* Platform SSO - at the bottom, formatted like Windows Hello */}
-            {security?.platformSSO && (
+            {platformSSO && (
               <div className="space-y-2 mt-3">
                 <StatusBadge
                   label="Platform SSO"
-                  status={(security.platformSSO.registered === true || security.platformSSO.registered === 1) ? 'Registered' : 'Not Registered'}
-                  type={getStatusType(security.platformSSO.registered === true || security.platformSSO.registered === 1)}
+                  status={isTruthyFlag(platformSSO.deviceRegistered) ? 'Registered' : 'Not Registered'}
+                  type={getStatusType(isTruthyFlag(platformSSO.deviceRegistered))}
                 />
                 <div className="ml-4 space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Token:</span>
                     <StatusBadge
                       label=""
-                      status={security.platformSSO.users?.[0]?.tokensPresent === true || security.platformSSO.users?.[0]?.tokensPresent === 1 ? 'Present' : 'Missing'}
-                      type={getStatusType(security.platformSSO.users?.[0]?.tokensPresent === true || security.platformSSO.users?.[0]?.tokensPresent === 1)}
+                      status={isTruthyFlag(platformSSOUser?.tokensPresent) ? 'Present' : 'Missing'}
+                      type={getStatusType(isTruthyFlag(platformSSOUser?.tokensPresent))}
                     />
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className="text-gray-600 dark:text-gray-400">Method:</span>
-                    <span className="text-gray-900 dark:text-white">{security.platformSSO.method || 'Unknown'}</span>
+                    <span className="text-gray-900 dark:text-white">{platformSSO.method || 'Unknown'}</span>
                   </div>
                 </div>
               </div>

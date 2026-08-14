@@ -237,15 +237,38 @@ export interface SecureTokenInfo {
 export interface PlatformSSOUsersInfo {
   supported: boolean
   deviceRegistered: boolean
+  /** Identity provider, e.g. "Microsoft Entra ID" */
+  provider: string | null
+  /** Authentication method, e.g. "Secure enclave key" */
+  method: string | null
+  extensionIdentifier: string | null
+  organizationName: string | null
+  loginFrequency: number
+  offlineGracePeriod: string | null
   registeredUserCount: number
   unregisteredUserCount: number
+  tokenPresentCount: number
+  /** Accounts the payload exempts from Platform SSO */
+  nonPlatformSSOAccounts: string[]
   users: PlatformSSOUser[]
 }
 
 export interface PlatformSSOUser {
   username: string
+  uid: number | null
   registered: boolean
   userPrincipalName: string | null
+  /** Masked by macOS as "u***r@example.ca" - proves registration, not an identity */
+  loginUserName: string | null
+  state: string | null
+  lastLoginDate: string | null
+  tokensPresent: boolean
+  tokenReceived: string | null
+  tokenExpiration: string | null
+  /** null when no token is present, so "no token" stays distinct from "token valid" */
+  tokenExpired: boolean | null
+  /** ok | excluded | no-session | device-not-registered | probe-failed */
+  probeStatus: string | null
 }
 
 // MARK: - Session History (TerminalServices RDP sessions)
@@ -559,16 +582,37 @@ function mapSecureTokenInfo(st: any): SecureTokenInfo {
   }
 }
 
+// Collectors emit booleans as true, 1, "1" or "true" depending on the serializer.
+const toFlag = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true'
+
 function mapPlatformSSOUsers(psso: any): PlatformSSOUsersInfo {
   return {
-    supported: psso.supported || false,
-    deviceRegistered: psso.deviceRegistered || psso.device_registered || false,
+    supported: toFlag(psso.supported),
+    deviceRegistered: toFlag(psso.deviceRegistered ?? psso.device_registered),
+    provider: psso.provider || null,
+    method: psso.method || null,
+    extensionIdentifier: psso.extensionIdentifier || psso.extension_identifier || null,
+    organizationName: psso.organizationName || psso.organization_name || null,
+    loginFrequency: psso.loginFrequency || psso.login_frequency || 0,
+    offlineGracePeriod: psso.offlineGracePeriod || psso.offline_grace_period || null,
     registeredUserCount: psso.registeredUserCount || psso.registered_user_count || 0,
     unregisteredUserCount: psso.unregisteredUserCount || psso.unregistered_user_count || 0,
+    tokenPresentCount: psso.tokenPresentCount || psso.token_present_count || 0,
+    nonPlatformSSOAccounts: psso.nonPlatformSSOAccounts || psso.non_platform_sso_accounts || [],
     users: (psso.users || []).map((u: any) => ({
       username: u.username || '',
-      registered: u.registered || false,
-      userPrincipalName: u.userPrincipalName || u.user_principal_name || null
+      uid: u.uid ?? null,
+      registered: toFlag(u.registered),
+      userPrincipalName: u.userPrincipalName || u.user_principal_name || null,
+      loginUserName: u.loginUserName || u.login_user_name || null,
+      state: u.state || null,
+      lastLoginDate: u.lastLoginDate || u.last_login_date || null,
+      tokensPresent: toFlag(u.tokensPresent ?? u.tokens_present),
+      tokenReceived: u.tokenReceived || u.token_received || null,
+      tokenExpiration: u.tokenExpiration || u.token_expiration || null,
+      tokenExpired: (u.tokenExpired ?? u.token_expired) == null ? null : toFlag(u.tokenExpired ?? u.token_expired),
+      probeStatus: u.probeStatus || u.probe_status || null
     }))
   }
 }
