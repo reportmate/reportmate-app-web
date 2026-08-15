@@ -94,6 +94,11 @@ const DetailRow = ({
   </div>
 )
 
+// Boolean-ish flags arrive from the collectors as true, 1, "1" or "true" depending on the
+// module, so every read of one goes through here rather than comparing against one shape.
+const isTruthyFlag = (value: unknown): boolean =>
+  value === true || value === 1 || value === '1' || value === 'true'
+
 // Platform detection helper - enhanced to detect macOS from module data
 const isMacOS = (device: any): boolean => {
   // Check explicit platform field
@@ -226,8 +231,18 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
   const rawSecurity = device?.modules?.security || device?.security
   const security = rawSecurity ? normalizeKeys(convertPowerShellObjects(rawSecurity)) as any : null
   
-  // Platform SSO data
-  const platformSSO = security?.platformSSO
+  // Platform SSO data. Collected by the identity module, not security - it is an
+  // identity concern, and the mac client no longer emits security.platformSSO.
+  const rawPlatformSSO = device?.modules?.identity?.platformSSOUsers || device?.identity?.platformSSOUsers
+  const platformSSO = rawPlatformSSO ? normalizeKeys(convertPowerShellObjects(rawPlatformSSO)) as any : null
+
+  // The account that actually holds the SSO registration. Never index users[0]: the list
+  // is every local account in directory order, so the first entry is typically a local
+  // admin that is exempt from Platform SSO and has no token - which rendered as a
+  // permanent "Missing" regardless of the real state.
+  const platformSSOUser = platformSSO?.users?.find((u: any) => isTruthyFlag(u?.tokensPresent))
+    || platformSSO?.users?.find((u: any) => isTruthyFlag(u?.registered))
+    || null
   
   // Activation Lock / Find My Mac
   const activationLock = security?.activationLock
@@ -736,25 +751,29 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                     label="Platform SSO" 
                     value={platformSSO.provider || 'Not configured'}
                   />
-                  <DetailRow 
-                    label="Registration" 
-                    value={(platformSSO.registered === true || platformSSO.registered === 1 || platformSSO.registered === '1') ? 'Registered' : 'Not Registered'}
-                    variant={(platformSSO.registered === true || platformSSO.registered === 1 || platformSSO.registered === '1') ? 'success' : 'warning'}
+                  <DetailRow
+                    label="Registration"
+                    value={isTruthyFlag(platformSSO.deviceRegistered) ? 'Registered' : 'Not Registered'}
+                    variant={isTruthyFlag(platformSSO.deviceRegistered) ? 'success' : 'warning'}
                   />
-                  {/* SSO Token - check if tokens present using truthy check */}
-                  {platformSSO.users?.[0] !== undefined && (
-                    <DetailRow 
-                      label="SSO Token" 
-                      value={(() => {
-                        const user = platformSSO.users[0];
-                        const hasToken = user.tokensPresent === true || user.tokensPresent === 1 || user.tokensPresent === '1' || user.tokensPresent === 'true';
-                        return hasToken ? 'Present' : 'Missing';
-                      })()}
-                      variant={(() => {
-                        const user = platformSSO.users[0];
-                        const hasToken = user.tokensPresent === true || user.tokensPresent === 1 || user.tokensPresent === '1' || user.tokensPresent === 'true';
-                        return hasToken ? 'success' : 'warning';
-                      })()}
+                  {platformSSOUser && (
+                    <DetailRow
+                      label="SSO User"
+                      value={platformSSOUser.userPrincipalName || platformSSOUser.loginUserName || platformSSOUser.username}
+                    />
+                  )}
+                  {platformSSO.users?.length > 0 && (
+                    <DetailRow
+                      label="SSO Token"
+                      value={isTruthyFlag(platformSSOUser?.tokensPresent) ? 'Present' : 'Missing'}
+                      variant={isTruthyFlag(platformSSOUser?.tokensPresent) ? 'success' : 'warning'}
+                    />
+                  )}
+                  {isTruthyFlag(platformSSOUser?.tokensPresent) && platformSSOUser?.tokenExpiration && (
+                    <DetailRow
+                      label="Token Expires"
+                      value={platformSSOUser.tokenExpiration}
+                      variant={isTruthyFlag(platformSSOUser.tokenExpired) ? 'warning' : 'success'}
                     />
                   )}
                 </>
