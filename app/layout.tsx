@@ -54,34 +54,6 @@ export const viewport: Viewport = {
   ],
 };
 
-async function getDevices() {
-  try {
-    const apiUrl = process.env.API_BASE_URL || 'http://localhost:3000'
-    
-    // Add timeout to prevent blocking the entire layout
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
-    
-    const response = await fetch(`${apiUrl}/api/v1/devices`, {
-      next: { revalidate: 30 },
-      signal: controller.signal,
-    })
-    
-    clearTimeout(timeout)
-
-    if (response.ok) {
-      const data = await response.json()
-      return Array.isArray(data) ? data : (data.devices || [])
-    }
-  } catch (error) {
-    // Don't log abort errors - they're expected on timeout
-    if (error instanceof Error && error.name !== 'AbortError') {
-      console.error('[Layout] Failed to fetch devices:', error)
-    }
-  }
-  return []
-}
-
 export default async function RootLayout({
   children,
 }: {
@@ -92,8 +64,10 @@ export default async function RootLayout({
   const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
   const skipAuth = isDevelopment || isDemoMode
   
-  // Fetch devices for search preloading
-  const devices = await getDevices()
+  // No data fetching here: the layout previously awaited the full device
+  // list before rendering ANY page (an unauthenticated upstream call that
+  // 401ed and returned [] in production, costing a wasted round trip per
+  // navigation). The search components fetch on demand instead.
   
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
@@ -180,13 +154,13 @@ export default async function RootLayout({
                 <ErrorBoundary>
                   {skipAuth ? (
                     // Development/Demo: No AutoAuth component
-                    <ToolbarWrapper preloadedDevices={devices}>
+                    <ToolbarWrapper>
                       {children}
                     </ToolbarWrapper>
                   ) : (
                     // Production: Full authentication with AutoAuth
                     <AutoAuth>
-                      <ToolbarWrapper preloadedDevices={devices}>
+                      <ToolbarWrapper>
                         {children}
                       </ToolbarWrapper>
                     </AutoAuth>

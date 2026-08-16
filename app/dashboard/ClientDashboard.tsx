@@ -10,7 +10,6 @@ import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
 import { calculateDeviceStatus } from "../../src/lib/data-processing"
-import { preloadInstallsData } from "../../src/hooks/useInstallsData"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 // WebPubSub message types for JSON subprotocol
@@ -300,11 +299,11 @@ export default function ClientDashboard() {
         // Recover from transient error state on successful fetch
         setConnectionStatus(prev => prev === 'error' ? 'polling' : prev)
         
-        // Prefetch installs data in background for faster navigation to /installs
-        // This starts loading the data that will be needed if user clicks on Errors/Warnings
-        if (isInitialLoad) {
-          preloadInstallsData()
-        }
+        // No background prefetch of /api/v1/installs/filters here: that
+        // response is ~27MB raw, and pulling plus parsing it on every
+        // dashboard visit (with a 5-minute SWR refresh) starved the page
+        // that was actually on screen. The /installs page fetches it when
+        // it is opened.
       } catch (error) {
         if (!aborted) {
           console.error('[DASHBOARD] Dashboard data fetch failed:', error)

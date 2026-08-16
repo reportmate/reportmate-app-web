@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, Suspense } from "react"
+import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
@@ -8,7 +8,6 @@ import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { normalizeKeys } from "../../src/lib/utils/powershell-parser"
 import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
-import { FitText } from "../../src/components/ui/FitText"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 interface InventoryItem {
@@ -126,8 +125,16 @@ function DevicesPageContent() {
               raw: { ...device, status: calculatedStatus }
             }
           })
-          
-                    setInventory(inventoryItems)
+          // Dedupe by serial number once at fetch time, so the render-path
+          // filters and counters below never repeat the O(n^2) scan.
+          const seen = new Set<string>()
+          const uniqueItems = inventoryItems.filter((item: InventoryItem) => {
+            if (!item.serialNumber || seen.has(item.serialNumber)) return false
+            seen.add(item.serialNumber)
+            return true
+          })
+
+          setInventory(uniqueItems)
         } else {
                     setInventory([])
         }
@@ -142,101 +149,67 @@ function DevicesPageContent() {
     fetchInventory()
   }, [])
 
-  // Filter inventory based on search query and filters
-  const filteredInventory = (() => {
+  // Search predicate shared by the table filter and the counter row.
+  const matchesSearch = (item: InventoryItem, query: string) => (
+    item?.deviceName?.toLowerCase().includes(query) ||
+    item?.assetTag?.toLowerCase().includes(query) ||
+    item?.serialNumber?.toLowerCase().includes(query) ||
+    item?.computerName?.toLowerCase().includes(query) ||
+    item?.hostname?.toLowerCase().includes(query) ||
+    item?.location?.toLowerCase().includes(query) ||
+    item?.manufacturer?.toLowerCase().includes(query) ||
+    item?.model?.toLowerCase().includes(query) ||
+    item?.uuid?.toLowerCase().includes(query) ||
+    item?.domain?.toLowerCase().includes(query) ||
+    item?.organizationalUnit?.toLowerCase().includes(query)
+  )
+
+  // Filter inventory based on search query and filters. Memoized: with ~900
+  // rows this previously re-ran (with an O(n^2) dedup) on every render.
+  const filteredInventory = useMemo(() => {
     try {
-            
       if (!Array.isArray(inventory)) {
         console.warn('Inventory is not an array:', inventory)
         return []
       }
-      
+
       let filtered = inventory
-      
+
       // Apply status filter first
       if (statusFilter !== 'all') {
         // Show non-archived devices matching the status
         filtered = filtered.filter(item => {
-          try {
-            if (item.archived) return false // Never show archived in status filters
-            const status = item.raw?.status?.toLowerCase()
-            return status === statusFilter
-          } catch (e) {
-            console.warn('Error checking item status:', item, e)
-            return false
-          }
+          if (item.archived) return false // Never show archived in status filters
+          return item.raw?.status?.toLowerCase() === statusFilter
         })
       } else {
         // If status is 'all', exclude archived devices by default
         filtered = filtered.filter(item => !item.archived)
       }
-      
+
       // Apply usage filter
       if (usageFilter !== 'all') {
-        filtered = filtered.filter(item => {
-          try {
-            const usage = item.usage?.toLowerCase()
-            return usage === usageFilter
-          } catch (e) {
-            console.warn('Error checking item usage:', item, e)
-            return false
-          }
-        })
+        filtered = filtered.filter(item => item.usage?.toLowerCase() === usageFilter)
       }
 
       // Apply catalog filter
       if (catalogFilter !== 'all') {
-        filtered = filtered.filter(item => {
-          try {
-            const catalog = item.catalog?.toLowerCase()
-            return catalog === catalogFilter
-          } catch (e) {
-            console.warn('Error checking item catalog:', item, e)
-            return false
-          }
-        })
+        filtered = filtered.filter(item => item.catalog?.toLowerCase() === catalogFilter)
       }
-      
+
       // Apply global platform filter
       if (platformFilter !== 'all') {
         filtered = filtered.filter(item => isPlatformVisible(item.platform || ''))
       }
-      
+
       // Then apply search filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
-        filtered = filtered.filter(item => {
-          try {
-            return (
-              item?.deviceName?.toLowerCase().includes(query) ||
-              item?.assetTag?.toLowerCase().includes(query) ||
-              item?.serialNumber?.toLowerCase().includes(query) ||
-              item?.computerName?.toLowerCase().includes(query) ||
-              item?.hostname?.toLowerCase().includes(query) ||
-              item?.location?.toLowerCase().includes(query) ||
-              item?.manufacturer?.toLowerCase().includes(query) ||
-              item?.model?.toLowerCase().includes(query) ||
-              item?.uuid?.toLowerCase().includes(query) ||
-              item?.domain?.toLowerCase().includes(query) ||
-              item?.organizationalUnit?.toLowerCase().includes(query)
-            )
-          } catch (e) {
-            console.warn('Error filtering item:', item, e)
-            return false
-          }
-        })
+        filtered = filtered.filter(item => matchesSearch(item, query))
       }
 
-      // Remove duplicates based on serialNumber
-      const uniqueFiltered = filtered.reduce((unique: InventoryItem[], item: InventoryItem) => {
-        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
-          unique.push(item)
-        }
-        return unique
-      }, [])
-      
-      // Apply sorting
-      const sorted = [...uniqueFiltered].sort((a, b) => {
+      // Apply sorting (inventory is already unique by serial number)
+      const sorted = [...filtered].sort((a, b) => {
         let aValue: any
         let bValue: any
         
@@ -288,8 +261,9 @@ function DevicesPageContent() {
       console.error('Error in filteredInventory:', e)
       return []
     }
-  })()
-  
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventory, statusFilter, usageFilter, catalogFilter, platformFilter, isPlatformVisible, searchQuery, sortColumn, sortDirection])
+
   // Handle column header click for sorting
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -302,67 +276,21 @@ function DevicesPageContent() {
     }
   }
 
-  // Calculate base counts (without filters) for reference
-  const getBaseCounts = () => {
-    try {
-      if (!Array.isArray(inventory)) return { all: 0 }
-      
-      // Remove duplicates first based on serialNumber
-      const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
-        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
-          unique.push(item)
-        }
-        return unique
-      }, [])
-      
-      return {
-        all: uniqueInventory.length
-      }
-    } catch (e) {
-      console.error('Error calculating base counts:', e)
-      return { all: 0 }
-    }
-  }
+  // Base count (without filters) for reference; inventory is already unique.
+  const baseCounts = useMemo(() => ({ all: Array.isArray(inventory) ? inventory.length : 0 }), [inventory])
 
-  // Get filter counts from search-filtered inventory (dynamic based on current search)
-  const getFilterCounts = () => {
+  // Filter counts from search-filtered inventory (dynamic based on current search)
+  const filterCounts = useMemo(() => {
     try {
-      if (!Array.isArray(inventory)) return { 
-        all: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 
+      if (!Array.isArray(inventory)) return {
+        all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0
       }
-      
-      // Start with unique inventory (remove duplicates based on serialNumber)
-      const uniqueInventory = inventory.reduce((unique: InventoryItem[], item: InventoryItem) => {
-        if (!unique.some(existingItem => existingItem.serialNumber === item.serialNumber)) {
-          unique.push(item)
-        }
-        return unique
-      }, [])
-      
-      // Apply search filter to the unique inventory
-      let searchFiltered = uniqueInventory
+
+      // Apply search filter (inventory is already unique by serial number)
+      let searchFiltered = inventory
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase()
-        searchFiltered = uniqueInventory.filter(item => {
-          try {
-            return (
-              item?.deviceName?.toLowerCase().includes(query) ||
-              item?.assetTag?.toLowerCase().includes(query) ||
-              item?.serialNumber?.toLowerCase().includes(query) ||
-              item?.computerName?.toLowerCase().includes(query) ||
-              item?.hostname?.toLowerCase().includes(query) ||
-              item?.location?.toLowerCase().includes(query) ||
-              item?.manufacturer?.toLowerCase().includes(query) ||
-              item?.model?.toLowerCase().includes(query) ||
-              item?.uuid?.toLowerCase().includes(query) ||
-              item?.domain?.toLowerCase().includes(query) ||
-              item?.organizationalUnit?.toLowerCase().includes(query)
-            )
-          } catch (e) {
-            console.warn('Error filtering item:', item, e)
-            return false
-          }
-        })
+        searchFiltered = inventory.filter(item => matchesSearch(item, query))
       }
 
       // Calculate counts from search-filtered results
@@ -400,10 +328,9 @@ function DevicesPageContent() {
       console.error('Error calculating filter counts:', e)
       return { all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventory, searchQuery])
 
-  const baseCounts = getBaseCounts()
-  const filterCounts = getFilterCounts()
   const isFiltered = searchQuery.trim() || statusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all'
 
   if (loading) {
@@ -829,9 +756,9 @@ function DevicesPageContent() {
                             className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 min-w-0 flex-1"
                             title={item.deviceName || 'Unknown Device'}
                           >
-                            <FitText minFontSize={11} maxFontSize={16}>
+                            <span className="block truncate">
                               {item.deviceName || 'Unknown Device'}
-                            </FitText>
+                            </span>
                           </Link>
                           <PlatformBadge platform={item.platform || ''} size="sm" />
                         </div>
@@ -890,9 +817,9 @@ function DevicesPageContent() {
                         </div>
                       </td>
                       <td className="px-4 lg:px-6 py-4" style={{ maxWidth: '120px' }}>
-                        <FitText minFontSize={10} maxFontSize={14} className="text-gray-500 dark:text-gray-400">
+                        <span className="block truncate text-sm text-gray-500 dark:text-gray-400">
                           {item.lastSeen ? formatRelativeTime(item.lastSeen) : '-'}
-                        </FitText>
+                        </span>
                       </td>
                       <td className="px-4 lg:px-6 py-4">
                         {(() => {
