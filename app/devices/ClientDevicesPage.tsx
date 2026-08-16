@@ -9,6 +9,8 @@ import { CopyButton } from "../../src/components/ui/CopyButton"
 import { normalizeKeys } from "../../src/lib/utils/powershell-parser"
 import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
+import DeviceFilters, { FilterOptions } from "../../src/components/shared/DeviceFilters"
+import { useScrollCollapse } from "../../src/hooks/useScrollCollapse"
 
 interface InventoryItem {
   id: string
@@ -22,6 +24,9 @@ interface InventoryItem {
   location?: string
   usage?: string
   catalog?: string
+  department?: string
+  area?: string
+  fleet?: string
   computerName?: string
   hostname?: string
   domain?: string
@@ -34,41 +39,72 @@ interface InventoryItem {
   raw?: any
 }
 
+// Case-insensitive membership test — selections come from URL params and from
+// inventory values that differ in casing between platforms.
+const includesCI = (list: string[], value?: string | null) =>
+  list.some(v => v.toLowerCase() === (value || '').toLowerCase())
+
 function DevicesPageContent() {
   const [inventory, setInventory] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
-  const [usageFilter, setUsageFilter] = useState<string>('all')
-  const [catalogFilter, setCatalogFilter] = useState<string>('all')
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  const [selectedUsages, setSelectedUsages] = useState<string[]>([])
+  const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
+  const [selectedAreas, setSelectedAreas] = useState<string[]>([])
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([])
+  const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const [filtersExpanded, setFiltersExpanded] = useState(false)
   const [sortColumn, setSortColumn] = useState<string>('deviceName')
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const searchParams = useSearchParams()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
-  // Initialize search query and filters from URL parameters
+  const { tableContainerRef, effectiveFiltersExpanded } = useScrollCollapse(
+    { filters: filtersExpanded },
+    { enabled: !loading }
+  )
+
+  const toggleIn = (setter: React.Dispatch<React.SetStateAction<string[]>>) => (value: string) =>
+    setter(prev => (includesCI(prev, value) ? prev.filter(v => v.toLowerCase() !== value.toLowerCase()) : [...prev, value]))
+
+  const toggleStatus = toggleIn(setSelectedStatuses)
+  const toggleUsage = toggleIn(setSelectedUsages)
+  const toggleCatalog = toggleIn(setSelectedCatalogs)
+  const toggleArea = toggleIn(setSelectedAreas)
+  const toggleLocation = toggleIn(setSelectedLocations)
+  const toggleFleet = toggleIn(setSelectedFleets)
+
+  const clearAllSelections = () => {
+    setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
+    setSelectedAreas([]); setSelectedLocations([]); setSelectedFleets([])
+  }
+
+  // Initialize search query and selections from URL parameters. Each dimension
+  // accepts a comma-separated list so deep links can preselect more than one pill.
   useEffect(() => {
     try {
       const urlSearch = searchParams.get('search')
       if (urlSearch) {
         setSearchQuery(urlSearch)
       }
-      
-      const urlStatus = searchParams.get('status')
-      if (urlStatus && ['active', 'stale', 'missing'].includes(urlStatus.toLowerCase())) {
-        setStatusFilter(urlStatus.toLowerCase())
-      }
-      
-      const urlUsage = searchParams.get('usage')
-      if (urlUsage && ['assigned', 'shared'].includes(urlUsage.toLowerCase())) {
-        setUsageFilter(urlUsage.toLowerCase())
-      }
 
-      const urlCatalog = searchParams.get('catalog')
-      if (urlCatalog && ['curriculum', 'staff', 'faculty', 'kiosk'].includes(urlCatalog.toLowerCase())) {
-        setCatalogFilter(urlCatalog.toLowerCase())
-      }
+      const list = (key: string) =>
+        (searchParams.get(key) || '').split(',').map(v => v.trim()).filter(Boolean)
+
+      const status = list('status')
+      if (status.length) setSelectedStatuses(status)
+      const usage = list('usage')
+      if (usage.length) setSelectedUsages(usage)
+      const catalog = list('catalog')
+      if (catalog.length) setSelectedCatalogs(catalog)
+      const area = list('area')
+      if (area.length) setSelectedAreas(area)
+      const location = list('location')
+      if (location.length) setSelectedLocations(location)
+      const fleet = list('fleet')
+      if (fleet.length) setSelectedFleets(fleet)
     } catch (e) {
       console.warn('Failed to get search params:', e)
     }
@@ -112,6 +148,10 @@ function DevicesPageContent() {
               usage: inventory.usage,
               catalog: inventory.catalog,
               department: inventory.department,
+              // Area is a distinct inventory dimension where collected; every
+              // other report falls back to department, so match that here.
+              area: inventory.area || inventory.department,
+              fleet: inventory.fleet,
               owner: inventory.owner,
               computerName: inventory.deviceName,
               hostname: device.hostname || device.modules?.network?.hostname,
@@ -173,28 +213,28 @@ function DevicesPageContent() {
         return []
       }
 
-      let filtered = inventory
+      // Archived devices are never listed here regardless of selections
+      let filtered = inventory.filter(item => !item.archived)
 
-      // Apply status filter first
-      if (statusFilter !== 'all') {
-        // Show non-archived devices matching the status
-        filtered = filtered.filter(item => {
-          if (item.archived) return false // Never show archived in status filters
-          return item.raw?.status?.toLowerCase() === statusFilter
-        })
-      } else {
-        // If status is 'all', exclude archived devices by default
-        filtered = filtered.filter(item => !item.archived)
+      // Apply the Selections accordion dimensions (multi-select, OR within a
+      // dimension and AND across dimensions)
+      if (selectedStatuses.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedStatuses, item.raw?.status))
       }
-
-      // Apply usage filter
-      if (usageFilter !== 'all') {
-        filtered = filtered.filter(item => item.usage?.toLowerCase() === usageFilter)
+      if (selectedUsages.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedUsages, item.usage))
       }
-
-      // Apply catalog filter
-      if (catalogFilter !== 'all') {
-        filtered = filtered.filter(item => item.catalog?.toLowerCase() === catalogFilter)
+      if (selectedCatalogs.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedCatalogs, item.catalog))
+      }
+      if (selectedAreas.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedAreas, item.area || item.department))
+      }
+      if (selectedLocations.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedLocations, item.location))
+      }
+      if (selectedFleets.length > 0) {
+        filtered = filtered.filter(item => includesCI(selectedFleets, item.fleet))
       }
 
       // Apply global platform filter
@@ -262,7 +302,8 @@ function DevicesPageContent() {
       return []
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventory, statusFilter, usageFilter, catalogFilter, platformFilter, isPlatformVisible, searchQuery, sortColumn, sortDirection])
+  }, [inventory, selectedStatuses, selectedUsages, selectedCatalogs, selectedAreas, selectedLocations,
+      selectedFleets, platformFilter, isPlatformVisible, searchQuery, sortColumn, sortDirection])
 
   // Handle column header click for sorting
   const handleSort = (column: string) => {
@@ -279,59 +320,37 @@ function DevicesPageContent() {
   // Base count (without filters) for reference; inventory is already unique.
   const baseCounts = useMemo(() => ({ all: Array.isArray(inventory) ? inventory.length : 0 }), [inventory])
 
-  // Filter counts from search-filtered inventory (dynamic based on current search)
-  const filterCounts = useMemo(() => {
-    try {
-      if (!Array.isArray(inventory)) return {
-        all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0
-      }
-
-      // Apply search filter (inventory is already unique by serial number)
-      let searchFiltered = inventory
-      if (searchQuery.trim()) {
-        const query = searchQuery.toLowerCase()
-        searchFiltered = inventory.filter(item => matchesSearch(item, query))
-      }
-
-      // Calculate counts from search-filtered results
-      return {
-        all: searchFiltered.filter(item => !item.archived).length,
-        active: searchFiltered.filter(item => 
-          item.raw?.status?.toLowerCase() === 'active'
-        ).length,
-        stale: searchFiltered.filter(item => 
-          item.raw?.status?.toLowerCase() === 'stale'
-        ).length,
-        missing: searchFiltered.filter(item => 
-          item.raw?.status?.toLowerCase() === 'missing'
-        ).length,
-        assigned: searchFiltered.filter(item =>
-          item.usage?.toLowerCase() === 'assigned'
-        ).length,
-        shared: searchFiltered.filter(item => 
-          item.usage?.toLowerCase() === 'shared'
-        ).length,
-        curriculum: searchFiltered.filter(item => 
-          item.catalog?.toLowerCase() === 'curriculum'
-        ).length,
-        staff: searchFiltered.filter(item => 
-          item.catalog?.toLowerCase() === 'staff'
-        ).length,
-        faculty: searchFiltered.filter(item => 
-          item.catalog?.toLowerCase() === 'faculty'
-        ).length,
-        kiosk: searchFiltered.filter(item => 
-          item.catalog?.toLowerCase() === 'kiosk'
-        ).length,
-      }
-    } catch (e) {
-      console.error('Error calculating filter counts:', e)
-      return { all: 0, active: 0, stale: 0, missing: 0, assigned: 0, shared: 0, curriculum: 0, staff: 0, faculty: 0, kiosk: 0 }
+  // Options offered by the Selections accordion, drawn from the live inventory
+  // so a dimension with no collected data hides itself rather than showing
+  // dead pills.
+  const filterOptions: FilterOptions = useMemo(() => {
+    const active = Array.isArray(inventory) ? inventory.filter(i => !i.archived) : []
+    const distinct = (pick: (item: InventoryItem) => string | undefined | null) =>
+      Array.from(new Set(active.map(pick).filter(Boolean) as string[])).sort()
+    return {
+      statuses: distinct(i => i.raw?.status),
+      usages: distinct(i => i.usage),
+      catalogs: distinct(i => i.catalog),
+      areas: distinct(i => i.area || i.department),
+      locations: distinct(i => i.location),
+      fleets: distinct(i => i.fleet),
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inventory, searchQuery])
+  }, [inventory])
 
-  const isFiltered = searchQuery.trim() || statusFilter !== 'all' || usageFilter !== 'all' || catalogFilter !== 'all'
+  // Device count per location drives proportional pill sizing in the accordion
+  const locationCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    if (Array.isArray(inventory)) {
+      inventory.forEach(item => {
+        if (!item.archived && item.location) counts[item.location] = (counts[item.location] || 0) + 1
+      })
+    }
+    return counts
+  }, [inventory])
+
+  const totalSelections = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length +
+    selectedAreas.length + selectedLocations.length + selectedFleets.length
+  const isFiltered = Boolean(searchQuery.trim()) || totalSelections > 0
 
   if (loading) {
     return (
@@ -349,13 +368,10 @@ function DevicesPageContent() {
                 <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded w-64"></div>
               </div>
               
-              {/* Filter buttons skeleton */}
-              <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
-                <div className="flex flex-wrap gap-2">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="h-8 bg-gray-300 dark:bg-gray-600 rounded-lg w-20"></div>
-                  ))}
-                </div>
+              {/* Selections accordion skeleton */}
+              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
+                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded"></div>
               </div>
 
               {/* Table skeleton */}
@@ -493,112 +509,30 @@ function DevicesPageContent() {
               </div>
             </div>
             
-            {/* Filter Row */}
-            <div className="border-b border-gray-200 dark:border-gray-600 px-4 lg:px-6 py-3 bg-gray-50 dark:bg-gray-700">
-              <nav className="flex flex-wrap gap-2 items-center">
-                {/* Status Filters */}
-                {[
-                  { key: 'active', label: 'Active', count: filterCounts.active, type: 'status', colors: 'bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-900 dark:text-emerald-300 dark:border-emerald-600 dark:hover:bg-emerald-800' },
-                  { key: 'stale', label: 'Stale', count: filterCounts.stale, type: 'status', colors: 'bg-amber-100 text-amber-700 border-amber-300 hover:bg-amber-200 dark:bg-amber-900 dark:text-amber-300 dark:border-amber-600 dark:hover:bg-amber-800' },
-                  { key: 'missing', label: 'Missing', count: filterCounts.missing, type: 'status', colors: 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-800' },
-                ].map((filter) => {
-                  const isActive = statusFilter === filter.key
-                  
-                  return (
-                    <button
-                      key={filter.key}
-                      onClick={() => setStatusFilter(statusFilter === filter.key ? 'all' : filter.key)}
-                      className={`${
-                        isActive
-                          ? filter.colors
-                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                    >
-                      <span>{filter.label}</span>
-                      <span className={`${
-                        isActive 
-                          ? 'bg-white/20 text-current'
-                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                        {filter.count}
-                      </span>
-                    </button>
-                  )
-                })}
-                
-                {/* Separator - Status/Usage */}
-                <div className="flex items-center px-2">
-                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
-                </div>
-                
-                {/* Usage Filters */}
-                {[
-                  { key: 'assigned', label: 'Assigned', count: filterCounts.assigned, type: 'usage', colors: 'bg-yellow-100 text-yellow-700 border-yellow-300 hover:bg-yellow-200 dark:bg-yellow-900 dark:text-yellow-300 dark:border-yellow-600 dark:hover:bg-yellow-800' },
-                  { key: 'shared', label: 'Shared', count: filterCounts.shared, type: 'usage', colors: 'bg-blue-100 text-blue-700 border-blue-300 hover:bg-blue-200 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600 dark:hover:bg-blue-800' },
-                ].map((filter) => {
-                  const isActive = usageFilter === filter.key
-                  
-                  return (
-                    <button
-                      key={filter.key}
-                      onClick={() => setUsageFilter(usageFilter === filter.key ? 'all' : filter.key)}
-                      className={`${
-                        isActive
-                          ? filter.colors
-                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                    >
-                      <span>{filter.label}</span>
-                      <span className={`${
-                        isActive 
-                          ? 'bg-white/20 text-current'
-                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                        {filter.count}
-                      </span>
-                    </button>
-                  )
-                })}
-                
-                {/* Separator - Usage/Catalog */}
-                <div className="flex items-center px-2">
-                  <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent dark:via-gray-500"></div>
-                </div>
-                
-                {/* Catalog Filters */}
-                {[
-                  { key: 'curriculum', label: 'Curriculum', count: filterCounts.curriculum, type: 'catalog', colors: 'bg-teal-100 text-teal-700 border-teal-300 hover:bg-teal-200 dark:bg-teal-900 dark:text-teal-300 dark:border-teal-600 dark:hover:bg-teal-800' },
-                  { key: 'staff', label: 'Staff', count: filterCounts.staff, type: 'catalog', colors: 'bg-orange-100 text-orange-700 border-orange-300 hover:bg-orange-200 dark:bg-orange-900 dark:text-orange-300 dark:border-orange-600 dark:hover:bg-orange-800' },
-                  { key: 'faculty', label: 'Faculty', count: filterCounts.faculty, type: 'catalog', colors: 'bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-900 dark:text-red-300 dark:border-red-600 dark:hover:bg-red-800' },
-                  { key: 'kiosk', label: 'Kiosk', count: filterCounts.kiosk, type: 'catalog', colors: 'bg-cyan-100 text-cyan-700 border-cyan-300 hover:bg-cyan-200 dark:bg-cyan-900 dark:text-cyan-300 dark:border-cyan-600 dark:hover:bg-cyan-800' },
-                ].map((filter) => {
-                  const isActive = catalogFilter === filter.key
-                  
-                  return (
-                    <button
-                      key={filter.key}
-                      onClick={() => setCatalogFilter(catalogFilter === filter.key ? 'all' : filter.key)}
-                      className={`${
-                        isActive
-                          ? filter.colors
-                          : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                      } px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors`}
-                    >
-                      <span>{filter.label}</span>
-                      <span className={`${
-                        isActive 
-                          ? 'bg-white/20 text-current'
-                          : 'bg-gray-200 text-gray-700 dark:bg-gray-500 dark:text-gray-200'
-                      } inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ml-1`}>
-                        {filter.count}
-                      </span>
-                    </button>
-                  )
-                })}
-              </nav>
-            </div>
+            {/* Selections accordion (shared component, same as every other report) */}
+            <DeviceFilters
+              filterOptions={filterOptions}
+              selectedStatuses={selectedStatuses}
+              selectedCatalogs={selectedCatalogs}
+              selectedAreas={selectedAreas}
+              selectedLocations={selectedLocations}
+              selectedFleets={selectedFleets}
+              selectedUsages={selectedUsages}
+              onStatusToggle={toggleStatus}
+              onCatalogToggle={toggleCatalog}
+              onAreaToggle={toggleArea}
+              onLocationToggle={toggleLocation}
+              onFleetToggle={toggleFleet}
+              onUsageToggle={toggleUsage}
+              onClearAll={clearAllSelections}
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              expanded={effectiveFiltersExpanded}
+              onToggle={() => setFiltersExpanded(!filtersExpanded)}
+              locationCounts={locationCounts}
+            />
 
-            <div className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
+            <div ref={tableContainerRef} className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
               <table className="w-full relative">
                 <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                   <tr>
