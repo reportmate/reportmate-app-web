@@ -110,7 +110,7 @@ export function useDeviceData(options: UseDeviceDataOptions = {}): UseDeviceData
         const startTime = Date.now()
         console.log(`[useDeviceData] Fetching ${moduleType} module data... (attempt ${attempt}/${maxRetries})`)
         
-        const response = await fetch(`/api/v1/`, {
+        const response = await fetch(`/api/v1/${moduleType}`, {
           cache: 'no-store',
           headers: {
             'Cache-Control': 'no-cache',
