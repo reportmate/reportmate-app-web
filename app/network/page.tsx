@@ -12,6 +12,7 @@ import { Copy } from "lucide-react"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { calculateDeviceStatus } from "@/src/lib/data-processing"
 
 interface NetworkDevice {
   id: string
@@ -50,6 +51,7 @@ function NetworkPageContent() {
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading }
   )
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
@@ -66,7 +68,16 @@ function NetworkPageContent() {
     }
   }
 
+  // Status is derived from lastSeen, the same rule every other report uses
+  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
+
   // Toggle functions for filters
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    )
+  }
+
   const toggleUsage = (usage: string) => {
     setSelectedUsages(prev => 
       prev.includes(usage) ? prev.filter(u => u !== usage) : [...prev, usage]
@@ -98,6 +109,7 @@ function NetworkPageContent() {
   }
 
   const _clearAllFilters = () => {
+    setSelectedStatuses([])
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
@@ -186,7 +198,7 @@ function NetworkPageContent() {
 
   // Extract unique filter options from devices (inventory data)
   const filterOptions: FilterOptions = {
-    statuses: [],
+    statuses: Array.from(new Set(networkDevices.map(statusOf))).sort(),
     usages: Array.from(new Set(
       devices.map(d => d.modules?.inventory?.usage).filter(Boolean)
     )).sort() as string[],
@@ -323,6 +335,7 @@ function NetworkPageContent() {
     }
 
     // Inventory-based filters
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(n))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
@@ -681,13 +694,13 @@ function NetworkPageContent() {
           {/* Selections accordion (shared component) */}
           <DeviceFilters
             filterOptions={filterOptions}
-            selectedStatuses={[]}
+            selectedStatuses={selectedStatuses}
             selectedCatalogs={selectedCatalogs}
             selectedAreas={selectedAreas}
             selectedLocations={selectedLocations}
             selectedFleets={selectedFleets}
             selectedUsages={selectedUsages}
-            onStatusToggle={() => { /* no statuses on /network */ }}
+            onStatusToggle={toggleStatus}
             onCatalogToggle={toggleCatalog}
             onAreaToggle={toggleArea}
             onLocationToggle={toggleLocation}
@@ -1060,21 +1073,28 @@ function NetworkPageContent() {
                               
                               return (
                                 <>
-                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1.5 min-w-0">
                                     {connectionDisplay && (
-                                      <span className="text-sm text-gray-900 dark:text-white">{connectionDisplay}</span>
+                                      <span className="text-sm text-gray-900 dark:text-white truncate">{connectionDisplay}</span>
                                     )}
                                     {networkDevice.networkInfo.vpnActive && (
-                                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700">
+                                      // Adapter names like "Fortinet Virtual Ethernet Adapter" wrapped
+                                      // to two lines and pushed the row out of its own height. The
+                                      // badge stays a fixed-width "VPN"; the adapter name lives on the
+                                      // device's own network tab.
+                                      <span
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs font-medium rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-700 flex-shrink-0"
+                                        title={networkDevice.networkInfo.vpnName || 'VPN active'}
+                                      >
                                         <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                         </svg>
-                                        {networkDevice.networkInfo.vpnName || 'VPN'}
+                                        VPN
                                       </span>
                                     )}
                                   </div>
                                   {protocolBand && protocolBand !== 'N/A' && (
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">{protocolBand}</span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{protocolBand}</span>
                                   )}
                                 </>
                               );
