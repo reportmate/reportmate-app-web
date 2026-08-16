@@ -50,7 +50,17 @@ export interface MdmEnrollmentInfo {
   depCapable?: boolean          // Mac: Device is DEP/ADE capable
   installedFromDep?: boolean    // Mac: Enrolled via ADE (formerly DEP)
   accessRights?: number         // Mac: MDM access rights bitmask
-  hasScepPayload?: boolean      // Mac: Has SCEP certificate payload
+  /**
+   * Mac: has a SCEP certificate payload. Superseded by
+   * `certificateEnrollmentMethod` - current Intune provisions the identity
+   * certificate over ACME, so this is false on healthy devices. Kept for
+   * devices that have not yet checked in with a client that reports the method.
+   */
+  hasScepPayload?: boolean
+  /** Mac: how the identity certificate is provisioned - ACME, SCEP or PKCS12 */
+  certificateEnrollmentMethod?: string
+  /** Mac: raw payload type backing the method, e.g. com.apple.security.acme */
+  identityPayloadType?: string
 }
 
 export interface DomainInfo {
@@ -278,7 +288,9 @@ function mapMdmEnrollment(mdm: any): MdmEnrollmentInfo {
     depCapable: parseBool(mdm.dep_capable || mdm.depCapable),
     installedFromDep: parseBool(mdm.installed_from_dep || mdm.installedFromDep),
     accessRights: parseInt(mdm.access_rights || mdm.accessRights) || undefined,
-    hasScepPayload: parseBool(mdm.has_scep_payload || mdm.hasScepPayload)
+    hasScepPayload: parseBool(mdm.has_scep_payload || mdm.hasScepPayload),
+    certificateEnrollmentMethod: mdm.certificate_enrollment_method || mdm.certificateEnrollmentMethod,
+    identityPayloadType: mdm.identity_payload_type || mdm.identityPayloadType
   }
 }
 
