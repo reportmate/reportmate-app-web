@@ -30,6 +30,10 @@ function parseMdmCertificate(mdmCertificate: any): {
   certificate_subject?: string
   certificate_issuer?: string
   certificate_expires?: string
+  certificate_enrollment_method?: string
+  identity_payload_type?: string
+  checkin_url?: string
+  server_url?: string
   mdm_provider?: string
 } {
   if (!mdmCertificate) return {}
@@ -56,6 +60,10 @@ function parseMdmCertificate(mdmCertificate: any): {
         certificate_subject: parsed.certificate_subject,
         certificate_issuer: parsed.certificate_issuer,
         certificate_expires: parsed.certificate_expires,
+        certificate_enrollment_method: parsed.certificate_enrollment_method,
+        identity_payload_type: parsed.identity_payload_type,
+        checkin_url: parsed.checkin_url,
+        server_url: parsed.server_url,
         mdm_provider: parsed.mdm_provider
       }
     } catch (e) {
@@ -71,6 +79,10 @@ function parseMdmCertificate(mdmCertificate: any): {
     certificate_subject: mdmCertificate.certificate_subject || mdmCertificate.certificateSubject,
     certificate_issuer: mdmCertificate.certificate_issuer || mdmCertificate.certificateIssuer,
     certificate_expires: mdmCertificate.certificate_expires || mdmCertificate.certificateExpires,
+    certificate_enrollment_method: mdmCertificate.certificate_enrollment_method || mdmCertificate.certificateEnrollmentMethod,
+    identity_payload_type: mdmCertificate.identity_payload_type || mdmCertificate.identityPayloadType,
+    checkin_url: mdmCertificate.checkin_url || mdmCertificate.checkinUrl,
+    server_url: mdmCertificate.server_url || mdmCertificate.serverUrl,
     mdm_provider: mdmCertificate.mdm_provider || mdmCertificate.mdmProvider
   }
 }
@@ -257,7 +269,31 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   
   // Parse the MDM certificate (handles nested JSON in 'output' field)
   const mdmCertificate = parseMdmCertificate(mdmCertificateRaw)
-  
+
+  // How the device's identity certificate is provisioned. Current Intune issues
+  // over ACME rather than SCEP, so a SCEP yes/no reports "No" on a perfectly
+  // healthy device. Newer clients report the method directly; fall back to the
+  // legacy SCEP boolean for devices that have not checked in with one yet.
+  const enrollmentMethod: string | null = (() => {
+    if (mdmCertificate.certificate_enrollment_method) {
+      return mdmCertificate.certificate_enrollment_method
+    }
+    if (mdmCertificate.identity_payload_type) {
+      const tail = mdmCertificate.identity_payload_type.split('.').pop() || ''
+      if (tail) return tail.toUpperCase()
+    }
+    if (parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload)) return 'SCEP'
+    return null
+  })()
+
+  // The endpoint that issues the identity certificate. Named for whatever
+  // protocol is actually in use rather than assuming SCEP.
+  const enrollmentUrlLabel = enrollmentMethod === 'ACME'
+    ? 'ACME Directory'
+    : enrollmentMethod === 'SCEP'
+      ? 'SCEP Server'
+      : 'Certificate Enrollment'
+
   // Parse enrolled status - osquery returns string "true"/"false", Windows returns boolean
   const isEnrolled = parseBool(mdmEnrollment.enrolled) || 
                      parseBool(mdmEnrollment.is_enrolled) || 
@@ -666,15 +702,15 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                     </span>
                   </div>
 
-                  {/* SCEP Payload */}
+                  {/* Identity certificate provisioning method (ACME, SCEP, PKCS12) */}
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">SCEP Certificate</span>
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Identity Certificate</span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload)
+                      enrollmentMethod
                         ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
                         : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
                     }`}>
-                      {parseBool(mdmEnrollment.has_scep_payload || mdmEnrollment.hasScepPayload) ? 'Yes' : 'No'}
+                      {enrollmentMethod ?? 'Unknown'}
                     </span>
                   </div>
                 </div>
@@ -1058,10 +1094,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                       </div>
                     )}
 
-                    {/* SCEP Server URL */}
+                    {/* Certificate enrollment endpoint - ACME directory or SCEP server */}
                     {mdmCertificate.scep_url && (
                       <div>
-                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">SCEP Server</div>
+                        <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">{enrollmentUrlLabel}</div>
                         <div className="flex items-center gap-2">
                           <span className="text-xs font-mono text-gray-900 dark:text-white break-all">
                             {mdmCertificate.scep_url}

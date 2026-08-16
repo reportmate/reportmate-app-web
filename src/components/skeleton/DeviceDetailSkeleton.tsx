@@ -822,7 +822,7 @@ export function ManagementTabSkeleton() {
             <div className="h-5 w-36 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-3"></div>
             {/* Grid of status pills */}
             <div className="grid grid-cols-2 gap-4 mb-4">
-              {['ADE Enrolled', 'User Approved', 'ADE Capable', 'SCEP Certificate'].map((label, i) => (
+              {['ADE Enrolled', 'User Approved', 'ADE Capable', 'Identity Certificate'].map((label, i) => (
                 <div key={label} className="flex items-center gap-3">
                   <div className="h-4 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse"></div>
                   <div className="h-6 w-12 bg-green-100 dark:bg-green-900 rounded-full animate-pulse" style={{ animationDelay: `${i * 0.05}s` }}></div>
@@ -898,7 +898,7 @@ export function ManagementTabSkeleton() {
               <div className="h-4 w-32 bg-green-200 dark:bg-green-900 rounded animate-pulse"></div>
             </div>
 
-            {/* SCEP Server */}
+            {/* Certificate enrollment endpoint */}
             <div>
               <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-1"></div>
               <div className="h-4 w-full bg-gray-50 dark:bg-gray-900 rounded animate-pulse"></div>
