@@ -234,9 +234,25 @@ function EventsPageContent() {
   const offsetRef = useRef(0)
   const fetchEventsRef = useRef<typeof fetchEvents | null>(null)
   
-  // Cache all fetched events for instant client-side filter switching
+  // Cache every event fetched for the current date window, keyed by id. Type
+  // toggles are answered from this cache so the table re-renders in the same
+  // frame; the server round-trip only tops the cache up in the background.
   const allEventsCache = useRef<Event[]>([])
-  
+  // Debounce handle for the background top-up fetch that follows a type toggle
+  const filterFetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Merge a freshly fetched page into the cache, de-duplicating by event id and
+  // keeping the newest-first order the table renders in.
+  const mergeIntoCache = useCallback((incoming: Event[]) => {
+    const byId = new Map<string, Event>()
+    for (const event of allEventsCache.current) byId.set(event.id, event)
+    for (const event of incoming) byId.set(event.id, event)
+    const merged = Array.from(byId.values())
+      .sort((a, b) => new Date(b.ts).getTime() - new Date(a.ts).getTime())
+    allEventsCache.current = merged
+    return merged
+  }, [])
+
   // Date range state (default to last 48 hours)
   const [startDate, setStartDate] = useState(() => {
     const date = new Date()
@@ -292,10 +308,11 @@ function EventsPageContent() {
       if (isLoadMore) {
         setLoadingMore(true)
       } else if (!isFilterChange) {
-        // For filter changes keep old events visible; only show full skeleton on date/mount resets
+        // A type toggle never shows a skeleton — the cache already answered it.
+        // Only date/mount resets, which genuinely have nothing to show, do.
         setLoading(true)
       }
-      
+
       // Build query parameters
       const queryParams = new URLSearchParams()
       queryParams.append('limit', EVENTS_PER_PAGE.toString())
@@ -333,15 +350,11 @@ function EventsPageContent() {
           VALID_EVENT_KINDS.includes(event.kind?.toLowerCase())
         )
         
-        if (isLoadMore) {
-          // Append to existing events
-          setEvents(prev => [...prev, ...newEvents])
-        } else {
-          // Replace events (initial load or filter change)
-          setEvents(newEvents)
-          allEventsCache.current = newEvents
-        }
-        
+        // Always merge rather than replace: a type toggle re-queries the server
+        // with a different type set, and replacing would throw away events the
+        // user can toggle straight back on.
+        setEvents(mergeIntoCache(newEvents))
+
         // Check if there are more events to load
         setHasMore(newEvents.length >= EVENTS_PER_PAGE)
         
@@ -363,7 +376,7 @@ function EventsPageContent() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE])
+  }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE, mergeIntoCache])
 
   // Initial fetch on mount or date range change (full skeleton)
   useEffect(() => {
@@ -375,15 +388,25 @@ function EventsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [startDate, endDate])
 
-  // Re-fetch when active filters change — keep old events visible until new results arrive
+  // A type toggle is answered client-side from the cache and repaints immediately.
+  // The server round-trip that follows only re-densifies the page — it is
+  // debounced so flipping several pills in a row costs one request, not one each.
   const prevActiveFilters = useRef(activeFilters)
   useEffect(() => {
-    if (prevActiveFilters.current !== activeFilters) {
-      prevActiveFilters.current = activeFilters
-      // Don't blank the table; swap events in once the first page of new results arrives
+    if (prevActiveFilters.current === activeFilters) return
+    prevActiveFilters.current = activeFilters
+
+    if (filterFetchTimer.current) clearTimeout(filterFetchTimer.current)
+    // Nothing selected renders an empty table, so there is nothing to top up
+    if (activeFilters.size === 0) return
+    filterFetchTimer.current = setTimeout(() => {
       setOffset(0)
       setHasMore(true)
       fetchEvents(0, false, activeFilters, true)
+    }, 300)
+
+    return () => {
+      if (filterFetchTimer.current) clearTimeout(filterFetchTimer.current)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeFilters])
@@ -422,8 +445,9 @@ function EventsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // stable — reads live values through refs
 
-  // Filter events based on platform, selected type and search query (client-side)
-  const filteredEvents = bundledEvents.filter(event => {
+  // Filter events by platform, selected type and search query — all client-side,
+  // so toggling a type pill repaints in the same frame instead of waiting on the API.
+  const filteredEvents = useMemo(() => bundledEvents.filter(event => {
     // Filter by platform first (global filter)
     if (platformFilter) {
       const eventPlatform = normalizePlatform((event as any).platform)
@@ -431,17 +455,23 @@ function EventsPageContent() {
         return false
       }
     }
-    
-    // Type filter is now handled server-side; always pass (for search + platform)
-    const typeMatch = true
-    
+
+    // A bundle matches when any of the kinds it rolled up is still selected
+    if (activeFilters.size > 0) {
+      const kinds = event.bundledKinds?.length ? event.bundledKinds : [event.kind]
+      if (!kinds.some(kind => activeFilters.has(kind?.toLowerCase()))) return false
+    } else {
+      // Every type deselected means nothing to show
+      return false
+    }
+
     // Then filter by search query if provided
     if (!searchQuery.trim()) {
-      return typeMatch
+      return true
     }
-    
+
     const query = searchQuery.toLowerCase()
-    const searchMatch = (
+    return (
       event.id.toLowerCase().includes(query) ||
       event.device.toLowerCase().includes(query) ||
       (event.bundledKinds || []).some(kind => kind.toLowerCase().includes(query)) ||
@@ -449,9 +479,8 @@ function EventsPageContent() {
       (event.deviceName && event.deviceName.toLowerCase().includes(query)) ||
       (event.assetTag && event.assetTag.toLowerCase().includes(query))
     )
-    
-    return typeMatch && searchMatch
-  })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [bundledEvents, platformFilter, isPlatformVisible, activeFilters, searchQuery])
 
   // currentEvents is just filteredEvents for infinite scroll (no client-side pagination)
   const currentEvents = filteredEvents
