@@ -244,10 +244,15 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   // Bundle related events intelligently
   const bundledEvents = useMemo(() => bundleEvents(events), [events])
   
-  // Filter bundled events based on hidden types
+  // Filter bundled events based on hidden types. Rendering is capped: the
+  // dashboard holds up to 1000 events in state, and mounting a row for every
+  // one of them puts ~1000 <tr>s in a widget that shows a dozen at a time.
+  const MAX_RENDERED_EVENTS = 250
   const filteredEvents = useMemo(() => {
-    if (hiddenTypes.size === 0) return bundledEvents
-    return bundledEvents.filter(event => !hiddenTypes.has(event.kind.toLowerCase()))
+    const visible = hiddenTypes.size === 0
+      ? bundledEvents
+      : bundledEvents.filter(event => !hiddenTypes.has(event.kind.toLowerCase()))
+    return visible.slice(0, MAX_RENDERED_EVENTS)
   }, [bundledEvents, hiddenTypes])
 
   // Toggle a filter type on/off
