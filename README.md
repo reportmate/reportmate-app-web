@@ -185,7 +185,7 @@ See the [Module Development Guide](docs/modules.md) for creating custom modules.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU Affero General Public License v3.0 (AGPL-3.0) - see the [LICENSE](LICENSE) file for details. A separate commercial license is available for organizations whose policies do not permit AGPL.
 
 ## Related Projects
 
