@@ -5,7 +5,11 @@ name: Publish web image
 
 on:
   push:
-    tags: ["v*"]
+    tags:
+      # Accept both v-prefixed tags and the YYYY.MM.DD.HHMM datestamp tags the
+      # client repos ship with, so the same tag convention triggers a publish.
+      - 'v*'
+      - '[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9].[0-9][0-9][0-9][0-9]*'
   workflow_dispatch:
 
 permissions:
