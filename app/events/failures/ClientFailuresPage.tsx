@@ -38,6 +38,9 @@ const REASON_LABELS: Record<string, string> = {
   invalid_internal_secret: 'Wrong internal secret',
   missing_credentials: 'No credentials',
   insufficient_scope: 'Missing scope',
+  upload_aborted: 'Upload aborted',
+  body_unreadable: 'Body unreadable',
+  empty_body: 'Empty body',
   malformed_json: 'Malformed JSON',
   invalid_payload: 'Invalid payload',
   empty_serial: 'Empty serial',
@@ -45,6 +48,8 @@ const REASON_LABELS: Record<string, string> = {
   short_serial: 'Serial too short',
   hostname_serial: 'Hostname as serial',
   letters_only_serial: 'Hostname-like serial',
+  serial_equals_hostname: 'Serial matches hostname',
+  usage_out_of_bounds: 'Usage out of bounds',
 }
 
 const HOURS_OPTIONS = [
