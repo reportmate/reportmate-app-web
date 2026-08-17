@@ -14,6 +14,7 @@ interface IngestFailure {
   reason: string
   detail: string | null
   statusCode: number | null
+  outcome: 'rejected' | 'accepted'
   endpoint: string | null
   clientIp: string | null
   userAgent: string | null
@@ -50,6 +51,32 @@ const REASON_LABELS: Record<string, string> = {
   letters_only_serial: 'Hostname-like serial',
   serial_equals_hostname: 'Serial matches hostname',
   usage_out_of_bounds: 'Usage out of bounds',
+  nul_in_payload: 'NUL characters stripped',
+  rate_limited: 'Rate limited',
+  internal_error: 'Server error',
+}
+
+// Two different questions share this table. "Rejected" is the page's reason
+// for existing: the device reached the server and did not get in. "Repaired"
+// is a check-in that succeeded while carrying a client defect worth watching
+// -- useful, but at fleet scale it is thousands of rows a day, and mixing it
+// into a view titled Failed Check-ins buries the handful of devices that are
+// genuinely stuck and makes the page read as a much bigger fire than it is.
+type Outcome = 'rejected' | 'accepted'
+
+const OUTCOME_COPY: Record<Outcome, { chip: string; heading: string; blurb: string; noun: string }> = {
+  rejected: {
+    chip: 'Rejected',
+    heading: 'Failed Check-ins',
+    blurb: 'Devices that reached the server but were turned away \u2014 the answer to "installed but never appeared"',
+    noun: 'rejected check-in',
+  },
+  accepted: {
+    chip: 'Repaired',
+    heading: 'Repaired Check-ins',
+    blurb: 'Accepted and stored \u2014 the server fixed a client defect on the way in. Watch these fall to zero as the client fix rolls out.',
+    noun: 'repaired check-in',
+  },
 }
 
 const HOURS_OPTIONS = [
@@ -62,7 +89,10 @@ function reasonLabel(reason: string): string {
   return REASON_LABELS[reason] || reason
 }
 
-function reasonBadgeClass(failureType: string): string {
+function reasonBadgeClass(failureType: string, outcome: string): string {
+  if (outcome === 'accepted') {
+    return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300'
+  }
   return failureType === 'auth'
     ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
@@ -75,12 +105,14 @@ export default function ClientFailuresPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hours, setHours] = useState(168)
+  const [outcome, setOutcome] = useState<Outcome>('rejected')
+  const [counts, setCounts] = useState<{ rejected: number; accepted: number }>({ rejected: 0, accepted: 0 })
   const [reasonFilter, setReasonFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
   const fetchFailures = useCallback(async () => {
     try {
-      const params = new URLSearchParams({ limit: '500', hours: String(hours) })
+      const params = new URLSearchParams({ limit: '500', hours: String(hours), outcome })
       if (reasonFilter) params.append('reason', reasonFilter)
       const resp = await fetch(`/api/events/failures?${params.toString()}`)
       if (!resp.ok) {
@@ -90,13 +122,17 @@ export default function ClientFailuresPage() {
       setFailures(Array.isArray(data.failures) ? data.failures : [])
       setSummary(Array.isArray(data.summary) ? data.summary : [])
       setTotal(typeof data.total === 'number' ? data.total : 0)
+      setCounts({
+        rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
+        accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
+      })
       setError(null)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load failures')
     } finally {
       setLoading(false)
     }
-  }, [hours, reasonFilter])
+  }, [hours, reasonFilter, outcome])
 
   useEffect(() => {
     setLoading(true)
@@ -119,6 +155,24 @@ export default function ClientFailuresPage() {
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
       <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
+
+        {/* Outcome switch: rejected is the page's job, repaired is context.
+            Both counts are always shown so neither side can go unnoticed. */}
+        <div className="flex flex-wrap gap-2 pb-3">
+          {(['rejected', 'accepted'] as Outcome[]).map(o => (
+            <button
+              key={o}
+              onClick={() => { if (o !== outcome) { setOutcome(o); setReasonFilter(null) } }}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                outcome === o
+                  ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+              }`}
+            >
+              {OUTCOME_COPY[o].chip} ({o === 'rejected' ? counts.rejected : counts.accepted})
+            </button>
+          ))}
+        </div>
 
         {/* Summary chips */}
         {summary.length > 0 && (
@@ -156,10 +210,10 @@ export default function ClientFailuresPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div>
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Failed Check-ins
+                {OUTCOME_COPY[outcome].heading}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Devices that reached the server but were rejected — the answer to &quot;installed but never appeared&quot;
+                {OUTCOME_COPY[outcome].blurb}
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
@@ -250,7 +304,7 @@ export default function ClientFailuresPage() {
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${reasonBadgeClass(f.failureType)}`}>
+                        <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${reasonBadgeClass(f.failureType, f.outcome)}`}>
                           {reasonLabel(f.reason)}
                         </span>
                         {f.statusCode && (
@@ -274,7 +328,7 @@ export default function ClientFailuresPage() {
           {/* Footer */}
           <div className="px-6 py-3 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
             <span>
-              {filteredFailures.length} of {total} rejected check-in{total === 1 ? '' : 's'} shown
+              {filteredFailures.length} of {total} {OUTCOME_COPY[outcome].noun}{total === 1 ? '' : 's'} shown
             </span>
             <Link href="/events" className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 font-medium">
               ← Events feed
