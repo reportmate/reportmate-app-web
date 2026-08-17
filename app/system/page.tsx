@@ -17,6 +17,7 @@ import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/Platfo
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { calculateDeviceStatus } from "@/src/lib/data-processing"
 
 interface SystemDevice {
   id: string
@@ -249,6 +250,7 @@ function SystemPageContent() {
   // Filters accordion state
   const [filtersExpanded, setFiltersExpanded] = useState(false)
 
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
@@ -301,6 +303,15 @@ function SystemPageContent() {
   const toggleLocation = (location: string) => {
     setSelectedLocations(prev =>
       prev.includes(location) ? prev.filter(l => l !== location) : [...prev, location]
+    )
+  }
+
+  // Status is derived from lastSeen, the same rule every other report uses
+  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
+
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev =>
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
     )
   }
 
@@ -373,6 +384,7 @@ function SystemPageContent() {
   }
   
   const clearAllFilters = () => {
+    setSelectedStatuses([])
     setSelectedUsages([])
     setSelectedCatalogs([])
     setSelectedLocations([])
@@ -393,8 +405,8 @@ function SystemPageContent() {
     if (osVersionFilter) router.push('/system')
   }
   
-  const totalActiveFilters = selectedUsages.length + selectedCatalogs.length + selectedLocations.length +
-    selectedAreas.length + selectedFleets.length +
+  const totalActiveFilters = selectedStatuses.length + selectedUsages.length + selectedCatalogs.length +
+    selectedLocations.length + selectedAreas.length + selectedFleets.length +
     selectedEditions.length + selectedActivationStatus.length + selectedLicenseType.length +
     selectedArchitectures.length + selectedTimeZones.length + selectedUptimeBuckets.length + selectedLicenseSources.length +
     selectedPendingBuckets.length +
@@ -503,7 +515,7 @@ function SystemPageContent() {
 
   // FilterOptions slice fed to the shared DeviceFilters component (inventory dimensions only)
   const selectionFilterOptions: FilterOptions = {
-    statuses: [],
+    statuses: Array.from(new Set(systems.map(statusOf))).sort(),
     usages: filterOptions.usages,
     catalogs: filterOptions.catalogs,
     areas: filterOptions.areas,
@@ -635,6 +647,7 @@ function SystemPageContent() {
     }
 
     // Inventory-based filters
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(s))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(inventory?.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(inventory?.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(inventory?.location || '')) return false
@@ -888,13 +901,13 @@ function SystemPageContent() {
           {/* Selections accordion (shared component) */}
           <DeviceFilters
             filterOptions={selectionFilterOptions}
-            selectedStatuses={[]}
+            selectedStatuses={selectedStatuses}
             selectedCatalogs={selectedCatalogs}
             selectedAreas={selectedAreas}
             selectedLocations={selectedLocations}
             selectedFleets={selectedFleets}
             selectedUsages={selectedUsages}
-            onStatusToggle={() => { /* no statuses on /system */ }}
+            onStatusToggle={toggleStatus}
             onCatalogToggle={toggleCatalog}
             onAreaToggle={toggleArea}
             onLocationToggle={toggleLocation}
