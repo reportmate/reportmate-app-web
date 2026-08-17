@@ -359,75 +359,78 @@ function DevicesPageContent() {
           {/* Content skeleton */}
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4 sm:pb-8 pt-4 sm:pt-8">
             <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              {/* Header section skeleton */}
+              {/* Header section skeleton — title, subtitle, search box */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-                <div>
-                  <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded w-24 mb-2"></div>
-                  <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-48"></div>
+                <div className="space-y-2">
+                  <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded w-64"></div>
+                  <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-72"></div>
                 </div>
-                <div className="h-10 bg-gray-300 dark:bg-gray-600 rounded w-64"></div>
-              </div>
-              
-              {/* Selections accordion skeleton */}
-              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
-                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
-                <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded"></div>
+                <div className="h-9 bg-gray-300 dark:bg-gray-600 rounded-lg w-64"></div>
               </div>
 
-              {/* Table skeleton */}
+              {/* Selections accordion skeleton — collapsed, matching the real header bar */}
+              <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-3 flex items-center justify-between">
+                <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                <div className="h-5 w-5 bg-gray-300 dark:bg-gray-600 rounded"></div>
+              </div>
+
+              {/* Table skeleton — same eight columns the loaded table renders */}
               <div className="overflow-auto max-h-[calc(100vh-16rem)] table-scrollbar">
                 <table className="w-full relative">
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     <tr>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-14"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-16"></div>
-                      </th>
-                      <th className="px-4 lg:px-6 py-3">
-                        <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
-                      </th>
+                      {['w-24', 'w-16', 'w-24', 'w-12', 'w-14', 'w-16', 'w-16', 'w-12'].map((width, i) => (
+                        <th key={i} className="px-4 lg:px-6 py-3 text-left">
+                          <div className={`h-3 bg-gray-300 dark:bg-gray-600 rounded ${width}`}></div>
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                    {[...Array(8)].map((_, i) => (
+                    {/* Enough rows to fill a typical viewport, so the card does not
+                        visibly grow when the real rows arrive */}
+                    {[...Array(15)].map((_, i) => (
                       <tr key={i}>
+                        {/* Device name + platform badge */}
                         <td className="px-4 lg:px-6 py-4">
-                          <div className="space-y-2">
+                          <div className="flex items-center gap-2">
                             <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-32"></div>
-                            <div className="h-3 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                            <div className="h-4 w-4 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
                           </div>
                         </td>
+                        {/* Asset tag + copy button */}
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
+                            <div className="h-3 w-3 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
+                          </div>
+                        </td>
+                        {/* Serial number + copy button */}
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
+                            <div className="h-3 w-3 bg-gray-300 dark:bg-gray-600 rounded flex-shrink-0"></div>
+                          </div>
+                        </td>
+                        {/* Usage pill */}
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded-full w-16"></div>
+                        </td>
+                        {/* Catalog pill */}
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-5 bg-gray-300 dark:bg-gray-600 rounded-full w-20"></div>
+                        </td>
+                        {/* Location */}
+                        <td className="px-4 lg:px-6 py-4">
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
+                        </td>
+                        {/* Last seen */}
                         <td className="px-4 lg:px-6 py-4">
                           <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-20"></div>
                         </td>
+                        {/* Status */}
                         <td className="px-4 lg:px-6 py-4">
-                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-28"></div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-16"></div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="h-6 bg-gray-300 dark:bg-gray-600 rounded-full w-18"></div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-24"></div>
-                        </td>
-                        <td className="px-4 lg:px-6 py-4">
-                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-8"></div>
+                          <div className="h-4 bg-gray-300 dark:bg-gray-600 rounded w-12"></div>
                         </td>
                       </tr>
                     ))}
