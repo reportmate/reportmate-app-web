@@ -90,12 +90,17 @@ interface UnusedApp {
 
 interface UtilizationSummary {
   totalAppsTracked: number
+  // Active is the reportable total. totalUsageHours is process lifetime and
+  // routinely exceeds devices x 24 x days many times over, so it is not shown
+  // as a headline figure. Work item 4521.
+  totalActiveHours?: number
   totalUsageHours: number
   totalLaunches: number
   uniqueUsers: number
   uniqueDevices: number
   singleUserAppCount: number
   unusedAppCount: number
+  noActiveUseAppCount?: number
 }
 
 // Version distribution data structure from API
@@ -553,7 +558,13 @@ function ApplicationsPageContent() {
   // when present so the chart totals match the real fleet, not just the page.
   const [versionDistributionServer, setVersionDistributionServer] =
     useState<{ [appName: string]: { totalDevices: number; versions: { [version: string]: number } } } | null>(null)
-  const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('totalHours')
+  // Active time is the headline metric, so it is also the default sort. Total
+  // time is process lifetime summed across concurrent processes, which has no
+  // wall-clock ceiling and is dominated by background services; sorting by it
+  // put "Microsoft Device Inventory Agent" at the top of the fleet's most-used
+  // list. Work item 4251 decided active is the faculty-facing number; 4521 is
+  // this page catching up to that decision.
+  const [utilizationSortColumn, setUtilizationSortColumn] = useState<'name' | 'activeHours' | 'totalHours' | 'launchCount' | 'deviceCount' | 'userCount' | 'lastUsed'>('activeHours')
   const [utilizationSortDirection, setUtilizationSortDirection] = useState<'asc' | 'desc'>('desc')
   
   // Report type: 'usage' for full usage analytics, 'versions' for version distribution only
@@ -1438,6 +1449,13 @@ function ApplicationsPageContent() {
         case 'name':
           compareResult = a.name.localeCompare(b.name)
           break
+        case 'activeHours':
+          compareResult = (a.activeHours || 0) - (b.activeHours || 0)
+          // Ties on active time are common: every background service reports
+          // zero. Fall back to total time so their order stays stable rather
+          // than arbitrary.
+          if (compareResult === 0) compareResult = (a.totalHours || 0) - (b.totalHours || 0)
+          break
         case 'totalHours':
           compareResult = (a.totalHours || 0) - (b.totalHours || 0)
           break
@@ -1676,7 +1694,7 @@ function ApplicationsPageContent() {
     setLastAppliedFilters('')
     // Reset sort and time period to defaults
     setUtilizationDays(30)
-    setUtilizationSortColumn('totalHours')
+    setUtilizationSortColumn('activeHours')
     setUtilizationSortDirection('desc')
   }
 
@@ -1966,7 +1984,18 @@ function ApplicationsPageContent() {
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 {reportType === 'usage' && utilizationData
-                  ? `${utilizationData.summary.totalAppsTracked.toLocaleString()} apps · ${utilizationData.summary.uniqueDevices.toLocaleString()} devices · ${utilizationData.summary.totalUsageHours.toLocaleString()} hours · ${utilizationData.summary.totalLaunches.toLocaleString()} launches · ${utilizationData.summary.uniqueUsers.toLocaleString()} unique users`
+                  ? [
+                      `${utilizationData.summary.totalAppsTracked.toLocaleString()} apps`,
+                      `${utilizationData.summary.uniqueDevices.toLocaleString()} devices`,
+                      utilizationData.summary.totalActiveHours != null
+                        ? `${Math.round(utilizationData.summary.totalActiveHours).toLocaleString()} active hours`
+                        : null,
+                      `${utilizationData.summary.totalLaunches.toLocaleString()} launches`,
+                      `${utilizationData.summary.uniqueUsers.toLocaleString()} unique users`,
+                      utilizationData.summary.noActiveUseAppCount
+                        ? `${utilizationData.summary.noActiveUseAppCount.toLocaleString()} with no active use`
+                        : null,
+                    ].filter(Boolean).join(' · ')
                   : reportType === 'versions' && sortedApplications.length > 0
                   ? `${sortedApplications.length} applications across ${new Set(sortedApplications.map(app => app.serialNumber)).size} devices`
                   : 'Generate report to see application inventory across your fleet'
@@ -2206,9 +2235,14 @@ function ApplicationsPageContent() {
                 <button
                   onClick={() => {
                     const csvContent = [
-                      ['Application', 'Total Hours', 'Launches', 'Devices', 'Users', 'Last Used', 'Single User'].join(','),
+                      // Active hours leads, because this export is what gets
+                      // handed to a faculty head. Process hours is kept but
+                      // named so nobody mistakes it for usage.
+                      ['Application', 'Active Hours', 'Foreground Hours', 'Process Hours', 'Launches', 'Devices', 'Users', 'Last Used', 'Single User'].join(','),
                       ...sortedUtilizationApps.map(app => [
                         app.name,
+                        app.activeHours != null ? app.activeHours.toFixed(1) : '',
+                        app.foregroundHours != null ? app.foregroundHours.toFixed(1) : '',
                         app.totalHours.toFixed(1),
                         app.launchCount,
                         app.deviceCount,
@@ -3125,12 +3159,27 @@ function ApplicationsPageContent() {
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Versions
                       </th>
-                      <th 
+                      <th
                         className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
-                        onClick={() => handleUtilizationSort('totalHours')}
+                        onClick={() => handleUtilizationSort('activeHours')}
+                        title="Time the application held focus with user input in the preceding 5 minutes. This is the utilization number; Process Time beside it is not."
                       >
                         <div className="flex items-center gap-1">
-                          Total Time
+                          Active Time
+                          {utilizationSortColumn === 'activeHours' && (
+                            <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </th>
+                      <th
+                        className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 select-none"
+                        onClick={() => handleUtilizationSort('totalHours')}
+                        title="Process lifetime summed across every concurrent process, including background services. Diagnostic only: it has no wall-clock ceiling and does not mean someone used the application."
+                      >
+                        <div className="flex items-center gap-1">
+                          Process Time
                           {utilizationSortColumn === 'totalHours' && (
                             <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -3198,7 +3247,7 @@ function ApplicationsPageContent() {
                   <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {error ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-12 text-center">
+                        <td colSpan={9} className="px-6 py-12 text-center">
                           <div className="flex flex-col items-center">
                             <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                               <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3218,7 +3267,7 @@ function ApplicationsPageContent() {
                       </tr>
                     ) : sortedUtilizationApps.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                        <td colSpan={9} className="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
                           <div className="flex flex-col items-center justify-center">
                             <svg className="w-12 h-12 mb-4 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -3277,20 +3326,44 @@ function ApplicationsPageContent() {
                               )
                             })()}
                           </td>
+                          {/* Active time: the headline. Zero is a meaningful answer
+                              here — it means nobody used the application in the
+                              window, which is exactly what a utilization report is
+                              asked for — so it renders as a real value rather than
+                              being hidden the way the old inline badge was. */}
                           <td className="px-4 lg:px-6 py-4">
-                            <div className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                            {app.activeSeconds != null ? (
+                              <>
+                                <div className={`text-sm font-medium ${app.activeSeconds > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                                  {formatDuration(app.activeSeconds)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">
+                                  {(app.activeHours ?? 0).toFixed(1)} hours
+                                </div>
+                                {app.foregroundHours != null && app.foregroundHours > 0 && (
+                                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                                    {app.foregroundHours.toFixed(1)}h foreground
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="text-sm text-gray-400 dark:text-gray-500" title="No client in scope has reported idle-time data for this application yet.">
+                                Not reported
+                              </div>
+                            )}
+                          </td>
+                          {/* Process time: retained for diagnostics, deliberately
+                              not styled as the primary number. */}
+                          <td className="px-4 lg:px-6 py-4">
+                            <div className="text-sm text-gray-600 dark:text-gray-400">
                               {formatDuration(app.totalSeconds)}
                             </div>
                             <div className="text-xs text-gray-500 dark:text-gray-400">
                               {app.totalHours.toFixed(1)} hours
                             </div>
-                            {/* Idle-time split: shown only when at least one client in scope
-                                has reported active_seconds for this app. Until clients ship
-                                Phase 2/3 of the idle-time work, this stays hidden. */}
-                            {app.activeRatio != null && app.activeHours != null && (
-                              <div className="text-xs mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300">
-                                <span className="font-medium">{app.activeHours.toFixed(1)}h active</span>
-                                <span className="opacity-70">({Math.round(app.activeRatio * 100)}%)</span>
+                            {app.activeRatio != null && (
+                              <div className="text-xs mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700/50 text-gray-600 dark:text-gray-300">
+                                <span className="opacity-70">{Math.round(app.activeRatio * 100)}% active</span>
                               </div>
                             )}
                           </td>
