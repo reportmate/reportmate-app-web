@@ -10,6 +10,7 @@ import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/Platfo
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { calculateDeviceStatus } from "@/src/lib/data-processing"
 
 interface IdentityDevice {
   id: string
@@ -153,19 +154,25 @@ function IdentityPageContent() {
   const [secureTokenFilter, setSecureTokenFilter] = useState<'with-token' | 'missing-token' | null>(null)
   const [bootstrapTokenFilter, setBootstrapTokenFilter] = useState<'escrowed' | 'not-escrowed' | null>(null)
   // Selections accordion state
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const toggleStatus = (s: string) => setSelectedStatuses(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
   const toggleUsage = (u: string) => setSelectedUsages(p => p.includes(u) ? p.filter(x => x !== u) : [...p, u])
   const toggleCatalog = (c: string) => setSelectedCatalogs(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])
   const toggleLocation = (l: string) => setSelectedLocations(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l])
   const toggleArea = (a: string) => setSelectedAreas(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a])
   const toggleFleet = (f: string) => setSelectedFleets(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])
   const clearAllSelections = () => {
-    setSelectedUsages([]); setSelectedCatalogs([]); setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+    setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
+    setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
   }
+
+  // Status is derived from lastSeen, the same rule every other report uses
+  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
   // Expandable legend categories
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const toggleCategory = (label: string) => {
@@ -290,6 +297,7 @@ function IdentityPageContent() {
       }
     }
     
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(d))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(d.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(d.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(d.location || '')) return false
@@ -580,7 +588,7 @@ function IdentityPageContent() {
           {/* Selections accordion (shared component) */}
           {(() => {
             const sharedFilterOptions: FilterOptions = {
-              statuses: [],
+              statuses: Array.from(new Set(platformFilteredDevices.map(statusOf))).sort(),
               usages: Array.from(new Set(platformFilteredDevices.map(d => d.usage).filter(Boolean) as string[])).sort(),
               catalogs: Array.from(new Set(platformFilteredDevices.map(d => d.catalog).filter(Boolean) as string[])).sort(),
               areas: Array.from(new Set(platformFilteredDevices.map(d => d.area || d.department).filter(Boolean) as string[])).sort(),
@@ -592,13 +600,13 @@ function IdentityPageContent() {
             return (
               <DeviceFilters
                 filterOptions={sharedFilterOptions}
-                selectedStatuses={[]}
+                selectedStatuses={selectedStatuses}
                 selectedCatalogs={selectedCatalogs}
                 selectedAreas={selectedAreas}
                 selectedLocations={selectedLocations}
                 selectedFleets={selectedFleets}
                 selectedUsages={selectedUsages}
-                onStatusToggle={() => { /* no statuses on /identity */ }}
+                onStatusToggle={toggleStatus}
                 onCatalogToggle={toggleCatalog}
                 onAreaToggle={toggleArea}
                 onLocationToggle={toggleLocation}

@@ -12,6 +12,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import { useDeviceData } from "@/src/hooks/useDeviceData"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
+import { calculateDeviceStatus } from "@/src/lib/data-processing"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -101,7 +102,9 @@ function HardwarePageContent() {
 
   // Filter options computed from inventory data
   const filterOptions: FilterOptions = {
-    statuses: ['Active', 'Stale', 'Missing'],
+    statuses: Array.from(new Set(
+      hardware.map(h => calculateDeviceStatus((h as any).lastSeen || (h as any).collectedAt))
+    )).sort(),
     usages: Array.from(new Set(
       allDevices.map((d: any) => d.modules?.inventory?.usage).filter(Boolean)
     )).sort() as string[],
@@ -615,17 +618,10 @@ function HardwarePageContent() {
     return name
   }
 
-  // Helper to get device status based on lastSeen
-  const getDeviceStatus = (device: any): string => {
-    const lastSeen = device.lastSeen || device.collectedAt
-    if (!lastSeen) return 'Missing'
-    const lastSeenDate = new Date(lastSeen)
-    const now = new Date()
-    const diffDays = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60 * 24)
-    if (diffDays <= 1) return 'Active'
-    if (diffDays <= 7) return 'Stale'
-    return 'Missing'
-  }
+  // Status comes from the shared helper so every report agrees on the same
+  // thresholds and the same lowercase values
+  const getDeviceStatus = (device: any): string =>
+    calculateDeviceStatus(device.lastSeen || device.collectedAt)
 
   // Helper to get inventory data
   const getInventory = (device: any) => {

@@ -6,6 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
+import { calculateDeviceStatus } from "@/src/lib/data-processing"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
@@ -37,6 +38,27 @@ interface Peripheral {
   fleet?: string | null
 }
 
+// The single Peripherals column renders one pill per type that a device
+// actually reports, so the table never needs a column per category (and so
+// never needs horizontal scrolling).
+const PERIPHERAL_TYPES = [
+  { key: 'usb', label: 'USB', field: 'usbDevices', pill: 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-200' },
+  { key: 'bluetooth', label: 'Bluetooth', field: 'bluetoothDevices', pill: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200' },
+  { key: 'printers', label: 'Printers', field: 'printers', pill: 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200' },
+  { key: 'cameras', label: 'Cameras', field: 'cameras', pill: 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200' },
+  { key: 'audio', label: 'Audio', field: 'audioDevices', pill: 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200' },
+  { key: 'displays', label: 'Displays', field: 'displayDevices', pill: 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200' },
+  { key: 'input', label: 'Input', field: 'inputDevices', pill: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200' },
+  { key: 'storage', label: 'Storage', field: 'storageDevices', pill: 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200' },
+] as const
+
+type PeripheralTypeKey = typeof PERIPHERAL_TYPES[number]['key']
+
+const countOf = (peripheral: Peripheral, field: string): number => {
+  const value = (peripheral as any)[field]
+  return Array.isArray(value) ? value.length : 0
+}
+
 function LoadingSkeleton() {
   return (
     <div className="animate-pulse">
@@ -61,8 +83,8 @@ function LoadingSkeleton() {
           <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded"></div>
         </div>
         <div className="px-6 py-4 border-t border-gray-100 dark:border-gray-700/50">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2].map(i => (
               <div key={i} className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                 <div className="h-4 w-24 bg-gray-200 dark:bg-gray-600 rounded mb-3"></div>
                 <div className="space-y-2">
@@ -85,19 +107,23 @@ function LoadingSkeleton() {
           <thead className="bg-gray-50 dark:bg-gray-700">
             <tr>
               <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-              <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-              <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
-              <th className="px-6 py-3"><div className="h-4 w-16 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
               <th className="px-6 py-3"><div className="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-12 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
+              <th className="px-6 py-3"><div className="h-4 w-20 bg-gray-300 dark:bg-gray-600 rounded"></div></th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
             {[...Array(8)].map((_, i) => (
               <tr key={i}>
                 <td className="px-6 py-4"><div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
-                <td className="px-6 py-4"><div className="h-4 w-12 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
+                <td className="px-6 py-4">
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4].map(j => (
+                      <div key={j} className="h-5 w-16 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-6 py-4"><div className="h-4 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
                 <td className="px-6 py-4"><div className="h-4 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div></td>
               </tr>
             ))}
@@ -114,7 +140,8 @@ function PeripheralsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [peripherals, setPeripherals] = useState<Peripheral[]>([])
   const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '')
-  const [deviceTypeFilter, setDeviceTypeFilter] = useState('all')
+  // Multi-select peripheral-type pills, replacing the old dropdown
+  const [selectedTypes, setSelectedTypes] = useState<PeripheralTypeKey[]>([])
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Sorting state
@@ -123,23 +150,28 @@ function PeripheralsPageContent() {
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
   const [filtersExpanded, setFiltersExpanded] = useState(false)
   // Widget-driven table filters (click a widget row to filter, click again to clear)
-  const [bluetoothFilter, setBluetoothFilter] = useState<'has' | 'none' | null>(null)
   const [printerFilter, setPrinterFilter] = useState<string | null>(null)
   const [usbTypeFilter, setUsbTypeFilter] = useState<string | null>(null)
   // Selections accordion state
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [selectedUsages, setSelectedUsages] = useState<string[]>([])
   const [selectedCatalogs, setSelectedCatalogs] = useState<string[]>([])
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
   const [selectedAreas, setSelectedAreas] = useState<string[]>([])
   const [selectedFleets, setSelectedFleets] = useState<string[]>([])
+  const toggleStatus = (s: string) => setSelectedStatuses(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s])
   const toggleUsage = (u: string) => setSelectedUsages(p => p.includes(u) ? p.filter(x => x !== u) : [...p, u])
   const toggleCatalog = (c: string) => setSelectedCatalogs(p => p.includes(c) ? p.filter(x => x !== c) : [...p, c])
   const toggleLocation = (l: string) => setSelectedLocations(p => p.includes(l) ? p.filter(x => x !== l) : [...p, l])
   const toggleArea = (a: string) => setSelectedAreas(p => p.includes(a) ? p.filter(x => x !== a) : [...p, a])
   const toggleFleet = (f: string) => setSelectedFleets(p => p.includes(f) ? p.filter(x => x !== f) : [...p, f])
   const clearAllSelections = () => {
-    setSelectedUsages([]); setSelectedCatalogs([]); setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
+    setSelectedStatuses([]); setSelectedUsages([]); setSelectedCatalogs([])
+    setSelectedLocations([]); setSelectedAreas([]); setSelectedFleets([])
   }
+
+  // Status is derived from lastSeen, the same rule every other report uses
+  const statusOf = (peripheral: Peripheral) => calculateDeviceStatus(peripheral.lastSeen)
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
@@ -184,23 +216,13 @@ function PeripheralsPageContent() {
     fetchPeripherals()
   }, [])
 
-  const getDeviceCount = (devices: any[]): number => {
-    return Array.isArray(devices) ? devices.length : 0
-  }
+  const getTotalDevices = (peripheral: Peripheral): number =>
+    PERIPHERAL_TYPES.reduce((sum, type) => sum + countOf(peripheral, type.field), 0)
 
-  const getTotalDevices = (peripheral: Peripheral): number => {
-    return getDeviceCount(peripheral.usbDevices) +
-           getDeviceCount(peripheral.bluetoothDevices) +
-           getDeviceCount(peripheral.printers) +
-           getDeviceCount(peripheral.cameras) +
-           getDeviceCount(peripheral.audioDevices) +
-           getDeviceCount(peripheral.displayDevices) +
-           getDeviceCount(peripheral.inputDevices) +
-           getDeviceCount(peripheral.storageDevices)
-  }
+  const query = searchQuery.trim().toLowerCase()
 
-  // Base filter (platform, search, device-type dropdown, inventory selections) —
-  // widget counts are computed from this so they stay stable as widget filters toggle.
+  // Base filter (platform, search, type pills, inventory selections) — widget
+  // counts are computed from this so they stay stable as widget filters toggle.
   const baseFiltered = peripherals.filter(peripheral => {
     // Global platform filter first
     if (platformFilter) {
@@ -210,48 +232,52 @@ function PeripheralsPageContent() {
       }
     }
 
-    const matchesSearch = peripheral.deviceName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      peripheral.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      JSON.stringify(peripheral.usbDevices).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      JSON.stringify(peripheral.bluetoothDevices).toLowerCase().includes(searchQuery.toLowerCase()) ||
-      JSON.stringify(peripheral.printers).toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = !query ||
+      peripheral.deviceName?.toLowerCase().includes(query) ||
+      peripheral.serialNumber?.toLowerCase().includes(query) ||
+      JSON.stringify(peripheral.usbDevices).toLowerCase().includes(query) ||
+      JSON.stringify(peripheral.bluetoothDevices).toLowerCase().includes(query) ||
+      JSON.stringify(peripheral.printers).toLowerCase().includes(query)
 
-    const matchesFilter = deviceTypeFilter === 'all' || (
-      (deviceTypeFilter === 'usb' && getDeviceCount(peripheral.usbDevices) > 0) ||
-      (deviceTypeFilter === 'bluetooth' && getDeviceCount(peripheral.bluetoothDevices) > 0) ||
-      (deviceTypeFilter === 'printers' && getDeviceCount(peripheral.printers) > 0) ||
-      (deviceTypeFilter === 'cameras' && getDeviceCount(peripheral.cameras) > 0) ||
-      (deviceTypeFilter === 'audio' && getDeviceCount(peripheral.audioDevices) > 0) ||
-      (deviceTypeFilter === 'displays' && getDeviceCount(peripheral.displayDevices) > 0) ||
-      (deviceTypeFilter === 'input' && getDeviceCount(peripheral.inputDevices) > 0) ||
-      (deviceTypeFilter === 'storage' && getDeviceCount(peripheral.storageDevices) > 0)
-    )
+    // A device matches when it reports at least one of the selected types
+    const matchesType = selectedTypes.length === 0 || selectedTypes.some(key => {
+      const type = PERIPHERAL_TYPES.find(t => t.key === key)
+      return type ? countOf(peripheral, type.field) > 0 : false
+    })
 
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(peripheral))) return false
     if (selectedUsages.length > 0 && !selectedUsages.includes(peripheral.usage || '')) return false
     if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(peripheral.catalog || '')) return false
     if (selectedLocations.length > 0 && !selectedLocations.includes(peripheral.location || '')) return false
     if (selectedAreas.length > 0 && !selectedAreas.includes(peripheral.area || peripheral.department || '')) return false
     if (selectedFleets.length > 0 && !selectedFleets.includes(peripheral.fleet || '')) return false
 
-    return matchesSearch && matchesFilter
+    return matchesSearch && matchesType
   })
+
+  // Devices carrying each peripheral type, for the header type pills. Counted
+  // before the type pills themselves apply so the counts don't collapse to zero
+  // as soon as one is selected.
+  const typeDeviceCounts = PERIPHERAL_TYPES.reduce((acc, type) => {
+    acc[type.key] = peripherals.filter(p => {
+      if (platformFilter && !isPlatformVisible(normalizePlatform(p.platform))) return false
+      return countOf(p, type.field) > 0
+    }).length
+    return acc
+  }, {} as Record<string, number>)
+
+  // Widget rows are narrowed by the same search box as the table, so typing
+  // "laser" leaves only the matching printers standing.
+  const matchesWidgetQuery = (label: string) => !query || label.toLowerCase().includes(query)
 
   // Calculate peripheral statistics for widgets (from base, so counts stay stable)
   const peripheralStats = {
-    // Bluetooth power state
-    bluetoothOn: baseFiltered.filter(p =>
-      p.bluetoothDevices && p.bluetoothDevices.length > 0
-    ).length,
-    bluetoothOff: baseFiltered.filter(p =>
-      !p.bluetoothDevices || p.bluetoothDevices.length === 0
-    ).length,
-
     // Printer names and counts
     printerNames: baseFiltered.reduce((acc, p) => {
       if (p.printers && Array.isArray(p.printers)) {
         p.printers.forEach((printer: any) => {
           const name = printer.name || printer.printerName || 'Unknown Printer'
-          acc[name] = (acc[name] || 0) + 1
+          if (matchesWidgetQuery(name)) acc[name] = (acc[name] || 0) + 1
         })
       }
       return acc
@@ -262,22 +288,23 @@ function PeripheralsPageContent() {
       if (p.usbDevices && Array.isArray(p.usbDevices)) {
         p.usbDevices.forEach((device: any) => {
           const type = device.class || device.type || device.vendor || 'Unknown'
-          acc[type] = (acc[type] || 0) + 1
+          if (matchesWidgetQuery(type)) acc[type] = (acc[type] || 0) + 1
         })
       }
       return acc
     }, {} as Record<string, number>),
 
-    // Total counts
-    totalUSB: baseFiltered.reduce((sum, p) => sum + getDeviceCount(p.usbDevices), 0),
-    totalBluetooth: baseFiltered.reduce((sum, p) => sum + getDeviceCount(p.bluetoothDevices), 0),
-    totalPrinters: baseFiltered.reduce((sum, p) => sum + getDeviceCount(p.printers), 0)
   }
+
+  // Header counts sum the rows actually listed, so a search that narrows the
+  // widget can't leave a total that contradicts what is on screen.
+  const sumValues = (counts: Record<string, number>) =>
+    Object.values(counts).reduce((sum, n) => sum + n, 0)
+  const totalPrinters = sumValues(peripheralStats.printerNames)
+  const totalUSB = sumValues(peripheralStats.usbTypes)
 
   // Apply widget-driven filters on top of the base, then sort → table rows
   const filteredPeripherals = baseFiltered.filter(peripheral => {
-    if (bluetoothFilter === 'has' && getDeviceCount(peripheral.bluetoothDevices) === 0) return false
-    if (bluetoothFilter === 'none' && getDeviceCount(peripheral.bluetoothDevices) > 0) return false
     if (printerFilter && !(Array.isArray(peripheral.printers) ? peripheral.printers : []).some((p: any) => (p.name || p.printerName || 'Unknown Printer') === printerFilter)) return false
     if (usbTypeFilter && !(Array.isArray(peripheral.usbDevices) ? peripheral.usbDevices : []).some((d: any) => (d.class || d.type || d.vendor || 'Unknown') === usbTypeFilter)) return false
     return true
@@ -325,23 +352,6 @@ function PeripheralsPageContent() {
                 </p>
               </div>
               <div className="flex items-center gap-4">
-                {/* Device Type Filter */}
-                <select
-                  value={deviceTypeFilter}
-                  onChange={(e) => setDeviceTypeFilter(e.target.value)}
-                  className="text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-1.5"
-                >
-                  <option value="all">All Device Types</option>
-                  <option value="usb">USB Devices</option>
-                  <option value="bluetooth">Bluetooth Devices</option>
-                  <option value="printers">Printers</option>
-                  <option value="cameras">Cameras</option>
-                  <option value="audio">Audio Devices</option>
-                  <option value="displays">Display Devices</option>
-                  <option value="input">Input Devices</option>
-                  <option value="storage">Storage Devices</option>
-                </select>
-
                 {/* Search */}
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -359,12 +369,42 @@ function PeripheralsPageContent() {
                 </div>
               </div>
             </div>
+
+            {/* Peripheral type filters — multi-select, replacing the old dropdown */}
+            <nav className="flex flex-wrap gap-2 mt-4">
+              {PERIPHERAL_TYPES.map(type => {
+                const isActive = selectedTypes.includes(type.key)
+                const count = typeDeviceCounts[type.key] || 0
+                return (
+                  <button
+                    key={type.key}
+                    onClick={() => setSelectedTypes(prev =>
+                      prev.includes(type.key) ? prev.filter(k => k !== type.key) : [...prev, type.key]
+                    )}
+                    className={`px-3 py-1.5 border rounded-lg text-sm font-medium flex items-center gap-2 transition-colors ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-300 dark:border-blue-700'
+                        : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    <span>{type.label}</span>
+                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                      isActive
+                        ? 'bg-blue-100 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
+                    }`}>
+                      {count}
+                    </span>
+                  </button>
+                )
+              })}
+            </nav>
           </div>
 
           {/* Selections accordion (shared component) */}
           {(() => {
             const sharedFilterOptions: FilterOptions = {
-              statuses: [],
+              statuses: Array.from(new Set(peripherals.map(statusOf))).sort(),
               usages: Array.from(new Set(peripherals.map(p => p.usage).filter(Boolean) as string[])).sort(),
               catalogs: Array.from(new Set(peripherals.map(p => p.catalog).filter(Boolean) as string[])).sort(),
               areas: Array.from(new Set(peripherals.map(p => p.area || p.department).filter(Boolean) as string[])).sort(),
@@ -376,13 +416,13 @@ function PeripheralsPageContent() {
             return (
               <DeviceFilters
                 filterOptions={sharedFilterOptions}
-                selectedStatuses={[]}
+                selectedStatuses={selectedStatuses}
                 selectedCatalogs={selectedCatalogs}
                 selectedAreas={selectedAreas}
                 selectedLocations={selectedLocations}
                 selectedFleets={selectedFleets}
                 selectedUsages={selectedUsages}
-                onStatusToggle={() => { /* no statuses on /peripherals */ }}
+                onStatusToggle={toggleStatus}
                 onCatalogToggle={toggleCatalog}
                 onAreaToggle={toggleArea}
                 onLocationToggle={toggleLocation}
@@ -417,76 +457,53 @@ function PeripheralsPageContent() {
             
             <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="px-6 py-4 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700/50">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {/* Bluetooth Power State Widget */}
-                  <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Bluetooth State</h4>
-                    <div className="space-y-1">
-                      <button
-                        onClick={() => setBluetoothFilter(bluetoothFilter === 'has' ? null : 'has')}
-                        className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${bluetoothFilter === 'has' ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">Has Devices</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{peripheralStats.bluetoothOn}</span>
-                      </button>
-                      <button
-                        onClick={() => setBluetoothFilter(bluetoothFilter === 'none' ? null : 'none')}
-                        className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${bluetoothFilter === 'none' ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-full bg-gray-400"></div>
-                          <span className="text-sm text-gray-600 dark:text-gray-400">No Devices</span>
-                        </div>
-                        <span className="text-sm font-medium text-gray-900 dark:text-white">{peripheralStats.bluetoothOff}</span>
-                      </button>
-                    </div>
-                  </div>
-
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Printers Widget */}
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Printers ({peripheralStats.totalPrinters})</h4>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Printers ({totalPrinters})</h4>
                     <div className="space-y-1 max-h-48 overflow-y-auto table-scrollbar pr-1">
                       {Object.entries(peripheralStats.printerNames).sort((a, b) => b[1] - a[1]).map(([name, count]) => (
                         <button
                           key={name}
                           onClick={() => setPrinterFilter(printerFilter === name ? null : name)}
-                          className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${printerFilter === name ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
+                          className={`flex items-center justify-between gap-3 w-full px-1.5 py-1 rounded transition-colors ${printerFilter === name ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div className="w-2.5 h-2.5 rounded-full bg-purple-500 flex-shrink-0"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={name}>{name}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate text-left" title={name}>{name}</span>
                           </div>
                           <span className="text-sm font-medium text-gray-900 dark:text-white flex-shrink-0">{count}</span>
                         </button>
                       ))}
                       {Object.keys(peripheralStats.printerNames).length === 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No printers found</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {query ? `No printers match "${searchQuery}"` : 'No printers found'}
+                        </span>
                       )}
                     </div>
                   </div>
 
                   {/* USB Devices Widget */}
                   <div className="bg-gray-50 dark:bg-gray-700/50 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
-                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">USB Devices ({peripheralStats.totalUSB})</h4>
+                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">USB Devices ({totalUSB})</h4>
                     <div className="space-y-1 max-h-48 overflow-y-auto table-scrollbar pr-1">
                       {Object.entries(peripheralStats.usbTypes).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
                         <button
                           key={type}
                           onClick={() => setUsbTypeFilter(usbTypeFilter === type ? null : type)}
-                          className={`flex items-center justify-between w-full px-1.5 py-1 rounded transition-colors ${usbTypeFilter === type ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
+                          className={`flex items-center justify-between gap-3 w-full px-1.5 py-1 rounded transition-colors ${usbTypeFilter === type ? 'bg-blue-100 dark:bg-blue-900/30' : 'hover:bg-gray-100 dark:hover:bg-gray-600/50'}`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
                             <div className="w-2.5 h-2.5 rounded-full bg-green-500 flex-shrink-0"></div>
-                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px]" title={type}>{type}</span>
+                            <span className="text-sm text-gray-600 dark:text-gray-400 truncate text-left" title={type}>{type}</span>
                           </div>
                           <span className="text-sm font-medium text-gray-900 dark:text-white flex-shrink-0">{count}</span>
                         </button>
                       ))}
                       {Object.keys(peripheralStats.usbTypes).length === 0 && (
-                        <span className="text-sm text-gray-500 dark:text-gray-400">No USB devices found</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                          {query ? `No USB devices match "${searchQuery}"` : 'No USB devices found'}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -495,13 +512,13 @@ function PeripheralsPageContent() {
             </CollapsibleSection>
           </div>
 
-          <div ref={tableContainerRef} className="flex-1 overflow-auto min-h-0 table-scrollbar">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+          <div ref={tableContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 table-scrollbar">
+            <table className="w-full table-fixed divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th 
+                  <th
                     onClick={() => handleSort('device')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-64 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Device
@@ -512,13 +529,10 @@ function PeripheralsPageContent() {
                       )}
                     </div>
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">USB Devices</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Bluetooth</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Printers</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Other Devices</th>
-                  <th 
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700">Peripherals</th>
+                  <th
                     onClick={() => handleSort('total')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
+                    className="w-24 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Total
@@ -529,9 +543,8 @@ function PeripheralsPageContent() {
                       )}
                     </div>
                   </th>
-                  <th 
+                  <th className="w-36 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                     onClick={() => handleSort('lastSeen')}
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"
                   >
                     <div className="flex items-center gap-1">
                       Last Seen
@@ -547,7 +560,7 @@ function PeripheralsPageContent() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={4} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -567,7 +580,7 @@ function PeripheralsPageContent() {
                   </tr>
                 ) : filteredPeripherals.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-12 text-center">
+                    <td colSpan={4} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.8 3.2h6.4a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H8.8a1 1 0 0 1-1-1V4.2a1 1 0 0 1 1-1zM8.8 7.2h6.4a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H8.8a2 2 0 0 1-2-2V9.2a2 2 0 0 1 2-2zM10.4 17.2h3.2a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1v-4a1 1 0 0 1 1-1z" />
@@ -580,7 +593,7 @@ function PeripheralsPageContent() {
                 ) : (
                   filteredPeripherals.map((peripheral) => (
                     <tr key={peripheral.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                      <td className="px-6 py-4 max-w-56">
+                      <td className="px-6 py-4">
                         <Link
                           href={`/device/${peripheral.serialNumber}#peripherals`}
                           className="group block min-w-0"
@@ -596,92 +609,26 @@ function PeripheralsPageContent() {
                         </Link>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white font-medium">
-                            {getDeviceCount(peripheral.usbDevices)} devices
-                          </div>
-                          {peripheral.usbDevices && peripheral.usbDevices.length > 0 && (
-                            <div className="text-gray-500 dark:text-gray-400 text-xs max-w-xs">
-                              {peripheral.usbDevices.slice(0, 2).map((device: any, idx: number) => (
-                                <div key={idx} className="truncate">
-                                  {device.product_name || device.name || 'Unknown USB Device'}
-                                </div>
-                              ))}
-                              {peripheral.usbDevices.length > 2 && (
-                                <div>+{peripheral.usbDevices.length - 2} more...</div>
-                              )}
-                            </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {PERIPHERAL_TYPES.map(type => {
+                            const count = countOf(peripheral, type.field)
+                            if (count === 0) return null
+                            return (
+                              <span
+                                key={type.key}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${type.pill}`}
+                              >
+                                <span className="tabular-nums">{count}</span>
+                                {type.label}
+                              </span>
+                            )
+                          })}
+                          {getTotalDevices(peripheral) === 0 && (
+                            <span className="text-sm text-gray-400 dark:text-gray-500">No peripherals reported</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white font-medium">
-                            {getDeviceCount(peripheral.bluetoothDevices)} devices
-                          </div>
-                          {peripheral.bluetoothDevices && peripheral.bluetoothDevices.length > 0 && (
-                            <div className="text-gray-500 dark:text-gray-400 text-xs max-w-xs">
-                              {peripheral.bluetoothDevices.slice(0, 2).map((device: any, idx: number) => (
-                                <div key={idx} className="truncate">
-                                  {device.name || device.address || 'Unknown Bluetooth'}
-                                </div>
-                              ))}
-                              {peripheral.bluetoothDevices.length > 2 && (
-                                <div>+{peripheral.bluetoothDevices.length - 2} more...</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm">
-                          <div className="text-gray-900 dark:text-white font-medium">
-                            {getDeviceCount(peripheral.printers)} printers
-                          </div>
-                          {peripheral.printers && peripheral.printers.length > 0 && (
-                            <div className="text-gray-500 dark:text-gray-400 text-xs max-w-xs">
-                              {peripheral.printers.slice(0, 2).map((printer: any, idx: number) => (
-                                <div key={idx} className="truncate">
-                                  {printer.name || printer.display_name || 'Unknown Printer'}
-                                </div>
-                              ))}
-                              {peripheral.printers.length > 2 && (
-                                <div>+{peripheral.printers.length - 2} more...</div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex flex-wrap gap-1">
-                          {getDeviceCount(peripheral.cameras) > 0 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                              {getDeviceCount(peripheral.cameras)} cameras
-                            </span>
-                          )}
-                          {getDeviceCount(peripheral.audioDevices) > 0 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                              {getDeviceCount(peripheral.audioDevices)} audio
-                            </span>
-                          )}
-                          {getDeviceCount(peripheral.displayDevices) > 0 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                              {getDeviceCount(peripheral.displayDevices)} displays
-                            </span>
-                          )}
-                          {getDeviceCount(peripheral.inputDevices) > 0 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                              {getDeviceCount(peripheral.inputDevices)} input
-                            </span>
-                          )}
-                          {getDeviceCount(peripheral.storageDevices) > 0 && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                              {getDeviceCount(peripheral.storageDevices)} storage
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium">
+                      <td className="px-6 py-4 text-sm text-gray-900 dark:text-white font-medium tabular-nums">
                         {getTotalDevices(peripheral)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
