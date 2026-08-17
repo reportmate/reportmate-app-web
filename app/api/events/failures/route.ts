@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const queryParams = new URLSearchParams()
-    for (const key of ['limit', 'offset', 'serial', 'reason', 'hours']) {
+    for (const key of ['limit', 'offset', 'serial', 'reason', 'hours', 'outcome']) {
       const value = searchParams.get(key)
       if (value) queryParams.append(key, value)
     }
