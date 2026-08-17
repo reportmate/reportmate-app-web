@@ -123,6 +123,10 @@ interface HardwareData {
     smartStatus?: string;
     purgeableSpace?: number;
     deviceName?: string;
+    // Physical disk identity (Windows camelCase / Mac snake_case)
+    model?: string;
+    serialNumber?: string;
+    serial_number?: string;
     type?: string;
     interface?: string;
     health?: string;
@@ -888,14 +892,15 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
         )}
       </div>
 
-      {/* Storage Devices Section - Show when multiple drives with capacity > 0 */}
+      {/* Storage Devices Section - hardware identity (model/serial), so it must show even
+          for single-drive machines and for disks whose free space could not be attributed */}
       {(() => {
-        const validDrives = storageDevices.filter((drive: any) => {
+        const validDrives = allStorageDevices.filter((drive: any) => {
           // Support both size (Mac) and capacity (Windows)
           const driveCapacity = drive.size ?? drive.capacity
           return driveCapacity && safeNumber(driveCapacity) > 0
         });
-        return validDrives.length > 1 ? (
+        return validDrives.length >= 1 ? (
           <div className="space-y-4">
             <h3 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
               <HardDrive className="w-6 h-6 text-gray-500" />
@@ -907,7 +912,8 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                   <thead className="bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Device Name</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Serial Number</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capacity</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Free Space</th>
@@ -921,7 +927,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                       const capacity = safeNumber(drive.size ?? drive.capacity);
                       const freeSpace = safeNumber(drive.freeSpace ?? drive.free_space);
                       const fileSystem = safeString(drive.fileSystem ?? drive.file_system);
-                      const deviceName = safeString(drive.deviceName ?? drive.device_name);
+                      // Mac reports the hardware model as device_name; Windows sends model
+                      const model = safeString(drive.model ?? drive.deviceName ?? drive.device_name);
+                      const serialNumber = safeString(drive.serialNumber ?? drive.serial_number);
                       // Cap usedPercent at 100% and floor at 0% to prevent visual overflow
                       const rawUsedPercent = capacity > 0 ? Math.round(((capacity - freeSpace) / capacity) * 100) : 0;
                       const usedPercent = Math.min(100, Math.max(0, rawUsedPercent));
@@ -933,7 +941,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                             {safeString(drive.name) && safeString(drive.name) !== 'Unknown' ? safeString(drive.name) : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {deviceName && deviceName !== 'Unknown' ? deviceName : '-'}
+                            {model && model !== 'Unknown' ? model : '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 font-mono">
+                            {serialNumber && serialNumber !== 'Unknown' ? serialNumber : '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {safeString(drive.type) && safeString(drive.type) !== 'Unknown' ? safeString(drive.type) : '-'}
@@ -942,6 +953,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                             {formatBytes(capacity)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                            {freeSpace > 0 ? (
                             <div className="flex flex-col gap-1">
                               <div>{formatBytes(freeSpace)} ({100 - usedPercent}% free)</div>
                               <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-1.5">
@@ -957,6 +969,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                                 ></div>
                               </div>
                             </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                             {fileSystem && fileSystem !== 'Unknown' ? fileSystem : '-'}
