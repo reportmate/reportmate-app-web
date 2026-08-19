@@ -31,9 +31,13 @@ interface HardwareData {
   manufacturer?: unknown;
   formFactor?: 'desktop' | 'laptop' | string;
   model_identifier?: unknown;
+  modelIdentifier?: unknown;
   memory?: {
-    // snake_case (Mac osquery)
+    // snake_case (Mac osquery), and the camelCase normalizeKeys() rewrites it to
     physical_memory?: unknown;
+    physicalMemory?: unknown;
+    unified_memory?: unknown;
+    unifiedMemory?: unknown;
     // camelCase (Windows)
     totalPhysical?: unknown;
     availablePhysical?: unknown;
@@ -62,17 +66,20 @@ interface HardwareData {
     efficiencyCores?: number;
   };
   battery?: {
-    // osquery snake_case fields (Mac)
+    // osquery snake_case fields (Mac), and the camelCase normalizeKeys() rewrites them to
     cycle_count?: unknown;
+    cycleCount?: unknown;
     percent_remaining?: unknown;
+    percentRemaining?: unknown;
     charging?: unknown;
     minutes_until_empty?: unknown;
+    minutesUntilEmpty?: unknown;
     minutes_to_full_charge?: unknown;
     max_capacity?: unknown;
     current_capacity?: unknown;
     designed_capacity?: unknown;
+    designedCapacity?: unknown;
     // Legacy camelCase fields (Windows)
-    cycleCount?: unknown;
     chargePercent?: unknown;
     health?: unknown;
     isCharging?: unknown;
@@ -355,14 +362,17 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
     return total + freeSpace
   }, 0) || 0
   
-  // Memory - support both physical_memory (Mac) and totalPhysical (Windows)
-  const totalMemory = safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
+  // Memory - the Mac client sends physical_memory, which normalizeKeys() rewrites to
+  // physicalMemory; the Windows client sends totalPhysical
+  const totalMemory = safeNumber(hardwareData.memory?.physicalMemory) || safeNumber(hardwareData.memory?.physical_memory) || safeNumber(hardwareData.memory?.totalPhysical) || 0
   const memoryModule = hardwareData.memory?.modules?.[0]
   const memoryModuleType = safeString(memoryModule?.type)
   const memoryModuleManufacturer = safeString(memoryModule?.manufacturer)
   const memoryType = hardwareData.memory?.type || memoryModuleType
   const memoryManufacturer = hardwareData.memory?.manufacturer || memoryModuleManufacturer
   
+  const modelIdentifier = hardwareData.modelIdentifier ?? hardwareData.model_identifier
+
   const processorName = safeProcessorName(hardwareData.processor)
   const processorArchitecture = safeString(hardwareData.processor?.architecture)
   // Support both logical_cores (Mac) and logicalProcessors (Windows)
@@ -378,8 +388,9 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const graphicsMemorySize = safeNumber(hardwareData.graphics?.memorySize) || safeNumber(hardwareData.graphics?.memory_size)
   const graphicsDriverVersion = safeString(hardwareData.graphics?.driverVersion)
   const graphicsCores = safeNumber(hardwareData.graphics?.cores)
-  // Support both metal_support (Mac) and metalSupport (Windows)
-  const graphicsMetalSupport = safeString(hardwareData.graphics?.metal_support) || safeString(hardwareData.graphics?.metalSupport)
+  // Support both metal_support (Mac, normalized to metalSupport) and metalSupport (Windows).
+  // safeString returns the literal 'Unknown' for a missing value, so pick the key first.
+  const graphicsMetalSupport = safeString(hardwareData.graphics?.metalSupport ?? hardwareData.graphics?.metal_support)
   
   // Clean GPU name by removing manufacturer prefix (e.g., "NVIDIA GeForce RTX 3080" -> "GeForce RTX 3080")
   const cleanGraphicsName = (() => {
@@ -409,14 +420,18 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   const hasDisplays = displays.length > 0
   
   // Support both osquery snake_case (Mac) and camelCase (Windows)
-  const batteryCycleCount = safeNumber(hardwareData.battery?.cycle_count) || safeNumber(hardwareData.battery?.cycleCount)
-  const batteryChargePercent = safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
+  const batteryCycleCount = safeNumber(hardwareData.battery?.cycleCount) || safeNumber(hardwareData.battery?.cycle_count)
+  const batteryChargePercent = safeNumber(hardwareData.battery?.percentRemaining) || safeNumber(hardwareData.battery?.percent_remaining) || safeNumber(hardwareData.battery?.chargePercent)
   const batteryHealth = safeString(hardwareData.battery?.health)
   const batteryIsCharging = hardwareData.battery?.charging === 1 || Boolean(hardwareData.battery?.isCharging)
-  // osquery: minutes_until_empty, Windows: estimatedRuntime
-  const batteryEstimatedRuntime = hardwareData.battery?.minutes_until_empty 
-    ? `${hardwareData.battery.minutes_until_empty} min`
+  // osquery: minutes_until_empty (normalized to minutesUntilEmpty), Windows: estimatedRuntime
+  // A charging machine reports 0 minutes until empty - that is absence of an estimate, not an estimate of zero
+  const batteryMinutesUntilEmpty = safeNumber(hardwareData.battery?.minutesUntilEmpty ?? hardwareData.battery?.minutes_until_empty)
+  const batteryEstimatedRuntime = batteryMinutesUntilEmpty > 0
+    ? `${batteryMinutesUntilEmpty} min`
     : (typeof hardwareData.battery?.estimatedRuntime === 'string' ? hardwareData.battery.estimatedRuntime : '')
+  const batteryDesignCapacity = hardwareData.battery?.designedCapacity ?? hardwareData.battery?.designed_capacity ?? hardwareData.battery?.designCapacity
+  const batteryCurrentCapacity = hardwareData.battery?.currentCapacity ?? hardwareData.battery?.current_capacity
   const batteryItems = Array.isArray(hardwareData.battery?.items) ? hardwareData.battery.items : null
   const formFactor = hardwareData.formFactor as string | undefined
   const isDesktop = formFactor === 'desktop'
@@ -440,7 +455,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // 1. Backend flag: unified_memory (set by Mac client for Apple Silicon)
   // 2. Apple Silicon with performance/efficiency cores (M-series chips)
   // 3. CPU name matches GPU name (common in SoCs)
-  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unified_memory)
+  const hasUnifiedMemoryFlag = Boolean(hardwareData.memory?.unifiedMemory ?? hardwareData.memory?.unified_memory)
   const isUnifiedMemory = hasUnifiedMemoryFlag || hasAppleSilicon || (processorName === graphicsName && graphicsName !== 'Unknown')
 
   // Clean up GPU name if it repeats the processor name
@@ -494,11 +509,11 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
             </div>
             
             {/* Identifier */}
-            {hardwareData.model_identifier && safeString(hardwareData.model_identifier) !== 'Unknown' && (
+            {modelIdentifier && safeString(modelIdentifier) !== 'Unknown' && (
               <div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Identifier</div>
                 <div className="text-xl font-mono font-bold text-gray-900 dark:text-white">
-                  {safeString(hardwareData.model_identifier)}
+                  {safeString(modelIdentifier)}
                 </div>
               </div>
             )}
@@ -1030,10 +1045,10 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                     {batteryEstimatedRuntime && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Runtime</th>
                     )}
-                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {batteryDesignCapacity !== undefined && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Design Capacity</th>
                     )}
-                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
+                    {batteryCurrentCapacity !== undefined && (
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Current Capacity</th>
                     )}
                   </tr>
@@ -1071,14 +1086,14 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
                         {batteryEstimatedRuntime}
                       </td>
                     )}
-                    {(hardwareData.battery.designed_capacity !== undefined || hardwareData.battery.designCapacity !== undefined) && (
+                    {batteryDesignCapacity !== undefined && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.designed_capacity) || safeNumber(hardwareData.battery.designCapacity)} mAh
+                        {safeNumber(batteryDesignCapacity)} mAh
                       </td>
                     )}
-                    {(hardwareData.battery.current_capacity !== undefined || hardwareData.battery.currentCapacity !== undefined) && (
+                    {batteryCurrentCapacity !== undefined && (
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
-                        {safeNumber(hardwareData.battery.current_capacity) || safeNumber(hardwareData.battery.currentCapacity)} mAh
+                        {safeNumber(batteryCurrentCapacity)} mAh
                       </td>
                     )}
                   </tr>
