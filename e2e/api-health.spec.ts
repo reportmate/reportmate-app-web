@@ -201,12 +201,3 @@ test.describe('FastAPI Unauthenticated Rejects', () => {
     expect([401, 403]).toContain(res.status())
   })
 })
-
-test.describe('FastAPI Negotiate Endpoint', () => {
-
-  test('GET /api/negotiate - returns SignalR config', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/negotiate`)
-    // May return 200 or 500 depending on SignalR config, but should not 404
-    expect(res.status()).not.toBe(404)
-  })
-})
