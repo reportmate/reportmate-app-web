@@ -58,13 +58,24 @@ interface UtilizationApp {
   foregroundHours?: number
   activeRatio?: number | null
   launchCount: number
+  // deviceCount / userCount count every device and user that produced any
+  // usage row, including rows that are pure background process time. That is
+  // installation footprint, not seats: Houdini reported 184 devices and 229
+  // users against 0.5 active hours. The active* variants count only those
+  // that contributed real attention and are what a licence question needs.
+  // Work item 4571.
   deviceCount: number
   userCount: number
+  activeDeviceCount?: number
+  activeUserCount?: number
   lastUsed: string | null
   firstUsed: string | null
   devices: string[]
   users: string[]
+  activeDevices?: string[]
+  activeUsers?: string[]
   isSingleUser: boolean
+  isSingleActiveUser?: boolean
   aliasedFrom?: string[]
 }
 
@@ -1463,10 +1474,12 @@ function ApplicationsPageContent() {
           compareResult = (a.launchCount || 0) - (b.launchCount || 0)
           break
         case 'deviceCount':
-          compareResult = (a.deviceCount || 0) - (b.deviceCount || 0)
+          // Sort on the figure the column actually leads with, else the sort
+          // arrow orders by a number the reader cannot see. #4571
+          compareResult = (a.activeDeviceCount ?? a.deviceCount ?? 0) - (b.activeDeviceCount ?? b.deviceCount ?? 0)
           break
         case 'userCount':
-          compareResult = (a.userCount || 0) - (b.userCount || 0)
+          compareResult = (a.activeUserCount ?? a.userCount ?? 0) - (b.activeUserCount ?? b.userCount ?? 0)
           break
         case 'lastUsed':
           const dateA = a.lastUsed ? new Date(a.lastUsed).getTime() : 0
@@ -2238,14 +2251,16 @@ function ApplicationsPageContent() {
                       // Active hours leads, because this export is what gets
                       // handed to a faculty head. Process hours is kept but
                       // named so nobody mistakes it for usage.
-                      ['Application', 'Active Hours', 'Foreground Hours', 'Process Hours', 'Launches', 'Devices', 'Users', 'Last Used', 'Single User'].join(','),
+                      ['Application', 'Active Hours', 'Foreground Hours', 'Process Hours', 'Launches', 'Active Devices', 'Devices Installed', 'Active Users', 'Users Attributed', 'Last Used', 'Single User'].join(','),
                       ...sortedUtilizationApps.map(app => [
                         app.name,
                         app.activeHours != null ? app.activeHours.toFixed(1) : '',
                         app.foregroundHours != null ? app.foregroundHours.toFixed(1) : '',
                         app.totalHours.toFixed(1),
                         app.launchCount,
+                        app.activeDeviceCount ?? '',
                         app.deviceCount,
+                        app.activeUserCount ?? '',
                         app.userCount,
                         app.lastUsed || '',
                         app.isSingleUser ? 'Yes' : 'No'
@@ -3205,7 +3220,7 @@ function ApplicationsPageContent() {
                         onClick={() => handleUtilizationSort('deviceCount')}
                       >
                         <div className="flex items-center gap-1">
-                          Devices
+                          Active Devices
                           {utilizationSortColumn === 'deviceCount' && (
                             <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -3218,7 +3233,7 @@ function ApplicationsPageContent() {
                         onClick={() => handleUtilizationSort('userCount')}
                       >
                         <div className="flex items-center gap-1">
-                          Users
+                          Active Users
                           {utilizationSortColumn === 'userCount' && (
                             <svg className={`w-4 h-4 transition-transform ${utilizationSortDirection === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
@@ -3372,15 +3387,29 @@ function ApplicationsPageContent() {
                               {app.launchCount.toLocaleString()}
                             </div>
                           </td>
+                          {/* Devices and users that actually used the app lead;
+                              the installation footprint stays visible beneath.
+                              Reading footprint as seats is how a daemon on the
+                              whole fleet looks like fleet-wide demand. #4571 */}
                           <td className="px-4 lg:px-6 py-4">
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {app.deviceCount}
+                            <div className={`text-sm ${(app.activeDeviceCount ?? 0) > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                              {app.activeDeviceCount ?? app.deviceCount}
                             </div>
+                            {app.activeDeviceCount != null && app.activeDeviceCount !== app.deviceCount && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400" title="Devices with any usage row, including background-only process time">
+                                {app.deviceCount} installed
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 lg:px-6 py-4">
-                            <div className="text-sm text-gray-900 dark:text-white">
-                              {app.userCount}
+                            <div className={`text-sm ${(app.activeUserCount ?? 0) > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                              {app.activeUserCount ?? app.userCount}
                             </div>
+                            {app.activeUserCount != null && app.activeUserCount !== app.userCount && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400" title="Users attributed any usage row, including background-only process time">
+                                {app.userCount} attributed
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 lg:px-6 py-4">
                             <div className="text-sm text-gray-900 dark:text-white">
