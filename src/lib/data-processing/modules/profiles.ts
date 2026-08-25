@@ -90,19 +90,24 @@ function parseMacProfilesOutput(rawText: string): ProfileItem[] {
  * Also handles Mac raw profiles output
  */
 export function extractProfiles(deviceModules: any): ProfilesInfo {
-  if (!deviceModules?.profiles) {
-    // Check in modules.profiles
-    if (!deviceModules?.modules?.profiles) {
-            return {
-        totalProfiles: 0,
-        systemProfiles: 0,
-        userProfiles: 0,
-        profiles: []
-      }
+  // The standalone `profiles` module was folded into `management`, so Windows devices
+  // carry their configuration profiles and policies there. macOS still reports the
+  // raw `profiles -C`/`-P` output under `profiles`. Read whichever is present: falling
+  // back to `management` is what lets Windows policies render in this view at all.
+  const profilesData =
+    deviceModules?.profiles ||
+    deviceModules?.modules?.profiles ||
+    deviceModules?.management ||
+    deviceModules?.modules?.management
+
+  if (!profilesData) {
+    return {
+      totalProfiles: 0,
+      systemProfiles: 0,
+      userProfiles: 0,
+      profiles: []
     }
   }
-
-  const profilesData = deviceModules.profiles || deviceModules.modules?.profiles
   
   
   // Process profiles from different sources
@@ -150,9 +155,9 @@ export function extractProfiles(deviceModules: any): ProfilesInfo {
   if (profilesData?.configurationProfiles && Array.isArray(profilesData.configurationProfiles)) {
     profilesData.configurationProfiles.forEach((profile: any) => {
       profiles.push({
-        id: profile.profileId || profile.uuid || 'unknown',
-        displayName: profile.profileName || profile.displayName || 'Unknown Profile',
-        uuid: profile.uuid || profile.profileId || 'unknown',
+        id: profile.profileId || profile.uuid || profile.identifier || 'unknown',
+        displayName: profile.profileName || profile.displayName || profile.name || 'Unknown Profile',
+        uuid: profile.uuid || profile.profileId || profile.identifier || 'unknown',
         type: profile.type || 'Device',
         installDate: profile.installDate || '',
         organization: profile.organization || '',
