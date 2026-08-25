@@ -14,7 +14,7 @@ interface IngestFailure {
   reason: string
   detail: string | null
   statusCode: number | null
-  outcome: 'rejected' | 'accepted'
+  outcome: 'rejected' | 'retried' | 'accepted'
   endpoint: string | null
   clientIp: string | null
   userAgent: string | null
@@ -56,20 +56,30 @@ const REASON_LABELS: Record<string, string> = {
   internal_error: 'Server error',
 }
 
-// Two different questions share this table. "Rejected" is the page's reason
-// for existing: the device reached the server and did not get in. "Repaired"
-// is a check-in that succeeded while carrying a client defect worth watching
-// -- useful, but at fleet scale it is thousands of rows a day, and mixing it
-// into a view titled Failed Check-ins buries the handful of devices that are
-// genuinely stuck and makes the page read as a much bigger fire than it is.
-type Outcome = 'rejected' | 'accepted'
+// Three different questions share this table. "Rejected" is the page's reason
+// for existing: the device reached the server and did not get in, and nothing
+// has arrived since. "Retried" is an upload that dropped in transport and
+// landed on the client's retry -- worth watching as a network signal, but the
+// device reported and counting it as a failure describes an outage that is
+// not happening. "Repaired" is a check-in that succeeded while carrying a
+// client defect worth watching. Both of the latter run to thousands of rows a
+// day at fleet scale, and mixing either into a view titled Failed Check-ins
+// buries the handful of devices that are genuinely stuck and makes the page
+// read as a much bigger fire than it is.
+type Outcome = 'rejected' | 'retried' | 'accepted'
 
 const OUTCOME_COPY: Record<Outcome, { chip: string; heading: string; blurb: string; noun: string }> = {
   rejected: {
     chip: 'Rejected',
     heading: 'Failed Check-ins',
-    blurb: 'Devices that reached the server but were turned away \u2014 the answer to "installed but never appeared"',
+    blurb: 'Devices that reached the server but were turned away and have sent nothing since \u2014 the answer to "installed but never appeared"',
     noun: 'rejected check-in',
+  },
+  retried: {
+    chip: 'Retried',
+    heading: 'Retried Check-ins',
+    blurb: 'The upload dropped in transport and the client\u2019s retry landed \u2014 the device reported. A network signal, not a device that failed to check in.',
+    noun: 'retried check-in',
   },
   accepted: {
     chip: 'Repaired',
@@ -93,6 +103,9 @@ function reasonBadgeClass(failureType: string, outcome: string): string {
   if (outcome === 'accepted') {
     return 'bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300'
   }
+  if (outcome === 'retried') {
+    return 'bg-gray-100 text-gray-700 dark:bg-gray-700/60 dark:text-gray-300'
+  }
   return failureType === 'auth'
     ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300'
@@ -106,7 +119,7 @@ export default function ClientFailuresPage() {
   const [error, setError] = useState<string | null>(null)
   const [hours, setHours] = useState(168)
   const [outcome, setOutcome] = useState<Outcome>('rejected')
-  const [counts, setCounts] = useState<{ rejected: number; accepted: number }>({ rejected: 0, accepted: 0 })
+  const [counts, setCounts] = useState<{ rejected: number; retried: number; accepted: number }>({ rejected: 0, retried: 0, accepted: 0 })
   const [reasonFilter, setReasonFilter] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -124,6 +137,7 @@ export default function ClientFailuresPage() {
       setTotal(typeof data.total === 'number' ? data.total : 0)
       setCounts({
         rejected: typeof data?.counts?.rejected === 'number' ? data.counts.rejected : 0,
+        retried: typeof data?.counts?.retried === 'number' ? data.counts.retried : 0,
         accepted: typeof data?.counts?.accepted === 'number' ? data.counts.accepted : 0,
       })
       setError(null)
@@ -156,10 +170,10 @@ export default function ClientFailuresPage() {
     <div className="h-[calc(100vh-4rem)] flex flex-col bg-gray-50 dark:bg-black overflow-hidden">
       <div className="flex-1 flex flex-col min-h-0 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-8">
 
-        {/* Outcome switch: rejected is the page's job, repaired is context.
-            Both counts are always shown so neither side can go unnoticed. */}
+        {/* Outcome switch: rejected is the page's job, the other two are
+            context. Every count is always shown so no side can go unnoticed. */}
         <div className="flex flex-wrap gap-2 pb-3">
-          {(['rejected', 'accepted'] as Outcome[]).map(o => (
+          {(['rejected', 'retried', 'accepted'] as Outcome[]).map(o => (
             <button
               key={o}
               onClick={() => { if (o !== outcome) { setOutcome(o); setReasonFilter(null) } }}
@@ -169,7 +183,7 @@ export default function ClientFailuresPage() {
                   : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
               }`}
             >
-              {OUTCOME_COPY[o].chip} ({o === 'rejected' ? counts.rejected : counts.accepted})
+              {OUTCOME_COPY[o].chip} ({counts[o]})
             </button>
           ))}
         </div>
