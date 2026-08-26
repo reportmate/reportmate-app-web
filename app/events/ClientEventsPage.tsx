@@ -142,6 +142,8 @@ const RESERVED_PAYLOAD_KEYS = new Set([
   'count', 'errors', 'warnings', 'error_items', 'warning_items', 'failed_items',
   'error_messages', 'warning_messages', 'module_status', 'warning_count', 'error_count',
   'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
+  'items', 'action', 'duration_seconds', 'item_warning_count', 'operational_warning_count',
+  'operational_warnings', 'session_installs', 'session_updates', 'session_removals',
 ])
 
 // Extract human-readable detail lines from a loaded event payload so they can be
@@ -152,6 +154,7 @@ const RESERVED_PAYLOAD_KEYS = new Set([
 //   Installs:{ failed_items: [{ displayName, error }] }    (array of objects)
 //   Generic: { error_messages: [...], warning_messages: [...] }
 //   Success: { "Managed Safari": "15.6.1", "ZoomPrefs": "14.1" }  (name → version)
+//   Cimian:  { items: [{ name: "Chrome", version: "151.0.7922.170" }] }  (array of objects)
 const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: string[]; successes: string[] } => {
   const errors: string[] = []
   const warnings: string[] = []
@@ -174,6 +177,22 @@ const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: s
         const detail = item.error || item.warning || ''
         const line = detail ? (name ? `${name}: ${detail}` : detail) : name
         if (line) target.push(line)
+      }
+    }
+  }
+
+  // The Windows installs collector sends its success items as an array of
+  // { name, version } objects rather than a flat map, and always includes them
+  // even when the summary message is a count. Read them so a multi-package run
+  // can still list what it installed.
+  if (Array.isArray(p.items)) {
+    for (const item of p.items) {
+      if (typeof item === 'string') {
+        if (item.trim()) successes.push(item.trim())
+      } else if (item && typeof item === 'object') {
+        const name = String(item.displayName || item.name || '').trim()
+        const version = String(item.version || '').trim()
+        if (name) successes.push(version ? `${name} ${version}` : name)
       }
     }
   }
@@ -758,18 +777,15 @@ function EventsPageContent() {
 
   // Auto-load payloads for visible success/warning/error events so their real
   // messages render inline in the table without the user expanding each row.
-  // Count-only success events (e.g. "16 packages installed") carry no per-item
-  // detail in their payload, so we skip fetching those.
+  // Count summaries like "16 packages installed" used to be skipped on the
+  // assumption that they carried no per-item detail. They do — both collectors
+  // send the package list alongside the count — and skipping the fetch is what
+  // left a count with nothing to expand into.
   const autoFetchedRef = useRef<Set<string>>(new Set())
   const shouldAutoFetch = (event: BundledEvent): boolean => {
     if (event.isBundle) return false
     const kind = event.kind?.toLowerCase()
-    if (kind === 'error' || kind === 'warning') return true
-    if (kind === 'success') {
-      // Skip count summaries like "16 packages installed" — no names in payload
-      return !/^\d+\s+packages?\b/i.test(event.message || '')
-    }
-    return false
+    return kind === 'error' || kind === 'warning' || kind === 'success'
   }
   const autoFetchKey = currentEvents.filter(shouldAutoFetch).map(e => e.id).join(',')
   useEffect(() => {
