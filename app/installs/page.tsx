@@ -61,6 +61,8 @@ interface InstallRecord {
 // installed -- the latter is tens of thousands of rows and answers nothing.
 const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   chip: string
+  pillActive: string
+  pillIdle: string
   devicesHeading: string
   packagesColumn: string
   messageColumn: string
@@ -76,6 +78,8 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
 }> = {
   errors: {
     chip: 'Errors',
+    pillActive: 'bg-red-600 text-white dark:bg-red-400 dark:text-gray-900',
+    pillIdle: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/50',
     devicesHeading: 'Devices with Install Errors',
     packagesColumn: 'Failed Packages',
     messageColumn: 'Error Message',
@@ -91,6 +95,8 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   },
   warnings: {
     chip: 'Warnings',
+    pillActive: 'bg-yellow-600 text-white dark:bg-yellow-400 dark:text-gray-900',
+    pillIdle: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50',
     devicesHeading: 'Devices with Warnings',
     packagesColumn: 'Warning Packages',
     messageColumn: 'Warning Message',
@@ -106,6 +112,8 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   },
   pending: {
     chip: 'Pending',
+    pillActive: 'bg-cyan-600 text-white dark:bg-cyan-400 dark:text-gray-900',
+    pillIdle: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300 hover:bg-cyan-200 dark:hover:bg-cyan-900/50',
     devicesHeading: 'Devices with Pending Updates',
     packagesColumn: 'Pending Packages',
     messageColumn: 'Reason',
@@ -121,6 +129,8 @@ const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
   },
   success: {
     chip: 'Successes',
+    pillActive: 'bg-green-600 text-white dark:bg-green-400 dark:text-gray-900',
+    pillIdle: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/50',
     devicesHeading: 'Devices with Successful Installs',
     packagesColumn: 'Installed Packages',
     messageColumn: 'Installed Version',
@@ -4102,39 +4112,45 @@ function InstallsPageContent() {
           {itemsStatusFilter !== 'all' && !filtersLoading && statusFilteredDevices.length > 0 && (
             <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-800 rounded-b-xl overflow-hidden">
               <div className="px-6 py-4">
-                {/* Status switch, then grouping switch. The device table
-                    answers "which machines"; the message table answers "what
-                    actually happened" without a click into each device. */}
-                <div className="flex flex-wrap items-center gap-2 mb-3">
-                  {(['errors', 'warnings', 'pending', 'success'] as const).map(status => (
-                    <button
-                      key={status}
-                      onClick={() => { if (status !== itemsStatusFilter) { setSearchQuery(''); selectStatusFilter(status) } }}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                        itemsStatusFilter === status
-                          ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {STATUS_VIEW_COPY[status].chip} ({statusFilterDeviceCounts[status]})
-                    </button>
-                  ))}
-                  <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
-                  {(['devices', 'messages'] as const).map(view => (
-                    <button
-                      key={view}
-                      onClick={() => selectStatusView(view)}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
-                        (view === 'messages') === showMessageView
-                          ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
-                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
-                      }`}
-                    >
-                      {view === 'devices'
-                        ? `By device (${statusFilteredDevices.length})`
-                        : `By message (${statusMessageGroups.filter(g => g.message).length})`}
-                    </button>
-                  ))}
+                {/* Grouping switch on the left, then the status pills, styled
+                    like the status filters on the device page's installs tab so
+                    the two read as the same control. The device table answers
+                    "which machines"; the message table answers "what actually
+                    happened" without a click into each device. */}
+                <div className="flex flex-wrap items-center gap-4 mb-3">
+                  <div className="flex items-center gap-2">
+                    {(['devices', 'messages'] as const).map(view => (
+                      <button
+                        key={view}
+                        onClick={() => selectStatusView(view)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          (view === 'messages') === showMessageView
+                            ? 'bg-gray-700 text-white dark:bg-gray-300 dark:text-gray-900'
+                            : 'bg-gray-100 text-gray-600 dark:bg-gray-700/50 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {view === 'devices'
+                          ? `By Device - ${statusFilteredDevices.length}`
+                          : `By Message - ${statusMessageGroups.filter(g => g.message).length}`}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {(['errors', 'warnings', 'pending', 'success'] as const).map(status => {
+                      const copy = STATUS_VIEW_COPY[status]
+                      return (
+                        <button
+                          key={status}
+                          onClick={() => { if (status !== itemsStatusFilter) { setSearchQuery(''); selectStatusFilter(status) } }}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                            itemsStatusFilter === status ? copy.pillActive : copy.pillIdle
+                          }`}
+                        >
+                          {copy.chip} - {statusFilterDeviceCounts[status]}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                   <svg className={statusCopy.iconClass} fill="currentColor" viewBox="0 0 20 20">
