@@ -2,9 +2,9 @@
 
 import { useState, useEffect, Suspense, useMemo, useCallback, useTransition } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '@/src/lib/time'
-import { categorizeDevicesByInstallStatus, getDeviceInstallItems } from '@/src/hooks/useInstallsData'
+import { categorizeDevicesByInstallStatus, getDeviceInstallItems, aggregateStatusMessages, getItemMessage, getItemTimestamp, isErrorItem, isWarningItem, isPendingItem, isSuccessItem, matchesItemStatus, type ItemStatusFilter } from '@/src/hooks/useInstallsData'
 import { calculateDeviceStatus } from '@/src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '@/src/components/widgets/InstallMessages'
 import { CopyButton } from '@/src/components/ui/CopyButton'
@@ -55,6 +55,87 @@ interface InstallRecord {
   raw?: any
 }
 
+// One place for everything the errors / warnings / pending / successes
+// drill-down renders differently. Successes are the packages that actually
+// completed an install in the most recent run, NOT everything currently
+// installed -- the latter is tens of thousands of rows and answers nothing.
+const STATUS_VIEW_COPY: Record<Exclude<ItemStatusFilter, 'all'>, {
+  chip: string
+  devicesHeading: string
+  packagesColumn: string
+  messageColumn: string
+  blurb: string
+  messageBlurb: string
+  emptyHeading: string
+  emptyBlurb: string
+  noun: string
+  chipClass: string
+  messageClass: string
+  iconClass: string
+  iconPath: string
+}> = {
+  errors: {
+    chip: 'Errors',
+    devicesHeading: 'Devices with Install Errors',
+    packagesColumn: 'Failed Packages',
+    messageColumn: 'Error Message',
+    blurb: 'These devices have one or more packages with failed installations or errors.',
+    messageBlurb: 'Every distinct error reported across these devices, most widespread first.',
+    emptyHeading: 'No Install Errors!',
+    emptyBlurb: 'All devices have successful installations. Great job keeping everything running smoothly!',
+    noun: 'errors',
+    chipClass: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+    messageClass: 'text-red-700 dark:text-red-300',
+    iconClass: 'w-5 h-5 text-red-500',
+    iconPath: 'M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z',
+  },
+  warnings: {
+    chip: 'Warnings',
+    devicesHeading: 'Devices with Warnings',
+    packagesColumn: 'Warning Packages',
+    messageColumn: 'Warning Message',
+    blurb: 'These devices have packages with warnings that need attention.',
+    messageBlurb: 'Every distinct warning reported across these devices, most widespread first.',
+    emptyHeading: 'No Warnings!',
+    emptyBlurb: 'No packages have warnings. Everything looks good!',
+    noun: 'warnings',
+    chipClass: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+    messageClass: 'text-yellow-700 dark:text-yellow-300',
+    iconClass: 'w-5 h-5 text-yellow-500',
+    iconPath: 'M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z',
+  },
+  pending: {
+    chip: 'Pending',
+    devicesHeading: 'Devices with Pending Updates',
+    packagesColumn: 'Pending Packages',
+    messageColumn: 'Reason',
+    blurb: 'These devices have packages with pending updates.',
+    messageBlurb: 'Every distinct reason a package is waiting, most widespread first.',
+    emptyHeading: 'No Pending Updates!',
+    emptyBlurb: 'All managed packages are up to date across your fleet.',
+    noun: 'pending updates',
+    chipClass: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
+    messageClass: 'text-blue-700 dark:text-blue-300',
+    iconClass: 'w-5 h-5 text-cyan-500',
+    iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z',
+  },
+  success: {
+    chip: 'Successes',
+    devicesHeading: 'Devices with Successful Installs',
+    packagesColumn: 'Installed Packages',
+    messageColumn: 'Installed Version',
+    blurb: 'These devices completed one or more installs in their most recent run \u2014 not everything they have installed, only what landed this time.',
+    messageBlurb: 'Every version that landed in the most recent run, most widespread first.',
+    emptyHeading: 'No Recent Installs',
+    emptyBlurb: 'No package completed an install in the most recent run on any device.',
+    noun: 'successful installs',
+    chipClass: 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300',
+    messageClass: 'text-green-700 dark:text-green-300',
+    iconClass: 'w-5 h-5 text-green-500',
+    iconPath: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z',
+  },
+}
+
 function InstallsPageContent() {
   const [installs, setInstalls] = useState<InstallRecord[]>([])
   const [loading, setLoading] = useState(false)
@@ -85,20 +166,26 @@ function InstallsPageContent() {
   const [warningTableSort, setWarningTableSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'count', direction: 'desc' })
   const [pendingTableSort, setPendingTableSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'count', direction: 'desc' })
   
-  // Status filter state - items filter (errors, warnings from Items tables)
-  const [itemsStatusFilter, setItemsStatusFilter] = useState<'all' | 'errors' | 'warnings' | 'pending'>('all')
+  // Status filter state - items filter (errors, warnings, pending, successes)
+  const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>('all')
   // Device status filter (active, stale, missing)
   const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | 'active' | 'stale' | 'missing'>('all')
   // Install status filter (installed, pending, warnings, errors, removed)
   const [installStatusFilter, setInstallStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warnings' | 'errors' | 'removed'>('all')
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
+  // How the errors/warnings drill-down is grouped: one row per device, or one
+  // row per distinct message so every message is readable without drilling in
+  const [statusView, setStatusView] = useState<'devices' | 'messages'>('devices')
+  // Message rows cap their device list; this tracks the ones expanded in place
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
 
   const { setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
 
   // Apply global platform filter (?platform=mac or ?platform=win)
@@ -907,17 +994,51 @@ function InstallsPageContent() {
   // Handle URL filter parameter (from dashboard click-through)
   useEffect(() => {
     const filterParam = searchParams.get('filter')
-    if (filterParam === 'errors' || filterParam === 'warnings' || filterParam === 'pending') {
-      setItemsStatusFilter(filterParam as 'errors' | 'warnings' | 'pending')
+    if (filterParam === 'errors' || filterParam === 'warnings' || filterParam === 'pending' || filterParam === 'success') {
+      setItemsStatusFilter(filterParam)
       // Collapse regular filters when viewing status-filtered view
       setFiltersExpanded(false)
     } else {
       setItemsStatusFilter('all')
     }
+    setStatusView(searchParams.get('view') === 'messages' ? 'messages' : 'devices')
   }, [searchParams])
 
+  const toggleExpandedMessage = useCallback((key: string) => {
+    setExpandedMessages(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+
+  // URL is canonical for the drill-down; defaults are omitted
+  const replaceInstallsUrl = useCallback((mutate: (params: URLSearchParams) => void) => {
+    const params = new URLSearchParams(searchParams.toString())
+    mutate(params)
+    const query = params.toString()
+    router.replace(query ? `/installs?${query}` : '/installs', { scroll: false })
+  }, [router, searchParams])
+
+  const selectStatusView = useCallback((view: 'devices' | 'messages') => {
+    setStatusView(view)
+    replaceInstallsUrl(params => {
+      if (view === 'messages') params.set('view', 'messages')
+      else params.delete('view')
+    })
+  }, [replaceInstallsUrl])
+
+  const selectStatusFilter = useCallback((status: ItemStatusFilter) => {
+    setItemsStatusFilter(status)
+    replaceInstallsUrl(params => {
+      if (status === 'all') params.delete('filter')
+      else params.set('filter', status)
+    })
+  }, [replaceInstallsUrl])
+
   // Categorize devices by install status (for filtered views)
-  const { devicesWithErrors, devicesWithWarnings, devicesWithPending } = useMemo(() => {
+  const { devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess } = useMemo(() => {
     return categorizeDevicesByInstallStatus(platformFilteredDevices)
   }, [platformFilteredDevices])
 
@@ -1126,11 +1247,9 @@ function InstallsPageContent() {
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const lastError = (item.lastError || '').toLowerCase()
-            const status = (item.currentStatus || item.status || '').toLowerCase()
             const searchLower = searchQuery.toLowerCase()
             // Match by item name OR by error message
-            return (itemName === searchLower || lastError.includes(searchLower)) && 
-                   (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'install-error')
+            return (itemName === searchLower || lastError.includes(searchLower)) && isErrorItem(item)
           })
         })
       } else if (itemsStatusFilter === 'warnings') {
@@ -1139,11 +1258,9 @@ function InstallsPageContent() {
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const lastWarning = (item.lastWarning || '').toLowerCase()
-            const status = (item.currentStatus || item.status || '').toLowerCase()
             const searchLower = searchQuery.toLowerCase()
             // Match by item name OR by warning message
-            return (itemName === searchLower || lastWarning.includes(searchLower)) && 
-                   (status.includes('warning') || status === 'needs-attention')
+            return (itemName === searchLower || lastWarning.includes(searchLower)) && isWarningItem(item)
           })
         })
       } else if (itemsStatusFilter === 'pending') {
@@ -1151,12 +1268,7 @@ function InstallsPageContent() {
           const cimianItems = getDeviceInstallItems(device)
           return cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
-            const status = (item.currentStatus || item.status || '').toLowerCase()
-            return itemName === searchQuery.toLowerCase() && 
-                   (status.includes('will-be-installed') || status.includes('update-available') || 
-                    status.includes('update_available') || status.includes('will-be-removed') || 
-                    status.includes('pending') || status.includes('scheduled') || 
-                    status === 'managed-update-available')
+            return itemName === searchQuery.toLowerCase() && isPendingItem(item)
           })
         })
       }
@@ -1419,6 +1531,7 @@ function InstallsPageContent() {
     if (itemsStatusFilter === 'errors') filtered = devicesWithErrors
     else if (itemsStatusFilter === 'warnings') filtered = devicesWithWarnings
     else if (itemsStatusFilter === 'pending') filtered = devicesWithPending
+    else if (itemsStatusFilter === 'success') filtered = devicesWithSuccess
     
     // Filter by device status (active/stale/missing)
     if (deviceStatusFilter !== 'all') {
@@ -1475,20 +1588,7 @@ function InstallsPageContent() {
           if (!selectedInstalls.includes(itemName)) return false
           
           // If we have an items status filter, the selected item must have that status
-          if (itemsStatusFilter !== 'all') {
-            const status = (item.currentStatus || item.status || '').toLowerCase()
-            if (itemsStatusFilter === 'errors') {
-              return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
-            } else if (itemsStatusFilter === 'warnings') {
-              return status.includes('warning') || status === 'needs-attention'
-            } else if (itemsStatusFilter === 'pending') {
-              return status.includes('will-be-installed') || status.includes('update-available') || 
-                     status.includes('update_available') || status.includes('will-be-removed') || 
-                     status.includes('pending') || status.includes('scheduled') || 
-                     status === 'managed-update-available'
-            }
-          }
-          return true
+          return matchesItemStatus(item, itemsStatusFilter)
         })
       })
     }
@@ -1517,26 +1617,32 @@ function InstallsPageContent() {
           if (!matchesQuery) return false
           
           // If we have an items status filter, the searched item must have that status
-          if (itemsStatusFilter !== 'all') {
-            const status = (item.currentStatus || item.status || '').toLowerCase()
-            if (itemsStatusFilter === 'errors') {
-              return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
-            } else if (itemsStatusFilter === 'warnings') {
-              return status.includes('warning') || status === 'needs-attention'
-            } else if (itemsStatusFilter === 'pending') {
-              return status.includes('will-be-installed') || status.includes('update-available') || 
-                     status.includes('update_available') || status.includes('will-be-removed') || 
-                     status.includes('pending') || status.includes('scheduled') || 
-                     status === 'managed-update-available'
-            }
-          }
-          return true
+          return matchesItemStatus(item, itemsStatusFilter)
         })
       })
     }
     
     return filtered
-  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
+  }, [itemsStatusFilter, deviceStatusFilter, platformFilteredDevices, devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess, searchQuery, selectedInstalls, selectedUsages, selectedCatalogs, selectedFleets, selectedAreas, selectedPlatforms, selectedRooms])
+
+  // Distinct error/warning messages across the drill-down's devices, for the
+  // "By message" grouping. Pending items carry no message, so the grouping is
+  // only offered for errors and warnings.
+  const statusMessageGroups = useMemo(() => {
+    if (itemsStatusFilter === 'all') return []
+    return aggregateStatusMessages(statusFilteredDevices, itemsStatusFilter, { itemNameFilter: searchQuery })
+  }, [statusFilteredDevices, itemsStatusFilter, searchQuery])
+
+  const showMessageView = statusView === 'messages' && itemsStatusFilter !== 'all'
+
+  // Device counts behind the drill-down's status switch, so every status shows
+  // its size before you click it
+  const statusFilterDeviceCounts = useMemo(() => ({
+    errors: devicesWithErrors.length,
+    warnings: devicesWithWarnings.length,
+    pending: devicesWithPending.length,
+    success: devicesWithSuccess.length,
+  }), [devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess])
 
   // Aggregate items with errors across all devices
   const itemsWithErrors = useMemo(() => {
@@ -1548,9 +1654,7 @@ function InstallsPageContent() {
       
       const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
-        // Check for error statuses
-        const status = (item.currentStatus || item.status || '').toLowerCase()
-        if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'install-error') {
+        if (isErrorItem(item)) {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!errorItems[itemName]) {
             errorItems[itemName] = { name: itemName, count: 0, devices: [] }
@@ -1588,9 +1692,8 @@ function InstallsPageContent() {
       
       const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
-        // Check for warning statuses ONLY (not pending statuses)
-        const status = (item.currentStatus || item.status || '').toLowerCase()
-        if (status.includes('warning') || status === 'needs-attention') {
+        // Warning statuses ONLY (not pending statuses)
+        if (isWarningItem(item)) {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!warningItems[itemName]) {
             warningItems[itemName] = { name: itemName, count: 0, devices: [] }
@@ -1627,14 +1730,8 @@ function InstallsPageContent() {
       
       const cimianItems = getDeviceInstallItems(device)
       cimianItems.forEach((item: any) => {
-        // Check for pending statuses - scheduled installations, updates, removals
-        const status = (item.currentStatus || item.status || '').toLowerCase()
-        // Include: will-be-installed, update-available, will-be-removed, pending-*, *-pending, update_available
-        if (status.includes('will-be-installed') || 
-            status.includes('update-available') || status.includes('update_available') ||
-            status.includes('will-be-removed') || 
-            status.includes('pending') ||
-            status.includes('scheduled')) {
+        // Pending statuses - scheduled installations, updates, removals
+        if (isPendingItem(item)) {
           const itemName = item.itemName || item.name || 'Unknown'
           if (!pendingItems[itemName]) {
             pendingItems[itemName] = { name: itemName, count: 0, devices: [] }
@@ -1660,6 +1757,40 @@ function InstallsPageContent() {
         : b.count - a.count
     })
   }, [platformFilteredDevices, pendingTableSort])
+
+  // Aggregate items that completed an install in the most recent run
+  const itemsWithSuccess = useMemo(() => {
+    const successItems: Record<string, { name: string; count: number; devices: string[] }> = {}
+
+    platformFilteredDevices.forEach((device: any) => {
+      if (device.archived === true) return // Skip archived devices
+
+      getDeviceInstallItems(device).forEach((item: any) => {
+        if (isSuccessItem(item)) {
+          const itemName = item.itemName || item.name || 'Unknown'
+          if (!successItems[itemName]) {
+            successItems[itemName] = { name: itemName, count: 0, devices: [] }
+          }
+          successItems[itemName].count++
+          successItems[itemName].devices.push(device.serialNumber || device.deviceId)
+        }
+      })
+    })
+
+    return Object.values(successItems).sort((a, b) => b.count - a.count)
+  }, [platformFilteredDevices])
+
+  const statusCopy = STATUS_VIEW_COPY[itemsStatusFilter === 'all' ? 'errors' : itemsStatusFilter]
+
+  // How many items match the searched package name, for the "(N) errors for X" heading
+  const statusFilterItemCount = useMemo(() => {
+    if (!searchQuery || itemsStatusFilter === 'all') return 0
+    const table = itemsStatusFilter === 'errors' ? itemsWithErrors
+      : itemsStatusFilter === 'warnings' ? itemsWithWarnings
+      : itemsStatusFilter === 'pending' ? itemsWithPending
+      : itemsWithSuccess
+    return table.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0
+  }, [searchQuery, itemsStatusFilter, itemsWithErrors, itemsWithWarnings, itemsWithPending, itemsWithSuccess])
 
   return (
     <div className="h-[calc(100vh-4rem)] bg-gray-50 dark:bg-black flex flex-col overflow-hidden">
@@ -2214,7 +2345,7 @@ function InstallsPageContent() {
 
             {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}
             {isConfigReport && !isGeneratingReport && (
-              itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 ||
+              itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 || itemsWithSuccess.length > 0 ||
               (itemsStatusFilter === 'all' && configReportData.length > 0)
             ) && (
             <div className="border-b border-gray-200 dark:border-gray-700">
@@ -2242,13 +2373,17 @@ function InstallsPageContent() {
               <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="bg-white dark:bg-gray-800">
             {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show in config report mode */}
-            {itemsStatusFilter === 'all' && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
+            {itemsStatusFilter === 'all' && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 || itemsWithSuccess.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
               <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
-                [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0].filter(Boolean).length === 3
-                  ? 'lg:grid-cols-3'
-                  : [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0].filter(Boolean).length === 2
-                    ? 'lg:grid-cols-2'
-                    : 'lg:grid-cols-1'
+                (() => {
+                  const shown = [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0, itemsWithSuccess.length > 0].filter(Boolean).length
+                  // Four across inside a max-w-7xl shell clips the Count
+                  // column, so four tables wrap to a 2x2 instead
+                  if (shown >= 4) return 'md:grid-cols-2'
+                  if (shown === 3) return 'md:grid-cols-2 lg:grid-cols-3'
+                  if (shown === 2) return 'lg:grid-cols-2'
+                  return 'lg:grid-cols-1'
+                })()
               }`}>
                 
                 {/* Items with Errors Table - Only show if has errors */}
@@ -2258,12 +2393,12 @@ function InstallsPageContent() {
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'errors' && !searchQuery) {
-                        setItemsStatusFilter('all')
+                        selectStatusFilter('all')
                         setFiltersExpanded(false)
                         setWidgetsExpanded(true)
                       } else {
                         setSearchQuery('')
-                        setItemsStatusFilter('errors')
+                        selectStatusFilter('errors')
                         setFiltersExpanded(true)
                       }
                     }}
@@ -2338,11 +2473,11 @@ function InstallsPageContent() {
                                 onClick={() => {
                                   if (isSelected) {
                                     setSearchQuery('')
-                                    setItemsStatusFilter('all')
+                                    selectStatusFilter('all')
                                     setWidgetsExpanded(true)
                                   } else {
                                     setSearchQuery(item.name)
-                                    setItemsStatusFilter('errors')
+                                    selectStatusFilter('errors')
                                   }
                                 }}
                               >
@@ -2369,12 +2504,12 @@ function InstallsPageContent() {
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'warnings' && !searchQuery) {
-                        setItemsStatusFilter('all')
+                        selectStatusFilter('all')
                         setFiltersExpanded(false)
                         setWidgetsExpanded(true)
                       } else {
                         setSearchQuery('')
-                        setItemsStatusFilter('warnings')
+                        selectStatusFilter('warnings')
                         setFiltersExpanded(true)
                       }
                     }}
@@ -2449,11 +2584,11 @@ function InstallsPageContent() {
                                 onClick={() => {
                                   if (isSelected) {
                                     setSearchQuery('')
-                                    setItemsStatusFilter('all')
+                                    selectStatusFilter('all')
                                     setWidgetsExpanded(true)
                                   } else {
                                     setSearchQuery(item.name)
-                                    setItemsStatusFilter('warnings')
+                                    selectStatusFilter('warnings')
                                   }
                                 }}
                               >
@@ -2480,12 +2615,12 @@ function InstallsPageContent() {
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
                     onClick={() => {
                       if (itemsStatusFilter === 'pending' && !searchQuery) {
-                        setItemsStatusFilter('all')
+                        selectStatusFilter('all')
                         setFiltersExpanded(false)
                         setWidgetsExpanded(true)
                       } else {
                         setSearchQuery('')
-                        setItemsStatusFilter('pending')
+                        selectStatusFilter('pending')
                         setFiltersExpanded(true)
                       }
                     }}
@@ -2560,11 +2695,11 @@ function InstallsPageContent() {
                                 onClick={() => {
                                   if (isSelected) {
                                     setSearchQuery('')
-                                    setItemsStatusFilter('all')
+                                    selectStatusFilter('all')
                                     setWidgetsExpanded(true)
                                   } else {
                                     setSearchQuery(item.name)
-                                    setItemsStatusFilter('pending')
+                                    selectStatusFilter('pending')
                                   }
                                 }}
                               >
@@ -2572,6 +2707,93 @@ function InstallsPageContent() {
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-cyan-600 dark:text-cyan-400">
+                                  {item.count}
+                                </td>
+                              </tr>
+                            )})
+                          }
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+                )}
+
+                {/* Items Installed Successfully - the packages that actually
+                    landed in the most recent run, so a rollout can be watched
+                    arriving instead of only noticed when it breaks */}
+                {itemsWithSuccess.length > 0 && (
+                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+                  <div 
+                    className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => {
+                      if (itemsStatusFilter === 'success' && !searchQuery) {
+                        selectStatusFilter('all')
+                        setFiltersExpanded(false)
+                        setWidgetsExpanded(true)
+                      } else {
+                        setSearchQuery('')
+                        selectStatusFilter('success')
+                        setFiltersExpanded(true)
+                      }
+                    }}
+                    title="Click to show all devices that completed an install in their most recent run"
+                  >
+                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'success' && !searchQuery ? 'text-green-700 dark:text-green-300' : 'text-gray-900 dark:text-white'}`}>
+                      <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      Items Installed
+                    </h3>
+                    <span className="text-sm font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
+                      {itemsWithSuccess.reduce((sum, item) => sum + item.count, 0)} total
+                    </span>
+                  </div>
+                  <div className="max-h-48 overflow-y-auto">
+                    {filtersLoading ? (
+                      <div className="space-y-2 animate-pulse">
+                        <div className="h-8 bg-gray-200 dark:bg-gray-600 rounded"></div>
+                        <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-3/4"></div>
+                        <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-5/6"></div>
+                      </div>
+                    ) : (
+                      <table className="w-full">
+                        <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                              Item Name
+                            </th>
+                            <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                              Count
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                          {itemsWithSuccess.map((item) => {
+                              const isSelected = searchQuery === item.name && itemsStatusFilter === 'success'
+                              return (
+                              <tr 
+                                key={item.name} 
+                                className={`cursor-pointer transition-colors ${
+                                  isSelected 
+                                    ? 'bg-green-100 dark:bg-green-900/40 hover:bg-green-200 dark:hover:bg-green-900/60' 
+                                    : 'hover:bg-gray-100 dark:hover:bg-gray-600'
+                                }`}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setSearchQuery('')
+                                    selectStatusFilter('all')
+                                    setWidgetsExpanded(true)
+                                  } else {
+                                    setSearchQuery(item.name)
+                                    selectStatusFilter('success')
+                                  }
+                                }}
+                              >
+                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-green-700 dark:text-green-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                  {item.name}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-right font-semibold text-green-600 dark:text-green-400">
                                   {item.count}
                                 </td>
                               </tr>
@@ -2594,7 +2816,7 @@ function InstallsPageContent() {
                   devices={platformFilteredDevices} 
                   maxItems={8}
                   onFilter={(type, message) => {
-                    setItemsStatusFilter(type)
+                    selectStatusFilter(type)
                     if (message) {
                       setSearchQuery(message)
                     } else {
@@ -2606,7 +2828,7 @@ function InstallsPageContent() {
                   devices={platformFilteredDevices} 
                   maxItems={8}
                   onFilter={(type, message) => {
-                    setItemsStatusFilter(type)
+                    selectStatusFilter(type)
                     if (message) {
                       setSearchQuery(message)
                     } else {
@@ -3880,53 +4102,143 @@ function InstallsPageContent() {
           {itemsStatusFilter !== 'all' && !filtersLoading && statusFilteredDevices.length > 0 && (
             <div className="flex-1 flex flex-col min-h-0 bg-white dark:bg-gray-800 rounded-b-xl overflow-hidden">
               <div className="px-6 py-4">
+                {/* Status switch, then grouping switch. The device table
+                    answers "which machines"; the message table answers "what
+                    actually happened" without a click into each device. */}
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  {(['errors', 'warnings', 'pending', 'success'] as const).map(status => (
+                    <button
+                      key={status}
+                      onClick={() => { if (status !== itemsStatusFilter) { setSearchQuery(''); selectStatusFilter(status) } }}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                        itemsStatusFilter === status
+                          ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {STATUS_VIEW_COPY[status].chip} ({statusFilterDeviceCounts[status]})
+                    </button>
+                  ))}
+                  <span className="mx-1 h-5 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+                  {(['devices', 'messages'] as const).map(view => (
+                    <button
+                      key={view}
+                      onClick={() => selectStatusView(view)}
+                      className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${
+                        (view === 'messages') === showMessageView
+                          ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                          : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {view === 'devices'
+                        ? `By device (${statusFilteredDevices.length})`
+                        : `By message (${statusMessageGroups.filter(g => g.message).length})`}
+                    </button>
+                  ))}
+                </div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                  {itemsStatusFilter === 'errors' ? (
-                    <>
-                      <svg className="w-5 h-5 text-red-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      {searchQuery ? (
-                        <>({statusFilteredDevices.length}) Devices with ({itemsWithErrors.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Install Errors for {searchQuery}</>
-                      ) : (
-                        <>({statusFilteredDevices.length}) Devices with Install Errors</>
-                      )}
-                    </>
-                  ) : itemsStatusFilter === 'warnings' ? (
-                    <>
-                      <svg className="w-5 h-5 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      {searchQuery ? (
-                        <>({statusFilteredDevices.length}) Devices with ({itemsWithWarnings.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Warnings for {searchQuery}</>
-                      ) : (
-                        <>({statusFilteredDevices.length}) Devices with Warnings</>
-                      )}
-                    </>
+                  <svg className={statusCopy.iconClass} fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d={statusCopy.iconPath} clipRule="evenodd" />
+                  </svg>
+                  {searchQuery ? (
+                    <>({statusFilteredDevices.length}) Devices with ({statusFilterItemCount}) {statusCopy.noun} for {searchQuery}</>
                   ) : (
-                    <>
-                      <svg className="w-5 h-5 text-cyan-500" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                      </svg>
-                      {searchQuery ? (
-                        <>({statusFilteredDevices.length}) Devices with ({itemsWithPending.find(i => i.name.toLowerCase() === searchQuery.toLowerCase())?.count || 0}) Pending for {searchQuery}</>
-                      ) : (
-                        <>({statusFilteredDevices.length}) Devices with Pending Updates</>
-                      )}
-                    </>
+                    <>({statusFilteredDevices.length}) {statusCopy.devicesHeading}</>
                   )}
                 </h3>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                  {searchQuery 
-                    ? `Showing devices with "${searchQuery}" packages that have ${itemsStatusFilter === 'errors' ? 'errors' : itemsStatusFilter === 'warnings' ? 'warnings' : 'pending updates'}.`
-                    : itemsStatusFilter === 'errors' 
-                      ? 'These devices have one or more packages with failed installations or errors.'
-                      : itemsStatusFilter === 'warnings'
-                        ? 'These devices have packages with warnings that need attention.'
-                        : 'These devices have packages with pending updates.'}
+                  {showMessageView
+                    ? statusCopy.messageBlurb
+                    : searchQuery
+                      ? `Showing devices with "${searchQuery}" packages that have ${statusCopy.noun}.`
+                      : statusCopy.blurb}
                 </p>
               </div>
               <div ref={setTableContainerRef} className="flex-1 overflow-x-auto overflow-y-auto min-h-0 table-scrollbar">
+                {showMessageView ? (
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                  <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        {statusCopy.messageColumn}
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Packages
+                      </th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+                        Devices
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                    {statusMessageGroups.map((group, groupIdx) => {
+                      const key = group.message || '__no_message__'
+                      const expanded = expandedMessages.has(key)
+                      const shownDevices = expanded ? group.devices : group.devices.slice(0, 8)
+                      return (
+                        <tr key={groupIdx} className="hover:bg-gray-50 dark:hover:bg-gray-800 align-top">
+                          <td className="px-4 py-3 max-w-xl">
+                            {group.message ? (
+                              <div className="flex items-start gap-2">
+                                <CopyButton value={group.message} size="sm" />
+                                <p className={`text-sm whitespace-pre-wrap break-words ${statusCopy.messageClass}`}>
+                                  {group.message}
+                                </p>
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 dark:text-gray-400 italic">
+                                {itemsStatusFilter === 'success'
+                                  ? 'No version reported'
+                                  : 'No message reported \u2014 flagged by package status only'}
+                              </p>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex flex-wrap gap-1 max-w-xs">
+                              {group.itemNames.map((name, idx) => (
+                                <span
+                                  key={idx}
+                                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${statusCopy.chipClass}`}
+                                >
+                                  {name}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900 dark:text-white mb-1">
+                              {group.deviceCount} device{group.deviceCount !== 1 ? 's' : ''}
+                            </div>
+                            <div className="flex flex-wrap gap-1 max-w-md">
+                              {shownDevices.map(device => (
+                                <Link
+                                  key={device.serialNumber}
+                                  href={`/device/${device.serialNumber}#installs`}
+                                  title={`${device.serialNumber} \u2014 ${device.itemNames.join(', ')}`}
+                                  className="inline-flex items-center gap-1 text-xs text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded"
+                                >
+                                  {device.deviceName}
+                                  {device.itemNames.length > 1 && (
+                                    <span className="text-gray-400 dark:text-gray-500">&times;{device.itemNames.length}</span>
+                                  )}
+                                </Link>
+                              ))}
+                              {group.devices.length > 8 && (
+                                <button
+                                  onClick={() => toggleExpandedMessage(key)}
+                                  className="text-xs text-blue-600 dark:text-blue-400 hover:underline px-1"
+                                >
+                                  {expanded ? 'Show fewer' : `+${group.devices.length - 8} more`}
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+                ) : (
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>
@@ -3934,7 +4246,7 @@ function InstallsPageContent() {
                         Device
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        {itemsStatusFilter === 'errors' ? 'Failed Packages' : itemsStatusFilter === 'warnings' ? 'Warning Packages' : 'Pending Packages'}
+                        {statusCopy.packagesColumn}
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Manifest / Repo
@@ -3949,26 +4261,9 @@ function InstallsPageContent() {
                   </thead>
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                     {statusFilteredDevices.map((device: any) => {
-                      const cimianItems = getDeviceInstallItems(device)
-                      
                       // First filter by status type
-                      const statusFilteredItems = itemsStatusFilter === 'errors'
-                        ? cimianItems.filter((item: any) => {
-                            const status = (item.currentStatus || item.status || '').toLowerCase()
-                            return status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall'
-                          })
-                        : itemsStatusFilter === 'warnings'
-                          ? cimianItems.filter((item: any) => {
-                              const status = (item.currentStatus || item.status || '').toLowerCase()
-                              return status.includes('warning') || status === 'needs-attention'
-                            })
-                          : cimianItems.filter((item: any) => {
-                              const status = (item.currentStatus || item.status || '').toLowerCase()
-                              return status.includes('will-be-installed') || status.includes('update-available') || 
-                                     status.includes('update_available') || status.includes('will-be-removed') || 
-                                     status.includes('pending') || status.includes('scheduled') || 
-                                     status === 'managed-update-available'
-                            })
+                      const statusFilteredItems = getDeviceInstallItems(device)
+                        .filter((item: any) => matchesItemStatus(item, itemsStatusFilter))
                       
                       // Then filter by search query if present
                       const affectedPackages = searchQuery
@@ -4010,23 +4305,37 @@ function InstallsPageContent() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3">
-                            <div className="flex flex-wrap gap-1">
-                              {affectedPackages.slice(0, 5).map((pkg: any, idx: number) => (
-                                <span 
-                                  key={idx}
-                                  className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
-                                    itemsStatusFilter === 'errors'
-                                      ? 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300'
-                                      : itemsStatusFilter === 'warnings'
-                                        ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300'
-                                        : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300'
-                                  }`}
-                                  title={`${pkg.itemName || pkg.name || pkg.displayName}: ${pkg.currentStatus || pkg.status}`}
-                                >
-                                  {pkg.itemName || pkg.name || pkg.displayName}
-                                </span>
-                              ))}
+                          <td className="px-4 py-3 align-top">
+                            {/* One line per package, message alongside the name:
+                                the whole point of the drill-down is reading the
+                                message, and a chip alone forces a click. */}
+                            <div className="flex flex-col gap-1.5">
+                              {affectedPackages.slice(0, 5).map((pkg: any, idx: number) => {
+                                const message = getItemMessage(pkg, itemsStatusFilter)
+                                const timestamp = getItemTimestamp(pkg)
+                                return (
+                                  <div key={idx} className="flex items-start gap-2 min-w-0">
+                                    <span 
+                                      className={`inline-flex px-2 py-0.5 text-xs font-medium rounded shrink-0 ${statusCopy.chipClass}`}
+                                      title={`${pkg.itemName || pkg.name || pkg.displayName}: ${pkg.currentStatus || pkg.status}`}
+                                    >
+                                      {pkg.itemName || pkg.name || pkg.displayName}
+                                    </span>
+                                    {message ? (
+                                      <span
+                                        className="text-xs text-gray-600 dark:text-gray-400 line-clamp-2 min-w-0 max-w-md"
+                                        title={timestamp ? `${message} \u2014 ${formatRelativeTime(timestamp)}` : message}
+                                      >
+                                        {message}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs text-gray-400 dark:text-gray-500 italic shrink-0">
+                                        {pkg.currentStatus || pkg.status || 'no message reported'}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })}
                               {affectedPackages.length > 5 && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
                                   +{affectedPackages.length - 5} more
@@ -4063,6 +4372,7 @@ function InstallsPageContent() {
                     })}
                   </tbody>
                 </table>
+                )}
               </div>
             </div>
           )}
@@ -4076,14 +4386,10 @@ function InstallsPageContent() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                {itemsStatusFilter === 'errors' ? 'No Install Errors!' : itemsStatusFilter === 'warnings' ? 'No Warnings!' : 'No Pending Updates!'}
+                {statusCopy.emptyHeading}
               </h3>
               <p className="text-gray-500 dark:text-gray-400">
-                {itemsStatusFilter === 'errors' 
-                  ? 'All devices have successful installations. Great job keeping everything running smoothly!'
-                  : itemsStatusFilter === 'warnings'
-                    ? 'No packages have warnings. Everything looks good!'
-                    : 'All managed packages are up to date across your fleet.'}
+                {statusCopy.emptyBlurb}
               </p>
             </div>
           )}
