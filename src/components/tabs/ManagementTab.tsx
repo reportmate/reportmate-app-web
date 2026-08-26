@@ -382,6 +382,11 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     return match ? match[1] : upn
   }
 
+  const intuneDeviceId = deviceDetails.intune_device_id || deviceDetails.intuneDeviceId
+  const entraObjectId = deviceDetails.entra_object_id || deviceDetails.entraObjectId
+  const hasDeviceDetails = !!(managementName || primaryUser || enrolledBy || intuneDeviceId ||
+                              entraObjectId || management.last_sync)
+
   // Intune usually reports the same account for both, so only show the pair when they differ
   const showPrimaryUser = !!primaryUser &&
     stripTenantSuffix(primaryUser)?.toLowerCase() !== stripTenantSuffix(enrolledBy)?.toLowerCase()
@@ -628,8 +633,8 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             )
           })()}
 
-          {/* Organization */}
-          {isEnrolled && tenantName && (
+          {/* Device identity - the tenant name itself is shown on the certificate card */}
+          {isEnrolled && hasDeviceDetails && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Details</h3>
               <div className="space-y-4">
@@ -668,28 +673,28 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 )}
 
-                {/* Intune Device ID with copy button - support both snake_case and camelCase */}
-                {(deviceDetails?.intune_device_id || deviceDetails?.intuneDeviceId) && (
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Intune ID</span>
-                    <div className="flex items-center gap-2 ml-3">
-                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {deviceDetails.intune_device_id || deviceDetails.intuneDeviceId}
+                {/* Intune Device ID with copy button */}
+                {intuneDeviceId && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Intune ID</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={intuneDeviceId}>
+                        {intuneDeviceId}
                       </span>
-                      <CopyButton value={deviceDetails.intune_device_id || deviceDetails.intuneDeviceId} />
+                      <CopyButton value={intuneDeviceId} className="shrink-0" />
                     </div>
                   </div>
                 )}
 
-                {/* Entra Object ID with copy button - support both snake_case and camelCase */}
-                {(deviceDetails?.entra_object_id || deviceDetails?.entraObjectId) && (
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Object ID</span>
-                    <div className="flex items-center gap-2 ml-3">
-                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {deviceDetails.entra_object_id || deviceDetails.entraObjectId}
+                {/* Entra Object ID with copy button */}
+                {entraObjectId && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Object ID</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={entraObjectId}>
+                        {entraObjectId}
                       </span>
-                      <CopyButton value={deviceDetails.entra_object_id || deviceDetails.entraObjectId} />
+                      <CopyButton value={entraObjectId} className="shrink-0" />
                     </div>
                   </div>
                 )}
@@ -1243,21 +1248,25 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 </div>
 
-                {/* TODO: Resources at bottom - Currently always 0, needs proper policy/app collection */}
-                {/* <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                {/* Resource counts - same footer the Mac card carries */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration Profiles</span>
-                    <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{profileCount}</span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{profileCount}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Compliance Policies</span>
-                    <span className="text-lg font-bold text-green-600 dark:text-green-400">{compliancePolicyCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</span>
-                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{managedAppCount}</span>
-                  </div>
-                </div> */}
+                  {compliancePolicyCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Compliance Policies</span>
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{compliancePolicyCount}</span>
+                    </div>
+                  )}
+                  {managedAppCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</span>
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{managedAppCount}</span>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               /* Fallback: Simple Management Resources */
