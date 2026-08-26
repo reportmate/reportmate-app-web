@@ -8,8 +8,13 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm. PINNED: `npm install -g pnpm` resolves the latest release the
+# base image can run, so the toolchain moved on its own and broke this build.
+# 10.34.5 is the newest pnpm that supports the Node 20 base above -- 11.x
+# requires Node >=22.13 and dies on `node:sqlite`, and 12.x is a standalone
+# binary that ignores the Node constraint entirely, which is how it got pulled
+# in on 2026-08-26 and turned ignored build scripts into a hard error.
+RUN npm install -g pnpm@10.34.5
 
 # Install dependencies based on the preferred package manager
 COPY package.json pnpm-lock.yaml* ./
@@ -21,8 +26,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (pinned to match the deps stage above)
+RUN npm install -g pnpm@10.34.5
 
 # Set environment variable for Docker build
 ENV DOCKER_BUILD=true
