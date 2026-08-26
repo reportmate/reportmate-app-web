@@ -8,8 +8,13 @@ FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm. PINNED: `npm install -g pnpm` follows the latest major, and
+# pnpm 12 (2026-08-26) turned "Ignored build scripts" from a warning into
+# ERR_PNPM_IGNORED_BUILDS, which broke this image mid-deploy with no change to
+# the app. onlyBuiltDependencies is declared in pnpm-workspace.yaml, but that
+# file is not copied into the build context below, so pnpm never sees it --
+# fixing that changes which install scripts run, so it is left alone here.
+RUN npm install -g pnpm@11.24.0
 
 # Install dependencies based on the preferred package manager
 COPY package.json pnpm-lock.yaml* ./
@@ -21,8 +26,8 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm (pinned to match the deps stage above)
+RUN npm install -g pnpm@11.24.0
 
 # Set environment variable for Docker build
 ENV DOCKER_BUILD=true
