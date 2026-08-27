@@ -11,7 +11,6 @@ import { extractInstalls, type InstallsInfo } from './modules/installs'
 import { extractApplications } from './modules/applications'
 import { extractSecurity, type SecurityInfo } from './modules/security'
 import { extractManagement, type ManagementInfo } from './modules/management'
-import { extractProfiles, type ProfilesInfo } from './modules/profiles'
 
 export interface ProcessedDeviceInfo {
   // Core identifiers
@@ -45,7 +44,6 @@ export interface ProcessedDeviceInfo {
   peripherals?: any
   security?: SecurityInfo
   management?: ManagementInfo
-  profiles?: ProfilesInfo
   
   // Legacy compatibility (deprecated - use modular data instead)
   model?: string
@@ -128,7 +126,6 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   const applications = extractApplications(modules)
   const management = extractManagement(modules)
   const installs = extractInstalls(modules)
-  const profiles = extractProfiles(modules)
   
   const finalName = inventory.deviceName
     || rawDevice.name
@@ -177,7 +174,6 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     applications,
     management,
     installs,
-    profiles,
     
     // Keep original modules for any unprocessed data
     modules: modules

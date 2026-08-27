@@ -208,6 +208,8 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   // NOTE: compliance_status and remote_management are rendered on the Security tab, not here
   const installedProfiles = management.installed_profiles || management.installedProfiles || []
   const profiles = management.profiles || []
+  // Windows carries its policy branches here, shaped like macOS mobileconfig profiles
+  const configurationProfiles = management.configuration_profiles || management.configurationProfiles || []
   const managedPolicies = management.managed_policies || management.managedPolicies || []
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
   const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
@@ -238,17 +240,50 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
     })
   }
   
+  // macOS reports installed_profiles; Windows reports the same idea as configuration_profiles
+  // (one branch per policy key, payloads carrying the values). Normalise the Windows entries
+  // onto the macOS field names so both platforms render through the one accordion below.
+  const profileEntries = useMemo(() => {
+    if (installedProfiles.length > 0) {
+      return installedProfiles.map((profile: any) => ({
+        ...profile,
+        scope: profile.user || (profile.type === 'User' ? 'User Level' : 'System Level')
+      }))
+    }
+    return configurationProfiles.map((profile: any, index: number) => {
+      const identifier = profile.identifier || profile.uuid || profile.profile_name ||
+                         profile.profileName || `profile-${index}`
+      const scope = (profile.type || 'Device') === 'User' ? 'User Level' : 'System Level'
+      return {
+        identifier,
+        name: profile.profile_name || profile.profileName || profile.name || identifier,
+        uuid: profile.uuid,
+        organization: profile.organization || profile.source || profile.category,
+        description: profile.description,
+        install_date: profile.install_date || profile.installDate,
+        payloads: profile.payloads || [],
+        payload_count: profile.payload_count ?? profile.payloadCount ?? (profile.payloads || []).length,
+        scope
+      }
+    })
+  }, [installedProfiles, configurationProfiles])
+
+  const userScopedProfileCount = useMemo(
+    () => profileEntries.filter((profile: any) => profile.scope === 'User Level').length,
+    [profileEntries]
+  )
+
   // Filter profiles by search
   const filteredProfiles = useMemo(() => {
-    if (!profileSearch.trim()) return installedProfiles
+    if (!profileSearch.trim()) return profileEntries
     const search = profileSearch.toLowerCase()
-    return installedProfiles.filter((profile: any) => {
+    return profileEntries.filter((profile: any) => {
       const name = (profile.name || profile.identifier || '').toLowerCase()
       const identifier = (profile.identifier || '').toLowerCase()
       const org = (profile.organization || '').toLowerCase()
       return name.includes(search) || identifier.includes(search) || org.includes(search)
     })
-  }, [installedProfiles, profileSearch])
+  }, [profileEntries, profileSearch])
   
   // Filter managed policies by search
   const filteredPolicies = useMemo(() => {
@@ -328,7 +363,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   
   const tenantName = tenantDetails.tenant_name || tenantDetails.tenantName || tenantDetails.organization
   const deviceAuthStatus = deviceDetails.device_auth_status || deviceDetails.deviceAuthStatus
-  const profileCount = installedProfiles.length || profiles.length || 0
+  const profileCount = profileEntries.length || profiles.length || 0
   
   // Mac-specific data - ADE configuration and device identifiers
   // NOTE: Compliance moved to Security tab, Remote Management may move to Security/Remote Access
@@ -337,6 +372,24 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const autopilotConfig = management.autopilot_config || management.autopilotConfig
   const primaryUser = deviceDetails.primary_user || deviceDetails.primaryUser
   const managementName = deviceDetails.management_name || deviceDetails.managementName
+  const enrolledBy = mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName
+
+  // Windows reports the enrolling account as `user@domain@<tenant-guid>` - the tenant is
+  // already shown on its own, so only the principal name is worth displaying.
+  const stripTenantSuffix = (upn?: string) => {
+    if (!upn) return upn
+    const match = upn.match(/^(.+)@[0-9a-fA-F-]{36}$/)
+    return match ? match[1] : upn
+  }
+
+  const intuneDeviceId = deviceDetails.intune_device_id || deviceDetails.intuneDeviceId
+  const entraObjectId = deviceDetails.entra_object_id || deviceDetails.entraObjectId
+  const hasDeviceDetails = !!(managementName || primaryUser || enrolledBy || intuneDeviceId ||
+                              entraObjectId || management.last_sync)
+
+  // Intune usually reports the same account for both, so only show the pair when they differ
+  const showPrimaryUser = !!primaryUser &&
+    stripTenantSuffix(primaryUser)?.toLowerCase() !== stripTenantSuffix(enrolledBy)?.toLowerCase()
   
   // Get compliance policies and managed apps for summary
   const compliancePolicies = management.compliance_policies || management.compliancePolicies || []
@@ -463,19 +516,11 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 </span>
               </div>
             )}
-
-            {/* User Principal Name - who enrolled the device */}
-            {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
-              <div className="flex items-start">
-                <span className="text-base font-medium text-gray-900 dark:text-white">Enrolled By</span>
-                <span className="text-base font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
-              </div>
-            )}
           </div>
 
           {/* Windows: Autopilot Configuration */}
-          {isEnrolled && !isMac && (management.autopilot_config || management.autopilotConfig) && (() => {
-            const autopilot = management.autopilot_config || management.autopilotConfig
+          {isEnrolled && !isMac && autopilotConfig && (() => {
+            const autopilot = autopilotConfig
             return (
               <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
@@ -588,8 +633,8 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
             )
           })()}
 
-          {/* Organization */}
-          {isEnrolled && tenantName && (
+          {/* Device identity - the tenant name itself is shown on the certificate card */}
+          {isEnrolled && hasDeviceDetails && (
             <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
               <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Details</h3>
               <div className="space-y-4">
@@ -603,46 +648,53 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                 )}
 
                 {/* Primary User - who has self-service device action access */}
-                {primaryUser && (
-                  <div className="flex items-start">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Primary User</span>
-                    <div className="flex items-center gap-2 ml-3">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">{primaryUser}</span>
-                      <CopyButton value={primaryUser} />
+                {showPrimaryUser && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Primary User</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={primaryUser}>
+                        {stripTenantSuffix(primaryUser)}
+                      </span>
+                      <CopyButton value={primaryUser} className="shrink-0" />
                     </div>
                   </div>
                 )}
 
                 {/* User Principal Name - who enrolled the device */}
-                {(mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName) && (
-                  <div className="flex items-start">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Enrolled By</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white ml-3">{mdmEnrollment.user_principal_name || mdmEnrollment.userPrincipalName}</span>
-                  </div>
-                )}
-
-                {/* Intune Device ID with copy button - support both snake_case and camelCase */}
-                {(deviceDetails?.intune_device_id || deviceDetails?.intuneDeviceId) && (
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Intune ID</span>
-                    <div className="flex items-center gap-2 ml-3">
-                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {deviceDetails.intune_device_id || deviceDetails.intuneDeviceId}
+                {enrolledBy && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Enrolled By</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={enrolledBy}>
+                        {stripTenantSuffix(enrolledBy)}
                       </span>
-                      <CopyButton value={deviceDetails.intune_device_id || deviceDetails.intuneDeviceId} />
+                      <CopyButton value={enrolledBy} className="shrink-0" />
                     </div>
                   </div>
                 )}
 
-                {/* Entra Object ID with copy button - support both snake_case and camelCase */}
-                {(deviceDetails?.entra_object_id || deviceDetails?.entraObjectId) && (
-                  <div className="flex items-center">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px]">Object ID</span>
-                    <div className="flex items-center gap-2 ml-3">
-                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100">
-                        {deviceDetails.entra_object_id || deviceDetails.entraObjectId}
+                {/* Intune Device ID with copy button */}
+                {intuneDeviceId && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Intune ID</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={intuneDeviceId}>
+                        {intuneDeviceId}
                       </span>
-                      <CopyButton value={deviceDetails.entra_object_id || deviceDetails.entraObjectId} />
+                      <CopyButton value={intuneDeviceId} className="shrink-0" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Entra Object ID with copy button */}
+                {entraObjectId && (
+                  <div className="flex items-center min-w-0">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400 min-w-[100px] shrink-0">Object ID</span>
+                    <div className="flex items-center gap-2 ml-3 min-w-0">
+                      <span className="text-sm font-mono text-gray-900 dark:text-gray-100 truncate" title={entraObjectId}>
+                        {entraObjectId}
+                      </span>
+                      <CopyButton value={entraObjectId} className="shrink-0" />
                     </div>
                   </div>
                 )}
@@ -872,93 +924,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                         </span>
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Windows: Autopilot Configuration (equivalent to Mac ADE) */}
-          {isEnrolled && !isMac && autopilotConfig && (autopilotConfig.assigned || autopilotConfig.activated) && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Windows Autopilot</h3>
-              <div className="space-y-3">
-                {/* Autopilot Assigned/Activated */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Assigned</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      autopilotConfig.assigned
-                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {autopilotConfig.assigned ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Activated</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      autopilotConfig.activated
-                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {autopilotConfig.activated ? 'Yes' : 'No'}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Deployment Mode */}
-                {autopilotConfig.deployment_mode && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Mode</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.deployment_mode}
-                    </span>
-                  </div>
-                )}
-
-                {/* Profile Name */}
-                {autopilotConfig.profile_name && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Profile</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.profile_name}
-                    </span>
-                  </div>
-                )}
-
-                {/* Group Tag */}
-                {autopilotConfig.group_tag && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Group Tag</span>
-                    <span className="text-sm font-mono text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
-                      {autopilotConfig.group_tag}
-                    </span>
-                  </div>
-                )}
-
-                {/* Enrollment Status Page */}
-                {autopilotConfig.enrollment_status_page_enabled !== undefined && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Enrollment Status Page</span>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                      autopilotConfig.enrollment_status_page_enabled
-                        ? 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300'
-                        : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {autopilotConfig.enrollment_status_page_enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </div>
-                )}
-
-                {/* Deployment Phase */}
-                {autopilotConfig.deployment_phase && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Deployment Phase</span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {autopilotConfig.deployment_phase}
-                    </span>
                   </div>
                 )}
               </div>
@@ -1283,21 +1248,25 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 </div>
 
-                {/* TODO: Resources at bottom - Currently always 0, needs proper policy/app collection */}
-                {/* <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
+                {/* Resource counts - same footer the Mac card carries */}
+                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Configuration Profiles</span>
-                    <span className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{profileCount}</span>
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{profileCount}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Compliance Policies</span>
-                    <span className="text-lg font-bold text-green-600 dark:text-green-400">{compliancePolicyCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</span>
-                    <span className="text-lg font-bold text-orange-600 dark:text-orange-400">{managedAppCount}</span>
-                  </div>
-                </div> */}
+                  {compliancePolicyCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Compliance Policies</span>
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{compliancePolicyCount}</span>
+                    </div>
+                  )}
+                  {managedAppCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Managed Apps</span>
+                      <span className="text-2xl font-bold text-gray-900 dark:text-white">{managedAppCount}</span>
+                    </div>
+                  )}
+                </div>
               </>
             ) : (
               /* Fallback: Simple Management Resources */
@@ -1366,15 +1335,18 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
         )}
       </div>
 
-      {/* Configuration Profiles Section (Mac) - Accordion style like SystemTab Background Activity */}
-      {isMac && installedProfiles.length > 0 && (
+      {/* Configuration Profiles Section - macOS profiles and Windows policy branches alike */}
+      {profileEntries.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
           <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Configuration Profiles</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                  Management profiles installed on this device ({filteredProfiles.length} of {installedProfiles.length} profiles)
+                  Management profiles applied to this device ({filteredProfiles.length} of {profileEntries.length} profiles
+                  {userScopedProfileCount > 0 && (
+                    <>, {profileEntries.length - userScopedProfileCount} system level, {userScopedProfileCount} user level</>
+                  )})
                 </p>
               </div>
               <div className="relative">
@@ -1470,10 +1442,10 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                           {payloadCount} payload{payloadCount !== 1 ? 's' : ''}
                         </span>
                       )}
-                      {/* User scope badge (e.g., "System Level") */}
-                      {profile.user && (
+                      {/* Scope badge - "System Level" or "User Level" on both platforms */}
+                      {profile.scope && (
                         <span className="text-xs text-gray-500 dark:text-gray-400">
-                          {profile.user}
+                          {profile.scope}
                         </span>
                       )}
                       {/* Method badge: Only show for legacy MCX profiles */}

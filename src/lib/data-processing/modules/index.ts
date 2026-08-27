@@ -41,7 +41,6 @@ export { extractPerformance, type PerformanceInfo } from './performance'
 export { extractPeripherals, type PeripheralInfo } from './peripherals'
 
 // Profiles module
-export { extractProfiles, type ProfilesInfo, type ProfileItem } from './profiles'
 
 // Security module
 export { extractSecurity, type SecurityInfo } from './security'
