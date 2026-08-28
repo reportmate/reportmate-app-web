@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
 import { SlidersHorizontal } from 'lucide-react'
+import { EventDetails } from './EventDetails'
+import { getEventModuleId, getEventDeviceHrefSuffix } from '../../eventLinks'
 
 interface RecentEventsTableProps {
   events: FleetEvent[]
@@ -65,48 +67,6 @@ const getFilterIcon = (key: string) => {
     default:
       return null
   }
-}
-
-// Helper function to detect module type from event
-const getEventModuleId = (event: BundledEvent): string | null => {
-  // Check if the event payload contains module_id
-  if (event.payload && typeof event.payload === 'object') {
-    const moduleId = (event.payload as any).module_id
-    if (moduleId && typeof moduleId === 'string') {
-      return moduleId
-    }
-  }
-  
-  // Fallback: try to detect module from message content
-  const message = event.message?.toLowerCase() || ''
-  
-  // Common module patterns in messages
-  if (message.includes('install') || message.includes('package') || message.includes('cimian')) {
-    return 'installs'
-  }
-  if (message.includes('hardware') || message.includes('cpu') || message.includes('memory') || message.includes('disk')) {
-    return 'hardware'
-  }
-  if (message.includes('network') || message.includes('wifi') || message.includes('ethernet') || message.includes('ip')) {
-    return 'network'
-  }
-  if (message.includes('profile') || message.includes('policy') || message.includes('configuration')) {
-    return 'management'  // Profiles merged into Management
-  }
-  if (message.includes('security') || message.includes('antivirus') || message.includes('firewall') || message.includes('tpm')) {
-    return 'security'
-  }
-  if (message.includes('system') || message.includes('os') || message.includes('operating system')) {
-    return 'system'
-  }
-  if (message.includes('application') || message.includes('software') || message.includes('app')) {
-    return 'applications'
-  }
-  if (message.includes('management') || message.includes('mdm') || message.includes('enrollment')) {
-    return 'management'
-  }
-  
-  return null
 }
 
 // Helper function to check if event is from a specific module (backward compatibility)
@@ -229,16 +189,16 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // All types visible by default
-  const DEFAULT_HIDDEN = useMemo(() => new Set<string>([]), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set([]))
+  // Info is the firehose — routine data-collection chatter that drowns the events
+  // worth reacting to. It is hidden by default and opted into from the filter.
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info']), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
   const [filterOpen, setFilterOpen] = useState(false)
   const filterRef = useRef<HTMLDivElement>(null)
-  // TODO: Accordion functionality disabled for now - will revisit later
-  // const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(new Set())
   const timeoutRef = React.useRef<NodeJS.Timeout | null>(null)
 
   // Bundle related events intelligently
@@ -268,18 +228,18 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
     })
   }
   
-  // TODO: Accordion toggle disabled for now - will revisit later
-  // const toggleExpanded = (eventId: string) => {
-  //   setExpandedEvents(prev => {
-  //     const next = new Set(prev)
-  //     if (next.has(eventId)) {
-  //       next.delete(eventId)
-  //     } else {
-  //       next.add(eventId)
-  //     }
-  //     return next
-  //   })
-  // }
+  const toggleExpanded = (eventId: string) => {
+    setExpandedEvents(prev => {
+      const next = new Set(prev)
+      if (next.has(eventId)) next.delete(eventId)
+      else next.add(eventId)
+      return next
+    })
+  }
+
+  // Collapse everything when the filter changes, so a hidden row can't stay open
+  // behind the filter and reappear expanded.
+  useEffect(() => { setExpandedEvents(new Set()) }, [hiddenTypes])
 
   const handleMouseEnter = () => {
     setIsHovered(true)
@@ -620,32 +580,37 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                         </td>
                       </tr>
                     ) : filteredEvents.map((bundledEvent: BundledEvent) => {
-                      // TODO: Accordion expand/collapse functionality disabled for now
-                      // const isExpanded = expandedEvents.has(bundledEvent.id)
-                      // const hasDetails = bundledEvent.hasExpandableDetails
-                      
+                      const isExpanded = expandedEvents.has(bundledEvent.id)
+
                       return (
                         <React.Fragment key={bundledEvent.id}>
-                          <tr 
-                            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                            // TODO: Accordion click disabled for now
-                            // onClick={hasDetails ? () => toggleExpanded(bundledEvent.id) : undefined}
+                          <tr
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
+                            onClick={() => toggleExpanded(bundledEvent.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault()
+                                toggleExpanded(bundledEvent.id)
+                              }
+                            }}
+                            tabIndex={0}
+                            role="button"
+                            aria-expanded={isExpanded}
                           >
                             <td className="w-20 px-3 py-2.5">
-                              <div className="flex items-center justify-center">
-                                {/* TODO: Accordion chevron disabled for now - just show status icon */}
+                              <div className="flex items-center gap-1">
+                                <svg
+                                  className={`w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
+                                  fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24" aria-hidden="true"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                </svg>
                                 {getStatusIcon(bundledEvent.kind)}
                               </div>
                             </td>
                             <td className="w-56 px-3 py-2.5">
                               <Link
-                                href={`/device/${encodeURIComponent(bundledEvent.device)}${(() => {
-                                  // For installs events, always navigate to the "Last Run" filter
-                                  // so users can see exactly which packages were processed
-                                  const moduleId = getEventModuleId(bundledEvent)
-                                  if (moduleId === 'installs') return '?filter=last_run#installs'
-                                  return moduleId ? `#${moduleId}` : ''
-                                })()}`}
+                                href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
                                 className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -660,13 +625,6 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                     ({bundledEvent.bundledKinds.join(', ')})
                                   </span>
                                 )}
-                                {/* TODO: Accordion hint disabled for now
-                                {hasDetails && !isExpanded && (
-                                  <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
-                                    (click to expand)
-                                  </span>
-                                )}
-                                */}
                               </div>
                             </td>
                             <td className="w-44 px-3 py-2.5">
@@ -678,89 +636,13 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                             </td>
                           </tr>
                           
-                          {/* TODO: Accordion expanded detail row disabled for now - will revisit later
-                          {isExpanded && hasDetails && (
-                            <tr className="bg-gray-50 dark:bg-gray-750">
-                              <td colSpan={4} className="px-6 py-4">
-                                <div className="space-y-3">
-                                  {bundledEvent.errorMessages && bundledEvent.errorMessages.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
-                                        Errors ({bundledEvent.errorMessages.length})
-                                      </h4>
-                                      <ul className="space-y-1">
-                                        {bundledEvent.errorMessages.map((msg, idx) => (
-                                          <li key={idx} className="text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded font-mono">
-                                            {msg}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  
-                                  {bundledEvent.warningMessages && bundledEvent.warningMessages.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-2">
-                                        Warnings ({bundledEvent.warningMessages.length})
-                                      </h4>
-                                      <ul className="space-y-1">
-                                        {bundledEvent.warningMessages.map((msg, idx) => (
-                                          <li key={idx} className="text-sm text-yellow-700 dark:text-yellow-300 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-1.5 rounded font-mono">
-                                            {msg}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  
-                                  {bundledEvent.failedItems && bundledEvent.failedItems.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-semibold text-red-600 dark:text-red-400 uppercase tracking-wide mb-2">
-                                        Failed Items ({bundledEvent.failedItems.length})
-                                      </h4>
-                                      <div className="space-y-2">
-                                        {bundledEvent.failedItems.map((item, idx) => (
-                                          <div key={idx} className="bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded border-l-2 border-red-400">
-                                            <div className="text-sm font-medium text-red-800 dark:text-red-200">
-                                              {item.displayName}
-                                            </div>
-                                            {item.error && (
-                                              <div className="text-xs text-red-600 dark:text-red-400 font-mono mt-1">
-                                                {item.error}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                  
-                                  {bundledEvent.warningItems && bundledEvent.warningItems.length > 0 && (
-                                    <div>
-                                      <h4 className="text-xs font-semibold text-yellow-600 dark:text-yellow-400 uppercase tracking-wide mb-2">
-                                        Items with Warnings ({bundledEvent.warningItems.length})
-                                      </h4>
-                                      <div className="space-y-2">
-                                        {bundledEvent.warningItems.map((item, idx) => (
-                                          <div key={idx} className="bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded border-l-2 border-yellow-400">
-                                            <div className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                                              {item.displayName}
-                                            </div>
-                                            {item.warning && (
-                                              <div className="text-xs text-yellow-600 dark:text-yellow-400 font-mono mt-1">
-                                                {item.warning}
-                                              </div>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
+                          {isExpanded && (
+                            <tr className="bg-gray-50 dark:bg-gray-900/40">
+                              <td colSpan={4} className="px-6 py-4 border-l-0">
+                                <EventDetails eventIds={bundledEvent.eventIds} />
                               </td>
                             </tr>
                           )}
-                          */}
                         </React.Fragment>
                       )
                     })}
