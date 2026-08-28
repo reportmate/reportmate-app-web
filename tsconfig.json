@@ -5,6 +5,7 @@
     "jsx": "preserve",
     "esModuleInterop": true,
     "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
