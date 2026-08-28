@@ -60,3 +60,55 @@ describe('Last Run filter with Cimian session-id markers', () => {
     expect(byName('Firefox').lastUpdate).toBe('')
   })
 })
+
+describe('Munki problem installs', () => {
+  const munkiDevice = (extra: any) => ({
+    installs: {
+      munki: {
+        startTime: '2026-08-28T20:20:00.000Z',
+        endTime: '2026-08-28T20:20:41.000Z',
+        items: [
+          { id: 'bbedit', name: 'BBEdit', displayName: 'BBEdit', type: 'munki', status: 'install_failed', endTime: '2026-08-28T20:20:41.000Z' },
+        ],
+        ...extra,
+      },
+    },
+  })
+
+  it('splits the semicolon-joined string the Mac client sends', () => {
+    const r = extractInstalls(munkiDevice({
+      problemInstalls: 'BBEdit; Microsoft Defender; Microsoft Word',
+    }) as any) as any
+    expect(r.packages.map((p: any) => p.name).sort())
+      .toEqual(['BBEdit', 'Microsoft Defender', 'Microsoft Word'])
+  })
+
+  it('prefers problemInstallsArray when present', () => {
+    const r = extractInstalls(munkiDevice({
+      problemInstalls: 'BBEdit; Microsoft Defender',
+      problemInstallsArray: ['BBEdit', 'Microsoft Defender'],
+    }) as any) as any
+    expect(r.packages.map((p: any) => p.name).sort()).toEqual(['BBEdit', 'Microsoft Defender'])
+  })
+
+  it('matches an existing item by display name instead of duplicating it', () => {
+    const r = extractInstalls({
+      installs: {
+        munki: {
+          startTime: '2026-08-28T20:20:00.000Z',
+          endTime: '2026-08-28T20:20:41.000Z',
+          items: [
+            { id: 'defender', name: 'Defender', displayName: 'Microsoft Defender', type: 'munki', status: 'install_failed', endTime: '2026-08-28T20:20:41.000Z' },
+          ],
+          problemInstalls: 'Microsoft Defender',
+        },
+      },
+    } as any) as any
+    expect(r.packages.map((p: any) => p.name)).toEqual(['Defender'])
+  })
+
+  it('still handles a comma-joined legacy string', () => {
+    const r = extractInstalls(munkiDevice({ problemInstalls: 'BBEdit, Firefox' }) as any) as any
+    expect(r.packages.map((p: any) => p.name).sort()).toEqual(['BBEdit', 'Firefox'])
+  })
+})

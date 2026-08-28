@@ -1278,10 +1278,21 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       }
     }
     
-    if (installs.munki?.problemInstalls && installs.munki.problemInstalls.trim() !== '') {
-      const problemItems = installs.munki.problemInstalls.split(',').map((s: string) => s.trim()).filter((s: string) => s.length > 0)
+    // The Mac client joins ProblemInstalls names with "; " and also ships them as
+    // problemInstallsArray. Splitting the joined string on "," therefore yielded a
+    // single fake package literally named "BBEdit; Microsoft Defender; Microsoft
+    // Excel; ..." — prefer the array, and split on ";" when only the string is present.
+    const problemInstallsArray = installs.munki?.problemInstallsArray || installs.munki?.problem_installs_array
+    if (Array.isArray(problemInstallsArray) || (installs.munki?.problemInstalls && installs.munki.problemInstalls.trim() !== '')) {
+      const problemItems: string[] = Array.isArray(problemInstallsArray)
+        ? problemInstallsArray.map((s: string) => String(s).trim()).filter((s: string) => s.length > 0)
+        : installs.munki.problemInstalls.split(/[;,]/).map((s: string) => s.trim()).filter((s: string) => s.length > 0)
       for (const itemName of problemItems) {
-        let pkg = packages.find(p => p.name.toLowerCase() === itemName.toLowerCase())
+        // ProblemInstalls carries Munki's display_name ("Microsoft Defender") while
+        // the items array carries the short name ("Defender"), so match on both —
+        // otherwise every problem install is duplicated as a second phantom row.
+        const needle = itemName.toLowerCase()
+        let pkg = packages.find(p => p.name?.toLowerCase() === needle || p.displayName?.toLowerCase() === needle)
         if (!pkg) {
           pkg = {
             id: itemName.toLowerCase().replace(/\s+/g, '-'),
