@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { formatRelativeTime, formatExactTime } from '../../lib/time';
 import { InstallsInfo, InstallPackage, ErrorMessage, WarningMessage } from '../../lib/data-processing/modules/installs';
 
@@ -35,6 +35,15 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string>('');
   const groupByCategory = true; // Always enabled
+
+  const isPendingWithReason = (pkg: InstallPackage): boolean =>
+    pkg.status?.toLowerCase() === 'pending' && !!pkg.pendingReason?.trim();
+
+  // A row is only worth expanding when it carries a message or a pending reason.
+  const hasExpandableContent = (pkg: InstallPackage): boolean =>
+    (pkg.errors?.length ?? 0) > 0 ||
+    (pkg.warnings?.length ?? 0) > 0 ||
+    isPendingWithReason(pkg);
 
   const togglePackageExpansion = (packageId: string) => {
     const newExpandedIds = new Set(expandedPackageIds);
@@ -173,6 +182,30 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     
     return { groups, sortedCategories };
   }, [filteredPackages, groupByCategory]);
+
+  // A status filter narrows the table to the handful of items that need attention,
+  // and their detail is the reason to filter at all — so open every matching row
+  // rather than making the operator click each chevron. Keyed on the filter itself,
+  // so a row collapsed by hand while a filter is active stays collapsed.
+  const filteredPackagesRef = useRef(filteredPackages);
+  filteredPackagesRef.current = filteredPackages;
+  const statusFilterKey = [...statusFilter].sort().join(',');
+  // The smart loader can swap a partial payload for the full one after mount; re-run
+  // then so a filtered landing still opens its rows. A refresh returning the same
+  // number of packages does not retrigger, so manual collapses survive polling.
+  const packageCount = data?.packages?.length ?? 0;
+
+  useEffect(() => {
+    if (!statusFilterKey) {
+      setExpandedPackageIds(new Set());
+      return;
+    }
+    setExpandedPackageIds(new Set(
+      filteredPackagesRef.current
+        .filter(pkg => hasExpandableContent(pkg))
+        .map(pkg => pkg.id)
+    ));
+  }, [statusFilterKey, packageCount]);
 
   // Check if any packages have categories
   const hasCategories = useMemo(() => {
@@ -599,17 +632,15 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                               
                               {/* Category Packages */}
                               {!isCollapsed && categoryPackages.map((pkg) => {
-                                const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
-                                const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
-                                const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
+                                const isRowExpandable = hasExpandableContent(pkg);
                                 const isExpanded = expandedPackageIds.has(pkg.id);
                                 
                                 return (
                                   <React.Fragment key={pkg.id}>
                                     {/* Main Package Row */}
                                     <tr 
-                                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasExpandableContent ? 'cursor-pointer' : ''}`}
-                                      onClick={() => hasExpandableContent && togglePackageExpansion(pkg.id)}
+                                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isRowExpandable ? 'cursor-pointer' : ''}`}
+                                      onClick={() => isRowExpandable && togglePackageExpansion(pkg.id)}
                                     >
                                       <td className="px-6 py-4 whitespace-nowrap pl-12">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
@@ -637,7 +668,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                         <div className="flex items-center justify-between">
                                           <span>{pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}</span>
-                                          {hasExpandableContent && (
+                                          {isRowExpandable && (
                                             <svg 
                                               className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200 ml-2 ${isExpanded ? 'rotate-90' : ''}`}
                                               fill="none" 
@@ -652,7 +683,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                     </tr>
 
                                     {/* Expandable Error/Warning/Pending Details Row */}
-                                    {isExpanded && hasExpandableContent && (
+                                    {isExpanded && isRowExpandable && (
                                       <tr className="bg-gray-50 dark:bg-gray-900">
                                         <td colSpan={5} className="px-6 py-4">
                                           <div className="space-y-3">
@@ -775,7 +806,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                             )}
 
                                             {/* Pending Reason Section */}
-                                            {hasPendingReason && (
+                                            {isPendingWithReason(pkg) && (
                                               <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
                                                 <div className="flex items-start gap-3">
                                                   <div className="flex-shrink-0">
@@ -835,17 +866,15 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                           {[...filteredPackages].sort((a, b) => 
                             (a.displayName || a.name).localeCompare(b.displayName || b.name)
                           ).map((pkg) => {
-                            const hasErrorsOrWarnings = (pkg.errors && pkg.errors.length > 0) || (pkg.warnings && pkg.warnings.length > 0);
-                            const hasPendingReason = pkg.status?.toLowerCase() === 'pending' && pkg.pendingReason && pkg.pendingReason.trim() !== '';
-                            const hasExpandableContent = hasErrorsOrWarnings || hasPendingReason;
+                            const isRowExpandable = hasExpandableContent(pkg);
                             const isExpanded = expandedPackageIds.has(pkg.id);
                             
                             return (
                               <React.Fragment key={pkg.id}>
                             {/* Main Package Row */}
                             <tr 
-                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${hasExpandableContent ? 'cursor-pointer' : ''}`}
-                              onClick={() => hasExpandableContent && togglePackageExpansion(pkg.id)}
+                              className={`hover:bg-gray-50 dark:hover:bg-gray-700 ${isRowExpandable ? 'cursor-pointer' : ''}`}
+                              onClick={() => isRowExpandable && togglePackageExpansion(pkg.id)}
                             >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(pkg.status || 'unknown')}`}>
@@ -873,7 +902,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                 <div className="flex items-center justify-between">
                                   <span>{pkg.lastUpdate ? formatRelativeTime(pkg.lastUpdate) : ''}</span>
-                                  {hasExpandableContent && (
+                                  {isRowExpandable && (
                                     <svg 
                                       className={`w-5 h-5 text-gray-400 dark:text-gray-500 transition-transform duration-200 ml-2 ${isExpanded ? 'rotate-90' : ''}`}
                                       fill="none" 
@@ -888,7 +917,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                             </tr>
 
                             {/* Expandable Error/Warning/Pending Details Row */}
-                            {isExpanded && hasExpandableContent && (
+                            {isExpanded && isRowExpandable && (
                               <tr className="bg-gray-50 dark:bg-gray-900">
                                 <td colSpan={5} className="px-6 py-4">
                                   <div className="space-y-3">
@@ -1011,7 +1040,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                     )}
 
                                     {/* Pending Reason Section */}
-                                    {hasPendingReason && (
+                                    {isPendingWithReason(pkg) && (
                                       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-cyan-200 dark:border-cyan-700">
                                         <div className="flex items-start gap-3">
                                           <div className="flex-shrink-0">

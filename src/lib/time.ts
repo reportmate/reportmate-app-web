@@ -207,3 +207,13 @@ export function normalizeCimianTimestamp(timestamp: string | undefined): string 
     return timestamp
   }
 }
+
+/**
+ * Cimian session identifiers are `yyyy-MM-dd-HHmm` (e.g. "2026-08-28-1158"), not
+ * timestamps. `new Date()` cannot parse them, so anything that treats
+ * `last_seen_in_session` as a date silently produces Invalid Date and drops the
+ * item. Use this to branch on the two shapes.
+ */
+export function isCimianSessionId(value: string | undefined | null): boolean {
+  return !!value && /^\d{4}-\d{2}-\d{2}-\d{4}$/.test(value.trim())
+}
