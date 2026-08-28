@@ -151,7 +151,7 @@ const getDeviceName = (event: FleetEvent, deviceNameMap: Record<string, string>)
   
   // If deviceId looks like an asset tag (short, alphanumeric), show it nicely
   if (deviceId && deviceId.length <= 10 && /^[A-Z0-9]+$/i.test(deviceId)) {
-    return deviceId // Return the serial number directly (e.g., "SERIAL5140")
+    return deviceId // Return the serial number directly
   }
   
   // Final fallback - return the deviceId (serial number) directly

@@ -45,7 +45,7 @@ function identifyDeviceIdentifierType(identifier: string): 'uuid' | 'assetTag' |
     return 'deviceName'
   }
   
-  // Asset tag pattern: Letter followed by digits (e.g., DUMMY36, ASSET-000)
+  // Asset tag pattern: a letter followed by digits (e.g. DUMMY36, ASSET-000)
   const assetTagPattern = /^[A-Z]\d+$/i
   if (assetTagPattern.test(identifier)) {
     return 'assetTag'

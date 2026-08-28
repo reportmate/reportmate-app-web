@@ -852,72 +852,15 @@ function ApplicationsPageContent() {
         let estimatedTotal = 100  // placeholder for progress bar
         let progress = 0
         
-        // Sample device serial numbers with realistic app counts for progress messages
-        const sampleDevices = [
-          { serial: 'DUMMY27', apps: 143 },
-          { serial: 'DUMMY92', apps: 372 },
-          { serial: 'DUMMY76', apps: 361 },
-          { serial: 'DUMMY09', apps: 370 },
-          { serial: 'DUMMY22', apps: 105 },
-          { serial: 'EXAMPLE3', apps: 36 },
-          { serial: 'DUMMY24', apps: 36 },
-          { serial: 'DUMMY27', apps: 370 },
-          { serial: 'DUMMY01', apps: 367 },
-          { serial: 'DUMMY02', apps: 96 },
-          { serial: 'DUMMY05', apps: 318 },
-          { serial: 'DUMMY06', apps: 345 },
-          { serial: 'DUMMY07', apps: 327 },
-          { serial: 'DUMMY08', apps: 271 },
-          { serial: 'DUMMY09', apps: 341 },
-          { serial: 'DUMMY10', apps: 345 },
-          { serial: 'DUMMY11', apps: 460 },
-          { serial: 'DUMMY12', apps: 351 },
-          { serial: 'DUMMY13', apps: 342 },
-          { serial: 'DUMMY14', apps: 342 },
-          { serial: 'DUMMY15', apps: 164 },
-          { serial: 'DUMMY16', apps: 364 },
-          { serial: 'DUMMY17', apps: 190 },
-          { serial: 'DUMMY19', apps: 151 },
-          { serial: 'DUMMY20', apps: 191 },
-          { serial: 'DUMMY23', apps: 348 },
-          { serial: 'DUMMY27', apps: 357 },
-          { serial: 'DUMMY30', apps: 220 },
-          { serial: 'DUMMY31', apps: 362 },
-          { serial: 'DUMMY32', apps: 113 },
-          { serial: 'DUMMY33', apps: 119 },
-          { serial: 'DUMMY34', apps: 78 },
-          { serial: 'DUMMY26', apps: 256 },
-          { serial: 'GM0MB0JQ', apps: 40 },
-          { serial: 'GM0MB0JS', apps: 74 },
-          { serial: 'DUMMY28', apps: 21 },
-          { serial: 'MJ071W8M', apps: 148 }
-        ]
-        let deviceIndex = 0
         
         progressInterval = setInterval(() => {
           // Progress quickly to 85%, then slow down dramatically, but keep moving
           if (progress < Math.floor(estimatedTotal * 0.85)) {
             progress += 5 // Fast progress to 85% (0-6 seconds)
-            // Show device-specific messages with app counts during processing
-            if (deviceIndex < sampleDevices.length) {
-              const device = sampleDevices[deviceIndex]
-              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
-              deviceIndex++
-            }
           } else if (progress < Math.floor(estimatedTotal * 0.95)) {
             progress += 1 // Medium slow progress from 85% to 95%
-            if (deviceIndex < sampleDevices.length) {
-              const device = sampleDevices[deviceIndex]
-              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
-              deviceIndex++
-            }
           } else if (progress < Math.floor(estimatedTotal * 0.995)) {
             progress += 0.5 // Very slow progress from 95% to 99.5%, keeps moving but never reaches 100%
-            if (deviceIndex < sampleDevices.length) {
-              const device = sampleDevices[deviceIndex]
-              setLoadingMessage(`Processing ${device.apps} apps from device ${device.serial}`)
-              deviceIndex++
-            }
           }
           setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
         }, 200)
