@@ -1,4 +1,5 @@
 import React from 'react'
+import { isCimianSessionId } from '../lib/time'
 
 interface LastRunItem {
   name: string
@@ -82,29 +83,38 @@ export function parseInstallsEventPayload(payload: any): LastRunSummaryData | nu
     }
   }
 
-  // Strategy 1: Session-based filtering (Cimian with session timestamps)
+  // Strategy 1: Session-based filtering (items the latest run actually acted on)
   let sessionStartTime = ''
-  if (installsData.cimian?.sessions?.[0]) {
-    sessionStartTime = installsData.cimian.sessions[0].start_time || installsData.cimian.sessions[0].startTime || ''
-  } else if (installsData.recentSessions?.[0]) {
-    sessionStartTime = installsData.recentSessions[0].start_time || installsData.recentSessions[0].startTime || ''
+  let sessionId = ''
+  const latestSession = installsData.cimian?.sessions?.[0] || installsData.recentSessions?.[0]
+  if (latestSession) {
+    sessionStartTime = latestSession.start_time || latestSession.startTime || ''
+    sessionId = latestSession.session_id || latestSession.sessionId || ''
   }
   const sessionTime = sessionStartTime ? new Date(sessionStartTime).getTime() : 0
 
-  if (sessionTime) {
+  if (sessionTime || sessionId) {
     for (const item of rawItems) {
-      const itemTimestamp = item.lastSeenInSession || item.lastUpdate || ''
-      if (!itemTimestamp) continue
-      try {
-        const itemTime = new Date(itemTimestamp).getTime()
-        if (!isNaN(itemTime) && itemTime >= sessionTime - 60000) {
-          lastRunItems.push({
-            name: item.displayName || item.name || 'Unknown',
-            version: item.version || item.installedVersion || '',
-            status: item.status || item.currentStatus || 'Unknown',
-          })
-        }
-      } catch { /* skip */ }
+      // Only lastSeenInSession proves the item was acted on. item.lastUpdate is
+      // stamped on every catalog member at status-check time, so falling back to
+      // it here matched the entire inventory instead of the run.
+      const marker = item.lastSeenInSession || ''
+      if (!marker) continue
+
+      // Cimian sends the session id (yyyy-MM-dd-HHmm), which Date cannot parse.
+      if (isCimianSessionId(marker)) {
+        if (!sessionId || marker.trim() !== sessionId.trim()) continue
+      } else {
+        if (!sessionTime) continue
+        const itemTime = new Date(marker).getTime()
+        if (isNaN(itemTime) || itemTime < sessionTime - 60000) continue
+      }
+
+      lastRunItems.push({
+        name: item.displayName || item.name || 'Unknown',
+        version: item.version || item.installedVersion || '',
+        status: item.status || item.currentStatus || 'Unknown',
+      })
     }
   }
 

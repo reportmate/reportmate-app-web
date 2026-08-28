@@ -1,4 +1,4 @@
-import { normalizeCimianTimestamp } from '../../time'
+import { normalizeCimianTimestamp, isCimianSessionId } from '../../time'
 
 /**
  * Installs Status Module
@@ -614,15 +614,26 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   }
   // Declared here to avoid TDZ — used inside the package processing loop below
   let latestSessionStartTime = ''
+  let latestSessionEndTime = ''
+  // Cimian stamps last_seen_in_session with the session *id* (yyyy-MM-dd-HHmm),
+  // not a timestamp, so the item-to-run match is an id comparison.
+  let latestSessionId = ''
 
   // Determine the latest session's start_time BEFORE the package loop so lastUpdate IIFE can use it
   if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
-    latestSessionStartTime = installs.cimian.sessions[0].start_time || installs.cimian.sessions[0].startTime || ''
+    const latestSession = installs.cimian.sessions[0]
+    latestSessionStartTime = latestSession.start_time || latestSession.startTime || ''
+    latestSessionEndTime = latestSession.end_time || latestSession.endTime || ''
+    latestSessionId = latestSession.session_id || latestSession.sessionId || ''
   } else if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
-    latestSessionStartTime = installs.recentSessions[0].start_time || installs.recentSessions[0].startTime || ''
+    const latestSession = installs.recentSessions[0]
+    latestSessionStartTime = latestSession.start_time || latestSession.startTime || ''
+    latestSessionEndTime = latestSession.end_time || latestSession.endTime || ''
+    latestSessionId = latestSession.session_id || latestSession.sessionId || ''
   } else if (installs.munki?.startTime || installs.munki?.endTime) {
     // Use startTime (run begin) so items installed during the run fall within the window
     latestSessionStartTime = installs.munki.startTime || installs.munki.endTime
+    latestSessionEndTime = installs.munki.endTime || ''
   }
 
   // Determine which managed software system to use
@@ -778,21 +789,31 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         // DATE PROCESSED: Only show for items processed in the LATEST session
         // Items from older sessions get empty (they weren't touched in this run)
         lastUpdate: (() => {
-          // Use lastSeenInSession as the authoritative timestamp
-          // Do NOT fall back to item.lastUpdate — for Munki items, the ...item spread
-          // carries raw fields that may have stale or global timestamps
-          const itemTimestamp = item.lastSeenInSession || ''
-          if (!itemTimestamp || !latestSessionStartTime) return ''
-          // Check if this item was processed in the latest session
-          // Compare the item's lastSeenInSession with the latest session's start_time
-          // If they're from the same session (within a reasonable window), show the timestamp
+          // Use lastSeenInSession as the authoritative marker of "acted on in this run".
+          // Do NOT fall back to item.lastUpdate — Cimian stamps that on every catalog
+          // member at status-check time, and for Munki items the ...item spread carries
+          // raw fields that may hold stale or global timestamps. Either fallback makes
+          // the Last Run filter match the whole inventory.
+          const marker = item.lastSeenInSession || ''
+          if (!marker) return ''
+
+          // Cimian: the marker is a session id (yyyy-MM-dd-HHmm), which Date cannot
+          // parse. Match it against the latest session's id, then show a real
+          // timestamp for the item — its own attempt time when present, else the run.
+          if (isCimianSessionId(marker)) {
+            if (!latestSessionId || marker.trim() !== latestSessionId.trim()) return ''
+            const displayTime = item.lastAttemptTime || item.lastUpdate || latestSessionEndTime || latestSessionStartTime
+            return displayTime ? normalizeCimianTimestamp(displayTime) : ''
+          }
+
+          // Munki (and any client still sending a timestamp): keep the window compare.
+          if (!latestSessionStartTime) return ''
           try {
-            const itemTime = new Date(normalizeCimianTimestamp(itemTimestamp)).getTime()
+            const itemTime = new Date(normalizeCimianTimestamp(marker)).getTime()
             const sessionTime = new Date(latestSessionStartTime).getTime()
             // Items processed in the latest session will have timestamps >= session start_time
-            // Use a 2-hour window to account for long-running sessions
             if (!isNaN(itemTime) && !isNaN(sessionTime) && itemTime >= sessionTime - 60000) {
-              return normalizeCimianTimestamp(itemTimestamp)
+              return normalizeCimianTimestamp(marker)
             }
           } catch { /* fall through */ }
           return ''
