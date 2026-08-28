@@ -64,17 +64,15 @@ interface InputDevice {
 }
 
 /**
- * A tablet's type badge comes from the client. Payloads collected before the
- * client carried `tabletType` through the flat input list have none, so derive
- * one from the name rather than dropping the badge on existing data.
+ * The badge on a pen device. Payloads collected before the client carried
+ * `tabletType` through the flat input list have none, so fall back to the
+ * generic label rather than leaving the card unbadged.
+ *
+ * This entry is the pen digitizer. Where the same chassis also contains a
+ * panel, that panel is a display and the Hardware module reports it with its
+ * real model name and its own serial - so there is nothing to infer here.
  */
-const deriveTabletType = (name?: string): string | undefined => {
-  const n = (name || '').toLowerCase()
-  if (!n) return undefined
-  if (n.includes('cintiq') || n.includes('display')) return 'Pen Display'
-  if (n.includes('intuos') || n.includes('bamboo')) return 'Pen Tablet'
-  return undefined
-}
+const PEN_INPUT_LABEL = 'Pen Input'
 
 interface InputDevices {
   keyboards?: InputDevice[]
@@ -715,11 +713,11 @@ const InputDevicesContent = ({
       {tablets.length > 0 && (
         <div className="space-y-3">
           <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
-            <Tablet className="w-4 h-4" /> Graphics Tablets
+            <Tablet className="w-4 h-4" /> Pen Input
           </h4>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {tablets.map((tablet, idx) => (
-              <DeviceCard key={idx} title={tablet.name || 'Graphics Tablet'} icon={Tablet} badge={tablet.tabletType || deriveTabletType(tablet.name)}>
+              <DeviceCard key={idx} title={tablet.name || 'Graphics Tablet'} icon={Tablet} badge={tablet.tabletType || PEN_INPUT_LABEL}>
                 <div className="space-y-2 text-sm">
                   {tablet.vendor && <InfoRow label="Vendor" value={tablet.vendor} />}
                   {tablet.vendorId && <InfoRow label="Vendor ID" value={tablet.vendorId} />}
