@@ -29,9 +29,14 @@ import { DebugAccordion } from '../DebugAccordion'
 // Type definitions
 interface USBDevice {
   name: string
+  // The Windows client names the device in `model` as well as `name`, and calls the
+  // product id `modelId`. Older payloads collected before it emitted `name` at all
+  // have only `model`, so both are read here rather than rendering them as unknown.
+  model?: string
   vendor?: string
   vendorId?: string
   productId?: string
+  modelId?: string
   serialNumber?: string
   speed?: string
   linkSpeed?: string
@@ -59,6 +64,30 @@ interface InputDevices {
   mice?: InputDevice[]
   trackpads?: InputDevice[]
   tablets?: InputDevice[]
+}
+
+/**
+ * The two clients disagree on the shape of `inputDevices`: macOS emits the nested
+ * object above, Windows emits one flat array of devices tagged with `deviceType`.
+ * A flat array has no `.keyboards`, so reading it as the nested shape silently
+ * reports every Windows machine as having zero input devices - including the
+ * pen-display workstations whose tablet is the whole point of the category.
+ *
+ * Group a flat array back into the nested shape and leave the nested shape alone.
+ */
+const groupInputDevices = (input: InputDevices | InputDevice[] | undefined): InputDevices => {
+  if (!input) return {}
+  if (!Array.isArray(input)) return input
+
+  const byType = (...types: string[]) =>
+    input.filter(d => types.includes((d.deviceType || '').toLowerCase()))
+
+  return {
+    keyboards: byType('keyboard'),
+    mice: byType('mouse'),
+    trackpads: byType('trackpad', 'touchpad'),
+    tablets: byType('graphics tablet', 'tablet', 'pen display', 'pen tablet'),
+  }
 }
 
 interface AudioDevice {
@@ -170,7 +199,8 @@ interface SerialPort {
 interface PeripheralsData {
   collectedAt?: string
   usbDevices?: USBDevice[]
-  inputDevices?: InputDevices
+  // Nested from macOS, a flat tagged array from Windows - see groupInputDevices.
+  inputDevices?: InputDevices | InputDevice[]
   audioDevices?: AudioDevice[]
   bluetoothDevices?: BluetoothDevice[]
   cameras?: never[] // Removed - not needed
@@ -280,6 +310,12 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
     return data || device.peripherals || device.modules?.peripherals || {}
   }, [device, data])
   
+  // Normalise the two client shapes into the nested form the sections render from
+  const inputDevices = useMemo(
+    () => groupInputDevices(peripherals.inputDevices),
+    [peripherals.inputDevices]
+  )
+
   // Split audio devices into outputs and microphones
   const audioDevices = useMemo(() =>
     Array.isArray(peripherals.audioDevices) ? peripherals.audioDevices : [],
@@ -351,10 +387,10 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
       id: 'input', 
       name: 'Input Devices', 
       icon: Keyboard, 
-      count: (peripherals.inputDevices?.keyboards?.length || 0) + 
-             (peripherals.inputDevices?.mice?.length || 0) + 
-             (peripherals.inputDevices?.trackpads?.length || 0) +
-             (peripherals.inputDevices?.tablets?.length || 0),
+      count: (inputDevices.keyboards?.length || 0) + 
+             (inputDevices.mice?.length || 0) + 
+             (inputDevices.trackpads?.length || 0) +
+             (inputDevices.tablets?.length || 0),
       color: 'text-purple-500'
     },
     { 
@@ -432,13 +468,13 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
         {isVisible('bluetooth') && filteredBluetoothDevices.length > 0 && (
           <BluetoothDevicesContent devices={filteredBluetoothDevices} />
         )}
-        {isVisible('input') && peripherals.inputDevices && (
-          ((peripherals.inputDevices.keyboards?.length || 0) > 0 || 
-           (peripherals.inputDevices.mice?.length || 0) > 0 || 
-           (peripherals.inputDevices.trackpads?.length || 0) > 0 ||
-           (peripherals.inputDevices.tablets?.length || 0) > 0) && (
+        {isVisible('input') && (
+          ((inputDevices.keyboards?.length || 0) > 0 || 
+           (inputDevices.mice?.length || 0) > 0 || 
+           (inputDevices.trackpads?.length || 0) > 0 ||
+           (inputDevices.tablets?.length || 0) > 0) && (
             <InputDevicesContent 
-              devices={peripherals.inputDevices} 
+              devices={inputDevices} 
               bluetoothDevices={peripherals.bluetoothDevices}
             />
           )
@@ -539,11 +575,11 @@ const USBThunderboltContent = ({
           </h4>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {usbDevices.map((device, idx) => (
-              <DeviceCard key={idx} title={device.name || 'Unknown USB Device'} icon={Usb} badge={device.deviceType}>
+              <DeviceCard key={idx} title={device.name || device.model || 'Unknown USB Device'} icon={Usb} badge={device.deviceType}>
                 <div className="space-y-2 text-sm">
                   {device.vendor && <InfoRow label="Vendor" value={device.vendor} />}
                   {device.vendorId && <InfoRow label="Vendor ID" value={device.vendorId} />}
-                  {device.productId && <InfoRow label="Product ID" value={device.productId} />}
+                  {(device.productId || device.modelId) && <InfoRow label="Product ID" value={device.productId || device.modelId || ''} />}
                   {device.serialNumber && <InfoRow label="Serial" value={device.serialNumber} />}
                   {device.linkSpeed && <InfoRow label="Link Speed" value={device.linkSpeed} />}
                   {device.speed && !device.linkSpeed && <InfoRow label="Speed" value={device.speed} />}
