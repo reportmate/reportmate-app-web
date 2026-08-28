@@ -52,11 +52,28 @@ interface InputDevice {
   name: string
   vendor?: string
   vendorId?: string
+  productId?: string
+  // The Windows client names the USB product id `modelId`; read either.
+  modelId?: string
+  serialNumber?: string
   isBuiltIn?: boolean
   connectionType?: string
   deviceType?: string
   supportsForcTouch?: boolean
   tabletType?: string
+}
+
+/**
+ * A tablet's type badge comes from the client. Payloads collected before the
+ * client carried `tabletType` through the flat input list have none, so derive
+ * one from the name rather than dropping the badge on existing data.
+ */
+const deriveTabletType = (name?: string): string | undefined => {
+  const n = (name || '').toLowerCase()
+  if (!n) return undefined
+  if (n.includes('cintiq') || n.includes('display')) return 'Pen Display'
+  if (n.includes('intuos') || n.includes('bamboo')) return 'Pen Tablet'
+  return undefined
 }
 
 interface InputDevices {
@@ -692,9 +709,12 @@ const InputDevicesContent = ({
           </h4>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {tablets.map((tablet, idx) => (
-              <DeviceCard key={idx} title={tablet.name || 'Graphics Tablet'} icon={Tablet} badge={tablet.tabletType}>
+              <DeviceCard key={idx} title={tablet.name || 'Graphics Tablet'} icon={Tablet} badge={tablet.tabletType || deriveTabletType(tablet.name)}>
                 <div className="space-y-2 text-sm">
                   {tablet.vendor && <InfoRow label="Vendor" value={tablet.vendor} />}
+                  {tablet.vendorId && <InfoRow label="Vendor ID" value={tablet.vendorId} />}
+                  {(tablet.productId || tablet.modelId) && <InfoRow label="Product ID" value={tablet.productId || tablet.modelId || ''} />}
+                  {tablet.serialNumber && <InfoRow label="Serial" value={tablet.serialNumber} />}
                   {tablet.connectionType && <InfoRow label="Connection" value={tablet.connectionType} />}
                 </div>
               </DeviceCard>
