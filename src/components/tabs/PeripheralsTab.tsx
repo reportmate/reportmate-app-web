@@ -625,7 +625,7 @@ const InputDevicesContent = ({
   // Consolidate keyboards from input devices AND Bluetooth
   const btKeyboards = (bluetoothDevices || [])
     .filter(d => d.deviceType === 'Keyboard' || d.deviceCategory === 'Keyboard')
-    .map(d => ({
+    .map((d): InputDevice => ({
       name: d.name || 'Keyboard',
       vendor: '',
       isBuiltIn: false,
@@ -659,6 +659,9 @@ const InputDevicesContent = ({
               <DeviceCard key={idx} title={kb.name || 'Keyboard'} icon={Keyboard} badge={kb.connectionType}>
                 <div className="space-y-2 text-sm">
                   {kb.vendor && <InfoRow label="Vendor" value={kb.vendor} />}
+                  {kb.vendorId && <InfoRow label="Vendor ID" value={kb.vendorId} />}
+                  {(kb.productId || kb.modelId) && <InfoRow label="Product ID" value={kb.productId || kb.modelId || ''} />}
+                  {kb.serialNumber && <InfoRow label="Serial" value={kb.serialNumber} />}
                   {kb.isBuiltIn !== undefined && <InfoRow label="Type" value={kb.isBuiltIn ? 'Built-in' : 'External'} />}
                 </div>
               </DeviceCard>
@@ -677,6 +680,9 @@ const InputDevicesContent = ({
               <DeviceCard key={idx} title={mouse.name || 'Mouse'} icon={Mouse} badge={mouse.connectionType}>
                 <div className="space-y-2 text-sm">
                   {mouse.vendor && <InfoRow label="Vendor" value={mouse.vendor} />}
+                  {mouse.vendorId && <InfoRow label="Vendor ID" value={mouse.vendorId} />}
+                  {(mouse.productId || mouse.modelId) && <InfoRow label="Product ID" value={mouse.productId || mouse.modelId || ''} />}
+                  {mouse.serialNumber && <InfoRow label="Serial" value={mouse.serialNumber} />}
                 </div>
               </DeviceCard>
             ))}
@@ -693,6 +699,10 @@ const InputDevicesContent = ({
             {trackpads.map((tp, idx) => (
               <DeviceCard key={idx} title={tp.name || 'Trackpad'} badge={tp.connectionType}>
                 <div className="space-y-2 text-sm">
+                  {tp.vendor && <InfoRow label="Vendor" value={tp.vendor} />}
+                  {tp.vendorId && <InfoRow label="Vendor ID" value={tp.vendorId} />}
+                  {(tp.productId || tp.modelId) && <InfoRow label="Product ID" value={tp.productId || tp.modelId || ''} />}
+                  {tp.serialNumber && <InfoRow label="Serial" value={tp.serialNumber} />}
                   {tp.isBuiltIn !== undefined && <InfoRow label="Type" value={tp.isBuiltIn ? 'Built-in' : 'External'} />}
                   {tp.supportsForcTouch !== undefined && <InfoRow label="Force Touch" value={tp.supportsForcTouch ? 'Yes' : 'No'} />}
                 </div>
