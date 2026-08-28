@@ -1,5 +1,5 @@
 /**
- * Cimian client version normalization (AB#3754).
+ * Cimian client version normalization.
  *
  * The Cimian client stamps its build as a calendar version. The canonical,
  * preferred form is `YYYY.MM.DD.HHMM` — zero-padded, four components — emitted
