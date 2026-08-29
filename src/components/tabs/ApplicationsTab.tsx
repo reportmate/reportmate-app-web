@@ -5,6 +5,9 @@
 
 import React, { useMemo, useState } from 'react'
 import { ApplicationsTable } from '../tables'
+import { formatDuration, hasUsage, usageSeconds, usageLastUsed, type UsageFilter } from '../tables/ApplicationsTable'
+import type { FilterPillOption } from '../ui/FilterPills'
+import { formatRelativeTime } from '../../lib/time'
 import { extractApplications } from '../../lib/data-processing/modules/applications'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
@@ -21,6 +24,8 @@ interface ApplicationUsage {
   users?: string[]
   uniqueUserCount?: number
   averageSessionSeconds?: number
+  activeNow?: boolean
+  daysSeen?: number
 }
 
 // macOS active session from SQLite watcher
@@ -102,16 +107,38 @@ interface ApplicationsTabProps {
 }
 
 // Helper to format duration
-function _formatDuration(seconds: number): string {
-  if (seconds < 60) return `${Math.round(seconds)}s`
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`
-  const hours = Math.floor(seconds / 3600)
-  const mins = Math.round((seconds % 3600) / 60)
-  return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`
+
+interface DailyUsageRow {
+  date?: string
+  appName?: string
+  launches?: number
+  totalSeconds?: number
+  users?: string[]
+}
+
+interface AggregatedUsage {
+  launchCount: number
+  totalSeconds: number
+  lastUsed: string
+  firstSeen: string
+  users: Set<string>
+  days: Set<string>
+  activeNow: boolean
+}
+
+const emptyUsage = (): AggregatedUsage => ({ launchCount: 0, totalSeconds: 0, lastUsed: '', firstSeen: '', users: new Set(), days: new Set(), activeNow: false })
+
+// History names come as "Safari", "Safari.app", or "com.apple.Safari.SandboxBroker (Safari)".
+function usageKey(name?: string): string {
+  if (!name) return ''
+  const paren = name.match(/\(([^)]+)\)\s*$/)
+  const base = paren ? paren[1] : name
+  return base.replace(/\.app$/i, '').trim().toLowerCase()
 }
 
 export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }) => {
-  const [activeFilter] = useState<'all' | 'unused' | 'singleUser' | 'withUsage'>('all')
+  const [usageFilter, setUsageFilter] = useState<UsageFilter>('all')
+  const [hideNested, setHideNested] = useState(true)
   
   // Normalize snake_case to camelCase for applications module
   // Prefer direct data prop if available
@@ -134,54 +161,56 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     [usageData?.activeSessions, usageData?.ActiveSessions]
   )
   
-  // Build usage map by app path for efficient lookup
+  // Per-day history is the long view (one row per app per day, carrying launches,
+  // seconds and users); the session list is only the current capture window but
+  // is the one place that says what is running right now.
+  const dailyHistory: DailyUsageRow[] = useMemo(
+    () => (normalizedApplicationsModule?.dailyUsageHistory || (rawApplicationsModule as any)?.dailyUsageHistory || []) as DailyUsageRow[],
+    [normalizedApplicationsModule?.dailyUsageHistory, rawApplicationsModule]
+  )
+
+  const usageByName = useMemo(() => {
+    const map = new Map<string, AggregatedUsage>()
+    for (const row of dailyHistory) {
+      const key = usageKey(row.appName)
+      if (!key) continue
+      const entry = map.get(key) || emptyUsage()
+      entry.launchCount += row.launches || 0
+      entry.totalSeconds += row.totalSeconds || 0
+      if (row.date) {
+        entry.days.add(row.date)
+        if (!entry.lastUsed || row.date > entry.lastUsed.slice(0, 10)) entry.lastUsed = `${row.date}T00:00:00Z`
+        if (!entry.firstSeen || row.date < entry.firstSeen.slice(0, 10)) entry.firstSeen = `${row.date}T00:00:00Z`
+      }
+      for (const user of row.users || []) entry.users.add(user)
+      map.set(key, entry)
+    }
+    return map
+  }, [dailyHistory])
+
   const usageByPath = useMemo(() => {
-    const map = new Map<string, {
-      launchCount: number
-      totalSeconds: number
-      lastUsed: string
-      firstSeen: string
-      users: Set<string>
-    }>()
-    
+    const map = new Map<string, AggregatedUsage>()
     for (const session of activeSessions) {
       const path = session.path
       if (!path) continue
-      
-      const existing = map.get(path)
-      if (existing) {
-        existing.launchCount++
-        existing.totalSeconds += session.durationSeconds || 0
-        if (session.startTime > existing.lastUsed) {
-          existing.lastUsed = session.startTime
-        }
-        if (session.startTime < existing.firstSeen) {
-          existing.firstSeen = session.startTime
-        }
-        if (session.user) {
-          existing.users.add(session.user)
-        }
-      } else {
-        map.set(path, {
-          launchCount: 1,
-          totalSeconds: session.durationSeconds || 0,
-          lastUsed: session.startTime || '',
-          firstSeen: session.startTime || '',
-          users: new Set(session.user ? [session.user] : [])
-        })
-      }
+      const entry = map.get(path) || emptyUsage()
+      entry.launchCount += 1
+      entry.totalSeconds += session.durationSeconds || 0
+      if (session.startTime && session.startTime > entry.lastUsed) entry.lastUsed = session.startTime
+      if (session.startTime && (!entry.firstSeen || session.startTime < entry.firstSeen)) entry.firstSeen = session.startTime
+      if (session.user) entry.users.add(session.user)
+      if (session.isActive === true || session.isActive === 1) entry.activeNow = true
+      if (session.startTime) entry.days.add(session.startTime.slice(0, 10))
+      map.set(path, entry)
     }
-    
     return map
   }, [activeSessions])
-  
-  // Check if we have applications data - check normalized module
+
   const hasApplicationsData = (data?.installedApps?.length ?? 0) > 0 ||
                               (device?.applications?.installedApps?.length ?? 0) > 0 ||
-                              (normalizedApplicationsModule?.installedApplications?.length ?? 0) > 0 || 
+                              (normalizedApplicationsModule?.installedApplications?.length ?? 0) > 0 ||
                               (applicationsModuleData?.applications?.length ?? 0) > 0
-  
-  // Memoize the selection of installed apps - use normalized module
+
   const installedApps = useMemo(() => {
     if (data?.installedApps?.length) {
       return data.installedApps
@@ -192,167 +221,236 @@ export const ApplicationsTab: React.FC<ApplicationsTabProps> = ({ device, data }
     }
     return []
   }, [
-    data?.installedApps, 
+    data?.installedApps,
     normalizedApplicationsModule?.installedApplications,
     applicationsModuleData?.applications
   ])
 
-  // Transform and enrich with usage data
   const processedApps = useMemo(() => {
     return installedApps.map((app: ApplicationInfo, index: number) => {
-      // Look up usage from the usageByPath map (macOS) or existing app.usage (Windows)
-      // Windows uses installLocation (camelCase), check both variants
-      const appPath = app.path || (app as unknown as Record<string, unknown>).installLocation as string || (app as unknown as Record<string, unknown>).install_location as string
-      const sessionUsage = appPath ? usageByPath.get(appPath) : undefined
+      const raw = app as unknown as Record<string, unknown>
+      const appPath = app.path || (raw.installLocation as string) || (raw.install_location as string)
+      const name = app.name || app.displayName || 'Unknown Application'
 
-      // Build usage object from session data if available
-      // Windows client sends totalUsageSeconds/lastLaunchTime, normalize to totalSeconds/lastUsed
-      const existingUsage = app.usage || (app as unknown as Record<string, unknown>).Usage as ApplicationUsage & { totalUsageSeconds?: number; lastLaunchTime?: string }
-      let usage: ApplicationUsage | undefined = existingUsage ? {
-        launchCount: existingUsage.launchCount,
-        totalSeconds: existingUsage.totalSeconds || existingUsage.totalUsageSeconds || 0,
-        lastUsed: existingUsage.lastUsed || existingUsage.lastLaunchTime,
-        firstSeen: existingUsage.firstSeen,
-        users: existingUsage.users,
-        uniqueUserCount: existingUsage.uniqueUserCount,
-        averageSessionSeconds: existingUsage.averageSessionSeconds
-      } : undefined
-      
-      if (sessionUsage) {
-        usage = {
-          launchCount: sessionUsage.launchCount,
-          totalSeconds: sessionUsage.totalSeconds,
-          lastUsed: sessionUsage.lastUsed,
-          firstSeen: sessionUsage.firstSeen,
-          users: Array.from(sessionUsage.users),
-          uniqueUserCount: sessionUsage.users.size,
-          averageSessionSeconds: sessionUsage.launchCount > 0 
-            ? sessionUsage.totalSeconds / sessionUsage.launchCount 
-            : 0
-        }
+      // Windows attaches usage to the app; macOS keys sessions by bundle path; the
+      // daily history is keyed by name on both. Merge all three, longest view wins.
+      const existing = (app.usage || (raw.Usage as ApplicationUsage & { totalUsageSeconds?: number; lastLaunchTime?: string })) as (ApplicationUsage & { totalUsageSeconds?: number; lastLaunchTime?: string }) | undefined
+      const merged = emptyUsage()
+      if (existing) {
+        merged.launchCount = existing.launchCount || 0
+        merged.totalSeconds = existing.totalSeconds || existing.totalUsageSeconds || 0
+        merged.lastUsed = existing.lastUsed || existing.lastLaunchTime || ''
+        merged.firstSeen = existing.firstSeen || ''
+        for (const user of existing.users || []) merged.users.add(user)
       }
-      
+      const byPath = appPath ? usageByPath.get(appPath) : undefined
+      const byName = usageByName.get(usageKey(name))
+      for (const source of [byName, byPath]) {
+        if (!source) continue
+        merged.launchCount = Math.max(merged.launchCount, source.launchCount)
+        merged.totalSeconds = Math.max(merged.totalSeconds, source.totalSeconds)
+        if (source.lastUsed > merged.lastUsed) merged.lastUsed = source.lastUsed
+        if (source.firstSeen && (!merged.firstSeen || source.firstSeen < merged.firstSeen)) merged.firstSeen = source.firstSeen
+        for (const user of source.users) merged.users.add(user)
+        for (const day of source.days) merged.days.add(day)
+        if (source.activeNow) merged.activeNow = true
+      }
+      // Sessions alone (no history) still count as launches.
+      if (merged.launchCount === 0 && byPath) merged.launchCount = byPath.launchCount
+
+      const usage: ApplicationUsage | undefined = (merged.launchCount > 0 || merged.totalSeconds > 0 || merged.activeNow) ? {
+        launchCount: merged.launchCount,
+        totalSeconds: merged.totalSeconds,
+        lastUsed: merged.lastUsed || undefined,
+        firstSeen: merged.firstSeen || undefined,
+        users: Array.from(merged.users),
+        uniqueUserCount: merged.users.size,
+        averageSessionSeconds: merged.launchCount > 0 ? merged.totalSeconds / merged.launchCount : undefined,
+        activeNow: merged.activeNow,
+        daysSeen: merged.days.size,
+      } : undefined
+
+      const nested = !!appPath && /\.app\/.*\.app$/i.test(appPath)
+
       return {
+        ...app,
         id: app.id || app.name || `app-${index}`,
-        name: app.name || app.displayName || 'Unknown Application',
+        name,
         displayName: app.displayName || app.name,
-        version: app.version || (app as unknown as Record<string, unknown>).bundle_version as string || 'Unknown',
-        publisher: app.publisher || (app as unknown as Record<string, unknown>).signed_by as string || 'Unknown Publisher',
+        version: app.version || (raw.bundle_version as string) || 'Unknown',
+        publisher: app.publisher || (raw.signed_by as string) || 'Unknown Publisher',
         category: app.category || 'Uncategorized',
-        installDate: app.installDate || (app as unknown as Record<string, unknown>).install_date as string || (app as unknown as Record<string, unknown>).last_modified as string,
+        installDate: app.installDate || (raw.install_date as string) || (raw.last_modified as string),
         size: app.size,
         path: appPath,
-        bundleId: (app as unknown as Record<string, unknown>).bundleId as string || (app as unknown as Record<string, unknown>).bundle_id as string || (app as unknown as Record<string, unknown>).bundleIdentifier as string,
-        info: (app as unknown as Record<string, unknown>).info as string,
-        obtained_from: (app as unknown as Record<string, unknown>).obtained_from as string,
-        runtime_environment: (app as unknown as Record<string, unknown>).runtime_environment as string,
-        has64bit: (app as unknown as Record<string, unknown>).has64bit as boolean,
-        signed_by: (app as unknown as Record<string, unknown>).signed_by as string,
+        bundleId: (raw.bundleId as string) || (raw.bundle_id as string) || (raw.bundleIdentifier as string),
+        source: (raw.source as string) || undefined,
+        architecture: (raw.architecture as string) || undefined,
+        nested,
+        info: raw.info as string,
+        obtained_from: raw.obtained_from as string,
+        runtime_environment: raw.runtime_environment as string,
+        has64bit: raw.has64bit as boolean,
+        signed_by: raw.signed_by as string,
         usage
-      }
+      } as ApplicationInfo & { nested: boolean; source?: string; architecture?: string }
     })
-  }, [installedApps, usageByPath])
+  }, [installedApps, usageByPath, usageByName])
 
-  // Filter apps based on active filter
+  // Most-used first; the version report is the same table read top to bottom.
+  const sortedApps = useMemo(() => {
+    return [...processedApps].sort((a, b) => {
+      const sa = usageSeconds(a.usage), sb = usageSeconds(b.usage)
+      if (sb !== sa) return sb - sa
+      const la = a.usage?.launchCount || 0, lb = b.usage?.launchCount || 0
+      if (lb !== la) return lb - la
+      return (a.displayName || a.name).localeCompare(b.displayName || b.name)
+    })
+  }, [processedApps])
+
+  const nestedCount = useMemo(() => sortedApps.filter(a => a.nested).length, [sortedApps])
+  const baseApps = useMemo(() => hideNested ? sortedApps.filter(a => !a.nested) : sortedApps, [sortedApps, hideNested])
+
+  const usedApps = useMemo(() => baseApps.filter(hasUsage), [baseApps])
+  const activeApps = useMemo(() => baseApps.filter(a => a.usage?.activeNow), [baseApps])
+  const unusedApps = useMemo(() => baseApps.filter(a => !hasUsage(a)), [baseApps])
+
+  const usageOptions: FilterPillOption<UsageFilter>[] = useMemo(() => [
+    { value: 'all', label: 'All', count: baseApps.length },
+    { value: 'used', label: 'Used', count: usedApps.length },
+    { value: 'active', label: 'Running', count: activeApps.length },
+    { value: 'unused', label: 'No usage', count: unusedApps.length },
+  ], [baseApps.length, usedApps.length, activeApps.length, unusedApps.length])
+
   const filteredApps = useMemo(() => {
-    if (activeFilter === 'all') return processedApps
-    
-    if (activeFilter === 'withUsage') {
-      return processedApps.filter((app: ApplicationInfo) => 
-        app.usage?.launchCount && app.usage.launchCount > 0
-      )
+    switch (usageFilter) {
+      case 'used': return usedApps
+      case 'active': return activeApps
+      case 'unused': return unusedApps
+      default: return baseApps
     }
-    
-    if (activeFilter === 'unused') {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-      return processedApps.filter((app: ApplicationInfo) => {
-        if (!app.usage?.lastUsed) return true // No usage data = unused
-        const lastUsed = new Date(app.usage.lastUsed)
-        return lastUsed < thirtyDaysAgo
-      })
-    }
-    
-    if (activeFilter === 'singleUser') {
-      return processedApps.filter((app: ApplicationInfo) => 
-        app.usage?.uniqueUserCount === 1
-      )
-    }
-    
-    return processedApps
-  }, [processedApps, activeFilter])
+  }, [usageFilter, baseApps, usedApps, activeApps, unusedApps])
 
-  // Calculate statistics
-  const totalApps = processedApps.length
-  const signedApps = processedApps.filter((app: ApplicationInfo) => 
-    (app as unknown as Record<string, unknown>).signed_by || app.publisher !== 'Unknown Publisher'
-  ).length
-  const recentApps = processedApps.filter((app: ApplicationInfo) => {
-    if (!app.installDate) return false
-    const installDate = new Date(app.installDate)
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    return installDate > thirtyDaysAgo
-  }).length
+  const distinctUsers = useMemo(() => {
+    const users = new Set<string>()
+    for (const app of processedApps) for (const user of app.usage?.users || []) users.add(user)
+    return users.size
+  }, [processedApps])
+
+  const totalUsageSeconds = useMemo(() => usedApps.reduce((sum, app) => sum + usageSeconds(app.usage), 0), [usedApps])
+
+  const historyDays = useMemo(() => {
+    const days = new Set<string>()
+    for (const row of dailyHistory) if (row.date) days.add(row.date)
+    return days.size
+  }, [dailyHistory])
+
+  const topApps = useMemo(() => usedApps.filter(a => usageSeconds(a.usage) > 0).slice(0, 8), [usedApps])
+  const topMax = topApps.length ? usageSeconds(topApps[0].usage) : 0
 
   const applicationsData = useMemo(() => ({
     totalApps: filteredApps.length,
-    signedApps,
-    recentApps,
     installedApps: filteredApps
-  }), [filteredApps, signedApps, recentApps])
+  }), [filteredApps])
 
-  // Empty state
+  const header = (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+          <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
+          <p className="text-base text-gray-600 dark:text-gray-400">Versions installed and how much each is used</p>
+        </div>
+      </div>
+      {processedApps.length > 0 && (
+        <div className="text-right">
+          <div className="text-sm text-gray-500 dark:text-gray-400">Applications</div>
+          <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{(sortedApps.length - nestedCount).toLocaleString()}</div>
+          {nestedCount > 0 && <div className="text-xs text-gray-400 dark:text-gray-500">+{nestedCount.toLocaleString()} bundled helpers</div>}
+        </div>
+      )}
+    </div>
+  )
+
   if (!hasApplicationsData) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
-              <p className="text-base text-gray-600 dark:text-gray-400">Inventory and usage tracking</p>
-            </div>
-          </div>
+        {header}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 px-6 py-16 text-center">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No applications reported</h3>
+          <p className="text-gray-600 dark:text-gray-400">The applications module has not reported an inventory for this device.</p>
         </div>
-        <ApplicationsTable data={applicationsData} />
       </div>
     )
   }
 
+  const stat = (label: string, value: string, hint?: string) => (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 px-5 py-4">
+      <div className="text-sm text-gray-500 dark:text-gray-400">{label}</div>
+      <div className="text-2xl font-semibold text-gray-900 dark:text-white tabular-nums">{value}</div>
+      {hint && <div className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{hint}</div>}
+    </div>
+  )
+
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
-            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Applications</h1>
-            <p className="text-base text-gray-600 dark:text-gray-400">Inventory and usage tracking</p>
-          </div>
-        </div>
-        
-        {/* Total Apps Count */}
-        <div className="flex items-center gap-4">
-          {totalApps > 0 && (
-            <div className="text-right">
-              <div className="text-sm text-gray-500 dark:text-gray-400">Total Applications</div>
-              <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                {totalApps.toLocaleString()}
-              </div>
-            </div>
-          )}
-        </div>
+      {header}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {stat('Used', usedApps.length.toLocaleString(), historyDays > 0 ? `across ${historyDays} day${historyDays > 1 ? 's' : ''} of history` : 'in the current capture window')}
+        {stat('Running now', activeApps.length.toLocaleString(), activeSessions.length ? `${activeSessions.length.toLocaleString()} session${activeSessions.length === 1 ? '' : 's'} in the capture window` : undefined)}
+        {stat('Time in apps', formatDuration(totalUsageSeconds), 'process lifetime, summed')}
+        {stat('People', distinctUsers.toLocaleString(), distinctUsers === 1 ? 'one account seen' : 'accounts seen in usage')}
       </div>
 
-      {/* Applications Table */}
-      <ApplicationsTable data={applicationsData} />
+      {topApps.length > 0 && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Most used</h2>
+          </div>
+          <ul className="divide-y divide-gray-100 dark:divide-gray-700">
+            {topApps.map(app => {
+              const seconds = usageSeconds(app.usage)
+              const share = topMax > 0 ? Math.max(2, Math.round((seconds / topMax) * 100)) : 0
+              const lastUsed = usageLastUsed(app.usage)
+              return (
+                <li key={app.id} className="px-6 py-3">
+                  <div className="flex items-baseline justify-between gap-4">
+                    <div className="flex items-baseline gap-2 min-w-0">
+                      {app.usage?.activeNow && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 translate-y-[-1px]" title="Running now" />}
+                      <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{(app.displayName || app.name).replace(/\.app$/, '')}</span>
+                      {app.version && app.version !== 'Unknown' && <span className="text-xs font-mono text-gray-500 dark:text-gray-400 shrink-0">{app.version}</span>}
+                    </div>
+                    <div className="flex items-baseline gap-4 text-xs text-gray-500 dark:text-gray-400 shrink-0 tabular-nums">
+                      <span className="text-sm text-gray-900 dark:text-white">{formatDuration(seconds)}</span>
+                      <span>{(app.usage?.launchCount || 0).toLocaleString()} launch{app.usage?.launchCount === 1 ? '' : 'es'}</span>
+                      {app.usage?.uniqueUserCount ? <span>{app.usage.uniqueUserCount} user{app.usage.uniqueUserCount > 1 ? 's' : ''}</span> : null}
+                      {lastUsed && <span>{formatRelativeTime(lastUsed)}</span>}
+                    </div>
+                  </div>
+                  <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
+                    <div className="h-full rounded-full bg-blue-500/70 dark:bg-blue-400/70" style={{ width: `${share}%` }} />
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      )}
+
+      <ApplicationsTable
+        data={applicationsData}
+        usageFilter={usageFilter}
+        usageOptions={usageOptions}
+        onUsageFilterChange={setUsageFilter}
+        hideNested={hideNested}
+        nestedCount={nestedCount}
+        onHideNestedChange={setHideNested}
+      />
 
       <DebugAccordion
         data={device?.modules?.applications}
