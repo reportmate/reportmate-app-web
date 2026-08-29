@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { viewerMayRead, KIOSK_ROLE } from './src/lib/kiosk/tokens'
 
 // Define routes that should not trigger auto-redirect
 const publicRoutes = [
   '/api/auth',          // NextAuth authentication endpoints
+  '/kiosk',             // Kiosk token exchange (validates its own token)
   '/api/transmission',  // Device data transmission endpoint (client authentication via passphrase)
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
@@ -220,6 +222,18 @@ export default async function middleware(request: NextRequest) {
     })
     
     if (token) {
+      // A kiosk viewer holds a long-lived session that may only read: GET/HEAD
+      // on the report pages and their APIs. Anything else is refused outright
+      // rather than redirected, so a screen never lands on the sign-in page.
+      if ((token as { role?: string }).role === KIOSK_ROLE) {
+        const readMethod = request.method === 'GET' || request.method === 'HEAD'
+        if (!readMethod || !viewerMayRead(pathname)) {
+          if (pathname.startsWith('/api/')) {
+            return NextResponse.json({ error: 'Forbidden', details: 'Kiosk sessions are read-only' }, { status: 403 })
+          }
+          return NextResponse.redirect(new URL('/events', process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin))
+        }
+      }
       return NextResponse.next()
     }
 
