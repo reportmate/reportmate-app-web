@@ -8,21 +8,10 @@
 
 import React, { useEffect, useState } from 'react'
 import { summarizeEventPayload, type EventDetailSummary } from '../../eventPayloadDetails'
+import { fetchEventPayload } from '../../eventInlineDetails'
 
 // Bundles are routine data-collection groupings; a handful of fetches covers them.
 const MAX_BUNDLE_FETCHES = 8
-
-const payloadCache = new Map<string, unknown>()
-
-async function fetchPayload(eventId: string): Promise<unknown> {
-  if (payloadCache.has(eventId)) return payloadCache.get(eventId)
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
-  if (!response.ok) throw new Error(`Payload unavailable (${response.status})`)
-  const body = await response.json()
-  const payload = body?.payload ?? body
-  payloadCache.set(eventId, payload)
-  return payload
-}
 
 function mergeSummaries(summaries: EventDetailSummary[]): EventDetailSummary {
   const modules = new Set<string>()
@@ -92,7 +81,7 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
     setError(null)
     setSummary(null)
 
-    Promise.all(idKey.split(',').slice(0, MAX_BUNDLE_FETCHES).map(fetchPayload))
+    Promise.all(idKey.split(',').slice(0, MAX_BUNDLE_FETCHES).map(fetchEventPayload))
       .then(payloads => {
         if (cancelled) return
         setSummary(mergeSummaries(payloads.map(summarizeEventPayload)))
@@ -157,25 +146,33 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
         </div>
       ))}
 
-      {summary.messages.length > 0 && (
-        <div>
-          <SectionLabel count={summary.messages.length}>Messages</SectionLabel>
-          <ul className="space-y-1">
-            {summary.messages.map((message, index) => (
-              <li
-                key={index}
-                className={`text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${TONE_TEXT[message.tone]}`}
-              >
-                {message.text}
-              </li>
-            ))}
-          </ul>
-          {summary.suppressedMessageCount > 0 && (
-            <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-              {summary.suppressedMessageCount} installer progress {summary.suppressedMessageCount === 1 ? 'line' : 'lines'} hidden
-            </p>
-          )}
-        </div>
+      {/* Munki reports a run's problems as message text, Cimian as item names; both
+          render under the same Errors / Warnings labels so a row reads the same
+          whichever client produced it. */}
+      {(['error', 'warning', 'neutral'] as const).map(tone => {
+        const messages = summary.messages.filter(m => m.tone === tone)
+        if (messages.length === 0) return null
+        const label = tone === 'error' ? 'Errors' : tone === 'warning' ? 'Warnings' : 'Notes'
+        return (
+          <div key={tone}>
+            <SectionLabel count={messages.length}>{label}</SectionLabel>
+            <ul className="space-y-1">
+              {messages.map((message, index) => (
+                <li
+                  key={index}
+                  className={`text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${TONE_TEXT[message.tone]}`}
+                >
+                  {message.text}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
+      })}
+      {summary.suppressedMessageCount > 0 && (
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {summary.suppressedMessageCount} installer progress {summary.suppressedMessageCount === 1 ? 'line' : 'lines'} hidden
+        </p>
       )}
 
       {summary.context.length > 0 && (

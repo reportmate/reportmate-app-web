@@ -9,6 +9,7 @@ import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
 import { SlidersHorizontal } from 'lucide-react'
 import { EventDetails } from './EventDetails'
+import { EventInlineLines } from './EventInlineLines'
 import { getEventModuleId, getEventDeviceHrefSuffix } from '../../eventLinks'
 
 interface RecentEventsTableProps {
@@ -189,10 +190,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // Info is the firehose — routine data-collection chatter that drowns the events
-  // worth reacting to. It is hidden by default and opted into from the filter.
-  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info']), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  // Info is the firehose — routine data-collection chatter — and System is the
+  // reboot log; both drown the events worth reacting to, so both are hidden by
+  // default and opted into from the filter.
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info', 'system']), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info', 'system']))
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
@@ -208,6 +210,8 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   // dashboard holds up to 1000 events in state, and mounting a row for every
   // one of them puts ~1000 <tr>s in a widget that shows a dozen at a time.
   const MAX_RENDERED_EVENTS = 250
+  // Payloads are fetched for the rows anyone will scroll to; the rest keep their summary
+  const AUTO_FETCH_ROWS = 60
   const filteredEvents = useMemo(() => {
     const visible = hiddenTypes.size === 0
       ? bundledEvents
@@ -462,11 +466,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                   <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Device
-                  </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                     Message
+                  </th>
+                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Device
                   </th>
                   <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Time
@@ -484,11 +488,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                           <div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
                         </div>
                       </td>
-                      <td className="w-56 px-3 py-2.5">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
-                      </td>
                       <td className="px-3 py-2.5 hidden md:table-cell">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+                      </td>
+                      <td className="w-56 px-3 py-2.5">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
                       </td>
                       <td className="w-44 px-3 py-2.5">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
@@ -556,11 +560,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                     <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Type
                     </th>
-                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Device
-                    </th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                       Message
+                    </th>
+                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Device
                     </th>
                     <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Time
@@ -579,7 +583,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                           </p>
                         </td>
                       </tr>
-                    ) : filteredEvents.map((bundledEvent: BundledEvent) => {
+                    ) : filteredEvents.map((bundledEvent: BundledEvent, index: number) => {
                       const isExpanded = expandedEvents.has(bundledEvent.id)
 
                       return (
@@ -608,24 +612,24 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 {getStatusIcon(bundledEvent.kind)}
                               </div>
                             </td>
+                            <td className="px-3 py-2.5 hidden md:table-cell">
+                              <EventInlineLines
+                                eventId={String(bundledEvent.id)}
+                                kind={bundledEvent.kind}
+                                summary={bundledEvent.message}
+                                isBundle={bundledEvent.isBundle}
+                                autoFetch={index < AUTO_FETCH_ROWS}
+                                itemsOnly
+                              />
+                            </td>
                             <td className="w-56 px-3 py-2.5">
                               <Link
                                 href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
-                                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                className="text-sm font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {getDeviceName(bundledEvent, deviceNameMap)}
                               </Link>
-                            </td>
-                            <td className="px-3 py-2.5 hidden md:table-cell">
-                              <div className="text-sm text-gray-900 dark:text-white truncate">
-                                {bundledEvent.message}
-                                {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                    ({bundledEvent.bundledKinds.join(', ')})
-                                  </span>
-                                )}
-                              </div>
                             </td>
                             <td className="w-44 px-3 py-2.5">
                               <div className="text-sm text-gray-600 dark:text-gray-400">

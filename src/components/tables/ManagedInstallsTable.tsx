@@ -26,9 +26,11 @@ interface ManagedInstallsTableProps {
   data: InstallsInfo;
   initialStatusFilter?: string[];
   initialSearchQuery?: string;
+  /** The last run failed; an empty list means "not reported", not "nothing assigned". */
+  runFailed?: boolean;
 }
 
-export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data, initialStatusFilter, initialSearchQuery }) => {
+export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data, initialStatusFilter, initialSearchQuery, runFailed = false }) => {
   const [statusFilter, setStatusFilter] = useState<Set<string>>(() => new Set(initialStatusFilter ?? []));
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery ?? '');
   const [expandedPackageIds, setExpandedPackageIds] = useState<Set<string>>(new Set());
@@ -547,16 +549,26 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                     <tr>
                       <td colSpan={5} className="px-6 py-16">
                         <div className="text-center">
-                          <div className="w-12 h-12 mx-auto mb-4 bg-emerald-100 dark:bg-emerald-900 rounded-full flex items-center justify-center">
-                            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
+                          <div className={`w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center ${runFailed ? 'bg-red-100 dark:bg-red-900' : 'bg-emerald-100 dark:bg-emerald-900'}`}>
+                            {runFailed ? (
+                              <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            ) : (
+                              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                            )}
                           </div>
                           <h3 className="text-sm font-medium text-gray-900 dark:text-white mb-2">
-                            {data.systemName ? `${data.systemName.charAt(0).toUpperCase() + data.systemName.slice(1)} System Active` : 'Management System Active'}
+                            {runFailed
+                              ? 'Last run did not complete'
+                              : data.systemName ? `${data.systemName.charAt(0).toUpperCase() + data.systemName.slice(1)} System Active` : 'Management System Active'}
                           </h3>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            The managed installs system is configured and running, but no packages are currently assigned to this device.
+                            {runFailed
+                              ? 'No items were reported because the run failed before it could evaluate the manifest.'
+                              : 'The managed installs system is configured and running, but no packages are currently assigned to this device.'}
                           </p>
                           {data.config?.lastRun && (
                             <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
