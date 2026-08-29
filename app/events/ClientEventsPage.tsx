@@ -826,43 +826,23 @@ function EventsPageContent() {
   const inlineLineClass = (line: InlineLine, tone: string) =>
     line.isMessage
       ? `text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${tone}`
-      : `text-xs break-words ${tone}`
+      : `text-sm break-words ${tone}`
 
   // Render the extracted error/warning/success detail lines beneath the summary
   // message. One line per item. Returns null when there is nothing to add.
-  // "FortiClient warning" becomes "FortiClient 7.4.3.4799 warning" when the
-  // payload carries exactly one item and the summary names it. The item line
-  // under the summary is then a repeat, so renderInlineDetails drops it.
-  const singleNamedItem = (event: BundledEvent): InlineLine | null => {
-    if (event.isBundle) return null
-    const { errors, warnings } = extractInlineDetails(fullPayloads[event.id])
-    const lines = [...errors, ...warnings]
-    if (lines.length !== 1 || lines[0].isMessage) return null
-    const first = lines[0].text.split(' ')[0]
-    return (event.message || '').toLowerCase().startsWith(first.toLowerCase()) ? lines[0] : null
+  // The row shows the items themselves, not a count of them: "4 warnings" or
+  // "2 packages installed" is replaced by the list once the payload is in.
+  // The summary stays only while loading, or when the payload has no items.
+  const inlineLines = (event: BundledEvent) => {
+    const { errors, warnings, successes } = extractInlineDetails(fullPayloads[event.id])
+    return { errors, warnings, successes, hasDetails: errors.length > 0 || warnings.length > 0 || successes.length > 0 }
   }
-  const getDisplayMessage = (event: BundledEvent): string => {
-    const message = getEventMessage(event)
-    const item = singleNamedItem(event)
-    if (!item) return message
-    const [name, ...rest] = item.text.split(' ')
-    const version = rest.join(' ')
-    if (!version || message.includes(version)) return message
-    return message.replace(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), `${name} ${version}`)
-  }
+  const getDisplayMessage = (event: BundledEvent): string | null =>
+    inlineLines(event).hasDetails ? null : getEventMessage(event)
 
   const renderInlineDetails = (event: BundledEvent): React.ReactNode => {
-    const extracted = extractInlineDetails(fullPayloads[event.id])
-    // A summary like "FortiClient warning" already names its one item, so a lone
-    // item line under it is a repeat; keep item lines only for 2+ or for messages
-    const promoted = singleNamedItem(event)
-    const trimItems = (lines: InlineLine[]) => (promoted && lines.length === 1 && lines[0].text === promoted.text ? [] : lines)
-    const errors = trimItems(extracted.errors)
-    const warnings = trimItems(extracted.warnings)
-    const successes = extracted.successes
-    // Success summaries already spell out a single package, so only expand 2+
-    const successLines = successes.length > 1 ? successes : []
-    const hasDetails = errors.length > 0 || warnings.length > 0 || successLines.length > 0
+    const { errors, warnings, successes, hasDetails } = inlineLines(event)
+    const successLines = successes
     if (!hasDetails) {
       if (shouldAutoFetch(event) && loadingPayloads.has(event.id)) {
         return <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Loading details…</div>
@@ -870,7 +850,7 @@ function EventsPageContent() {
       return null
     }
     return (
-      <div className="mt-1 space-y-1">
+      <div className="space-y-1">
         {errors.map((m, i) => (
           <div key={`e-${i}`} className={inlineLineClass(m, 'text-red-700 dark:text-red-300')}>{m.text}</div>
         ))}
@@ -878,7 +858,7 @@ function EventsPageContent() {
           <div key={`w-${i}`} className={inlineLineClass(m, 'text-yellow-700 dark:text-yellow-300')}>{m.text}</div>
         ))}
         {successLines.map((m, i) => (
-          <div key={`s-${i}`} className="text-xs text-green-700 dark:text-green-300 break-words">{m}</div>
+          <div key={`s-${i}`} className="text-sm text-green-700 dark:text-green-300 break-words">{m}</div>
         ))}
       </div>
     )
