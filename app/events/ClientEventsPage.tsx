@@ -12,7 +12,7 @@ import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent 
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { LastRunSummary } from "../../src/components/LastRunSummary"
 import { EventDetails } from "../../src/lib/modules/widgets/EventDetails"
-import { extractInlineDetails, inlineLineClass, type InlineLine } from "../../src/lib/eventInlineDetails"
+import { extractInlineDetails, inlineLineClass } from "../../src/lib/eventInlineDetails"
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 import { Search, X } from 'lucide-react'
 
@@ -742,6 +742,13 @@ function EventsPageContent() {
     const { errors, warnings, successes } = extractInlineDetails(fullPayloads[event.id])
     return { errors, warnings, successes, hasDetails: errors.length > 0 || warnings.length > 0 || successes.length > 0 }
   }
+  // A count summary takes its kind's colour, like the item lines it stands in for
+  const summaryToneClass = (kind: string) => ({
+    success: 'text-green-700 dark:text-green-300',
+    warning: 'text-yellow-700 dark:text-yellow-300',
+    error: 'text-red-700 dark:text-red-300',
+  } as Record<string, string>)[(kind || '').toLowerCase()] || 'text-gray-900 dark:text-white'
+
   const getDisplayMessage = (event: BundledEvent): string | null =>
     inlineLines(event).hasDetails ? null : getEventMessage(event)
 
@@ -1049,10 +1056,10 @@ function EventsPageContent() {
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device
+                        Message
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Message
+                        Device
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
@@ -1097,11 +1104,17 @@ function EventsPageContent() {
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
+                            <td className="px-4 lg:px-6 py-4 align-top">
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
+                              </div>
+                              {renderInlineDetails(event)}
+                            </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
-                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                  className="font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -1116,12 +1129,6 @@ function EventsPageContent() {
                                   )}
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-4 lg:px-6 py-4 align-top">
-                              <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getDisplayMessage(event)}
-                              </div>
-                              {renderInlineDetails(event)}
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -1420,10 +1427,10 @@ function EventsPageContent() {
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device
+                        Message
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Message
+                        Device
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
@@ -1488,11 +1495,17 @@ function EventsPageContent() {
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
+                            <td className="px-4 py-3 max-w-xs align-top">
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
+                              </div>
+                              {renderInlineDetails(event)}
+                            </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
-                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                  className="font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -1507,12 +1520,6 @@ function EventsPageContent() {
                                   )}
                                 </div>
                               </div>
-                            </td>
-                            <td className="px-4 py-3 max-w-xs align-top">
-                              <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getDisplayMessage(event)}
-                              </div>
-                              {renderInlineDetails(event)}
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -1745,7 +1752,7 @@ function EventsPageContent() {
                       <div>
                         <Link
                           href={getDeviceHref(event)}
-                          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
+                          className="font-medium text-gray-900 dark:text-white hover:underline text-sm block"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {event.deviceName || event.device}
@@ -1764,7 +1771,7 @@ function EventsPageContent() {
                     {/* Message */}
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
-                      <div className="text-sm text-gray-900 dark:text-white break-words">
+                      <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
                         {getDisplayMessage(event)}
                       </div>
                       {renderInlineDetails(event)}

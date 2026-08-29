@@ -190,10 +190,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
 }) => {
   const [isHovered, setIsHovered] = useState(false)
   const [showTooltip, setShowTooltip] = useState(false)
-  // Info is the firehose — routine data-collection chatter that drowns the events
-  // worth reacting to. It is hidden by default and opted into from the filter.
-  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info']), [])
-  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info']))
+  // Info is the firehose — routine data-collection chatter — and System is the
+  // reboot log; both drown the events worth reacting to, so both are hidden by
+  // default and opted into from the filter.
+  const DEFAULT_HIDDEN = useMemo(() => new Set<string>(['info', 'system']), [])
+  const [hiddenTypes, setHiddenTypes] = useState<Set<string>>(new Set(['info', 'system']))
   // Only show filter as active when user has deviated from the default state
   const isFilterCustomized = hiddenTypes.size !== DEFAULT_HIDDEN.size ||
     [...hiddenTypes].some(t => !DEFAULT_HIDDEN.has(t))
