@@ -34,6 +34,16 @@ const authOptions: NextAuthOptions = {
   },
   useSecureCookies: true,
   callbacks: {
+    // Carry the kiosk role from the JWT into the session so client code can
+    // hide controls a viewer cannot use.
+    async jwt({ token }) {
+      return token
+    },
+    async session({ session, token }) {
+      const role = (token as { role?: string }).role
+      if (role) (session as { role?: string }).role = role
+      return session
+    },
     async signIn() {
       // Always allow sign in - let NextAuth handle any issues
       return true
