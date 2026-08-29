@@ -22,6 +22,14 @@ interface EventInlineLinesProps {
   className?: string
 }
 
+// The summary takes the kind's colour too, so a row reads the same whether it
+// lists items or a count
+const SUMMARY_TONE: Record<string, string> = {
+  success: 'text-green-700 dark:text-green-300',
+  warning: 'text-yellow-700 dark:text-yellow-300',
+  error: 'text-red-700 dark:text-red-300',
+}
+
 const shouldFetch = (kind: string) => ['success', 'warning', 'error'].includes(kind.toLowerCase())
 
 export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kind, summary, isBundle = false, autoFetch = true, itemsOnly = false, className = '' }) => {
@@ -60,7 +68,7 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
   if (!hasDetails) {
     return (
       <div className={className}>
-        <div className="text-sm text-gray-900 dark:text-white break-words">{summary}</div>
+        <div className={`text-sm break-words ${SUMMARY_TONE[kind.toLowerCase()] || 'text-gray-900 dark:text-white'}`}>{summary}</div>
         {loading && <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Loading details…</div>}
       </div>
     )
