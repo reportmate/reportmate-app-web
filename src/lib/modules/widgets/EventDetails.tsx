@@ -129,16 +129,16 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
       {summary.groups.map(group => (
         <div key={group.key}>
           <SectionLabel count={group.items.length}>{group.label}</SectionLabel>
-          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className={`grid gap-x-6 gap-y-1 ${group.items.some(item => item.detail) ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
             {group.items.map((item, index) => (
-              <li key={`${item.name}-${index}`} className="flex items-baseline gap-2 min-w-0">
+              <li key={`${item.name}-${index}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 min-w-0">
                 <span className={`w-1.5 h-1.5 rounded-full shrink-0 translate-y-[-1px] ${TONE_DOT[group.tone]}`}></span>
-                <span className={`text-sm truncate ${TONE_TEXT[group.tone]}`}>{item.name}</span>
+                <span className={`text-sm break-words ${TONE_TEXT[group.tone]}`}>{item.name}</span>
                 {item.version && (
                   <span className="text-xs text-gray-500 dark:text-gray-400 font-mono shrink-0">{item.version}</span>
                 )}
                 {item.detail && (
-                  <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{item.detail}</span>
+                  <span className="basis-full pl-3.5 text-xs text-gray-500 dark:text-gray-400 break-words">{item.detail}</span>
                 )}
               </li>
             ))}
