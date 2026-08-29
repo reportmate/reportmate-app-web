@@ -13,6 +13,8 @@ const RESERVED_PAYLOAD_KEYS = new Set([
   'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
   'items', 'action', 'duration_seconds', 'item_warning_count', 'operational_warning_count',
   'operational_warnings', 'session_installs', 'session_updates', 'session_removals',
+  'recommendation', 'collection_type', 'collectionType', 'operating_system', 'display_version',
+  'version', 'uptime', 'previous_boot_time', 'current_boot_time',
 ])
 
 // Extract human-readable detail lines from a loaded event payload so they can be
@@ -78,10 +80,17 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
   pushItems(warnings, p.warning_items)
   pushItems(errors, p.failed_items)
 
+  // A client recommendation is a run message: the module is telling the
+  // operator something, not naming a package.
+  if (typeof p.recommendation === 'string' && p.recommendation.trim()) {
+    warnings.push({ text: p.recommendation.trim(), isMessage: true })
+  }
+
   // Success payloads are a flat "package name → version" map — one line each.
+  // Only a version-shaped value counts; other strings are context.
   for (const [key, value] of Object.entries(p)) {
-    if (RESERVED_PAYLOAD_KEYS.has(key)) continue
-    if (typeof value === 'string' && value.trim()) {
+    if (RESERVED_PAYLOAD_KEYS.has(key) || /count$/i.test(key)) continue
+    if (typeof value === 'string' && /^\d/.test(value.trim())) {
       successes.push(`${key} ${value.trim()}`)
     }
   }

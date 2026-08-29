@@ -158,7 +158,7 @@ export function summarizeEventPayload(payload: unknown): EventDetailSummary {
   for (const [key, tone] of [
     ['errors', 'error'], ['error_messages', 'error'],
     ['warnings', 'warning'], ['warning_messages', 'warning'],
-    ['recommendation', 'neutral'],
+    ['recommendation', 'warning'],
   ] as const) {
     const { kept, suppressed } = splitMessages(p[key])
     suppressedMessageCount += suppressed
