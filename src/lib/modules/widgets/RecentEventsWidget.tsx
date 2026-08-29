@@ -614,7 +614,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                             <td className="w-56 px-3 py-2.5">
                               <Link
                                 href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
-                                className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                className="text-sm font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 {getDeviceName(bundledEvent, deviceNameMap)}
@@ -627,6 +627,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 summary={bundledEvent.message}
                                 isBundle={bundledEvent.isBundle}
                                 autoFetch={index < AUTO_FETCH_ROWS}
+                                itemsOnly
                               />
                               {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">

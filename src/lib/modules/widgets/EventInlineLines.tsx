@@ -16,12 +16,14 @@ interface EventInlineLinesProps {
   isBundle?: boolean
   /** Fetch the payload for this row; false for rows far down a long list. */
   autoFetch?: boolean
+  /** Keep run messages (the mono chips) for the expanded view; list only items. */
+  itemsOnly?: boolean
   className?: string
 }
 
 const shouldFetch = (kind: string) => ['success', 'warning', 'error'].includes(kind.toLowerCase())
 
-export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kind, summary, isBundle = false, autoFetch = true, className = '' }) => {
+export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kind, summary, isBundle = false, autoFetch = true, itemsOnly = false, className = '' }) => {
   const [payload, setPayload] = useState<unknown>(() => cachedEventPayload(eventId))
   const [loading, setLoading] = useState(false)
 
@@ -36,7 +38,10 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
     return () => { cancelled = true }
   }, [eventId, kind, isBundle, autoFetch, payload])
 
-  const { errors, warnings, successes } = extractInlineDetails(payload)
+  const extracted = extractInlineDetails(payload)
+  const errors = itemsOnly ? extracted.errors.filter(l => !l.isMessage) : extracted.errors
+  const warnings = itemsOnly ? extracted.warnings.filter(l => !l.isMessage) : extracted.warnings
+  const successes = extracted.successes
   const hasDetails = errors.length > 0 || warnings.length > 0 || successes.length > 0
 
   if (!hasDetails) {
