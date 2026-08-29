@@ -78,7 +78,7 @@ export default async function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="format-detection" content="telephone=no" />
       </head>
-      <body className={`${inter.className} h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
+      <body className={`${inter.className} min-h-full antialiased bg-white dark:bg-black transition-colors duration-200`} suppressHydrationWarning>
         <script 
           dangerouslySetInnerHTML={{
             __html: `

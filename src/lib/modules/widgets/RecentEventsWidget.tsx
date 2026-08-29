@@ -629,11 +629,6 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 autoFetch={index < AUTO_FETCH_ROWS}
                                 itemsOnly
                               />
-                              {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400">
-                                  ({bundledEvent.bundledKinds.join(', ')})
-                                </span>
-                              )}
                             </td>
                             <td className="w-44 px-3 py-2.5">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
