@@ -611,6 +611,78 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
                   }
                 />
               )}
+              {(summary.failedLoginsLast7Days !== undefined || passwordPolicyData || lapsData || autoLoginData) && (
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-3 pt-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="w-3.5 h-3.5 text-orange-600 dark:text-orange-400" />
+                    <h4 className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Login Security</h4>
+                  </div>
+                  <div className="space-y-1">
+                  {summary.failedLoginsLast7Days !== undefined && (
+                    <>
+                      <DetailRow
+                        label="Failed Logins (7d)"
+                        value={summary.failedLoginsLast7Days}
+                        variant={summary.failedLoginsLast7Days > 10 ? 'error' : summary.failedLoginsLast7Days > 5 ? 'warning' : 'success'}
+                      />
+                      <DetailRow label="Currently Logged In" value={summary.currentlyLoggedIn} />
+                    </>
+                  )}
+                  {passwordPolicyData && (
+                    <div className={summary.failedLoginsLast7Days !== undefined ? "border-t border-gray-200 dark:border-gray-700 my-2 pt-2" : ""}>
+                      {passwordPolicyData.minPasswordLength != null && (
+                        <DetailRow
+                          label="Min Password Length"
+                          value={String(passwordPolicyData.minPasswordLength)}
+                          variant={passwordPolicyData.minPasswordLength === 0 ? 'warning' : passwordPolicyData.minPasswordLength >= 8 ? 'success' : 'neutral'}
+                        />
+                      )}
+                      {passwordPolicyData.maxPasswordAgeDays != null && (
+                        <DetailRow
+                          label="Max Password Age"
+                          value={passwordPolicyData.maxPasswordAgeDays === 0 ? 'Never expires' : `${passwordPolicyData.maxPasswordAgeDays} days`}
+                        />
+                      )}
+                      {passwordPolicyData.lockoutThreshold != null && (
+                        <DetailRow
+                          label="Lockout Threshold"
+                          value={passwordPolicyData.lockoutThreshold === 0 ? 'No lockout' : `${passwordPolicyData.lockoutThreshold} attempts`}
+                          variant={passwordPolicyData.lockoutThreshold === 0 ? 'warning' : 'neutral'}
+                        />
+                      )}
+                      {passwordPolicyData.complexityRequired != null && (
+                        <DetailRow
+                          label="Complexity"
+                          value={passwordPolicyData.complexityRequired ? 'Required' : 'Not Required'}
+                          variant={passwordPolicyData.complexityRequired ? 'success' : 'neutral'}
+                        />
+                      )}
+                    </div>
+                  )}
+                  {lapsData && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                      <DetailRow
+                        label="LAPS"
+                        value={lapsData.windowsLapsConfigured ? `Windows LAPS${lapsData.backupDirectory ? ` (${lapsData.backupDirectory})` : ''}` : lapsData.legacyLapsInstalled ? 'Legacy LAPS' : 'Not Configured'}
+                        variant={(lapsData.windowsLapsConfigured || lapsData.legacyLapsInstalled) ? 'success' : 'neutral'}
+                      />
+                    </div>
+                  )}
+                  {autoLoginData && (
+                    <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
+                      <DetailRow
+                        label="Auto Admin Logon"
+                        value={autoLoginData.autoAdminLogon ? 'Enabled' : 'Disabled'}
+                        variant={autoLoginData.autoAdminLogon ? 'error' : 'success'}
+                      />
+                      {autoLoginData.hasDefaultPassword && (
+                        <DetailRow label="Stored Password" value="Present" variant="error" />
+                      )}
+                    </div>
+                  )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -856,79 +928,6 @@ export const IdentityTab: React.FC<IdentityTabProps> = ({ device }) => {
           </div>
         )}
 
-        {/* Login Security Card - Windows Only (failed logins + password/LAPS/auto-login posture) */}
-        {!isMac && (summary.failedLoginsLast7Days !== undefined || passwordPolicyData || lapsData || autoLoginData) && (
-          <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400" />
-              <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Login Security</h3>
-            </div>
-            <div className="space-y-1">
-              {summary.failedLoginsLast7Days !== undefined && (
-                <>
-                  <DetailRow
-                    label="Failed Logins (7d)"
-                    value={summary.failedLoginsLast7Days}
-                    variant={summary.failedLoginsLast7Days > 10 ? 'error' : summary.failedLoginsLast7Days > 5 ? 'warning' : 'success'}
-                  />
-                  <DetailRow label="Currently Logged In" value={summary.currentlyLoggedIn} />
-                </>
-              )}
-              {passwordPolicyData && (
-                <div className={summary.failedLoginsLast7Days !== undefined ? "border-t border-gray-200 dark:border-gray-700 my-2 pt-2" : ""}>
-                  {passwordPolicyData.minPasswordLength != null && (
-                    <DetailRow
-                      label="Min Password Length"
-                      value={String(passwordPolicyData.minPasswordLength)}
-                      variant={passwordPolicyData.minPasswordLength === 0 ? 'warning' : passwordPolicyData.minPasswordLength >= 8 ? 'success' : 'neutral'}
-                    />
-                  )}
-                  {passwordPolicyData.maxPasswordAgeDays != null && (
-                    <DetailRow
-                      label="Max Password Age"
-                      value={passwordPolicyData.maxPasswordAgeDays === 0 ? 'Never expires' : `${passwordPolicyData.maxPasswordAgeDays} days`}
-                    />
-                  )}
-                  {passwordPolicyData.lockoutThreshold != null && (
-                    <DetailRow
-                      label="Lockout Threshold"
-                      value={passwordPolicyData.lockoutThreshold === 0 ? 'No lockout' : `${passwordPolicyData.lockoutThreshold} attempts`}
-                      variant={passwordPolicyData.lockoutThreshold === 0 ? 'warning' : 'neutral'}
-                    />
-                  )}
-                  {passwordPolicyData.complexityRequired != null && (
-                    <DetailRow
-                      label="Complexity"
-                      value={passwordPolicyData.complexityRequired ? 'Required' : 'Not Required'}
-                      variant={passwordPolicyData.complexityRequired ? 'success' : 'neutral'}
-                    />
-                  )}
-                </div>
-              )}
-              {lapsData && (
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <DetailRow
-                    label="LAPS"
-                    value={lapsData.windowsLapsConfigured ? `Windows LAPS${lapsData.backupDirectory ? ` (${lapsData.backupDirectory})` : ''}` : lapsData.legacyLapsInstalled ? 'Legacy LAPS' : 'Not Configured'}
-                    variant={(lapsData.windowsLapsConfigured || lapsData.legacyLapsInstalled) ? 'success' : 'neutral'}
-                  />
-                </div>
-              )}
-              {autoLoginData && (
-                <div className="border-t border-gray-200 dark:border-gray-700 my-2 pt-2">
-                  <DetailRow
-                    label="Auto Admin Logon"
-                    value={autoLoginData.autoAdminLogon ? 'Enabled' : 'Disabled'}
-                    variant={autoLoginData.autoAdminLogon ? 'error' : 'success'}
-                  />
-                  {autoLoginData.hasDefaultPassword && (
-                    <DetailRow label="Stored Password" value="Present" variant="error" />
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* BTMDB Health Footnote - macOS Only (Collapsible) */}
