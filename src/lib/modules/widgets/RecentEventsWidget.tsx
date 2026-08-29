@@ -465,11 +465,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                   <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Type
                   </th>
-                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                    Device
-                  </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                     Message
+                  </th>
+                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Device
                   </th>
                   <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Time
@@ -487,11 +487,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                           <div className="h-6 w-6 bg-gray-200 dark:bg-gray-700 rounded-full"></div>
                         </div>
                       </td>
-                      <td className="w-56 px-3 py-2.5">
-                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
-                      </td>
                       <td className="px-3 py-2.5 hidden md:table-cell">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-48"></div>
+                      </td>
+                      <td className="w-56 px-3 py-2.5">
+                        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-32"></div>
                       </td>
                       <td className="w-44 px-3 py-2.5">
                         <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-20"></div>
@@ -559,11 +559,11 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                     <th className="w-20 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Type
                     </th>
-                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                      Device
-                    </th>
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider hidden md:table-cell">
                       Message
+                    </th>
+                    <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                      Device
                     </th>
                     <th className="w-44 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Time
@@ -611,15 +611,6 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 {getStatusIcon(bundledEvent.kind)}
                               </div>
                             </td>
-                            <td className="w-56 px-3 py-2.5">
-                              <Link
-                                href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
-                                className="text-sm font-medium text-gray-900 dark:text-white hover:underline block truncate"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {getDeviceName(bundledEvent, deviceNameMap)}
-                              </Link>
-                            </td>
                             <td className="px-3 py-2.5 hidden md:table-cell">
                               <EventInlineLines
                                 eventId={String(bundledEvent.id)}
@@ -629,6 +620,15 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 autoFetch={index < AUTO_FETCH_ROWS}
                                 itemsOnly
                               />
+                            </td>
+                            <td className="w-56 px-3 py-2.5">
+                              <Link
+                                href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
+                                className="text-sm font-medium text-gray-900 dark:text-white hover:underline block truncate"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {getDeviceName(bundledEvent, deviceNameMap)}
+                              </Link>
                             </td>
                             <td className="w-44 px-3 py-2.5">
                               <div className="text-sm text-gray-600 dark:text-gray-400">

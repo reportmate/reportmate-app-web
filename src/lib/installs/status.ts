@@ -31,6 +31,15 @@ const RUN_WARNING_ITEM_PATTERNS: RegExp[] = [
   /^(\S+) (?:requires|is not|was not|could not)/i,
 ]
 
+/** The package a Munki run message is about, or null when it names none. */
+export function itemNameFromMessage(message: string): string | null {
+  for (const pattern of RUN_WARNING_ITEM_PATTERNS) {
+    const match = message.match(pattern)
+    if (match) return match[1].replace(/[.,:]+$/, '')
+  }
+  return null
+}
+
 export function runLevelWarnings(device: any): RunLevelWarning[] {
   const raw = device?.modules?.installs?.munki?.warnings
   if (typeof raw !== 'string' || raw.trim() === '') return []
@@ -38,13 +47,7 @@ export function runLevelWarnings(device: any): RunLevelWarning[] {
     .split(/WARNING:|[\n\r]+/)
     .map((w: string) => w.trim())
     .filter(Boolean)
-    .map((message: string) => {
-      for (const pattern of RUN_WARNING_ITEM_PATTERNS) {
-        const match = message.match(pattern)
-        if (match) return { message, itemName: match[1].replace(/[.,:]+$/, '') }
-      }
-      return { message, itemName: null }
-    })
+    .map((message: string) => ({ message, itemName: itemNameFromMessage(message) }))
 }
 
 export function getDeviceInstallItems(device: any): any[] {

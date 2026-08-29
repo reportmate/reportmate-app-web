@@ -6,7 +6,8 @@
  */
 
 import React, { useEffect, useState } from 'react'
-import { extractInlineDetails, fetchEventPayload, cachedEventPayload, inlineLineClass } from '../../eventInlineDetails'
+import { extractInlineDetails, fetchEventPayload, cachedEventPayload, inlineLineClass, type InlineLine } from '../../eventInlineDetails'
+import { itemNameFromMessage } from '../../installs/status'
 
 interface EventInlineLinesProps {
   eventId: string
@@ -39,8 +40,20 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
   }, [eventId, kind, isBundle, autoFetch, payload])
 
   const extracted = extractInlineDetails(payload)
-  const errors = itemsOnly ? extracted.errors.filter(l => !l.isMessage) : extracted.errors
-  const warnings = itemsOnly ? extracted.warnings.filter(l => !l.isMessage) : extracted.warnings
+  // Items-only rows still list the package a run message is about
+  // ("Could not process item X" becomes "X"); messages naming nothing stay
+  // in the expanded view.
+  const toItems = (lines: InlineLine[]): InlineLine[] => {
+    const out: InlineLine[] = []
+    for (const line of lines) {
+      if (!line.isMessage) { out.push(line); continue }
+      const name = itemNameFromMessage(line.text)
+      if (name && !out.some(l => l.text === name)) out.push({ text: name, isMessage: false })
+    }
+    return out
+  }
+  const errors = itemsOnly ? toItems(extracted.errors) : extracted.errors
+  const warnings = itemsOnly ? toItems(extracted.warnings) : extracted.warnings
   const successes = extracted.successes
   const hasDetails = errors.length > 0 || warnings.length > 0 || successes.length > 0
 
