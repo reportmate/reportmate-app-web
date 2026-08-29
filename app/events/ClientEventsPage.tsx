@@ -150,6 +150,19 @@ function EventsPageContent() {
     () => new Set(['success', 'warning', 'error'])
   )
   const [searchQuery, setSearchQuery] = useState('')
+  // Success, Warnings and Errors combine. System and Info are solo views: the
+  // first click shows only that kind, the second returns to the default set.
+  const DEFAULT_KINDS = ['success', 'warning', 'error']
+  const SOLO_KINDS = new Set(['system', 'info'])
+  const toggleKindFilter = (key: string) => setActiveFilters(prev => {
+    if (SOLO_KINDS.has(key)) {
+      return prev.has(key) && prev.size === 1 ? new Set(DEFAULT_KINDS) : new Set([key])
+    }
+    const next = new Set([...prev].filter(k => !SOLO_KINDS.has(k)))
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
   // Several rows can be open at once; a Set of ids rather than a single id
   const [expandedEvents, setExpandedEvents] = useState<Set<string>>(() => new Set())
   const collapseEvent = (id: string) => setExpandedEvents(prev => { const next = new Set(prev); next.delete(id); return next })
@@ -1008,12 +1021,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -1035,12 +1043,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -1367,12 +1370,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1403,12 +1401,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
