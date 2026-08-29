@@ -11,6 +11,7 @@ import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkel
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { LastRunSummary } from "../../src/components/LastRunSummary"
+import { EventDetails } from "../../src/lib/modules/widgets/EventDetails"
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 import { Search, X } from 'lucide-react'
 
@@ -92,23 +93,23 @@ const isBundleId = (id: string | number): boolean => {
 function getFilterStyles(key: string, isActive: boolean) {
   const baseColors: Record<string, { active: string; inactive: string }> = {
     success: {
-      active: 'bg-green-700 text-white border-green-800 shadow-md dark:bg-green-600 dark:border-green-700',
+      active: 'bg-green-200 text-green-900 border-green-400 ring-1 ring-green-400 dark:bg-green-900/70 dark:text-green-100 dark:border-green-600 dark:ring-green-600',
       inactive: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200 hover:border-green-300 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/60'
     },
     warning: {
-      active: 'bg-yellow-600 text-white border-yellow-700 shadow-md dark:bg-yellow-500 dark:border-yellow-600',
+      active: 'bg-yellow-200 text-yellow-900 border-yellow-400 ring-1 ring-yellow-400 dark:bg-yellow-900/70 dark:text-yellow-100 dark:border-yellow-600 dark:ring-yellow-600',
       inactive: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800 dark:hover:bg-yellow-900/60'
     },
     error: {
-      active: 'bg-red-700 text-white border-red-800 shadow-md dark:bg-red-600 dark:border-red-700',
+      active: 'bg-red-200 text-red-900 border-red-400 ring-1 ring-red-400 dark:bg-red-900/70 dark:text-red-100 dark:border-red-600 dark:ring-red-600',
       inactive: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200 hover:border-red-300 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/60'
     },
     info: {
-      active: 'bg-blue-700 text-white border-blue-800 shadow-md dark:bg-blue-600 dark:border-blue-700',
+      active: 'bg-blue-200 text-blue-900 border-blue-400 ring-1 ring-blue-400 dark:bg-blue-900/70 dark:text-blue-100 dark:border-blue-600 dark:ring-blue-600',
       inactive: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 hover:border-blue-300 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/60'
     },
     system: {
-      active: 'bg-purple-700 text-white border-purple-800 shadow-md dark:bg-purple-600 dark:border-purple-700',
+      active: 'bg-purple-200 text-purple-900 border-purple-400 ring-1 ring-purple-400 dark:bg-purple-900/70 dark:text-purple-100 dark:border-purple-600 dark:ring-purple-600',
       inactive: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200 hover:border-purple-300 dark:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/60'
     },
   }
@@ -155,28 +156,32 @@ const RESERVED_PAYLOAD_KEYS = new Set([
 //   Generic: { error_messages: [...], warning_messages: [...] }
 //   Success: { "Managed Safari": "15.6.1", "ZoomPrefs": "14.1" }  (name → version)
 //   Cimian:  { items: [{ name: "Chrome", version: "151.0.7922.170" }] }  (array of objects)
-const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: string[]; successes: string[] } => {
-  const errors: string[] = []
-  const warnings: string[] = []
+// A line is either a run message (sentence from the client) or an item
+// ("Name version"); the flag decides how the row renders it.
+type InlineLine = { text: string; isMessage: boolean }
+const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; warnings: InlineLine[]; successes: string[] } => {
+  const errors: InlineLine[] = []
+  const warnings: InlineLine[] = []
   const successes: string[] = []
   if (!payload || typeof payload !== 'object') return { errors, warnings, successes }
   const p = payload as Record<string, any>
 
-  const pushString = (target: string[], val: unknown) => {
+  const pushString = (target: InlineLine[], val: unknown) => {
     if (typeof val === 'string' && val.trim()) {
-      val.split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push(s))
+      val.split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push({ text: s, isMessage: true }))
     }
   }
-  const pushItems = (target: string[], val: unknown) => {
+  const pushItems = (target: InlineLine[], val: unknown) => {
     if (!Array.isArray(val)) return
     for (const item of val) {
       if (typeof item === 'string') {
-        if (item.trim()) target.push(item.trim())
+        if (item.trim()) target.push({ text: item.trim(), isMessage: false })
       } else if (item && typeof item === 'object') {
         const name = item.displayName || item.name || ''
+        const version = item.version ? ` ${item.version}` : ''
         const detail = item.error || item.warning || ''
-        const line = detail ? (name ? `${name}: ${detail}` : detail) : name
-        if (line) target.push(line)
+        const line = detail ? (name ? `${name}${version}: ${detail}` : detail) : `${name}${version}`
+        if (line) target.push({ text: line, isMessage: Boolean(detail) })
       }
     }
   }
@@ -213,9 +218,13 @@ const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: s
     }
   }
 
+  const dedupe = (lines: InlineLine[]) => {
+    const seen = new Set<string>()
+    return lines.filter(l => (seen.has(l.text) ? false : (seen.add(l.text), true)))
+  }
   return {
-    errors: Array.from(new Set(errors)),
-    warnings: Array.from(new Set(warnings)),
+    errors: dedupe(errors),
+    warnings: dedupe(warnings),
     successes: Array.from(new Set(successes)),
   }
 }
@@ -230,7 +239,10 @@ function EventsPageContent() {
     () => new Set(['success', 'warning', 'error', 'system'])
   )
   const [searchQuery, setSearchQuery] = useState('')
-  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+  // Several rows can be open at once; a Set of ids rather than a single id
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(() => new Set())
+  const collapseEvent = (id: string) => setExpandedEvents(prev => { const next = new Set(prev); next.delete(id); return next })
+  const expandEvent = (id: string) => setExpandedEvents(prev => new Set(prev).add(id))
   // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
@@ -241,7 +253,7 @@ function EventsPageContent() {
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Ref for infinite scroll sentinel
-  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const _loadMoreRef = useRef<HTMLDivElement>(null)
   // Refs for scroll containers (used by scroll-based infinite scroll)
   const desktopScrollRef = useRef<HTMLDivElement>(null)
   const tabletScrollRef = useRef<HTMLDivElement>(null)
@@ -809,10 +821,45 @@ function EventsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFetchKey])
 
+  // A run message (a sentence from the client) gets the same mono chip the
+  // expanded view uses; a bare "Name version" item line stays plain text.
+  const inlineLineClass = (line: InlineLine, tone: string) =>
+    line.isMessage
+      ? `text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${tone}`
+      : `text-xs break-words ${tone}`
+
   // Render the extracted error/warning/success detail lines beneath the summary
   // message. One line per item. Returns null when there is nothing to add.
+  // "FortiClient warning" becomes "FortiClient 7.4.3.4799 warning" when the
+  // payload carries exactly one item and the summary names it. The item line
+  // under the summary is then a repeat, so renderInlineDetails drops it.
+  const singleNamedItem = (event: BundledEvent): InlineLine | null => {
+    if (event.isBundle) return null
+    const { errors, warnings } = extractInlineDetails(fullPayloads[event.id])
+    const lines = [...errors, ...warnings]
+    if (lines.length !== 1 || lines[0].isMessage) return null
+    const first = lines[0].text.split(' ')[0]
+    return (event.message || '').toLowerCase().startsWith(first.toLowerCase()) ? lines[0] : null
+  }
+  const getDisplayMessage = (event: BundledEvent): string => {
+    const message = getEventMessage(event)
+    const item = singleNamedItem(event)
+    if (!item) return message
+    const [name, ...rest] = item.text.split(' ')
+    const version = rest.join(' ')
+    if (!version || message.includes(version)) return message
+    return message.replace(new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i'), `${name} ${version}`)
+  }
+
   const renderInlineDetails = (event: BundledEvent): React.ReactNode => {
-    const { errors, warnings, successes } = extractInlineDetails(fullPayloads[event.id])
+    const extracted = extractInlineDetails(fullPayloads[event.id])
+    // A summary like "FortiClient warning" already names its one item, so a lone
+    // item line under it is a repeat; keep item lines only for 2+ or for messages
+    const promoted = singleNamedItem(event)
+    const trimItems = (lines: InlineLine[]) => (promoted && lines.length === 1 && lines[0].text === promoted.text ? [] : lines)
+    const errors = trimItems(extracted.errors)
+    const warnings = trimItems(extracted.warnings)
+    const successes = extracted.successes
     // Success summaries already spell out a single package, so only expand 2+
     const successLines = successes.length > 1 ? successes : []
     const hasDetails = errors.length > 0 || warnings.length > 0 || successLines.length > 0
@@ -823,12 +870,12 @@ function EventsPageContent() {
       return null
     }
     return (
-      <div className="mt-1 space-y-0.5">
+      <div className="mt-1 space-y-1">
         {errors.map((m, i) => (
-          <div key={`e-${i}`} className="text-xs text-red-700 dark:text-red-300 break-words">{m}</div>
+          <div key={`e-${i}`} className={inlineLineClass(m, 'text-red-700 dark:text-red-300')}>{m.text}</div>
         ))}
         {warnings.map((m, i) => (
-          <div key={`w-${i}`} className="text-xs text-yellow-700 dark:text-yellow-300 break-words">{m}</div>
+          <div key={`w-${i}`} className={inlineLineClass(m, 'text-yellow-700 dark:text-yellow-300')}>{m.text}</div>
         ))}
         {successLines.map((m, i) => (
           <div key={`s-${i}`} className="text-xs text-green-700 dark:text-green-300 break-words">{m}</div>
@@ -1145,7 +1192,7 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const isExpanded = expandedEvent === event.id
+                      const isExpanded = expandedEvents.has(event.id)
                       
                       return (
                         <React.Fragment key={event.id}>
@@ -1153,9 +1200,9 @@ function EventsPageContent() {
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                             onClick={async () => {
                               if (isExpanded) {
-                                setExpandedEvent(null)
+                                collapseEvent(event.id)
                               } else {
-                                setExpandedEvent(event.id)
+                                expandEvent(event.id)
                                 await fetchFullPayload(event.id)
                               }
                             }}
@@ -1187,7 +1234,7 @@ function EventsPageContent() {
                             </td>
                             <td className="px-4 lg:px-6 py-4 align-top">
                               <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getEventMessage(event)}
+                                {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
                             </td>
@@ -1203,9 +1250,9 @@ function EventsPageContent() {
                                 onClick={async (e) => {
                                   e.preventDefault()
                                   if (isExpanded) {
-                                    setExpandedEvent(null)
+                                    collapseEvent(event.id)
                                   } else {
-                                    setExpandedEvent(event.id)
+                                    expandEvent(event.id)
                                     // Fetch full payload when expanding
                                     await fetchFullPayload(event.id)
                                   }
@@ -1246,10 +1293,11 @@ function EventsPageContent() {
                                     {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                                       <LastRunSummary payload={fullPayloads[event.id]} />
                                     )}
+                                    <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                                          {fullPayloads[event.id] ? 'Raw Payload' : 'Raw Payload (from events list)'}
                                         </h4>
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -1535,7 +1583,7 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const isExpanded = expandedEvent === event.id
+                      const isExpanded = expandedEvents.has(event.id)
                       
                       return (
                         <React.Fragment key={event.id}>
@@ -1543,9 +1591,9 @@ function EventsPageContent() {
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                             onClick={async () => {
                               if (isExpanded) {
-                                setExpandedEvent(null)
+                                collapseEvent(event.id)
                               } else {
-                                setExpandedEvent(event.id)
+                                expandEvent(event.id)
                                 await fetchFullPayload(event.id)
                               }
                             }}
@@ -1577,7 +1625,7 @@ function EventsPageContent() {
                             </td>
                             <td className="px-4 py-3 max-w-xs align-top">
                               <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getEventMessage(event)}
+                                {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
                             </td>
@@ -1593,9 +1641,9 @@ function EventsPageContent() {
                                 onClick={async (e) => {
                                   e.preventDefault()
                                   if (isExpanded) {
-                                    setExpandedEvent(null)
+                                    collapseEvent(event.id)
                                   } else {
-                                    setExpandedEvent(event.id)
+                                    expandEvent(event.id)
                                     await fetchFullPayload(event.id)
                                   }
                                 }}
@@ -1623,6 +1671,7 @@ function EventsPageContent() {
                                     {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                                       <LastRunSummary payload={fullPayloads[event.id]} />
                                     )}
+                                    <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1777,7 +1826,7 @@ function EventsPageContent() {
                 </div>
               ) : (
                 currentEvents.map((event) => {
-                const isExpanded = expandedEvent === event.id
+                const isExpanded = expandedEvents.has(event.id)
                 
                 return (
                   <div 
@@ -1785,9 +1834,9 @@ function EventsPageContent() {
                     className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer"
                     onClick={async () => {
                       if (isExpanded) {
-                        setExpandedEvent(null)
+                        collapseEvent(event.id)
                       } else {
-                        setExpandedEvent(event.id)
+                        expandEvent(event.id)
                         await fetchFullPayload(event.id)
                       }
                     }}
@@ -1831,7 +1880,7 @@ function EventsPageContent() {
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
                       <div className="text-sm text-gray-900 dark:text-white break-words">
-                        {getEventMessage(event)}
+                        {getDisplayMessage(event)}
                       </div>
                       {renderInlineDetails(event)}
                     </div>
@@ -1847,9 +1896,9 @@ function EventsPageContent() {
                         onClick={async (e) => {
                           e.preventDefault()
                           if (isExpanded) {
-                            setExpandedEvent(null)
+                            collapseEvent(event.id)
                           } else {
-                            setExpandedEvent(event.id)
+                            expandEvent(event.id)
                             await fetchFullPayload(event.id)
                           }
                         }}
@@ -1890,6 +1939,7 @@ function EventsPageContent() {
                         {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                           <LastRunSummary payload={fullPayloads[event.id]} />
                         )}
+                        <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-medium text-gray-900 dark:text-white">

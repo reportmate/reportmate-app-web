@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '@/src/lib/time'
 import { categorizeDevicesByInstallStatus, getDeviceInstallItems, aggregateStatusMessages, getItemMessage, getItemTimestamp, isErrorItem, isWarningItem, isPendingItem, isSuccessItem, matchesItemStatus, type ItemStatusFilter } from '@/src/hooks/useInstallsData'
+import { runLevelWarnings } from '@/src/lib/installs/status'
 import { calculateDeviceStatus } from '@/src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '@/src/components/widgets/InstallMessages'
 import { CopyButton } from '@/src/components/ui/CopyButton'
@@ -190,7 +191,7 @@ function InstallsPageContent() {
   // Message rows cap their device list; this tracks the ones expanded in place
   const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
 
-  const { setTableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
+  const { setTableContainerRef, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading && !filtersLoading }
   )
@@ -325,7 +326,7 @@ function InstallsPageContent() {
       setLoadingProgress({ current: 0, total: 0 })
       
       // Use a simple indeterminate progress while filters endpoint loads
-      let estimatedTotal = 100  // placeholder for progress bar
+      const estimatedTotal = 100  // placeholder for progress bar
       
       // Start fetching - we'll simulate progress with the actual device count
       let progress = 0
@@ -1264,14 +1265,18 @@ function InstallsPageContent() {
         })
       } else if (itemsStatusFilter === 'warnings') {
         relevantDevices = devicesWithWarnings.filter((device: any) => {
+          const searchLower = searchQuery.toLowerCase()
           const cimianItems = getDeviceInstallItems(device)
-          return cimianItems.some((item: any) => {
+          const itemMatch = cimianItems.some((item: any) => {
             const itemName = (item.itemName || item.name || '').toLowerCase()
             const lastWarning = (item.lastWarning || '').toLowerCase()
-            const searchLower = searchQuery.toLowerCase()
             // Match by item name OR by warning message
             return (itemName === searchLower || lastWarning.includes(searchLower)) && isWarningItem(item)
           })
+          if (itemMatch) return true
+          return runLevelWarnings(device).some(({ itemName, message }) =>
+            (itemName || '').toLowerCase() === searchLower || message.toLowerCase().includes(searchLower)
+          )
         })
       } else if (itemsStatusFilter === 'pending') {
         relevantDevices = devicesWithPending.filter((device: any) => {
@@ -1712,6 +1717,15 @@ function InstallsPageContent() {
           warningItems[itemName].devices.push(device.serialNumber || device.deviceId)
         }
       })
+      // Munki run-level warnings, attributed to the package they name
+      runLevelWarnings(device).forEach(({ itemName }) => {
+        if (!itemName) return
+        if (!warningItems[itemName]) {
+          warningItems[itemName] = { name: itemName, count: 0, devices: [] }
+        }
+        warningItems[itemName].count++
+        warningItems[itemName].devices.push(device.serialNumber || device.deviceId)
+      })
     })
     
     const items = Object.values(warningItems)
@@ -2086,9 +2100,9 @@ function InstallsPageContent() {
                   </div>
                 </div>
 
-                {/* Skeleton Widgets Content - 3 Tables Row */}
+                {/* Skeleton Widgets Content - Errors, Warnings, Pending, Installed in one row */}
                 <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-                  <div className="px-6 py-4 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  <div className="px-6 py-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                     {/* Skeleton Items with Errors Table */}
                     <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                       <div className="flex items-center justify-between mb-4">
@@ -2140,6 +2154,25 @@ function InstallsPageContent() {
                         {[...Array(4)].map((_, i) => (
                           <div key={i} className="flex justify-between items-center py-1">
                             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Skeleton Items Installed Table */}
+                    <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-green-200 dark:bg-green-900/50 rounded-full"></div>
+                          <div className="h-5 bg-gray-200 dark:bg-gray-600 rounded w-28"></div>
+                        </div>
+                        <div className="h-5 bg-green-100 dark:bg-green-900/30 rounded w-14"></div>
+                      </div>
+                      <div className="space-y-2">
+                        {[...Array(4)].map((_, i) => (
+                          <div key={i} className="flex justify-between items-center py-1">
+                            <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-24"></div>
                             <div className="h-4 bg-gray-200 dark:bg-gray-600 rounded w-8"></div>
                           </div>
                         ))}
@@ -2355,8 +2388,7 @@ function InstallsPageContent() {
 
             {/* Widgets Accordion - Collapsible section for Items with Errors/Warnings/Pending and Config Widgets */}
             {isConfigReport && !isGeneratingReport && (
-              itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 || itemsWithSuccess.length > 0 ||
-              (itemsStatusFilter === 'all' && configReportData.length > 0)
+              configReportData.length > 0
             ) && (
             <div className="border-b border-gray-200 dark:border-gray-700">
               {/* Widgets Accordion Header */}
@@ -2383,10 +2415,13 @@ function InstallsPageContent() {
               <CollapsibleSection expanded={effectiveWidgetsExpanded} maxHeight="60vh">
               <div className="bg-white dark:bg-gray-800">
             {/* Items Tables - Errors, Warnings, Pending (Above config widgets) - Only show in config report mode */}
-            {itemsStatusFilter === 'all' && (itemsWithErrors.length > 0 || itemsWithWarnings.length > 0 || itemsWithPending.length > 0 || itemsWithSuccess.length > 0) && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
+            {itemsStatusFilter === 'all' && configReportData.length > 0 && !selectedMunkiVersion && !selectedCimianVersion && !selectedManifest && !selectedSoftwareRepo && (
               <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
                 (() => {
-                  const shown = [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0, itemsWithSuccess.length > 0].filter(Boolean).length
+                  // Errors and Warnings are the point of the page, so they always
+                  // have a box, even when empty; Pending and Installed only appear
+                  // when they have something to list
+                  const shown = [true, true, itemsWithPending.length > 0, itemsWithSuccess.length > 0].filter(Boolean).length
                   // One row of four; the tables are table-fixed so the item
                   // name truncates instead of pushing Count out of the box
                   if (shown >= 4) return 'md:grid-cols-2 lg:grid-cols-4'
@@ -2396,8 +2431,8 @@ function InstallsPageContent() {
                 })()
               }`}>
                 
-                {/* Items with Errors Table - Only show if has errors */}
-                {itemsWithErrors.length > 0 && (
+                {/* Items with Errors Table - always shown */}
+                {(
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
@@ -2500,6 +2535,11 @@ function InstallsPageContent() {
                               </tr>
                             )})
                           }
+                                                  {itemsWithErrors.length === 0 && (
+                            <tr>
+                              <td colSpan={2} className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No items with errors</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     )}
@@ -2507,8 +2547,8 @@ function InstallsPageContent() {
                 </div>
                 )}
 
-                {/* Items with Warnings Table - Only show if has warnings */}
-                {itemsWithWarnings.length > 0 && (
+                {/* Items with Warnings Table - always shown */}
+                {(
                 <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
                   <div 
                     className="flex items-center justify-between mb-4 cursor-pointer hover:opacity-80 transition-opacity"
@@ -2611,6 +2651,11 @@ function InstallsPageContent() {
                               </tr>
                             )})
                           }
+                                                  {itemsWithWarnings.length === 0 && (
+                            <tr>
+                              <td colSpan={2} className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">No items with warnings</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     )}
@@ -3469,38 +3514,12 @@ function InstallsPageContent() {
             )
           })()}
 
-          {/* Installs report-builder accordion (page-specific) */}
-          {!filtersLoading && (
+          {/* Report-builder item picker (page-specific); the status filters that
+              used to live in this accordion sit beside the search bar now */}
+          {!filtersLoading && isGeneratingReport && (
             <div className="border-b border-gray-200 dark:border-gray-700">
-              {/* Accordion Header - Hide button when in generate report mode */}
-              {!isGeneratingReport && (
-              <button
-                onClick={() => setFiltersExpanded(!filtersExpanded)}
-                className="w-full px-6 py-3 flex items-center justify-between bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Installs
-                  </span>
-                  {(selectedInstalls.length > 0 || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedRooms.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0) && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300">
-                      {selectedInstalls.length + selectedUsages.length + selectedCatalogs.length + selectedRooms.length + selectedFleets.length + selectedAreas.length + selectedPlatforms.length} active
-                    </span>
-                  )}
-                </div>
-                <svg 
-                  className={`w-5 h-5 text-gray-500 dark:text-gray-400 transition-transform ${effectiveFiltersExpanded ? 'rotate-90' : 'rotate-180'}`} 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-              )}
-
               {/* Filter Clouds Section - Show when expanded OR in generate report mode */}
-              <CollapsibleSection expanded={effectiveFiltersExpanded || isGeneratingReport}>
+              <CollapsibleSection expanded={isGeneratingReport}>
             <div className={`px-6 py-4 bg-white dark:bg-gray-800 ${isGeneratingReport && !loading && installs.length === 0 && !hasGeneratedReport ? 'rounded-b-xl' : ''}`}>
               <div className="space-y-4">
 
@@ -3551,129 +3570,6 @@ function InstallsPageContent() {
                 </div>
                 )}
 
-                {/* Device Status and Install Status Filters - Only show after report is generated */}
-                {!isGeneratingReport && (installs.length > 0 || (isConfigReport && configReportData.length > 0)) && (
-                <div className="flex flex-col md:flex-row gap-8 pt-4">
-                  {/* Device Status Filter */}
-                  <div className="pb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Device Status
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      <button
-                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'active' ? 'all' : 'active')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          deviceStatusFilter === 'active'
-                            ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        Active ({deviceStatusCounts.active})
-                      </button>
-                      <button
-                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'stale' ? 'all' : 'stale')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          deviceStatusFilter === 'stale'
-                            ? 'bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900 dark:text-yellow-200 dark:border-yellow-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
-                        Stale ({deviceStatusCounts.stale})
-                      </button>
-                      <button
-                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === 'missing' ? 'all' : 'missing')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          deviceStatusFilter === 'missing'
-                            ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                        Missing ({deviceStatusCounts.missing})
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Install Status Filter - Hide when items widget filter (errors/warnings/pending) is active */}
-                  {itemsStatusFilter === 'all' && (
-                  <div className="pb-2">
-                    <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Install Status
-                    </h3>
-                    <div className="flex flex-wrap gap-1">
-                      <button
-                        onClick={() => setInstallStatusFilter(installStatusFilter === 'installed' ? 'all' : 'installed')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          installStatusFilter === 'installed'
-                            ? 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900 dark:text-green-200 dark:border-green-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <svg className="w-3 h-3 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Installed ({installStatusCounts.installed})
-                      </button>
-                      <button
-                        onClick={() => setInstallStatusFilter(installStatusFilter === 'pending' ? 'all' : 'pending')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          installStatusFilter === 'pending'
-                            ? 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900 dark:text-cyan-200 dark:border-cyan-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <svg className="w-3 h-3 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Pending ({installStatusCounts.pending})
-                      </button>
-                      <button
-                        onClick={() => setInstallStatusFilter(installStatusFilter === 'warnings' ? 'all' : 'warnings')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          installStatusFilter === 'warnings'
-                            ? 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900 dark:text-amber-200 dark:border-amber-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <svg className="w-3 h-3 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                        Warnings ({installStatusCounts.warnings})
-                      </button>
-                      <button
-                        onClick={() => setInstallStatusFilter(installStatusFilter === 'errors' ? 'all' : 'errors')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          installStatusFilter === 'errors'
-                            ? 'bg-red-100 text-red-800 border-red-300 dark:bg-red-900 dark:text-red-200 dark:border-red-600'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Errors ({installStatusCounts.errors})
-                      </button>
-                      <button
-                        onClick={() => setInstallStatusFilter(installStatusFilter === 'removed' ? 'all' : 'removed')}
-                        className={`px-3 py-1.5 text-xs rounded-full border transition-colors flex items-center gap-1.5 ${
-                          installStatusFilter === 'removed'
-                            ? 'bg-gray-200 text-gray-800 border-gray-400 dark:bg-gray-600 dark:text-gray-200 dark:border-gray-500'
-                            : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200 dark:bg-gray-600 dark:text-gray-300 dark:border-gray-500 dark:hover:bg-gray-500'
-                        }`}
-                      >
-                        <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Removed ({installStatusCounts.removed})
-                      </button>
-                    </div>
-                  </div>
-                  )}
-                </div>
-                )}
-
               </div>
             </div>
           </CollapsibleSection>
@@ -3707,6 +3603,48 @@ function InstallsPageContent() {
                     </button>
                   )}
                 </div>
+                {/* Device and install status filters. A pill is coloured by what it
+                    means and goes solid when active, matching the status chips on
+                    the device Installs tab. */}
+                {(installs.length > 0 || (isConfigReport && configReportData.length > 0)) && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {([
+                      { value: 'active', label: 'Active', count: deviceStatusCounts.active, tone: 'neutral' },
+                      { value: 'stale', label: 'Stale', count: deviceStatusCounts.stale, tone: 'neutral' },
+                      { value: 'missing', label: 'Missing', count: deviceStatusCounts.missing, tone: 'neutral' },
+                    ] as const).map(pill => (
+                      <button
+                        key={pill.value}
+                        onClick={() => setDeviceStatusFilter(deviceStatusFilter === pill.value ? 'all' : pill.value)}
+                        aria-pressed={deviceStatusFilter === pill.value}
+                        className={statusPillClass(pill.tone, deviceStatusFilter === pill.value)}
+                      >
+                        {pill.label} - {pill.count}
+                      </button>
+                    ))}
+                    {itemsStatusFilter === 'all' && (
+                      <>
+                        <span className="w-px h-5 bg-gray-200 dark:bg-gray-700 mx-1" aria-hidden="true"></span>
+                        {([
+                          { value: 'errors', label: 'Errors', count: installStatusCounts.errors, tone: 'red' },
+                          { value: 'warnings', label: 'Warnings', count: installStatusCounts.warnings, tone: 'amber' },
+                          { value: 'pending', label: 'Pending', count: installStatusCounts.pending, tone: 'cyan' },
+                          { value: 'installed', label: 'Installed', count: installStatusCounts.installed, tone: 'green' },
+                          { value: 'removed', label: 'Removed', count: installStatusCounts.removed, tone: 'purple' },
+                        ] as const).map(pill => (
+                          <button
+                            key={pill.value}
+                            onClick={() => setInstallStatusFilter(installStatusFilter === pill.value ? 'all' : pill.value)}
+                            aria-pressed={installStatusFilter === pill.value}
+                            className={statusPillClass(pill.tone, installStatusFilter === pill.value)}
+                          >
+                            {pill.label} - {pill.count}
+                          </button>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
                 {/* Clear Filter(s) Button - Show when any filter is active */}
                 {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
                   <button
@@ -4413,6 +4351,22 @@ function InstallsPageContent() {
       </div>
     </div>
   )
+}
+
+// Status filter pills. Install statuses take the same soft tones as the status
+// chips on the device Installs tab; device statuses stay neutral. Active is one
+// shade deeper plus a ring, never a solid fill.
+const STATUS_PILL_TONES = {
+  green: ['bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300 hover:bg-green-200 dark:hover:bg-green-900/60', 'bg-green-200 text-green-900 ring-1 ring-green-400 dark:bg-green-900/70 dark:text-green-100 dark:ring-green-600'],
+  amber: ['bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/60', 'bg-yellow-200 text-yellow-900 ring-1 ring-yellow-400 dark:bg-yellow-900/70 dark:text-yellow-100 dark:ring-yellow-600'],
+  red: ['bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/60', 'bg-red-200 text-red-900 ring-1 ring-red-400 dark:bg-red-900/70 dark:text-red-100 dark:ring-red-600'],
+  cyan: ['bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300 hover:bg-cyan-200 dark:hover:bg-cyan-900/60', 'bg-cyan-200 text-cyan-900 ring-1 ring-cyan-400 dark:bg-cyan-900/70 dark:text-cyan-100 dark:ring-cyan-600'],
+  purple: ['bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300 hover:bg-purple-200 dark:hover:bg-purple-900/60', 'bg-purple-200 text-purple-900 ring-1 ring-purple-400 dark:bg-purple-900/70 dark:text-purple-100 dark:ring-purple-600'],
+  neutral: ['bg-white text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700', 'bg-gray-200 text-gray-900 border border-gray-400 dark:bg-gray-600 dark:text-white dark:border-gray-500'],
+} as const
+
+function statusPillClass(tone: keyof typeof STATUS_PILL_TONES, active: boolean): string {
+  return `px-3 py-1 text-sm font-medium rounded-full whitespace-nowrap transition-colors ${STATUS_PILL_TONES[tone][active ? 1 : 0]}`
 }
 
 export default function InstallsPage() {
