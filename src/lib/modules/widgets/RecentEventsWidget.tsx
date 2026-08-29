@@ -9,6 +9,7 @@ import { formatRelativeTime } from '../../time'
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from '../../eventBundling'
 import { SlidersHorizontal } from 'lucide-react'
 import { EventDetails } from './EventDetails'
+import { EventInlineLines } from './EventInlineLines'
 import { getEventModuleId, getEventDeviceHrefSuffix } from '../../eventLinks'
 
 interface RecentEventsTableProps {
@@ -208,6 +209,8 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
   // dashboard holds up to 1000 events in state, and mounting a row for every
   // one of them puts ~1000 <tr>s in a widget that shows a dozen at a time.
   const MAX_RENDERED_EVENTS = 250
+  // Payloads are fetched for the rows anyone will scroll to; the rest keep their summary
+  const AUTO_FETCH_ROWS = 60
   const filteredEvents = useMemo(() => {
     const visible = hiddenTypes.size === 0
       ? bundledEvents
@@ -579,7 +582,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                           </p>
                         </td>
                       </tr>
-                    ) : filteredEvents.map((bundledEvent: BundledEvent) => {
+                    ) : filteredEvents.map((bundledEvent: BundledEvent, index: number) => {
                       const isExpanded = expandedEvents.has(bundledEvent.id)
 
                       return (
@@ -618,14 +621,18 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                               </Link>
                             </td>
                             <td className="px-3 py-2.5 hidden md:table-cell">
-                              <div className="text-sm text-gray-900 dark:text-white truncate">
-                                {bundledEvent.message}
-                                {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
-                                    ({bundledEvent.bundledKinds.join(', ')})
-                                  </span>
-                                )}
-                              </div>
+                              <EventInlineLines
+                                eventId={String(bundledEvent.id)}
+                                kind={bundledEvent.kind}
+                                summary={bundledEvent.message}
+                                isBundle={bundledEvent.isBundle}
+                                autoFetch={index < AUTO_FETCH_ROWS}
+                              />
+                              {bundledEvent.isBundle && bundledEvent.bundledKinds.length > 1 && (
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  ({bundledEvent.bundledKinds.join(', ')})
+                                </span>
+                              )}
                             </td>
                             <td className="w-44 px-3 py-2.5">
                               <div className="text-sm text-gray-600 dark:text-gray-400">

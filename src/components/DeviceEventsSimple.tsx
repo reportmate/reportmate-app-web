@@ -3,6 +3,7 @@ import { normalizeEventKind, severityToBadgeClasses } from '../lib/events/normal
 import { CopyButton } from './ui/CopyButton';
 import { LastRunSummary } from './LastRunSummary';
 import { EventDetails } from '../lib/modules/widgets/EventDetails';
+import { EventInlineLines } from '../lib/modules/widgets/EventInlineLines';
 import { Search, X } from 'lucide-react';
 
 interface EventDto {
@@ -587,9 +588,13 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   </span>
                   
                   {/* Event Message - Hidden on mobile (sm and below) */}
-                  <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
-                    {getEventMessage(ev)}
-                  </span>
+                  <EventInlineLines
+                    eventId={String(ev.id)}
+                    kind={ev.kind || ''}
+                    summary={getEventMessage(ev)}
+                    isBundle={Boolean(ev.isBundle)}
+                    className="flex-1 min-w-0 hidden md:block font-medium"
+                  />
                   
                   {/* Timestamp */}
                   <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">

@@ -8,21 +8,10 @@
 
 import React, { useEffect, useState } from 'react'
 import { summarizeEventPayload, type EventDetailSummary } from '../../eventPayloadDetails'
+import { fetchEventPayload } from '../../eventInlineDetails'
 
 // Bundles are routine data-collection groupings; a handful of fetches covers them.
 const MAX_BUNDLE_FETCHES = 8
-
-const payloadCache = new Map<string, unknown>()
-
-async function fetchPayload(eventId: string): Promise<unknown> {
-  if (payloadCache.has(eventId)) return payloadCache.get(eventId)
-  const response = await fetch(`/api/events/${encodeURIComponent(eventId)}/payload`)
-  if (!response.ok) throw new Error(`Payload unavailable (${response.status})`)
-  const body = await response.json()
-  const payload = body?.payload ?? body
-  payloadCache.set(eventId, payload)
-  return payload
-}
 
 function mergeSummaries(summaries: EventDetailSummary[]): EventDetailSummary {
   const modules = new Set<string>()
@@ -92,7 +81,7 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
     setError(null)
     setSummary(null)
 
-    Promise.all(idKey.split(',').slice(0, MAX_BUNDLE_FETCHES).map(fetchPayload))
+    Promise.all(idKey.split(',').slice(0, MAX_BUNDLE_FETCHES).map(fetchEventPayload))
       .then(payloads => {
         if (cancelled) return
         setSummary(mergeSummaries(payloads.map(summarizeEventPayload)))
