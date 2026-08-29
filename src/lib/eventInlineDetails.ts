@@ -47,7 +47,7 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
       } else if (item && typeof item === 'object') {
         const name = item.displayName || item.name || ''
         const version = item.version ? ` ${item.version}` : ''
-        const detail = item.error || item.warning || ''
+        const detail = item.error || item.warning || item.message || ''
         const line = detail ? (name ? `${name}${version}: ${detail}` : detail) : `${name}${version}`
         if (line) target.push({ text: line, isMessage: Boolean(detail) })
       }

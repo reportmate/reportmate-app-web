@@ -103,7 +103,7 @@ function normalizeItem(raw: unknown): EventDetailItem | null {
   const name = String(rec.name ?? rec.displayName ?? rec.display_name ?? rec.item_name ?? '').trim()
   if (!name) return null
   const version = rec.version ?? rec.installedVersion ?? rec.installed_version
-  const detail = rec.error ?? rec.warning ?? rec.reason ?? rec.pending_reason
+  const detail = rec.error ?? rec.warning ?? rec.message ?? rec.reason ?? rec.pending_reason
   return {
     name,
     version: version ? String(version) : undefined,
