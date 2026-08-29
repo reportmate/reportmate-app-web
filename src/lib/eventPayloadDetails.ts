@@ -61,6 +61,21 @@ const ITEM_GROUPS: Array<{ key: string; label: string; tone: EventDetailGroup['t
   { key: 'failed_items', label: 'Failed', tone: 'error' },
 ]
 
+// Keys that carry structure or context rather than a package. Anything else with a
+// string value in a Munki success payload is a "package name -> version" pair: the
+// Mac client sends "13 packages installed" as exactly that flat map, so without
+// this the accordion had nothing to list under the count.
+const RESERVED_KEYS = new Set([
+  'count', 'errors', 'warnings', 'error_items', 'warning_items', 'failed_items',
+  'error_messages', 'warning_messages', 'module_status', 'warning_count', 'error_count',
+  'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
+  'items', 'action', 'duration_seconds', 'item_warning_count', 'operational_warning_count',
+  'operational_warnings', 'session_installs', 'session_updates', 'session_removals',
+  'collection_type', 'collectionType', 'operating_system', 'display_version', 'version',
+  'uptime', 'recommendation', 'previous_boot_time', 'current_boot_time',
+  'previous_version', 'current_version', 'newlyInstalledItems', 'installed_items', 'removed_items',
+])
+
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 
@@ -88,7 +103,7 @@ function normalizeItem(raw: unknown): EventDetailItem | null {
   const name = String(rec.name ?? rec.displayName ?? rec.display_name ?? rec.item_name ?? '').trim()
   if (!name) return null
   const version = rec.version ?? rec.installedVersion ?? rec.installed_version
-  const detail = rec.error ?? rec.warning ?? rec.reason ?? rec.pending_reason
+  const detail = rec.error ?? rec.warning ?? rec.message ?? rec.reason ?? rec.pending_reason
   return {
     name,
     version: version ? String(version) : undefined,
@@ -126,13 +141,24 @@ export function summarizeEventPayload(payload: unknown): EventDetailSummary {
     const items = raw.map(normalizeItem).filter((i): i is EventDetailItem => i !== null)
     if (items.length) groups.push({ key, label, tone, items })
   }
+  const flatInstalled: EventDetailItem[] = []
+  for (const [key, value] of Object.entries(p)) {
+    if (RESERVED_KEYS.has(key) || typeof value !== 'string' || !value.trim()) continue
+    // A package pair is "Name": "version"; anything named like a counter
+    // (moduleCount) or whose value is not version-shaped is context, not a package
+    if (/count$/i.test(key) || !/^\d/.test(value.trim())) continue
+    flatInstalled.push({ name: key, version: value.trim() })
+  }
+  if (flatInstalled.length && !groups.some(g => g.key === 'installed_items')) {
+    groups.push({ key: 'installed_items', label: 'Installed', tone: 'success', items: flatInstalled })
+  }
 
   const messages: EventDetailSummary['messages'] = []
   let suppressedMessageCount = 0
   for (const [key, tone] of [
     ['errors', 'error'], ['error_messages', 'error'],
     ['warnings', 'warning'], ['warning_messages', 'warning'],
-    ['recommendation', 'neutral'],
+    ['recommendation', 'warning'],
   ] as const) {
     const { kept, suppressed } = splitMessages(p[key])
     suppressedMessageCount += suppressed

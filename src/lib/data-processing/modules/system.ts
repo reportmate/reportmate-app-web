@@ -269,7 +269,8 @@ export function extractSystem(deviceModules: any): SystemInfo {
         description: service.description || '',
         status: service.status || service.state || 'Unknown',
         startType: service.startType || service.start_type || '',
-        start_type: service.start_type || service.startType || ''
+        start_type: service.start_type || service.startType || '',
+        path: service.path || service.binaryPath || service.binary_path || ''
       }
     })
     

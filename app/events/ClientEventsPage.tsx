@@ -11,6 +11,8 @@ import { EventsPageSkeleton } from "../../src/components/skeleton/EventsPageSkel
 import { bundleEvents, formatPayloadPreview, type FleetEvent, type BundledEvent } from "../../src/lib/eventBundling"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { LastRunSummary } from "../../src/components/LastRunSummary"
+import { EventDetails } from "../../src/lib/modules/widgets/EventDetails"
+import { extractInlineDetails, inlineLineClass } from "../../src/lib/eventInlineDetails"
 import { usePlatformFilterSafe, normalizePlatform } from "../../src/providers/PlatformFilterProvider"
 import { Search, X } from 'lucide-react'
 
@@ -92,23 +94,23 @@ const isBundleId = (id: string | number): boolean => {
 function getFilterStyles(key: string, isActive: boolean) {
   const baseColors: Record<string, { active: string; inactive: string }> = {
     success: {
-      active: 'bg-green-700 text-white border-green-800 shadow-md dark:bg-green-600 dark:border-green-700',
+      active: 'bg-green-200 text-green-900 border-green-400 ring-1 ring-green-400 dark:bg-green-900/70 dark:text-green-100 dark:border-green-600 dark:ring-green-600',
       inactive: 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200 hover:border-green-300 dark:bg-green-900/40 dark:text-green-400 dark:border-green-800 dark:hover:bg-green-900/60'
     },
     warning: {
-      active: 'bg-yellow-600 text-white border-yellow-700 shadow-md dark:bg-yellow-500 dark:border-yellow-600',
+      active: 'bg-yellow-200 text-yellow-900 border-yellow-400 ring-1 ring-yellow-400 dark:bg-yellow-900/70 dark:text-yellow-100 dark:border-yellow-600 dark:ring-yellow-600',
       inactive: 'bg-yellow-100 text-yellow-700 border-yellow-200 hover:bg-yellow-200 hover:border-yellow-300 dark:bg-yellow-900/40 dark:text-yellow-400 dark:border-yellow-800 dark:hover:bg-yellow-900/60'
     },
     error: {
-      active: 'bg-red-700 text-white border-red-800 shadow-md dark:bg-red-600 dark:border-red-700',
+      active: 'bg-red-200 text-red-900 border-red-400 ring-1 ring-red-400 dark:bg-red-900/70 dark:text-red-100 dark:border-red-600 dark:ring-red-600',
       inactive: 'bg-red-100 text-red-700 border-red-200 hover:bg-red-200 hover:border-red-300 dark:bg-red-900/40 dark:text-red-400 dark:border-red-800 dark:hover:bg-red-900/60'
     },
     info: {
-      active: 'bg-blue-700 text-white border-blue-800 shadow-md dark:bg-blue-600 dark:border-blue-700',
+      active: 'bg-blue-200 text-blue-900 border-blue-400 ring-1 ring-blue-400 dark:bg-blue-900/70 dark:text-blue-100 dark:border-blue-600 dark:ring-blue-600',
       inactive: 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 hover:border-blue-300 dark:bg-blue-900/40 dark:text-blue-400 dark:border-blue-800 dark:hover:bg-blue-900/60'
     },
     system: {
-      active: 'bg-purple-700 text-white border-purple-800 shadow-md dark:bg-purple-600 dark:border-purple-700',
+      active: 'bg-purple-200 text-purple-900 border-purple-400 ring-1 ring-purple-400 dark:bg-purple-900/70 dark:text-purple-100 dark:border-purple-600 dark:ring-purple-600',
       inactive: 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200 hover:border-purple-300 dark:bg-purple-900/40 dark:text-purple-400 dark:border-purple-800 dark:hover:bg-purple-900/60'
     },
   }
@@ -136,101 +138,35 @@ const getEventMessage = (event: BundledEvent): string => {
   return formatPayloadPreview(originalEvent.payload);
 }
 
-// Payload keys that carry structure/metadata rather than an installed package.
-// Everything else with a string value in a success payload is a "name → version" pair.
-const RESERVED_PAYLOAD_KEYS = new Set([
-  'count', 'errors', 'warnings', 'error_items', 'warning_items', 'failed_items',
-  'error_messages', 'warning_messages', 'module_status', 'warning_count', 'error_count',
-  'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
-  'items', 'action', 'duration_seconds', 'item_warning_count', 'operational_warning_count',
-  'operational_warnings', 'session_installs', 'session_updates', 'session_removals',
-])
-
-// Extract human-readable detail lines from a loaded event payload so they can be
-// shown inline in the Message column without expanding the raw payload.
-// Handles the shapes ReportMate actually emits:
-//   Munki:   { errors: "a; b", warnings: "c; d" }         (semicolon-joined string)
-//   Cimian:  { warning_items: ["Name"], error_items: [] }  (array of names)
-//   Installs:{ failed_items: [{ displayName, error }] }    (array of objects)
-//   Generic: { error_messages: [...], warning_messages: [...] }
-//   Success: { "Managed Safari": "15.6.1", "ZoomPrefs": "14.1" }  (name → version)
-//   Cimian:  { items: [{ name: "Chrome", version: "151.0.7922.170" }] }  (array of objects)
-const extractInlineDetails = (payload: unknown): { errors: string[]; warnings: string[]; successes: string[] } => {
-  const errors: string[] = []
-  const warnings: string[] = []
-  const successes: string[] = []
-  if (!payload || typeof payload !== 'object') return { errors, warnings, successes }
-  const p = payload as Record<string, any>
-
-  const pushString = (target: string[], val: unknown) => {
-    if (typeof val === 'string' && val.trim()) {
-      val.split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push(s))
-    }
-  }
-  const pushItems = (target: string[], val: unknown) => {
-    if (!Array.isArray(val)) return
-    for (const item of val) {
-      if (typeof item === 'string') {
-        if (item.trim()) target.push(item.trim())
-      } else if (item && typeof item === 'object') {
-        const name = item.displayName || item.name || ''
-        const detail = item.error || item.warning || ''
-        const line = detail ? (name ? `${name}: ${detail}` : detail) : name
-        if (line) target.push(line)
-      }
-    }
-  }
-
-  // The Windows installs collector sends its success items as an array of
-  // { name, version } objects rather than a flat map, and always includes them
-  // even when the summary message is a count. Read them so a multi-package run
-  // can still list what it installed.
-  if (Array.isArray(p.items)) {
-    for (const item of p.items) {
-      if (typeof item === 'string') {
-        if (item.trim()) successes.push(item.trim())
-      } else if (item && typeof item === 'object') {
-        const name = String(item.displayName || item.name || '').trim()
-        const version = String(item.version || '').trim()
-        if (name) successes.push(version ? `${name} ${version}` : name)
-      }
-    }
-  }
-
-  pushString(errors, p.errors)
-  pushString(warnings, p.warnings)
-  pushItems(errors, p.error_messages)
-  pushItems(warnings, p.warning_messages)
-  pushItems(errors, p.error_items)
-  pushItems(warnings, p.warning_items)
-  pushItems(errors, p.failed_items)
-
-  // Success payloads are a flat "package name → version" map — one line each.
-  for (const [key, value] of Object.entries(p)) {
-    if (RESERVED_PAYLOAD_KEYS.has(key)) continue
-    if (typeof value === 'string' && value.trim()) {
-      successes.push(`${key} ${value.trim()}`)
-    }
-  }
-
-  return {
-    errors: Array.from(new Set(errors)),
-    warnings: Array.from(new Set(warnings)),
-    successes: Array.from(new Set(successes)),
-  }
-}
 
 function EventsPageContent() {
   const [events, setEvents] = useState<Event[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Multi-select filters: success, warning, error, system active by default; info off
+  // Multi-select filters: success, warning, error on by default; system (the
+  // reboot log) and info (collection chatter) are opted into
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
-    () => new Set(['success', 'warning', 'error', 'system'])
+    () => new Set(['success', 'warning', 'error'])
   )
   const [searchQuery, setSearchQuery] = useState('')
-  const [expandedEvent, setExpandedEvent] = useState<string | null>(null)
+  // Success, Warnings and Errors combine. System and Info are solo views: the
+  // first click shows only that kind, the second returns to the default set.
+  const DEFAULT_KINDS = ['success', 'warning', 'error']
+  const SOLO_KINDS = new Set(['system', 'info'])
+  const toggleKindFilter = (key: string) => setActiveFilters(prev => {
+    if (SOLO_KINDS.has(key)) {
+      return prev.has(key) && prev.size === 1 ? new Set(DEFAULT_KINDS) : new Set([key])
+    }
+    const next = new Set([...prev].filter(k => !SOLO_KINDS.has(k)))
+    if (next.has(key)) next.delete(key)
+    else next.add(key)
+    return next
+  })
+  // Several rows can be open at once; a Set of ids rather than a single id
+  const [expandedEvents, setExpandedEvents] = useState<Set<string>>(() => new Set())
+  const collapseEvent = (id: string) => setExpandedEvents(prev => { const next = new Set(prev); next.delete(id); return next })
+  const expandEvent = (id: string) => setExpandedEvents(prev => new Set(prev).add(id))
   // Device name map removed - events API now includes deviceName and assetTag directly
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({})
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set())
@@ -241,7 +177,7 @@ function EventsPageContent() {
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Ref for infinite scroll sentinel
-  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const _loadMoreRef = useRef<HTMLDivElement>(null)
   // Refs for scroll containers (used by scroll-based infinite scroll)
   const desktopScrollRef = useRef<HTMLDivElement>(null)
   const tabletScrollRef = useRef<HTMLDivElement>(null)
@@ -809,13 +745,30 @@ function EventsPageContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoFetchKey])
 
+  // A run message (a sentence from the client) gets the same mono chip the
+  // expanded view uses; a bare "Name version" item line stays plain text.
   // Render the extracted error/warning/success detail lines beneath the summary
   // message. One line per item. Returns null when there is nothing to add.
-  const renderInlineDetails = (event: BundledEvent): React.ReactNode => {
+  // The row shows the items themselves, not a count of them: "4 warnings" or
+  // "2 packages installed" is replaced by the list once the payload is in.
+  // The summary stays only while loading, or when the payload has no items.
+  const inlineLines = (event: BundledEvent) => {
     const { errors, warnings, successes } = extractInlineDetails(fullPayloads[event.id])
-    // Success summaries already spell out a single package, so only expand 2+
-    const successLines = successes.length > 1 ? successes : []
-    const hasDetails = errors.length > 0 || warnings.length > 0 || successLines.length > 0
+    return { errors, warnings, successes, hasDetails: errors.length > 0 || warnings.length > 0 || successes.length > 0 }
+  }
+  // A count summary takes its kind's colour, like the item lines it stands in for
+  const summaryToneClass = (kind: string) => ({
+    success: 'text-green-700 dark:text-green-300',
+    warning: 'text-yellow-700 dark:text-yellow-300',
+    error: 'text-red-700 dark:text-red-300',
+  } as Record<string, string>)[(kind || '').toLowerCase()] || 'text-gray-900 dark:text-white'
+
+  const getDisplayMessage = (event: BundledEvent): string | null =>
+    inlineLines(event).hasDetails ? null : getEventMessage(event)
+
+  const renderInlineDetails = (event: BundledEvent): React.ReactNode => {
+    const { errors, warnings, successes, hasDetails } = inlineLines(event)
+    const successLines = successes
     if (!hasDetails) {
       if (shouldAutoFetch(event) && loadingPayloads.has(event.id)) {
         return <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Loading details…</div>
@@ -823,15 +776,15 @@ function EventsPageContent() {
       return null
     }
     return (
-      <div className="mt-1 space-y-0.5">
+      <div className="space-y-1">
         {errors.map((m, i) => (
-          <div key={`e-${i}`} className="text-xs text-red-700 dark:text-red-300 break-words">{m}</div>
+          <div key={`e-${i}`} className={inlineLineClass(m, 'text-red-700 dark:text-red-300')}>{m.text}</div>
         ))}
         {warnings.map((m, i) => (
-          <div key={`w-${i}`} className="text-xs text-yellow-700 dark:text-yellow-300 break-words">{m}</div>
+          <div key={`w-${i}`} className={inlineLineClass(m, 'text-yellow-700 dark:text-yellow-300')}>{m.text}</div>
         ))}
         {successLines.map((m, i) => (
-          <div key={`s-${i}`} className="text-xs text-green-700 dark:text-green-300 break-words">{m}</div>
+          <div key={`s-${i}`} className="text-sm text-green-700 dark:text-green-300 break-words">{m}</div>
         ))}
       </div>
     )
@@ -1068,12 +1021,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center justify-center gap-2 px-3 py-1.5 border rounded-lg text-sm font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -1095,12 +1043,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${getFilterStyles(filter.key, isActive)}`}
                               >
                                 {getStatusIcon(filter.key)}
@@ -1145,7 +1088,7 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const isExpanded = expandedEvent === event.id
+                      const isExpanded = expandedEvents.has(event.id)
                       
                       return (
                         <React.Fragment key={event.id}>
@@ -1153,9 +1096,9 @@ function EventsPageContent() {
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                             onClick={async () => {
                               if (isExpanded) {
-                                setExpandedEvent(null)
+                                collapseEvent(event.id)
                               } else {
-                                setExpandedEvent(event.id)
+                                expandEvent(event.id)
                                 await fetchFullPayload(event.id)
                               }
                             }}
@@ -1169,7 +1112,7 @@ function EventsPageContent() {
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
-                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                  className="font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -1186,8 +1129,8 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-4 lg:px-6 py-4 align-top">
-                              <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getEventMessage(event)}
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
                             </td>
@@ -1203,9 +1146,9 @@ function EventsPageContent() {
                                 onClick={async (e) => {
                                   e.preventDefault()
                                   if (isExpanded) {
-                                    setExpandedEvent(null)
+                                    collapseEvent(event.id)
                                   } else {
-                                    setExpandedEvent(event.id)
+                                    expandEvent(event.id)
                                     // Fetch full payload when expanding
                                     await fetchFullPayload(event.id)
                                   }
@@ -1246,10 +1189,11 @@ function EventsPageContent() {
                                     {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                                       <LastRunSummary payload={fullPayloads[event.id]} />
                                     )}
+                                    <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                                          {fullPayloads[event.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                                          {fullPayloads[event.id] ? 'Raw Payload' : 'Raw Payload (from events list)'}
                                         </h4>
                                       </div>
                                       <div className="flex items-center gap-2">
@@ -1426,12 +1370,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1462,12 +1401,7 @@ function EventsPageContent() {
                             return (
                               <button
                                 key={filter.key}
-                                onClick={() => setActiveFilters(prev => {
-                                  const next = new Set(prev)
-                                  if (next.has(filter.key)) next.delete(filter.key)
-                                  else next.add(filter.key)
-                                  return next
-                                })}
+                                onClick={() => toggleKindFilter(filter.key)}
                                 className={`flex items-center gap-1 px-2 py-1 border rounded text-xs font-medium transition-colors ${
                                   isActive
                                     ? 'bg-blue-100 text-blue-700 border-blue-300 dark:bg-blue-900 dark:text-blue-300 dark:border-blue-600'
@@ -1535,7 +1469,7 @@ function EventsPageContent() {
                       </tr>
                     ) : (
                       currentEvents.map((event) => {
-                      const isExpanded = expandedEvent === event.id
+                      const isExpanded = expandedEvents.has(event.id)
                       
                       return (
                         <React.Fragment key={event.id}>
@@ -1543,9 +1477,9 @@ function EventsPageContent() {
                             className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                             onClick={async () => {
                               if (isExpanded) {
-                                setExpandedEvent(null)
+                                collapseEvent(event.id)
                               } else {
-                                setExpandedEvent(event.id)
+                                expandEvent(event.id)
                                 await fetchFullPayload(event.id)
                               }
                             }}
@@ -1559,7 +1493,7 @@ function EventsPageContent() {
                               <div>
                                 <Link
                                   href={getDeviceHref(event)}
-                                  className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors block truncate"
+                                  className="font-medium text-gray-900 dark:text-white hover:underline block truncate"
                                   title={event.deviceName || event.device}
                                   onClick={(e) => e.stopPropagation()}
                                 >
@@ -1576,8 +1510,8 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-4 py-3 max-w-xs align-top">
-                              <div className="text-sm text-gray-900 dark:text-white break-words">
-                                {getEventMessage(event)}
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
                             </td>
@@ -1593,9 +1527,9 @@ function EventsPageContent() {
                                 onClick={async (e) => {
                                   e.preventDefault()
                                   if (isExpanded) {
-                                    setExpandedEvent(null)
+                                    collapseEvent(event.id)
                                   } else {
-                                    setExpandedEvent(event.id)
+                                    expandEvent(event.id)
                                     await fetchFullPayload(event.id)
                                   }
                                 }}
@@ -1623,6 +1557,7 @@ function EventsPageContent() {
                                     {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                                       <LastRunSummary payload={fullPayloads[event.id]} />
                                     )}
+                                    <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                                     <div className="flex items-center justify-between">
                                       <div className="flex items-center gap-2">
                                         <h4 className="text-sm font-medium text-gray-900 dark:text-white">
@@ -1777,7 +1712,7 @@ function EventsPageContent() {
                 </div>
               ) : (
                 currentEvents.map((event) => {
-                const isExpanded = expandedEvent === event.id
+                const isExpanded = expandedEvents.has(event.id)
                 
                 return (
                   <div 
@@ -1785,9 +1720,9 @@ function EventsPageContent() {
                     className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 cursor-pointer"
                     onClick={async () => {
                       if (isExpanded) {
-                        setExpandedEvent(null)
+                        collapseEvent(event.id)
                       } else {
-                        setExpandedEvent(event.id)
+                        expandEvent(event.id)
                         await fetchFullPayload(event.id)
                       }
                     }}
@@ -1811,7 +1746,7 @@ function EventsPageContent() {
                       <div>
                         <Link
                           href={getDeviceHref(event)}
-                          className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors text-sm block"
+                          className="font-medium text-gray-900 dark:text-white hover:underline text-sm block"
                           onClick={(e) => e.stopPropagation()}
                         >
                           {event.deviceName || event.device}
@@ -1830,8 +1765,8 @@ function EventsPageContent() {
                     {/* Message */}
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
-                      <div className="text-sm text-gray-900 dark:text-white break-words">
-                        {getEventMessage(event)}
+                      <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                        {getDisplayMessage(event)}
                       </div>
                       {renderInlineDetails(event)}
                     </div>
@@ -1847,9 +1782,9 @@ function EventsPageContent() {
                         onClick={async (e) => {
                           e.preventDefault()
                           if (isExpanded) {
-                            setExpandedEvent(null)
+                            collapseEvent(event.id)
                           } else {
-                            setExpandedEvent(event.id)
+                            expandEvent(event.id)
                             await fetchFullPayload(event.id)
                           }
                         }}
@@ -1890,6 +1825,7 @@ function EventsPageContent() {
                         {!!fullPayloads[event.id] && !loadingPayloads.has(event.id) && (
                           <LastRunSummary payload={fullPayloads[event.id]} />
                         )}
+                        <EventDetails eventIds={event.isBundle && event.eventIds ? event.eventIds : [String(event.id)]} />
                         <div className="flex items-center justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <h4 className="text-sm font-medium text-gray-900 dark:text-white">

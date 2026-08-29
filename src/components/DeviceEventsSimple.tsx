@@ -1,7 +1,9 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { normalizeEventKind, severityToBadgeClasses } from '../lib/events/normalize';
 import { CopyButton } from './ui/CopyButton';
 import { LastRunSummary } from './LastRunSummary';
+import { EventDetails } from '../lib/modules/widgets/EventDetails';
+import { EventInlineLines } from '../lib/modules/widgets/EventInlineLines';
 import { Search, X } from 'lucide-react';
 
 interface EventDto {
@@ -77,7 +79,8 @@ const formatTimestamp = (ts?: string): string => {
 }
 
 export default function DeviceEvents({ events }: { events: EventDto[] }) {
-  const [expanded, setExpanded] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+  const isOpen = (id: string) => expanded.has(id);
   const [fullPayloads, setFullPayloads] = useState<Record<string, unknown>>({});
   const [loadingPayloads, setLoadingPayloads] = useState<Set<string>>(new Set());
   const [payloadSearches, setPayloadSearches] = useState<Record<string, string>>({});
@@ -585,9 +588,13 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   </span>
                   
                   {/* Event Message - Hidden on mobile (sm and below) */}
-                  <span className="font-medium text-gray-900 dark:text-white truncate flex-1 min-w-0 hidden md:block">
-                    {getEventMessage(ev)}
-                  </span>
+                  <EventInlineLines
+                    eventId={String(ev.id)}
+                    kind={ev.kind || ''}
+                    summary={getEventMessage(ev)}
+                    isBundle={Boolean(ev.isBundle)}
+                    className="flex-1 min-w-0 hidden md:block font-medium"
+                  />
                   
                   {/* Timestamp */}
                   <span className="text-sm text-gray-500 dark:text-gray-400 flex-shrink-0">
@@ -597,8 +604,8 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                 
                 <button 
                   onClick={() => {
-                    const isOpening = expanded !== ev.id;
-                    setExpanded(e => (e === ev.id ? null : ev.id));
+                    const isOpening = !isOpen(ev.id);
+                    setExpanded(prev => { const next = new Set(prev); if (next.has(ev.id)) next.delete(ev.id); else next.add(ev.id); return next; });
                     
                     // Auto-fetch full payload when opening, just like the main events page
                     if (isOpening) {
@@ -606,17 +613,17 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                     }
                   }}
                   className="flex items-center gap-1 px-3 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors flex-shrink-0"
-                  aria-expanded={expanded === ev.id}
+                  aria-expanded={isOpen(ev.id)}
                   aria-controls={`payload-${ev.id}`}
                 >
-                  {expanded === ev.id ? 'Hide' : 'Show'} Payload
+                  {isOpen(ev.id) ? 'Hide' : 'Show'} Payload
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={expanded === ev.id ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={isOpen(ev.id) ? "M5 15l7-7 7 7" : "M19 9l-7 7-7-7"} />
                   </svg>
                 </button>
               </header>
 
-              {expanded === ev.id && (
+              {isOpen(ev.id) && (
                 <div 
                   id={`payload-${ev.id}`}
                   className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
@@ -625,10 +632,13 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   {fullPayloads[ev.id] && !loadingPayloads.has(ev.id) && (
                     <LastRunSummary payload={fullPayloads[ev.id]} />
                   )}
+                  <div className="mb-4">
+                    <EventDetails eventIds={bundledEventIds.length > 0 ? bundledEventIds : [String(ev.id)]} />
+                  </div>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <h4 className="text-sm font-medium text-gray-900 dark:text-white">
-                        {fullPayloads[ev.id] ? 'Full Raw Payload' : 'Raw Payload (from events list)'}
+                        {fullPayloads[ev.id] ? 'Raw Payload' : 'Raw Payload (from events list)'}
                       </h4>
                       <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono">
                         #{ev.id}

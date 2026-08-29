@@ -6,6 +6,8 @@
 
 import { formatRelativeTime, formatExactTime, formatBootTime, parseInstallTime } from '../../lib/time'
 import React, { useState, useMemo, useRef, useEffect } from 'react'
+import { FilterPills } from '../ui/FilterPills'
+import { classifyServicePath, type WindowsSource } from '../../lib/windows-source'
 import { extractSystem } from '../../lib/data-processing/modules/system'
 import { ScheduledTasksTable } from '../tables/ScheduledTasksTable'
 import { LaunchdTable } from '../tables/LaunchdTable'
@@ -156,6 +158,8 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   
   // State for services search
   const [servicesSearch, setServicesSearch] = useState('')
+  const [servicesStatusFilter, setServicesStatusFilter] = useState<'all' | 'running' | 'stopped'>('all')
+  const [servicesSourceFilter, setServicesSourceFilter] = useState<'all' | WindowsSource>('all')
   // State for privileged helper tools search
   const [helperSearch, setHelperSearch] = useState('')
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -264,18 +268,46 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
     ? getMacOSMarketingName(osInfo?.version)
     : getWindowsMarketingName(osInfo?.displayVersion)
 
-  // Filter services based on search
+  const isServiceRunning = (service: any) => {
+    const status = (service.status || '').toLowerCase()
+    return status.includes('running') || status.includes('started')
+  }
+
+  const servicesStatusOptions = useMemo(() => {
+    const running = services.filter(isServiceRunning).length
+    return [
+      { value: 'all' as const, label: 'All', count: services.length },
+      { value: 'running' as const, label: 'Running', count: running },
+      { value: 'stopped' as const, label: 'Stopped', count: services.length - running },
+    ]
+  }, [services])
+
+  const servicesSourceOptions = useMemo(() => {
+    const builtIn = services.filter((s: any) => classifyServicePath(s.path) === 'windows').length
+    return [
+      { value: 'all' as const, label: 'All', count: services.length },
+      { value: 'windows' as const, label: 'Windows', count: builtIn },
+      { value: 'third-party' as const, label: 'Third-party', count: services.length - builtIn },
+    ]
+  }, [services])
+
+  // Filter services on status, source and search
   const filteredServices = useMemo(() => {
-    if (!servicesSearch.trim()) return services
-    
-    const searchLower = servicesSearch.toLowerCase()
-    return services.filter((service: any) => 
-      service.name?.toLowerCase().includes(searchLower) ||
-      service.displayName?.toLowerCase().includes(searchLower) ||
-      service.description?.toLowerCase().includes(searchLower) ||
-      service.status?.toLowerCase().includes(searchLower)
-    )
-  }, [services, servicesSearch])
+    const searchLower = servicesSearch.trim().toLowerCase()
+    return services.filter((service: any) => {
+      if (servicesStatusFilter === 'running' && !isServiceRunning(service)) return false
+      if (servicesStatusFilter === 'stopped' && isServiceRunning(service)) return false
+      if (servicesSourceFilter !== 'all' && classifyServicePath(service.path) !== servicesSourceFilter) return false
+      if (!searchLower) return true
+      return (
+        service.name?.toLowerCase().includes(searchLower) ||
+        service.displayName?.toLowerCase().includes(searchLower) ||
+        service.description?.toLowerCase().includes(searchLower) ||
+        service.path?.toLowerCase().includes(searchLower) ||
+        service.status?.toLowerCase().includes(searchLower)
+      )
+    })
+  }, [services, servicesSearch, servicesStatusFilter, servicesSourceFilter])
   
   return (
     <div className="space-y-6">
@@ -495,31 +527,33 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               </div>
             </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          {/* Fixed layout: every narrow column has a width, Update absorbs the
+              rest, so the table never grows past the card and never scrolls sideways */}
+          <div>
+            <table className="w-full table-fixed">
               <thead className="bg-gray-50 dark:bg-gray-900">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">KB</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Severity</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">CVEs</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Release Date</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Update</th>
+                  <th className="w-28 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">KB</th>
+                  <th className="w-40 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                  <th className="w-24 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Severity</th>
+                  <th className="w-56 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">CVEs</th>
+                  <th className="w-32 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                  <th className="w-28 px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Released</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                 {pendingWindowsUpdates.map((update, index) => (
-                  <tr key={update.kbNumber || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                    <td className="px-6 py-4">
+                  <tr key={update.kbNumber || index} className="hover:bg-gray-50 dark:hover:bg-gray-700 align-top">
+                    <td className="px-4 py-3">
                       <div>
                         <div className="text-sm font-medium text-gray-900 dark:text-white">{update.title}</div>
                         {update.description && update.description !== update.title && (
-                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-md truncate">{update.description}</div>
+                          <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 truncate" title={update.description}>{update.description}</div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {update.kbNumber ? (
                         <a
                           href={`https://support.microsoft.com/help/${update.kbNumber.replace('KB', '')}`}
@@ -533,12 +567,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                    <td className="px-3 py-3">
+                      <span className="inline-block max-w-full truncate px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" title={update.category || undefined}>
                         {update.category || 'Update'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-3 py-3 whitespace-nowrap">
                       {update.severity ? (
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                           update.severity === 'Critical' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
@@ -552,23 +586,23 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-3 py-3">
                       {update.cves.length > 0 ? (
                         <div className="flex flex-wrap gap-1">
-                          {update.cves.slice(0, 3).map((cve) => (
+                          {update.cves.slice(0, 2).map((cve) => (
                             <a
                               key={cve}
                               href={`https://msrc.microsoft.com/update-guide/vulnerability/${cve}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:underline"
+                              className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-mono text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/30 hover:underline"
                             >
                               {cve}
                             </a>
                           ))}
-                          {update.cves.length > 3 && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700" title={update.cves.slice(3).join(', ')}>
-                              +{update.cves.length - 3} more
+                          {update.cves.length > 2 && (
+                            <span className="inline-flex items-center whitespace-nowrap px-2 py-0.5 rounded text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700" title={update.cves.slice(2).join(', ')}>
+                              +{update.cves.length - 2} more
                             </span>
                           )}
                         </div>
@@ -576,8 +610,8 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         <span className="text-sm text-gray-400">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex gap-1">
+                    <td className="px-3 py-3">
+                      <div className="flex flex-wrap gap-1">
                         {update.isDownloaded ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                             Downloaded
@@ -594,7 +628,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                    <td className="px-3 py-3 whitespace-nowrap text-sm text-gray-900 dark:text-white tabular-nums">
                       {update.releaseDate ? new Date(update.releaseDate).toISOString().split('T')[0] : '-'}
                     </td>
                   </tr>
@@ -878,19 +912,23 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                   System services and their status ({filteredServices.length} of {services.length} services)
                 </p>
               </div>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              <div className="flex flex-wrap items-center gap-3">
+                <FilterPills ariaLabel="Service status" options={servicesStatusOptions} value={servicesStatusFilter} onChange={setServicesStatusFilter} />
+                <FilterPills ariaLabel="Service source" options={servicesSourceOptions} value={servicesSourceFilter} onChange={setServicesSourceFilter} />
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    className="block w-full sm:w-56 pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Search services..."
+                    value={servicesSearch}
+                    onChange={(e) => setServicesSearch(e.target.value)}
+                  />
                 </div>
-                <input
-                  type="text"
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md leading-5 bg-white dark:bg-gray-700 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                  placeholder="Search services..."
-                  value={servicesSearch}
-                  onChange={(e) => setServicesSearch(e.target.value)}
-                />
               </div>
             </div>
           </div>
@@ -899,12 +937,12 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
               ref={scrollContainerRef}
               className="max-h-96 overflow-auto overlay-scrollbar"
             >
-              <table className="w-full min-w-full">
+              <table className="w-full min-w-full table-fixed">
                 <thead className="bg-gray-50 dark:bg-gray-900 sticky top-0 z-10">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Type</th>
+                    <th className="w-[30%] px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Service</th>
+                    <th className="w-28 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                    <th className="w-40 px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Start Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Description</th>
                   </tr>
                 </thead>
@@ -936,13 +974,16 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         {service.startType || service.start_type || 'Unknown'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
-                        {service.description || 'No description available'}
+                        <div className="truncate" title={service.description || undefined}>{service.description || 'No description available'}</div>
+                        {service.path && (
+                          <div className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate" title={service.path}>{service.path}</div>
+                        )}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {filteredServices.length === 0 && servicesSearch && (
+              {filteredServices.length === 0 && (servicesSearch || servicesStatusFilter !== 'all' || servicesSourceFilter !== 'all') && (
                 <div className="px-6 py-8 text-center">
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     No services found matching &quot;{servicesSearch}&quot;

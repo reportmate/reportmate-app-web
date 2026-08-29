@@ -9,6 +9,7 @@ import { ManagedInstallsTable } from '../tables/ManagedInstallsTable'
 import { extractInstalls, type InstallsInfo } from '../../lib/data-processing/modules/installs'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
+import { InstallsRunStatus, lastRunFailed } from '../InstallsRunStatus'
 
 interface InstallsTabProps {
   device: any
@@ -545,12 +546,16 @@ export const InstallsTab: React.FC<InstallsTabProps> = ({ device, data, initialF
       {/* Loading State */}
       {/* Removed simple loading state in favor of full page skeleton */}
 
+      {/* Outcome of the last run, above the items it did or did not produce */}
+      <InstallsRunStatus serialNumber={device?.serialNumber} installs={normalizedInstallsModule} />
+
       {/* Managed Installs with Configuration */}
       {processedInstallsData ? (
         <>
           <ManagedInstallsTable
             data={processedInstallsData}
             initialStatusFilter={initialFilter ? (Array.isArray(initialFilter) ? initialFilter : [initialFilter]) : undefined}
+            runFailed={lastRunFailed(normalizedInstallsModule)}
           />
           
           <DebugAccordion

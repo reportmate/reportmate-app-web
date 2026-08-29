@@ -12,6 +12,44 @@
  * Get all install items from a device, checking both Cimian and Munki paths.
  * Cimian is preferred; falls back to Munki items if no Cimian data.
  */
+/**
+ * Munki reports a run's warnings as one semicolon/newline-joined string on the
+ * run, not on the item they concern ("Download of Excel failed: error -1005").
+ * The Warnings card reads that string; the Items with Warnings box read only
+ * items, so it stayed at zero on macOS. This attributes each run-level warning
+ * to its package by the name embedded in the text, so both agree.
+ */
+export interface RunLevelWarning {
+  message: string
+  itemName: string | null
+}
+
+const RUN_WARNING_ITEM_PATTERNS: RegExp[] = [
+  /^(?:Download|Install|Installation|Removal|Update) of (.+?) failed/i,
+  /Could not process item (\S+)/i,
+  /Will not attempt to remove (\S+)/i,
+  /^(\S+) (?:requires|is not|was not|could not)/i,
+]
+
+/** The package a Munki run message is about, or null when it names none. */
+export function itemNameFromMessage(message: string): string | null {
+  for (const pattern of RUN_WARNING_ITEM_PATTERNS) {
+    const match = message.match(pattern)
+    if (match) return match[1].replace(/[.,:]+$/, '')
+  }
+  return null
+}
+
+export function runLevelWarnings(device: any): RunLevelWarning[] {
+  const raw = device?.modules?.installs?.munki?.warnings
+  if (typeof raw !== 'string' || raw.trim() === '') return []
+  return raw
+    .split(/WARNING:|[\n\r]+/)
+    .map((w: string) => w.trim())
+    .filter(Boolean)
+    .map((message: string) => ({ message, itemName: itemNameFromMessage(message) }))
+}
+
 export function getDeviceInstallItems(device: any): any[] {
   const cimianItems = device?.modules?.installs?.cimian?.items
   if (cimianItems && cimianItems.length > 0) return cimianItems
@@ -40,7 +78,7 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
 
     const hasError = items.some(isErrorItem)
     // Warnings are issues that need attention - NOT pending changes
-    const hasWarning = items.some(isWarningItem)
+    const hasWarning = items.some(isWarningItem) || runLevelWarnings(device).length > 0
     // Pending are scheduled changes - installations, removals, updates
     const hasPending = items.some(isPendingItem)
     // Success is an install that actually completed in the most recent run
@@ -108,14 +146,26 @@ function hasText(value: any): boolean {
   return typeof value === 'string' && value.trim() !== ''
 }
 
+// Cimian leaves `currentStatus` at "Installed" for an item whose most recent
+// attempt raised a warning or failed, and records the outcome in
+// `lastAttemptStatus` instead (with no message text). Read it when the status
+// itself says nothing, or every Windows warning is invisible.
+function attemptCategory(item: any): ItemStatusCategory {
+  const attempt = (item?.lastAttemptStatus || '').toLowerCase()
+  if (!attempt) return null
+  if (attempt.includes('warn')) return 'warning'
+  if (attempt.includes('fail') || attempt.includes('error')) return 'error'
+  return null
+}
+
 export function isErrorItem(item: any): boolean {
-  const category = statusCategory(item)
+  const category = statusCategory(item) || attemptCategory(item)
   if (category) return category === 'error'
   return hasText(item?.lastError)
 }
 
 export function isWarningItem(item: any): boolean {
-  const category = statusCategory(item)
+  const category = statusCategory(item) || attemptCategory(item)
   if (category) return category === 'warning'
   return !hasText(item?.lastError) && hasText(item?.lastWarning)
 }
@@ -306,8 +356,12 @@ export function aggregateInstallWarnings(devices: any[]): AggregatedInstallMessa
     const deviceName = device.modules?.inventory?.deviceName || device.serialNumber || 'Unknown'
     const serialNumber = device.serialNumber || device.deviceId || 'Unknown'
     
-    // Cimian and Munki both attach the run's message to the item
+    // Cimian and Munki both attach the run's message to the item. Munki stamps a
+    // failed download with both lastError and lastWarning, so an item that is an
+    // error is skipped here or every failure is counted twice and the Warnings
+    // card disagrees with the Items with Warnings box.
     for (const item of getDeviceInstallItems(device)) {
+      if (isErrorItem(item)) continue
       if (item.lastWarning && item.lastWarning.trim() !== '') {
         const warningMsg = item.lastWarning.trim()
         const existing = warningMap.get(warningMsg)

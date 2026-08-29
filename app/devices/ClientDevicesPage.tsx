@@ -693,9 +693,7 @@ function DevicesPageContent() {
                             className="font-medium text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 min-w-0 flex-1"
                             title={item.deviceName || 'Unknown Device'}
                           >
-                            <span className="block truncate">
-                              {item.deviceName || 'Unknown Device'}
-                            </span>
+                            <TailTruncate text={item.deviceName || 'Unknown Device'} />
                           </Link>
                           <PlatformBadge platform={item.platform || ''} size="sm" />
                         </div>
@@ -796,6 +794,18 @@ function DevicesPageContent() {
         )}
       </div>
     </div>
+  )
+}
+
+// Truncate in the middle so a numbered name keeps its number: the head
+// ellipsises, the last three characters always stay put.
+function TailTruncate({ text, keep = 3 }: { text: string; keep?: number }) {
+  if (text.length <= keep + 1) return <span className="block truncate">{text}</span>
+  return (
+    <span className="flex min-w-0">
+      <span className="truncate">{text.slice(0, -keep)}</span>
+      <span className="shrink-0">{text.slice(-keep)}</span>
+    </span>
   )
 }
 
