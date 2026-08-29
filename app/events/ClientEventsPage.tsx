@@ -998,10 +998,10 @@ function EventsPageContent() {
                 <table className="w-full table-fixed relative border-collapse">
                   <colgroup>
                     <col style={{width: '5%'}} />
-                    <col style={{width: '52%'}} />
-                    <col style={{width: '21%'}} />
-                    <col style={{width: '13%'}} />
-                    <col style={{width: '9%'}} />
+                    <col style={{width: '22%'}} />
+                    <col style={{width: '49%'}} />
+                    <col style={{width: '14%'}} />
+                    <col style={{width: '10%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     {/* Filter Row */}
@@ -1060,10 +1060,10 @@ function EventsPageContent() {
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Message
+                        Device
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device
+                        Message
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
@@ -1108,12 +1108,6 @@ function EventsPageContent() {
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-4 lg:px-6 py-4 align-top">
-                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
-                                {getDisplayMessage(event)}
-                              </div>
-                              {renderInlineDetails(event)}
-                            </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div>
                                 <Link
@@ -1133,6 +1127,12 @@ function EventsPageContent() {
                                   )}
                                 </div>
                               </div>
+                            </td>
+                            <td className="px-4 lg:px-6 py-4 align-top">
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
+                              </div>
+                              {renderInlineDetails(event)}
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
@@ -1346,10 +1346,10 @@ function EventsPageContent() {
                 <table className="w-full table-fixed border-collapse">
                   <colgroup>
                     <col style={{width: '5%'}} />
-                    <col style={{width: '52%'}} />
-                    <col style={{width: '21%'}} />
-                    <col style={{width: '13%'}} />
-                    <col style={{width: '9%'}} />
+                    <col style={{width: '22%'}} />
+                    <col style={{width: '49%'}} />
+                    <col style={{width: '14%'}} />
+                    <col style={{width: '10%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
@@ -1421,10 +1421,10 @@ function EventsPageContent() {
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Message
+                        Device
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
-                        Device
+                        Message
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
@@ -1489,12 +1489,6 @@ function EventsPageContent() {
                                 {getStatusIcon(event.kind)}
                               </div>
                             </td>
-                            <td className="px-4 py-3 max-w-xs align-top">
-                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
-                                {getDisplayMessage(event)}
-                              </div>
-                              {renderInlineDetails(event)}
-                            </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div>
                                 <Link
@@ -1514,6 +1508,12 @@ function EventsPageContent() {
                                   )}
                                 </div>
                               </div>
+                            </td>
+                            <td className="px-4 py-3 max-w-xs align-top">
+                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                                {getDisplayMessage(event)}
+                              </div>
+                              {renderInlineDetails(event)}
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
