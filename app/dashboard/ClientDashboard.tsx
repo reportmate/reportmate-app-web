@@ -13,18 +13,6 @@ import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 // WebPubSub message types for JSON subprotocol
-interface WebPubSubMessage {
-  type: "message" | "system" | "ack"
-  from?: string
-  group?: string
-  data?: unknown
-  dataType?: string
-  event?: string
-  connectionId?: string
-  userId?: string
-  message?: string
-}
-
 // FleetEvent interface for events from /api/events
 interface FleetEvent {
   id: string
@@ -102,16 +90,13 @@ export default function ClientDashboard() {
   const [, setTimeUpdateCounter] = useState(0)
   const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
   const [installStatsLoading, setInstallStatsLoading] = useState(true)
-  const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
+  // Events arrive by polling only; there is no longer a WebSocket path to negotiate.
+  const [connectionStatus, setConnectionStatus] = useState<string>("polling")
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const _fetchAbortRef = useRef(false)
-  const wsRef = useRef<WebSocket | null>(null)
-  const reconnectAttemptsRef = useRef(0)
-  const connectionStatusRef = useRef(connectionStatus)
-  const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Filter devices by platform
@@ -151,8 +136,6 @@ export default function ClientDashboard() {
     return nameMap
   }, [devices])
   
-  // Keep connectionStatusRef in sync so the polling interval can read it without a dependency
-  useEffect(() => { connectionStatusRef.current = connectionStatus }, [connectionStatus])
 
   // CONSOLIDATED API FETCH: Single /api/dashboard call for devices + installStats + events
   // Events use a per-type window function on the backend so all types are represented
@@ -327,137 +310,13 @@ export default function ClientDashboard() {
     fetchDashboardData(true)
     
     // Refresh devices + installStats + events every 30 seconds
-    // Skip tick when WebSocket is connected (WS delivers real-time events)
     const interval = setInterval(() => {
-      if (connectionStatusRef.current !== 'connected') fetchDashboardData(false)
+      fetchDashboardData(false)
     }, 30000)
 
     return () => {
       aborted = true
       clearInterval(interval)
-    }
-  }, [])
-
-  // SignalR WebSocket connection for real-time events
-  useEffect(() => {
-    let isActive = true
-    let reconnectTimeout: NodeJS.Timeout | null = null
-
-    async function connectWebSocket() {
-      if (!isActive) return
-
-      try {
-        // Check if WebPubSub is enabled
-        const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
-        const apiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL
-
-        if (!isEnabled || !apiBaseUrl) {
-          setConnectionStatus('polling')
-          return
-        }
-
-        setConnectionStatus('connecting')
-
-        // Get negotiate token from API with timeout
-        const negotiateResponse = await Promise.race([
-          fetch(`${apiBaseUrl}/api/v1/negotiate?device=dashboard`),
-          new Promise((_, reject) =>
-            setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
-          )
-        ]) as Response
-
-        if (!negotiateResponse.ok) {
-          throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
-        }
-
-        const negotiateData = await negotiateResponse.json()
-
-        if (negotiateData.error || !negotiateData.url) {
-          throw new Error(negotiateData.error || 'WebPubSub not available')
-        }
-
-        if (!isActive) return
-
-        // Connect using native WebSocket with Azure Web PubSub JSON subprotocol
-        const ws = new WebSocket(negotiateData.url, 'json.webpubsub.azure.v1')
-        wsRef.current = ws
-
-        ws.onopen = () => {
-          if (!isActive) {
-            ws.close()
-            return
-          }
-          setConnectionStatus('connected')
-          reconnectAttemptsRef.current = 0
-          setLastUpdateTime(new Date())
-        }
-
-        ws.onmessage = (event) => {
-          if (!isActive) return
-          try {
-            const message: WebPubSubMessage = JSON.parse(event.data)
-
-            if (message.type === 'message') {
-              const eventData = message.data as FleetEvent
-              if (eventData && eventData.id) {
-                setEvents(prev => {
-                  // Avoid duplicates
-                  const exists = prev.some(e => e.id === eventData.id)
-                  if (exists) return prev
-                  // Add new event at the beginning, keep last 300
-                  return [eventData, ...prev].slice(0, 1000)
-                })
-                setLastUpdateTime(new Date())
-              }
-            }
-          } catch {
-            // Silently ignore parse errors
-          }
-        }
-
-        ws.onerror = () => {
-          // Error handled in onclose
-        }
-
-        ws.onclose = () => {
-          wsRef.current = null
-
-          if (!isActive) return
-
-          // Attempt reconnect with exponential backoff
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
-            reconnectAttemptsRef.current++
-            setConnectionStatus('reconnecting')
-            reconnectTimeout = setTimeout(connectWebSocket, delay)
-          } else {
-            setConnectionStatus('polling')
-          }
-        }
-      } catch {
-        if (isActive) {
-          setConnectionStatus('polling')
-        }
-      }
-    }
-
-    // Start WebSocket connection
-    connectWebSocket()
-
-    return () => {
-      isActive = false
-
-      // Cleanup WebSocket connection
-      if (wsRef.current) {
-        wsRef.current.close()
-        wsRef.current = null
-      }
-
-      // Cleanup reconnect timeout
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout)
-        reconnectTimeout = null
-      }
     }
   }, [])
 

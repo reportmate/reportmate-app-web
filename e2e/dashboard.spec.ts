@@ -80,30 +80,6 @@ test.describe('ReportMate Dashboard', () => {
     await expect(searchResults.first().locator('[data-testid="device-name"]'))
       .toContainText('MacBook')
   })
-
-  test('displays real-time status updates', async ({ page }) => {
-    // Mock WebSocket connection for real-time updates
-    await page.route('**/negotiate', (route) => {
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          url: 'ws://localhost:8080/ws',
-          accessToken: 'mock-token'
-        })
-      })
-    })
-
-    // Wait for devices to load
-    await page.waitForSelector('[data-testid="device-card"]', { timeout: 10000 })
-    
-    // Check that real-time indicator is present
-    await expect(page.locator('[data-testid="realtime-indicator"]')).toBeVisible()
-    
-    // Check connection status
-    await expect(page.locator('[data-testid="connection-status"]'))
-      .toHaveText('Connected', { timeout: 10000 })
-  })
 })
 
 test.describe('Device Detail Page', () => {
