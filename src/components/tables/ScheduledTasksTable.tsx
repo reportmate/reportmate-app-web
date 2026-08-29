@@ -5,6 +5,8 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react'
 import { formatExactTime } from '../../lib/time'
+import { FilterPills } from '../ui/FilterPills'
+import { classifyTaskPath, type WindowsSource } from '../../lib/windows-source'
 
 export interface ScheduledTask {
   name: string
@@ -29,6 +31,7 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
 }) => {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | WindowsSource>('all')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -97,6 +100,10 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
       )
     }
     
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter(task => classifyTaskPath(task.path) === sourceFilter)
+    }
+
     if (statusFilter !== 'all') {
       filtered = filtered.filter(task => {
         if (statusFilter === 'enabled') return task.enabled
@@ -109,7 +116,16 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
     }
     
     return filtered
-  }, [scheduledTasks, search, statusFilter])
+  }, [scheduledTasks, search, statusFilter, sourceFilter])
+
+  const sourceOptions = useMemo(() => {
+    const builtIn = scheduledTasks.filter(task => classifyTaskPath(task.path) === 'windows').length
+    return [
+      { value: 'all' as const, label: 'All', count: scheduledTasks.length },
+      { value: 'windows' as const, label: 'Windows', count: builtIn },
+      { value: 'third-party' as const, label: 'Third-party', count: scheduledTasks.length - builtIn },
+    ]
+  }, [scheduledTasks])
 
   // Filter options with labels and counts
   const filterOptions = useMemo(() => {
@@ -214,7 +230,8 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
               Windows scheduled tasks and their execution status ({filteredTasks.length} of {scheduledTasks.length} tasks)
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <FilterPills ariaLabel="Task source" options={sourceOptions} value={sourceFilter} onChange={setSourceFilter} />
             {/* Custom Filter Dropdown */}
             <div className="relative" ref={dropdownRef}>
               <button
@@ -349,10 +366,10 @@ export const ScheduledTasksTable: React.FC<ScheduledTasksTableProps> = ({
               ))}
             </tbody>
           </table>
-          {filteredTasks.length === 0 && search && (
+          {filteredTasks.length === 0 && (search || sourceFilter !== 'all' || statusFilter !== 'all') && (
             <div className="px-6 py-8 text-center">
               <p className="text-sm text-gray-500 dark:text-gray-400">
-                No scheduled tasks found matching &quot;{search}&quot;
+                No scheduled tasks match the current filters
               </p>
             </div>
           )}

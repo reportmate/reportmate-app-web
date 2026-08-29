@@ -2387,9 +2387,9 @@ function InstallsPageContent() {
               <div className={`px-6 py-4 grid grid-cols-1 gap-6 ${
                 (() => {
                   const shown = [itemsWithErrors.length > 0, itemsWithWarnings.length > 0, itemsWithPending.length > 0, itemsWithSuccess.length > 0].filter(Boolean).length
-                  // Four across inside a max-w-7xl shell clips the Count
-                  // column, so four tables wrap to a 2x2 instead
-                  if (shown >= 4) return 'md:grid-cols-2'
+                  // One row of four; the tables are table-fixed so the item
+                  // name truncates instead of pushing Count out of the box
+                  if (shown >= 4) return 'md:grid-cols-2 lg:grid-cols-4'
                   if (shown === 3) return 'md:grid-cols-2 lg:grid-cols-3'
                   if (shown === 2) return 'lg:grid-cols-2'
                   return 'lg:grid-cols-1'
@@ -2432,7 +2432,7 @@ function InstallsPageContent() {
                         <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
@@ -2452,7 +2452,7 @@ function InstallsPageContent() {
                               </div>
                             </th>
                             <th 
-                              className="px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                              className="w-20 px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
                               onClick={() => setErrorTableSort(prev => ({
                                 column: 'count',
                                 direction: prev.column === 'count' && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -2543,7 +2543,7 @@ function InstallsPageContent() {
                         <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
@@ -2563,7 +2563,7 @@ function InstallsPageContent() {
                               </div>
                             </th>
                             <th 
-                              className="px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                              className="w-20 px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
                               onClick={() => setWarningTableSort(prev => ({
                                 column: 'count',
                                 direction: prev.column === 'count' && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -2654,7 +2654,7 @@ function InstallsPageContent() {
                         <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th 
@@ -2674,7 +2674,7 @@ function InstallsPageContent() {
                               </div>
                             </th>
                             <th 
-                              className="px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                              className="w-20 px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
                               onClick={() => setPendingTableSort(prev => ({
                                 column: 'count',
                                 direction: prev.column === 'count' && prev.direction === 'desc' ? 'asc' : 'desc'
@@ -2767,13 +2767,13 @@ function InstallsPageContent() {
                         <div className="h-6 bg-gray-200 dark:bg-gray-600 rounded w-5/6"></div>
                       </div>
                     ) : (
-                      <table className="w-full">
+                      <table className="w-full table-fixed">
                         <thead className="sticky top-0 bg-gray-50 dark:bg-gray-600 z-10">
                           <tr>
                             <th className="px-4 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                               Item Name
                             </th>
-                            <th className="px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
+                            <th className="w-20 px-4 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-200 uppercase tracking-wider">
                               Count
                             </th>
                           </tr>
