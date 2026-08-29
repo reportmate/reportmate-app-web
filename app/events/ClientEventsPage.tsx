@@ -144,9 +144,10 @@ function EventsPageContent() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // Multi-select filters: success, warning, error, system active by default; info off
+  // Multi-select filters: success, warning, error on by default; system (the
+  // reboot log) and info (collection chatter) are opted into
   const [activeFilters, setActiveFilters] = useState<Set<string>>(
-    () => new Set(['success', 'warning', 'error', 'system'])
+    () => new Set(['success', 'warning', 'error'])
   )
   const [searchQuery, setSearchQuery] = useState('')
   // Several rows can be open at once; a Set of ids rather than a single id
@@ -984,10 +985,10 @@ function EventsPageContent() {
                 <table className="w-full table-fixed relative border-collapse">
                   <colgroup>
                     <col style={{width: '5%'}} />
-                    <col style={{width: '22%'}} />
-                    <col style={{width: '49%'}} />
-                    <col style={{width: '14%'}} />
-                    <col style={{width: '10%'}} />
+                    <col style={{width: '52%'}} />
+                    <col style={{width: '21%'}} />
+                    <col style={{width: '13%'}} />
+                    <col style={{width: '9%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10 shadow-sm">
                     {/* Filter Row */}
@@ -1052,19 +1053,19 @@ function EventsPageContent() {
                     </tr>
                     {/* Header Row - desktop */}
                     <tr>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-16">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Message
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-64">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Payloads
                       </th>
                     </tr>
@@ -1342,10 +1343,10 @@ function EventsPageContent() {
                 <table className="w-full table-fixed border-collapse">
                   <colgroup>
                     <col style={{width: '5%'}} />
-                    <col style={{width: '22%'}} />
-                    <col style={{width: '49%'}} />
-                    <col style={{width: '14%'}} />
-                    <col style={{width: '10%'}} />
+                    <col style={{width: '52%'}} />
+                    <col style={{width: '21%'}} />
+                    <col style={{width: '13%'}} />
+                    <col style={{width: '9%'}} />
                   </colgroup>
                   <thead className="bg-gray-50 dark:bg-gray-700">
                     {/* Filter Row */}
@@ -1423,19 +1424,19 @@ function EventsPageContent() {
                     </tr>
                     {/* Header Row */}
                     <tr>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-16">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Type
                       </th>
                       <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Message
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-64">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Device
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-40">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Time
                       </th>
-                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24">
+                      <th className="px-4 lg:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Payloads
                       </th>
                     </tr>
