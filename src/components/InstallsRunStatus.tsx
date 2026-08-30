@@ -27,11 +27,25 @@ function runOutcome(installs: any): { outcome: Outcome; errors: string[]; warnin
   const munki = installs?.munki
   const cimian = installs?.cimian
   if (munki) {
-    const errors = splitMessages(munki.errors)
-    const warnings = splitMessages(munki.warnings)
+    // Newer clients send structured warningItems / errorItems ({name?, version?,
+    // message}); older ones the semicolon-joined strings. Show both the same way,
+    // with the item name leading when the problem names one.
+    const describe = (problem: any): string => {
+      const name = String(problem?.name || '').trim()
+      const version = String(problem?.version || '').trim()
+      const message = String(problem?.message || '').trim()
+      if (!name) return message
+      return message ? `${name}${version ? ` ${version}` : ''}: ${message}` : `${name}${version ? ` ${version}` : ''}`
+    }
+    const structuredErrors = Array.isArray(munki.errorItems) ? munki.errorItems.map(describe).filter(Boolean) : []
+    const structuredWarnings = Array.isArray(munki.warningItems) ? munki.warningItems.map(describe).filter(Boolean) : []
+    const errors = structuredErrors.length ? structuredErrors : splitMessages(munki.errors)
+    const warnings = structuredWarnings.length ? structuredWarnings : splitMessages(munki.warnings)
     const status = String(munki.status || '').toLowerCase()
-    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error' || errors.length > 0
-    return { outcome: failed ? 'error' : (warnings.length > 0 || status === 'warning') ? 'warning' : null, errors, warnings }
+    const sessionStatus = String(munki.lastSessionStatus || '').toLowerCase()
+    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error' || sessionStatus === 'failed' || errors.length > 0
+    const warned = warnings.length > 0 || status === 'warning' || sessionStatus === 'partial_failure'
+    return { outcome: failed ? 'error' : warned ? 'warning' : null, errors, warnings }
   }
   if (cimian) {
     const session = Array.isArray(cimian.sessions) ? cimian.sessions[0] : null
