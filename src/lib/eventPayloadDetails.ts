@@ -70,7 +70,7 @@ const RESERVED_KEYS = new Set([
   'error_messages', 'warning_messages', 'module_status', 'warning_count', 'error_count',
   'run_type', 'session_id', 'modules', 'modules_processed', 'message', 'summary',
   'items', 'action', 'duration_seconds', 'item_warning_count', 'operational_warning_count',
-  'operational_warnings', 'session_installs', 'session_updates', 'session_removals',
+  'operational_warnings', 'operational_errors', 'session_installs', 'session_updates', 'session_removals',
   'collection_type', 'collectionType', 'operating_system', 'display_version', 'version',
   'uptime', 'recommendation', 'previous_boot_time', 'current_boot_time',
   'previous_version', 'current_version', 'newlyInstalledItems', 'installed_items', 'removed_items',
@@ -156,11 +156,14 @@ export function summarizeEventPayload(payload: unknown): EventDetailSummary {
   const messages: EventDetailSummary['messages'] = []
   let suppressedMessageCount = 0
   for (const [key, tone] of [
-    ['errors', 'error'], ['error_messages', 'error'],
-    ['warnings', 'warning'], ['warning_messages', 'warning'],
+    ['errors', 'error'], ['error_messages', 'error'], ['operational_errors', 'error'],
+    ['warnings', 'warning'], ['warning_messages', 'warning'], ['operational_warnings', 'warning'],
     ['recommendation', 'warning'],
   ] as const) {
-    const { kept, suppressed } = splitMessages(p[key])
+    const raw = p[key]
+    // operational_* entries are { message } objects; everything else is text.
+    const source = Array.isArray(raw) ? raw.map(v => (v && typeof v === 'object' ? String((v as Record<string, unknown>).message ?? '') : v)) : raw
+    const { kept, suppressed } = splitMessages(source)
     suppressedMessageCount += suppressed
     for (const text of kept) messages.push({ tone, text })
   }

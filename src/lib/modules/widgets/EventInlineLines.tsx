@@ -48,14 +48,15 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
   }, [eventId, kind, isBundle, autoFetch, payload])
 
   const extracted = extractInlineDetails(payload)
-  // Items-only rows still list the package a run message is about
-  // ("Could not process item X" becomes "X"); messages naming nothing stay
-  // in the expanded view.
+  // Items-only rows list the package each problem is about. Structured items
+  // (warning_items / error_items / failed_items) carry the name outright; a
+  // legacy run message gives it up by pattern ("Could not process item X" →
+  // "X"). Messages naming nothing stay in the expanded view.
   const toItems = (lines: InlineLine[]): InlineLine[] => {
     const out: InlineLine[] = []
     for (const line of lines) {
       if (!line.isMessage) { out.push(line); continue }
-      const name = itemNameFromMessage(line.text)
+      const name = line.name || itemNameFromMessage(line.text)
       if (name && !out.some(l => l.text === name)) out.push({ text: name, isMessage: false })
     }
     return out
