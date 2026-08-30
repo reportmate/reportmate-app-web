@@ -87,8 +87,13 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
 
   if (!outcome) return null
 
-  const errorLines: InlineLine[] = errors.length ? errors.map(text => ({ text, isMessage: true })) : (eventLines?.errors ?? [])
-  const warningLines: InlineLine[] = warnings.length ? warnings.map(text => ({ text, isMessage: true })) : (eventLines?.warnings ?? [])
+  // When the module carries the run's messages, the Errors and Warnings section
+  // below the table renders them; repeating them here read as duplication. The
+  // card only prints text in the blank-module case, where it comes from the
+  // device's latest matching event instead.
+  const moduleHasMessages = errors.length > 0 || warnings.length > 0
+  const errorLines: InlineLine[] = moduleHasMessages ? [] : (eventLines?.errors ?? [])
+  const warningLines: InlineLine[] = moduleHasMessages ? [] : (eventLines?.warnings ?? [])
   const isError = outcome === 'error'
 
   return (
@@ -106,7 +111,7 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
           {errorLines.map((line, i) => <div key={`e-${i}`} className={inlineLineClass(line, 'text-red-700 dark:text-red-300')}>{line.text}</div>)}
           {warningLines.map((line, i) => <div key={`w-${i}`} className={inlineLineClass(line, 'text-yellow-700 dark:text-yellow-300')}>{line.text}</div>)}
         </div>
-      ) : (
+      ) : moduleHasMessages ? null : (
         <p className="text-xs text-gray-500 dark:text-gray-400">No message text was reported for this run.</p>
       )}
     </div>
