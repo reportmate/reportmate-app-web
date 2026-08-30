@@ -16,17 +16,13 @@ export interface SystemProblem {
 }
 
 export interface SystemProblemsSummary {
-  /** The most recent finished session, so the card can name it. */
-  latestSessionId?: string
-  latestTime?: string
-  /** Problems from the most recent finished session. */
-  current: SystemProblem[]
-  /** Problems from earlier sessions inside the window, newest first. */
-  recent: SystemProblem[]
-  /** The most recent session failed outright (errors, or failed status). */
-  latestFailed: boolean
-  /** The most recent session reported no items at all. */
-  latestItemless: boolean
+  /** System-level problems from the most recent run that had any. */
+  problems: SystemProblem[]
+  /** Session the problems came from. */
+  sessionId?: string
+  time?: string
+  /** The most recent session failed outright and reported no items at all. */
+  failedWithoutItems: boolean
 }
 
 const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000
@@ -47,88 +43,60 @@ function systemLines(raw: unknown): string[] {
 export function collectSystemProblems(installs: any): SystemProblemsSummary {
   const munki = installs?.munki
   const cimian = installs?.cimian
-  const empty: SystemProblemsSummary = { current: [], recent: [], latestFailed: false, latestItemless: false }
+  const empty: SystemProblemsSummary = { problems: [], failedWithoutItems: false }
 
   if (munki) {
     const sessions: any[] = Array.isArray(munki.sessions) ? munki.sessions : []
     if (sessions.length > 0) {
+      const itemless = !Array.isArray(munki.items) || munki.items.length === 0
+      const latestFailed = String(sessions[0]?.status || '').toLowerCase() === 'failed'
       const cutoff = Date.now() - RECENT_WINDOW_MS
-      const summary: SystemProblemsSummary = {
-        latestSessionId: String(sessions[0]?.session_id || sessions[0]?.sessionId || ''),
-        latestTime: String(sessions[0]?.end_time || sessions[0]?.endTime || sessions[0]?.start_time || sessions[0]?.startTime || ''),
-        current: [],
-        recent: [],
-        latestFailed: String(sessions[0]?.status || '').toLowerCase() === 'failed'
-          || ((sessions[0]?.error_items ?? sessions[0]?.errorItems ?? []) as any[]).length > 0,
-        latestItemless: !Array.isArray(munki.items) || munki.items.length === 0,
-      }
-      sessions.slice(0, MAX_SESSIONS).forEach((session, index) => {
-        // Sessions arrive snake_case from the client but may be camelCased by
-        // normalizeKeys before they reach here; accept either spelling.
+      // The most recent run that raised system-level problems is the one the
+      // box reports; runs older than the window have aged out.
+      for (const session of sessions.slice(0, MAX_SESSIONS)) {
         const time = String(session?.end_time || session?.endTime || session?.start_time || session?.startTime || '')
-        if (index > 0 && time && new Date(time).getTime() < cutoff) return
-        const sessionId = String(session?.session_id || session?.sessionId || '')
+        if (time && new Date(time).getTime() < cutoff) break
+        const problems: SystemProblem[] = []
         for (const [keys, tone] of [[['error_items', 'errorItems'], 'error'], [['warning_items', 'warningItems'], 'warning']] as const) {
-          const list = (session?.[keys[0]] ?? session?.[keys[1]] ?? []) as any[]
-          for (const problem of list) {
+          for (const problem of ((session?.[keys[0]] ?? session?.[keys[1]] ?? []) as any[])) {
             if (!nameless(problem)) continue
             const message = messageOf(problem)
-            if (!message) continue
-            const target = index === 0 ? summary.current : summary.recent
-            if (!target.some(p => p.message === message) && !summary.current.some(p => p.message === message)) {
-              target.push({ tone, message, sessionId, time })
-            }
+            if (message && !problems.some(p => p.message === message)) problems.push({ tone, message })
           }
         }
-      })
-      return summary
+        if (problems.length > 0) {
+          return {
+            problems,
+            sessionId: String(session?.session_id || session?.sessionId || ''),
+            time,
+            failedWithoutItems: latestFailed && itemless,
+          }
+        }
+      }
+      return { ...empty, failedWithoutItems: latestFailed && itemless }
     }
     // Legacy payload: only the latest run's flattened strings exist.
     const errors = systemLines(munki.errors)
     const warnings = systemLines(munki.warnings)
     const status = String(munki.status || '').toLowerCase()
+    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error'
+      || String(munki.errors || '').trim() !== ''
+    const itemless = !Array.isArray(munki.items) || munki.items.length === 0
     return {
-      current: [
+      problems: [
         ...errors.map(message => ({ tone: 'error' as const, message })),
         ...warnings.map(message => ({ tone: 'warning' as const, message })),
       ],
-      recent: [],
-      latestFailed: munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error'
-        || String(munki.errors || '').trim() !== '',
-      latestItemless: !Array.isArray(munki.items) || munki.items.length === 0,
+      failedWithoutItems: failed && itemless,
     }
   }
 
   if (cimian) {
     const sessions: any[] = Array.isArray(cimian.sessions) ? cimian.sessions : []
     if (sessions.length === 0) return empty
-    const cutoff = Date.now() - RECENT_WINDOW_MS
-    const summary: SystemProblemsSummary = {
-      latestSessionId: String(sessions[0]?.session_id || sessions[0]?.sessionId || ''),
-      latestTime: String(sessions[0]?.end_time || sessions[0]?.endTime || sessions[0]?.start_time || sessions[0]?.startTime || ''),
-      current: [],
-      recent: [],
-      latestFailed: ['failed', 'error'].includes(String(sessions[0]?.status || '').toLowerCase()),
-      latestItemless: !Array.isArray(cimian.items) || cimian.items.length === 0,
-    }
-    sessions.slice(0, MAX_SESSIONS).forEach((session, index) => {
-      const time = String(session?.end_time || session?.endTime || session?.start_time || session?.startTime || '')
-      if (index > 0 && time && new Date(time).getTime() < cutoff) return
-      const status = String(session?.status || '').toLowerCase()
-      if (!['failed', 'error'].includes(status)) return
-      // Cimian sessions carry counts rather than message text; the failed
-      // session itself is the system-level fact worth surfacing.
-      const failures = Number(session?.failures ?? session?.packages_failed ?? 0)
-      const id = session?.session_id || session?.sessionId || ''
-      const message = failures > 0
-        ? `Run ${id} failed (${failures} failure${failures === 1 ? '' : 's'})`
-        : `Run ${id} failed`
-      const target = index === 0 ? summary.current : summary.recent
-      if (!target.some(p => p.message === message) && !summary.current.some(p => p.message === message)) {
-        target.push({ tone: 'error', message, sessionId: String(id), time })
-      }
-    })
-    return summary
+    const itemless = !Array.isArray(cimian.items) || cimian.items.length === 0
+    const latestFailed = ['failed', 'error'].includes(String(sessions[0]?.status || '').toLowerCase())
+    return { ...empty, failedWithoutItems: latestFailed && itemless }
   }
 
   return empty
