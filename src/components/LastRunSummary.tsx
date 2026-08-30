@@ -62,8 +62,13 @@ export function parseInstallsEventPayload(payload: any): LastRunSummaryData | nu
   // Strategy 0: Event-specific filtering — if the payload has explicit package
   // references (failed_items for errors, packages for installs/updates/removals),
   // filter to only those. This prevents showing all 122 Cimian items for a single error.
-  const failedItemsList: string[] = Array.isArray(effectivePayload.failed_items) ? effectivePayload.failed_items : []
-  const eventPackagesList: string[] = Array.isArray(effectivePayload.packages) ? effectivePayload.packages : []
+  // Both clients send these as [{name, version}] objects; older payloads carried plain names.
+  const namesOf = (value: unknown): string[] =>
+    Array.isArray(value)
+      ? value.map((entry) => (typeof entry === 'string' ? entry : (entry as { name?: string })?.name || '')).filter(Boolean)
+      : []
+  const failedItemsList: string[] = namesOf(effectivePayload.failed_items)
+  const eventPackagesList: string[] = [...namesOf(effectivePayload.packages), ...namesOf(effectivePayload.items)]
   const specificPackages = [...failedItemsList, ...eventPackagesList]
 
   if (specificPackages.length > 0 && rawItems.length > 0) {

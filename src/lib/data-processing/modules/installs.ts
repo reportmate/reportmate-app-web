@@ -618,6 +618,10 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
   // Cimian stamps last_seen_in_session with the session *id* (yyyy-MM-dd-HHmm),
   // not a timestamp, so the item-to-run match is an id comparison.
   let latestSessionId = ''
+  // Munki builds with structured session reports send sessions, events and per-item
+  // report fields under the Cimian names; the string-splitting fallbacks below are
+  // for older Munki clients only.
+  const hasMunkiSessions = Array.isArray(installs.munki?.sessions) && installs.munki.sessions.length > 0
 
   // Determine the latest session's start_time BEFORE the package loop so lastUpdate IIFE can use it
   if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
@@ -627,6 +631,12 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     latestSessionId = latestSession.session_id || latestSession.sessionId || ''
   } else if (installs.recentSessions && Array.isArray(installs.recentSessions) && installs.recentSessions.length > 0) {
     const latestSession = installs.recentSessions[0]
+    latestSessionStartTime = latestSession.start_time || latestSession.startTime || ''
+    latestSessionEndTime = latestSession.end_time || latestSession.endTime || ''
+    latestSessionId = latestSession.session_id || latestSession.sessionId || ''
+  } else if (hasMunkiSessions) {
+    // Newer Munki writes the same session records Cimian does, session id included.
+    const latestSession = installs.munki.sessions[0]
     latestSessionStartTime = latestSession.start_time || latestSession.startTime || ''
     latestSessionEndTime = latestSession.end_time || latestSession.endTime || ''
     latestSessionId = latestSession.session_id || latestSession.sessionId || ''
@@ -707,14 +717,22 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       ...item,
       name: item.name || item.displayName || 'Unknown',
       displayName: item.displayName || item.name || 'Unknown',
-      status: item.status, // Already standardized from macOS client
+      // currentStatus comes from Munki's items.json on newer clients; older clients
+      // send only the MunkiReport-style status, already standardized on the client.
+      status: item.currentStatus || item.status,
       version: item.version || item.installedVersion || 'Unknown',
       installedVersion: item.installedVersion || '',
       id: item.id || item.name?.toLowerCase().replace(/\s+/g, '-') || 'unknown',
       type: 'munki',
-      // Only set lastSeenInSession for items whose raw status proves they were processed
-      // installed/pending_install/pending_removal items were NOT touched and must NOT match
-      lastSeenInSession: munkiProcessedStatuses.has(item.status) ? (item.endTime || '') : ''
+      // Newer clients stamp lastSeenInSession with the session id from items.json.
+      // Otherwise only items whose raw status proves they were processed get one;
+      // installed/pending_install/pending_removal items were NOT touched and must NOT match.
+      lastSeenInSession: item.lastSeenInSession || (munkiProcessedStatuses.has(item.status) ? (item.endTime || '') : ''),
+      lastAttemptTime: item.lastAttemptTime || '',
+      lastAttemptStatus: item.lastAttemptStatus || '',
+      failureCount: item.failureCount ?? 0,
+      installCount: item.installCount ?? 0,
+      updateCount: item.updateCount ?? 0
     }))
       }
   else if (installs.recentInstalls && Array.isArray(installs.recentInstalls) && installs.recentInstalls.length > 0) {
@@ -1003,6 +1021,19 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
               }
     }
   }
+  // Munki sessions carry the same run_type / duration_seconds as Cimian's
+  else if (hasMunkiSessions) {
+    const sessions = installs.munki.sessions
+    const withActivity = sessions.find((session: any) =>
+      (session.status === 'completed' || session.status === 'partial_failure') &&
+      ((session.summary?.total_actions ?? 0) > 0 || (session.summary?.failures ?? 0) > 0) &&
+      (session.duration_seconds ?? 0) > 0
+    )
+    const chosen = withActivity || sessions.find((session: any) => session.status !== 'running') || sessions[0]
+    latestRunType = chosen.run_type || chosen.runType || 'Manual'
+    latestDurationSeconds = chosen.duration_seconds
+    latestDuration = typeof chosen.duration_seconds === 'number' ? `${chosen.duration_seconds}s` : 'Unknown'
+  }
   // Fallback to cimian.sessions if recentSessions is not available
   else if (installs.cimian?.sessions && Array.isArray(installs.cimian.sessions) && installs.cimian.sessions.length > 0) {
     // Find the most recent session with activity from cimian.sessions
@@ -1094,9 +1125,9 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       softwareRepoURL: installs.munki?.softwareRepoURL || '',
       manifest: installs.munki?.manifestName || installs.munki?.clientIdentifier || '',
       lastRun: installs.munki?.endTime || installs.munki?.lastRun || '',
-      runType: 'Auto', // Munki is typically scheduled
-      duration: 'Unknown', // Munki doesn't report duration
-      durationSeconds: undefined
+      runType: hasMunkiSessions ? latestRunType : 'Auto',
+      duration: hasMunkiSessions ? latestDuration : 'Unknown',
+      durationSeconds: hasMunkiSessions ? latestDurationSeconds : undefined
     } : {
       // Cimian configuration
       type: 'Cimian',
@@ -1149,7 +1180,20 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
     // Creates SYNTHETIC items for packages mentioned in messages but missing from munki.items
     // (e.g., "Could not process item ReportMate for install" when ReportMate isn't in items array)
     // This always runs — the per-item lastWarning/lastError only covers items that exist.
-    if (installs.munki?.errors && installs.munki.errors.trim() !== '') {
+    if (hasMunkiSessions) {
+      // Attributed problems already arrived per item (lastError / lastWarning); the
+      // nameless ones — catalog, manifest, download — are run-level messages.
+      const stamp = installs.munki.endTime || new Date().toISOString()
+      for (const problem of (installs.munki.errorItems || []) as Array<{ name?: string; message?: string }>) {
+        if (problem.name || !problem.message) continue
+        installsInfo.messages?.errors.push({ id: `munki-run-error-system`, message: problem.message, timestamp: stamp, code: 'MUNKI_ERROR', package: 'Munki' })
+      }
+      for (const problem of (installs.munki.warningItems || []) as Array<{ name?: string; message?: string }>) {
+        if (problem.name || !problem.message) continue
+        installsInfo.messages?.warnings.push({ id: `munki-run-warning-system`, message: problem.message, timestamp: stamp, code: 'MUNKI_WARNING', package: 'Munki' })
+      }
+    }
+    if (!hasMunkiSessions && installs.munki?.errors && installs.munki.errors.trim() !== '') {
       // Pre-process: group installer log blocks (delimited by --- lines) into single coherent errors.
       // macOS installer output arrives as semicolon-separated lines between --- delimiters:
       //   "---; installer: Package name is; installer:PHASE:...; installer: The upgrade failed. ...; ---"
@@ -1242,7 +1286,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         }
       }
     }
-    if (installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
+    if (!hasMunkiSessions && installs.munki?.warnings && installs.munki.warnings.trim() !== '') {
       for (const msg of installs.munki.warnings.split(';').map((s: string) => s.trim()).filter((s: string) => s.length > 0)) {
         const matchedPkg = findPackageForMessage(msg, packages)
         if (matchedPkg) {
