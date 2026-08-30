@@ -9,6 +9,7 @@
 import React, { useEffect, useState } from "react"
 import { useSettings } from "../../providers/SettingsProvider"
 import { DEFAULT_KIOSK_SETTINGS } from "../../lib/settings/defaults"
+import { safeKioskPath } from "../../lib/kiosk/role"
 import type { KioskSettings, SettingsDocument } from "../../lib/settings/types"
 
 const HOME_PAGES: Array<{ path: string; label: string }> = [
@@ -51,7 +52,7 @@ export function KioskSettingsEditor({ readOnly = false }: { readOnly?: boolean }
 
   async function save() {
     setStatus({ type: "saving" })
-    const doc: SettingsDocument = { ...settings, kiosk }
+    const doc: SettingsDocument = { ...settings, kiosk: { ...kiosk, homePath: safeKioskPath(kiosk.homePath) } }
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",

@@ -10,7 +10,7 @@
 
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { KIOSK_ROLE } from '../lib/kiosk/role'
+import { KIOSK_ROLE, safeKioskPath } from '../lib/kiosk/role'
 import { useSettingsOptional } from '../providers/SettingsProvider'
 import { DEFAULT_KIOSK_SETTINGS } from '../lib/settings/defaults'
 import { useTheme } from './theme-provider'
@@ -23,7 +23,8 @@ export function KioskBehaviour() {
   const { setTheme } = useTheme()
   const isKiosk = (session as { role?: string } | null)?.role === KIOSK_ROLE
   const kiosk = { ...DEFAULT_KIOSK_SETTINGS, ...(settings?.settings.kiosk ?? {}) }
-  const { homePath, zoom, idleMinutes, theme } = kiosk
+  const { zoom, idleMinutes, theme } = kiosk
+  const homePath = safeKioskPath(kiosk.homePath)
 
   useEffect(() => {
     if (!isKiosk) return
