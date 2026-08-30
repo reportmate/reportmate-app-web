@@ -694,7 +694,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                         )}
                                                       </button>
                                                     </div>
-                                                    <p className="text-sm text-red-700 dark:text-red-300">
+                                                    <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
                                                       {error.message}
                                                     </p>
                                                     {error.details && (
@@ -753,7 +753,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                         )}
                                                       </button>
                                                     </div>
-                                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                                    <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
                                                       {warning.message}
                                                     </p>
                                                     {warning.details && (
@@ -928,7 +928,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                 )}
                                               </button>
                                             </div>
-                                            <p className="text-sm text-red-700 dark:text-red-300">
+                                            <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
                                               {error.message}
                                             </p>
                                             {error.details && (
@@ -987,7 +987,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                 )}
                                               </button>
                                             </div>
-                                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                            <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
                                               {warning.message}
                                             </p>
                                             {warning.details && (

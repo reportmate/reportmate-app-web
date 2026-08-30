@@ -1,3 +1,4 @@
+import { cleanLogText } from './logText'
 /**
  * Turn a raw event payload into the sections the Recent Events accordion renders.
  *
@@ -107,7 +108,7 @@ function normalizeItem(raw: unknown): EventDetailItem | null {
   return {
     name,
     version: version ? String(version) : undefined,
-    detail: detail ? String(detail) : undefined,
+    detail: detail ? cleanLogText(detail) : undefined,
   }
 }
 
@@ -165,7 +166,7 @@ export function summarizeEventPayload(payload: unknown): EventDetailSummary {
     const source = Array.isArray(raw) ? raw.map(v => (v && typeof v === 'object' ? String((v as Record<string, unknown>).message ?? '') : v)) : raw
     const { kept, suppressed } = splitMessages(source)
     suppressedMessageCount += suppressed
-    for (const text of kept) messages.push({ tone, text })
+    for (const text of kept) messages.push({ tone, text: cleanLogText(text) })
   }
 
   const context: EventDetailSummary['context'] = []

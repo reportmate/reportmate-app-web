@@ -1,3 +1,4 @@
+import { cleanLogText } from './logText'
 /**
  * Inline detail lines for an event row: what a run installed, warned about or
  * failed on, straight from its payload. Shared by the fleet events feed, the
@@ -40,7 +41,7 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
 
   const pushString = (target: InlineLine[], val: unknown) => {
     if (typeof val === 'string' && val.trim()) {
-      val.split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push({ text: s, isMessage: true }))
+      cleanLogText(val).split(';').map(s => s.trim()).filter(Boolean).forEach(s => target.push({ text: s, isMessage: true }))
     }
   }
   const pushItems = (target: InlineLine[], val: unknown) => {
@@ -51,7 +52,7 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
       } else if (item && typeof item === 'object') {
         const name = String(item.displayName || item.name || '').trim()
         const version = String(item.version || '').trim()
-        const detail = String(item.error || item.warning || item.message || '').trim()
+        const detail = cleanLogText(item.error || item.warning || item.message)
         const line = detail ? (name ? `${name}${version ? ` ${version}` : ''}: ${detail}` : detail) : `${name}${version ? ` ${version}` : ''}`
         if (line) target.push({ text: line, isMessage: Boolean(detail), name: name || undefined, version: version || undefined, message: detail || undefined })
       }
@@ -141,5 +142,5 @@ export function cachedEventPayload(eventId: string): unknown {
 /** Run messages get a mono chip; a bare "Name version" item stays plain text. */
 export const inlineLineClass = (line: InlineLine, tone: string) =>
   line.isMessage
-    ? `text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${tone}`
+    ? `text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 whitespace-pre-wrap break-words ${tone}`
     : `text-sm break-words ${tone}`

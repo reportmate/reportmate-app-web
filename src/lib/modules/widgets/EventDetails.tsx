@@ -138,7 +138,7 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
                   <span className="text-xs text-gray-500 dark:text-gray-400 font-mono shrink-0">{item.version}</span>
                 )}
                 {item.detail && (
-                  <span className={`basis-full ml-3.5 text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${TONE_TEXT[group.tone]}`}>{item.detail}</span>
+                  <span className={`basis-full ml-3.5 text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 whitespace-pre-wrap break-words ${TONE_TEXT[group.tone]}`}>{item.detail}</span>
                 )}
               </li>
             ))}
@@ -160,7 +160,7 @@ export const EventDetails: React.FC<{ eventIds: string[] }> = ({ eventIds }) => 
               {messages.map((message, index) => (
                 <li
                   key={index}
-                  className={`text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 break-words ${TONE_TEXT[message.tone]}`}
+                  className={`text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-900/50 whitespace-pre-wrap break-words ${TONE_TEXT[message.tone]}`}
                 >
                   {message.text}
                 </li>

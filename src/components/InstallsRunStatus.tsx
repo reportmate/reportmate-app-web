@@ -24,8 +24,8 @@ export function lastRunFailed(installs: any): boolean {
 }
 
 const CHIP: Record<'error' | 'warning', string> = {
-  error: 'text-xs font-mono px-2.5 py-1.5 rounded bg-red-100/70 dark:bg-red-900/40 text-red-800 dark:text-red-200 break-words',
-  warning: 'text-xs font-mono px-2.5 py-1.5 rounded bg-yellow-200/80 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 break-words',
+  error: 'text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-800 text-red-700 dark:text-red-300 whitespace-pre-wrap break-words',
+  warning: 'text-xs font-mono px-2.5 py-1.5 rounded bg-gray-100 dark:bg-gray-800 text-yellow-800 dark:text-yellow-300 whitespace-pre-wrap break-words',
 }
 
 export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumber, installs }) => {

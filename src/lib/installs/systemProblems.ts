@@ -1,3 +1,4 @@
+import { cleanLogText } from '../logText'
 /**
  * System-level problems from managed-software runs: messages the client could
  * not attribute to any item (manifest and catalog retrieval, preflight and
@@ -29,12 +30,12 @@ const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000
 const MAX_SESSIONS = 8
 
 const nameless = (problem: any) => !String(problem?.name || '').trim()
-const messageOf = (problem: any) => String(problem?.message || '').trim()
+const messageOf = (problem: any) => cleanLogText(problem?.message)
 
 /** Legacy flattened strings: keep only lines that name no item. */
 function systemLines(raw: unknown): string[] {
   if (typeof raw !== 'string') return []
-  return raw
+  return cleanLogText(raw)
     .split(/;|\n/)
     .map(s => s.trim())
     .filter(s => s && !/^-{3,}$/.test(s) && !/^installer:/i.test(s) && itemNameFromMessage(s) === null)
