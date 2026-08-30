@@ -293,63 +293,13 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
     : packages;
   const installedCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'installed').length;
   const pendingCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'pending').length;
-  const warningCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length + runLevelWarnings.length;
-  const errorCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length + runLevelErrors.length;
+  const warningCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'warning').length;
+  const errorCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'error').length;
   const removedCount = contextPackages.filter((pkg: any) => pkg.status?.toLowerCase() === 'removed').length;
 
-  const hasRunLevelMessages = runLevelErrors.length > 0 || runLevelWarnings.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* Run-level (Munki/Cimian system) errors and warnings — surfaces preflight
-          failures and other unattributable messages that aren't tied to a specific package. */}
-      {hasRunLevelMessages && hasPackages && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">
-              Errors and Warnings
-              <span className="ml-2 text-xs font-normal text-gray-500 dark:text-gray-400">
-                {runLevelErrors.length > 0 && `${runLevelErrors.length} error${runLevelErrors.length === 1 ? '' : 's'}`}
-                {runLevelErrors.length > 0 && runLevelWarnings.length > 0 && ', '}
-                {runLevelWarnings.length > 0 && `${runLevelWarnings.length} warning${runLevelWarnings.length === 1 ? '' : 's'}`}
-              </span>
-            </h3>
-          </div>
-          <div className="px-6 py-4 space-y-2">
-            {runLevelErrors.map((error, i) => (
-              <div
-                key={error.id || `run-error-${i}`}
-                className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded px-3 py-2"
-              >
-                <p className="text-sm text-red-800 dark:text-red-300 font-mono break-words">
-                  {error.message}
-                </p>
-                {error.timestamp && (
-                  <p className="text-xs text-red-500 dark:text-red-500 mt-1">
-                    {formatExactTime(error.timestamp)}
-                  </p>
-                )}
-              </div>
-            ))}
-            {runLevelWarnings.map((warning, i) => (
-              <div
-                key={warning.id || `run-warning-${i}`}
-                className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded px-3 py-2"
-              >
-                <p className="text-sm text-yellow-800 dark:text-yellow-300 font-mono break-words">
-                  {warning.message}
-                </p>
-                {warning.timestamp && (
-                  <p className="text-xs text-yellow-600 dark:text-yellow-500 mt-1">
-                    {formatExactTime(warning.timestamp)}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Full Width Packages Table */}
       <div className="space-y-4">
           {/* Packages Table */}
@@ -744,7 +694,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                         )}
                                                       </button>
                                                     </div>
-                                                    <p className="text-sm text-red-700 dark:text-red-300">
+                                                    <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
                                                       {error.message}
                                                     </p>
                                                     {error.details && (
@@ -803,7 +753,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                         )}
                                                       </button>
                                                     </div>
-                                                    <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                                    <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
                                                       {warning.message}
                                                     </p>
                                                     {warning.details && (
@@ -978,7 +928,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                 )}
                                               </button>
                                             </div>
-                                            <p className="text-sm text-red-700 dark:text-red-300">
+                                            <p className="text-sm text-red-700 dark:text-red-300 whitespace-pre-wrap break-words">
                                               {error.message}
                                             </p>
                                             {error.details && (
@@ -1037,7 +987,7 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
                                                 )}
                                               </button>
                                             </div>
-                                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                            <p className="text-sm text-yellow-700 dark:text-yellow-300 whitespace-pre-wrap break-words">
                                               {warning.message}
                                             </p>
                                             {warning.details && (

@@ -21,6 +21,14 @@ const VALID_EVENT_KINDS: ReadonlyArray<string> = ['system', 'info', 'error', 'wa
 // Helper function to get status icons matching the filter button style (no circles)
 const getStatusIcon = (kind: string) => {
   switch (kind.toLowerCase()) {
+    case 'removed':
+      return (
+        <div className="w-5 h-5 text-purple-500" title="Removed">
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        </div>
+      )
     case 'success':
       return (
         <div className="w-5 h-5 text-green-500" title="Success">
@@ -798,9 +806,16 @@ function EventsPageContent() {
   // A count summary takes its kind's colour, like the item lines it stands in for
   const summaryToneClass = (kind: string) => ({
     success: 'text-green-700 dark:text-green-300',
+    removed: 'text-purple-700 dark:text-purple-300',
     warning: 'text-yellow-700 dark:text-yellow-300',
     error: 'text-red-700 dark:text-red-300',
   } as Record<string, string>)[(kind || '').toLowerCase()] || 'text-gray-900 dark:text-white'
+
+  // Removals are successes rendered in the removed purple, matching the widget rows
+  const isRemovalEvent = (event: BundledEvent): boolean =>
+    (event.kind || '').toLowerCase() === 'success' &&
+    (extractInlineDetails(fullPayloads[event.id]).isRemoval || /\bremoved$/i.test(String(event.message || '').trim()))
+  const effectiveKind = (event: BundledEvent): string => (isRemovalEvent(event) ? 'removed' : event.kind)
 
   const getDisplayMessage = (event: BundledEvent): string | null =>
     inlineLines(event).hasDetails ? null : getEventMessage(event)
@@ -823,7 +838,7 @@ function EventsPageContent() {
           <div key={`w-${i}`} className={inlineLineClass(m, 'text-yellow-700 dark:text-yellow-300')}>{m.text}</div>
         ))}
         {successLines.map((m, i) => (
-          <div key={`s-${i}`} className="text-sm text-green-700 dark:text-green-300 break-words">{m}</div>
+          <div key={`s-${i}`} className={`text-sm break-words ${isRemovalEvent(event) ? 'text-purple-700 dark:text-purple-300' : 'text-green-700 dark:text-green-300'}`}>{m}</div>
         ))}
       </div>
     )
@@ -1144,7 +1159,7 @@ function EventsPageContent() {
                           >
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
                               <div className="flex items-center justify-center">
-                                {getStatusIcon(event.kind)}
+                                {getStatusIcon(effectiveKind(event))}
                               </div>
                             </td>
                             <td className="px-4 lg:px-6 py-4 whitespace-nowrap align-top">
@@ -1168,7 +1183,7 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-4 lg:px-6 py-4 align-top">
-                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                              <div className={`text-sm break-words ${summaryToneClass(effectiveKind(event))}`}>
                                 {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
@@ -1525,7 +1540,7 @@ function EventsPageContent() {
                           >
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
                               <div className="flex items-center justify-center">
-                                {getStatusIcon(event.kind)}
+                                {getStatusIcon(effectiveKind(event))}
                               </div>
                             </td>
                             <td className="px-4 lg:px-6 py-3 whitespace-nowrap align-top">
@@ -1549,7 +1564,7 @@ function EventsPageContent() {
                               </div>
                             </td>
                             <td className="px-4 py-3 max-w-xs align-top">
-                              <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                              <div className={`text-sm break-words ${summaryToneClass(effectiveKind(event))}`}>
                                 {getDisplayMessage(event)}
                               </div>
                               {renderInlineDetails(event)}
@@ -1769,7 +1784,7 @@ function EventsPageContent() {
                     {/* Card Header */}
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2 flex-wrap">
-                        {getStatusIcon(event.kind)}
+                        {getStatusIcon(effectiveKind(event))}
                         <span 
                           className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 font-mono"
                           title={isBundleId(event.id) ? `Bundle: ${event.eventIds?.join(', ') || event.id}` : `#${event.id}`}
@@ -1804,7 +1819,7 @@ function EventsPageContent() {
                     {/* Message */}
                     <div className="mb-3">
                       <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Message</div>
-                      <div className={`text-sm break-words ${summaryToneClass(event.kind)}`}>
+                      <div className={`text-sm break-words ${summaryToneClass(effectiveKind(event))}`}>
                         {getDisplayMessage(event)}
                       </div>
                       {renderInlineDetails(event)}

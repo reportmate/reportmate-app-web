@@ -473,6 +473,10 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
     const platform = platformStats[0]
     const displayName = platform.platform === 'macOS' ? 'Macintosh' : platform.platform
     const totalDevices = platform.count
+    // A bar either has a real usage value or it is not a bar; the unclassified
+    // remainder is a footnote, not a category.
+    const knownUsageStats = usageStats.filter(stats => stats.usage !== 'Unknown')
+    const unknownUsageCount = usageStats.filter(stats => stats.usage === 'Unknown').reduce((sum, stats) => sum + stats.count, 0)
 
     return (
       <div className="space-y-3">
@@ -484,10 +488,13 @@ export const PlatformDistributionChart: React.FC<PlatformDistributionChartProps>
           <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
             {displayName} — {totalDevices} {totalDevices === 1 ? 'device' : 'devices'} — by Usage
           </span>
+          {unknownUsageCount > 0 && (
+            <span className="ml-auto text-xs text-gray-400 dark:text-gray-500">{unknownUsageCount} unknown</span>
+          )}
         </div>
 
         {/* Usage cards */}
-        {usageStats.map(stats => {
+        {knownUsageStats.map(stats => {
           const isExpanded = expandedUsage === stats.usage
 
           return (
