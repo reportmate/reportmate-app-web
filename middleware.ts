@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
-import { viewerMayRead, KIOSK_ROLE } from './src/lib/kiosk/tokens'
+import { viewerMayRead, matchKioskToken, issueKioskSession, kioskCookieName, KIOSK_ROLE } from './src/lib/kiosk/tokens'
 
 // Define routes that should not trigger auto-redirect
 const publicRoutes = [
@@ -235,6 +235,26 @@ export default async function middleware(request: NextRequest) {
         }
       }
       return NextResponse.next()
+    }
+
+    // No live session, but a kiosk cookie: NextAuth re-issues session JWTs
+    // with its 24h maxAge, so a wall display's session lapses daily. While
+    // the pinned token is still listed, mint a fresh viewer session in place
+    // and carry on, under the same read-only rules.
+    const secure = process.env.NODE_ENV === 'production'
+    const kioskToken = request.cookies.get(kioskCookieName(secure))?.value
+    const kioskLabel = matchKioskToken(kioskToken)
+    if (kioskLabel && kioskToken && process.env.NEXTAUTH_SECRET) {
+      const readMethod = request.method === 'GET' || request.method === 'HEAD'
+      if (!readMethod || !viewerMayRead(pathname)) {
+        if (pathname.startsWith('/api/')) {
+          return NextResponse.json({ error: 'Forbidden', details: 'Kiosk sessions are read-only' }, { status: 403 })
+        }
+        return NextResponse.redirect(new URL('/events', process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_SITE_URL || request.nextUrl.origin))
+      }
+      const response = NextResponse.next()
+      await issueKioskSession(response, { label: kioskLabel, token: kioskToken, secret: process.env.NEXTAUTH_SECRET, secure })
+      return response
     }
 
     // API routes answer with JSON 401 rather than an HTML redirect: fetch()

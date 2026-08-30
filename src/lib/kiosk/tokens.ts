@@ -4,14 +4,27 @@
  * A display that shows ReportMate all day should not hold a person's Entra
  * session. KIOSK_TOKENS carries one opaque token per screen (comma-separated,
  * sourced from Key Vault or Secrets Manager). Presenting a listed token to
- * /kiosk mints a long-lived NextAuth JWT with role "viewer": read-only pages
- * and read-only APIs, nothing else. Rotating the secret ends every session.
+ * /kiosk mints a NextAuth JWT with role "viewer": read-only pages and
+ * read-only APIs, nothing else. Rotating the secret ends every session.
+ *
+ * NextAuth's own session endpoint re-issues every session JWT with the app's
+ * session.maxAge (24 hours), so the long expiry stamped at /kiosk does not
+ * survive the first session fetch. The kiosk token is therefore pinned in a
+ * second, long-lived cookie, and the middleware mints a fresh viewer session
+ * from it whenever the session JWT has lapsed — a screen never lands on the
+ * sign-in page while its token is still listed.
  */
 
-import { timingSafeEqual } from 'crypto'
+import { encode } from 'next-auth/jwt'
+import type { NextResponse } from 'next/server'
 
 export const KIOSK_ROLE = 'viewer'
 export const KIOSK_SESSION_DAYS = 365
+
+export const sessionCookieName = (secure: boolean) =>
+  secure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
+export const kioskCookieName = (secure: boolean) =>
+  secure ? '__Secure-reportmate-kiosk' : 'reportmate-kiosk'
 
 /** Parse KIOSK_TOKENS as "label:token" or bare "token" entries. */
 export function kioskTokens(): Array<{ label: string; token: string }> {
@@ -29,10 +42,14 @@ export function kioskTokens(): Array<{ label: string; token: string }> {
     .filter(e => e.token.length >= 16)
 }
 
+/** Constant-time comparison that also runs in the edge middleware runtime. */
 function safeEqual(a: string, b: string): boolean {
-  const ab = Buffer.from(a)
-  const bb = Buffer.from(b)
-  return ab.length === bb.length && timingSafeEqual(ab, bb)
+  const ab = new TextEncoder().encode(a)
+  const bb = new TextEncoder().encode(b)
+  if (ab.length !== bb.length) return false
+  let diff = 0
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i]
+  return diff === 0
 }
 
 /** The label of the kiosk a presented token belongs to, or null. */
@@ -42,6 +59,30 @@ export function matchKioskToken(presented: string | null | undefined): string | 
     if (safeEqual(presented, token)) return label
   }
   return null
+}
+
+/**
+ * Set the viewer session for a kiosk on a response, with the kiosk token
+ * pinned beside it so the session can be re-minted after NextAuth shortens it.
+ */
+export async function issueKioskSession(
+  response: NextResponse,
+  opts: { label: string; token: string; secret: string; secure: boolean },
+): Promise<void> {
+  const maxAge = KIOSK_SESSION_DAYS * 24 * 60 * 60
+  const jwt = await encode({
+    secret: opts.secret,
+    maxAge,
+    token: {
+      name: `Kiosk ${opts.label}`,
+      email: `${opts.label}@kiosk.reportmate`,
+      role: KIOSK_ROLE,
+      kiosk: opts.label,
+    },
+  })
+  const base = { httpOnly: true, sameSite: 'lax' as const, secure: opts.secure, path: '/', maxAge }
+  response.cookies.set({ name: sessionCookieName(opts.secure), value: jwt, ...base })
+  response.cookies.set({ name: kioskCookieName(opts.secure), value: opts.token, ...base })
 }
 
 /**
