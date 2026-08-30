@@ -156,7 +156,7 @@ function extractErrorWarningDetails(events: FleetEvent[]): Partial<BundledEvent>
         failedItems.push({
           name: item.name || 'Unknown',
           displayName: item.displayName || item.name || 'Unknown',
-          error: item.error || ''
+          error: item.error || item.message || ''
         })
       }
     }
@@ -167,7 +167,7 @@ function extractErrorWarningDetails(events: FleetEvent[]): Partial<BundledEvent>
         warningItems.push({
           name: item.name || 'Unknown',
           displayName: item.displayName || item.name || 'Unknown',
-          warning: item.warning || ''
+          warning: item.warning || item.message || ''
         })
       }
     }
