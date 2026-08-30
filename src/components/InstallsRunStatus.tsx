@@ -25,7 +25,7 @@ export function lastRunFailed(installs: any): boolean {
 
 const CHIP: Record<'error' | 'warning', string> = {
   error: 'text-xs font-mono px-2.5 py-1.5 rounded bg-red-100/70 dark:bg-red-900/40 text-red-800 dark:text-red-200 break-words',
-  warning: 'text-xs font-mono px-2.5 py-1.5 rounded bg-yellow-100/70 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200 break-words',
+  warning: 'text-xs font-mono px-2.5 py-1.5 rounded bg-yellow-200/80 dark:bg-yellow-900/50 text-yellow-900 dark:text-yellow-200 break-words',
 }
 
 export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumber, installs }) => {
@@ -61,10 +61,10 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
   const isError = summary.failedWithoutItems || summary.problems.some(p => p.tone === 'error')
   const chrome = isError
     ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-900/20'
-    : 'border-yellow-200 bg-yellow-50/60 dark:border-yellow-900 dark:bg-yellow-900/20'
+    : 'border-yellow-400 bg-yellow-100/80 dark:border-yellow-700 dark:bg-yellow-900/30'
   const badge = isError
     ? { text: 'Last run failed', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
-    : { text: 'Last run had warnings', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' }
+    : { text: 'Last run warnings', className: 'bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-200' }
 
   const stampParts: string[] = []
   if (summary.sessionId) stampParts.push(summary.sessionId)
