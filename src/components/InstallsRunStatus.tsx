@@ -10,6 +10,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { extractInlineDetails, fetchEventPayload, inlineLineClass, type InlineLine } from '../lib/eventInlineDetails'
+import { itemNameFromMessage } from '../lib/installs/status'
 
 interface InstallsRunStatusProps {
   serialNumber?: string
@@ -37,14 +38,29 @@ function runOutcome(installs: any): { outcome: Outcome; errors: string[]; warnin
       if (!name) return message
       return message ? `${name}${version ? ` ${version}` : ''}: ${message}` : `${name}${version ? ` ${version}` : ''}`
     }
-    const structuredErrors = Array.isArray(munki.errorItems) ? munki.errorItems.map(describe).filter(Boolean) : []
-    const structuredWarnings = Array.isArray(munki.warningItems) ? munki.warningItems.map(describe).filter(Boolean) : []
-    const errors = structuredErrors.length ? structuredErrors : splitMessages(munki.errors)
-    const warnings = structuredWarnings.length ? structuredWarnings : splitMessages(munki.warnings)
+    // Only problems that name no item belong here; anything attributable —
+    // structured items with a name, "Download of X failed", installer output —
+    // lives on the item itself in the table below.
+    const nameless = (problem: any) => !String(problem?.name || '').trim()
+    const systemOnly = (message: string) => !/^installer:/i.test(message) && itemNameFromMessage(message) === null
+    const hasStructured = Array.isArray(munki.errorItems) || Array.isArray(munki.warningItems)
+    const errors = hasStructured
+      ? (munki.errorItems || []).filter(nameless).map(describe).filter(Boolean)
+      : splitMessages(munki.errors).filter(systemOnly)
+    const warnings = hasStructured
+      ? (munki.warningItems || []).filter(nameless).map(describe).filter(Boolean)
+      : splitMessages(munki.warnings).filter(systemOnly)
+    const anyErrors = hasStructured ? (munki.errorItems || []).length > 0 : splitMessages(munki.errors).length > 0
     const status = String(munki.status || '').toLowerCase()
     const sessionStatus = String(munki.lastSessionStatus || '').toLowerCase()
-    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error' || sessionStatus === 'failed' || errors.length > 0
+    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error' || sessionStatus === 'failed' || anyErrors
     const warned = warnings.length > 0 || status === 'warning' || sessionStatus === 'partial_failure'
+    const itemless = !Array.isArray(munki.items) || munki.items.length === 0
+    // With every problem attached to an item and items on the page, the card
+    // would only repeat the table; show it for system problems or an empty run.
+    if (errors.length === 0 && warnings.length === 0 && !(failed && itemless)) {
+      return { outcome: null, errors: [], warnings: [] }
+    }
     return { outcome: failed ? 'error' : warned ? 'warning' : null, errors, warnings }
   }
   if (cimian) {
