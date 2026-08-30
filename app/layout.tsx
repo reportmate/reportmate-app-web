@@ -4,7 +4,7 @@ import "./globals.css";
 import ErrorBoundary from "../src/components/ErrorBoundary";
 import { ThemeProvider } from "../src/components/theme-provider";
 import { EdgeThemeFix } from "../src/components/edge-theme-fix";
-import { KioskIdleReset } from "../src/components/KioskIdleReset";
+import { KioskBehaviour } from "../src/components/KioskBehaviour";
 import AuthProvider from "../components/auth/AuthProvider";
 import AutoAuth from "../components/auth/AutoAuth";
 import { SWRProvider } from "../src/providers/SWRProvider";
@@ -152,7 +152,7 @@ export default async function RootLayout({
                 <DebugModeProvider>
                 <DemoModeProvider>
                 <EdgeThemeFix />
-                <KioskIdleReset />
+                <KioskBehaviour />
                 <ErrorBoundary>
                   {skipAuth ? (
                     // Development/Demo: No AutoAuth component

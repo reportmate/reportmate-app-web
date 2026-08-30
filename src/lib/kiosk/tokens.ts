@@ -91,7 +91,7 @@ export async function issueKioskSession(
  * middleware also refuses any method other than GET/HEAD for a viewer.
  */
 const VIEWER_PAGE_PREFIXES = ['/dashboard', '/events', '/devices', '/device/', '/system', '/installs', '/applications', '/hardware', '/network', '/security', '/management', '/inventory', '/identity', '/peripherals', '/reports']
-const VIEWER_API_PREFIXES = ['/api/dashboard', '/api/events', '/api/device', '/api/device-names', '/api/stats', '/api/version', '/api/v1/devices', '/api/v1/device', '/api/v1/events', '/api/v1/installs', '/api/v1/identity', '/api/v1/system', '/api/v1/applications', '/api/v1/hardware', '/api/v1/network', '/api/v1/security', '/api/v1/management', '/api/v1/inventory', '/api/v1/peripherals']
+const VIEWER_API_PREFIXES = ['/api/settings', '/api/dashboard', '/api/events', '/api/device', '/api/device-names', '/api/stats', '/api/version', '/api/v1/devices', '/api/v1/device', '/api/v1/events', '/api/v1/installs', '/api/v1/identity', '/api/v1/system', '/api/v1/applications', '/api/v1/hardware', '/api/v1/network', '/api/v1/security', '/api/v1/management', '/api/v1/inventory', '/api/v1/peripherals']
 
 export function viewerMayRead(pathname: string): boolean {
   if (pathname === '/' || pathname === '/kiosk') return true
