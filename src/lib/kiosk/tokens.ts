@@ -17,8 +17,9 @@
 
 import { encode } from 'next-auth/jwt'
 import type { NextResponse } from 'next/server'
+import { KIOSK_ROLE } from './role'
 
-export const KIOSK_ROLE = 'viewer'
+export { KIOSK_ROLE }
 export const KIOSK_SESSION_DAYS = 365
 
 export const sessionCookieName = (secure: boolean) =>
