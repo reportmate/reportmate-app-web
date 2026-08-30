@@ -1,91 +1,63 @@
 /**
- * Outcome of the most recent managed-software run on a device.
+ * System-level outcome of recent managed-software runs on a device.
  *
- * A run that never reached its manifest reports zero items, so the items
- * table alone reads as "nothing assigned" when the truth is "the run failed".
- * This card says which, and shows the run's messages: from the module when
- * the client sent them, else from the device's latest error or warning event,
- * because the stale-error sweep can blank the module strings.
+ * Item problems live on their items in the table; this card carries only what
+ * no item can: manifest and catalog retrieval failures, preflight and
+ * postflight errors, a run that reported nothing at all. Problems are
+ * session-scoped — a later clean run demotes them to "earlier runs" rather
+ * than erasing them — and each line is stamped with the session it came from.
  */
 
 import React, { useEffect, useState } from 'react'
 import { extractInlineDetails, fetchEventPayload, inlineLineClass, type InlineLine } from '../lib/eventInlineDetails'
-import { itemNameFromMessage } from '../lib/installs/status'
+import { collectSystemProblems, type SystemProblem } from '../lib/installs/systemProblems'
 
 interface InstallsRunStatusProps {
   serialNumber?: string
   installs: any
 }
 
-type Outcome = 'error' | 'warning' | null
-
-function splitMessages(raw: unknown): string[] {
-  if (typeof raw !== 'string') return []
-  return raw.split(/;|\n/).map(s => s.trim()).filter(s => s && !/^-{3,}$/.test(s) && !/^installer:(%|PHASE:|STATUS:)/i.test(s))
-}
-
-function runOutcome(installs: any): { outcome: Outcome; errors: string[]; warnings: string[] } {
-  const munki = installs?.munki
-  const cimian = installs?.cimian
-  if (munki) {
-    // Newer clients send structured warningItems / errorItems ({name?, version?,
-    // message}); older ones the semicolon-joined strings. Show both the same way,
-    // with the item name leading when the problem names one.
-    const describe = (problem: any): string => {
-      const name = String(problem?.name || '').trim()
-      const version = String(problem?.version || '').trim()
-      const message = String(problem?.message || '').trim()
-      if (!name) return message
-      return message ? `${name}${version ? ` ${version}` : ''}: ${message}` : `${name}${version ? ` ${version}` : ''}`
-    }
-    // Only problems that name no item belong here; anything attributable —
-    // structured items with a name, "Download of X failed", installer output —
-    // lives on the item itself in the table below.
-    const nameless = (problem: any) => !String(problem?.name || '').trim()
-    const systemOnly = (message: string) => !/^installer:/i.test(message) && itemNameFromMessage(message) === null
-    const hasStructured = Array.isArray(munki.errorItems) || Array.isArray(munki.warningItems)
-    const errors = hasStructured
-      ? (munki.errorItems || []).filter(nameless).map(describe).filter(Boolean)
-      : splitMessages(munki.errors).filter(systemOnly)
-    const warnings = hasStructured
-      ? (munki.warningItems || []).filter(nameless).map(describe).filter(Boolean)
-      : splitMessages(munki.warnings).filter(systemOnly)
-    const anyErrors = hasStructured ? (munki.errorItems || []).length > 0 : splitMessages(munki.errors).length > 0
-    const status = String(munki.status || '').toLowerCase()
-    const sessionStatus = String(munki.lastSessionStatus || '').toLowerCase()
-    const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error' || sessionStatus === 'failed' || anyErrors
-    const warned = warnings.length > 0 || status === 'warning' || sessionStatus === 'partial_failure'
-    const itemless = !Array.isArray(munki.items) || munki.items.length === 0
-    // With every problem attached to an item and items on the page, the card
-    // would only repeat the table; show it for system problems or an empty run.
-    if (errors.length === 0 && warnings.length === 0 && !(failed && itemless)) {
-      return { outcome: null, errors: [], warnings: [] }
-    }
-    return { outcome: failed ? 'error' : warned ? 'warning' : null, errors, warnings }
-  }
-  if (cimian) {
-    const session = Array.isArray(cimian.sessions) ? cimian.sessions[0] : null
-    const status = String(session?.status || cimian.status || '').toLowerCase()
-    const failed = (session?.failures || 0) > 0 || (session?.packages_failed || 0) > 0 || status === 'failed' || status === 'error'
-    const warned = status === 'warning' || (session?.warnings || 0) > 0
-    return { outcome: failed ? 'error' : warned ? 'warning' : null, errors: [], warnings: [] }
-  }
-  return { outcome: null, errors: [], warnings: [] }
-}
-
 export function lastRunFailed(installs: any): boolean {
-  return runOutcome(installs).outcome === 'error'
+  return collectSystemProblems(installs).latestFailed
+}
+
+const formatStamp = (problem: SystemProblem): string | null => {
+  if (problem.sessionId) return problem.sessionId
+  if (problem.time) {
+    const parsed = new Date(problem.time)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString()
+  }
+  return null
+}
+
+const ProblemLine: React.FC<{ problem: SystemProblem; stamped?: boolean }> = ({ problem, stamped = false }) => {
+  const tone = problem.tone === 'error' ? 'text-red-700 dark:text-red-300' : 'text-yellow-700 dark:text-yellow-300'
+  const stamp = stamped ? formatStamp(problem) : null
+  return (
+    <div>
+      <div className={inlineLineClass({ text: problem.message, isMessage: true }, tone)}>{problem.message}</div>
+      {stamp && <div className="mt-0.5 text-[11px] text-gray-400 dark:text-gray-500 font-mono">{stamp}</div>}
+    </div>
+  )
 }
 
 export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumber, installs }) => {
-  const { outcome, errors, warnings } = runOutcome(installs)
-  const [eventLines, setEventLines] = useState<{ errors: InlineLine[]; warnings: InlineLine[] } | null>(null)
+  const summary = collectSystemProblems(installs)
+  const [eventLines, setEventLines] = useState<InlineLine[] | null>(null)
 
-  // No text on the module: read it from the device's latest matching event
+  const currentTone: 'error' | 'warning' | null = summary.latestFailed || summary.current.some(p => p.tone === 'error')
+    ? 'error'
+    : summary.current.length > 0 ? 'warning' : null
+  const showCurrent = currentTone !== null
+  const showRecent = summary.recent.length > 0
+  const needsEventText = showCurrent && summary.current.length === 0
+
+  // A failed run with no module text (the stale-error sweep blanks it): read the
+  // device's latest matching event instead.
   useEffect(() => {
-    if (!outcome || !serialNumber || errors.length > 0 || warnings.length > 0) return
+    if (!needsEventText || !serialNumber) return
     let cancelled = false
-    const type = outcome === 'error' ? 'error' : 'warning'
+    const type = currentTone === 'error' ? 'error' : 'warning'
     fetch(`/api/device/${encodeURIComponent(serialNumber)}/modules/events?limit=5&type=${type}`)
       .then(r => (r.ok ? r.json() : null))
       .then(async result => {
@@ -95,35 +67,63 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
         const payload = await fetchEventPayload(String(installsEvent.id))
         if (cancelled) return
         const extracted = extractInlineDetails(payload)
-        setEventLines({ errors: extracted.errors, warnings: extracted.warnings })
+        setEventLines([...extracted.errors, ...extracted.warnings])
       })
       .catch(() => { /* the card still states the outcome without text */ })
     return () => { cancelled = true }
-  }, [outcome, serialNumber, errors.length, warnings.length])
+  }, [needsEventText, serialNumber, currentTone])
 
-  if (!outcome) return null
+  if (!showCurrent && !showRecent) return null
 
-  const errorLines: InlineLine[] = errors.length ? errors.map(text => ({ text, isMessage: true })) : (eventLines?.errors ?? [])
-  const warningLines: InlineLine[] = warnings.length ? warnings.map(text => ({ text, isMessage: true })) : (eventLines?.warnings ?? [])
-  const isError = outcome === 'error'
+  const isError = currentTone === 'error'
+  const chrome = showCurrent
+    ? isError
+      ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-900/20'
+      : 'border-yellow-200 bg-yellow-50/60 dark:border-yellow-900 dark:bg-yellow-900/20'
+    : 'border-gray-200 bg-gray-50/60 dark:border-gray-700 dark:bg-gray-800/40'
+  const badge = showCurrent
+    ? isError
+      ? { text: 'Last run failed', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
+      : { text: 'Last run had warnings', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' }
+    : { text: 'Earlier runs had problems', className: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-200' }
 
   return (
-    <div className={`rounded-lg border p-4 ${isError ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-900/20' : 'border-yellow-200 bg-yellow-50/60 dark:border-yellow-900 dark:bg-yellow-900/20'}`}>
+    <div className={`rounded-lg border p-4 ${chrome}`}>
       <div className="flex items-center gap-2 mb-2">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${isError ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>
-          {isError ? 'Last run failed' : 'Last run had warnings'}
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
+          {badge.text}
         </span>
-        {isError && (!installs?.munki?.items || installs.munki.items.length === 0) && (
+        {showCurrent && isError && summary.latestItemless && (
           <span className="text-sm text-gray-600 dark:text-gray-400">The run did not complete, so no items were reported.</span>
         )}
+        {!showCurrent && showRecent && (
+          <span className="text-sm text-gray-600 dark:text-gray-400">The latest run was clean; these are from the last 24 hours.</span>
+        )}
       </div>
-      {(errorLines.length > 0 || warningLines.length > 0) ? (
-        <div className="space-y-1">
-          {errorLines.map((line, i) => <div key={`e-${i}`} className={inlineLineClass(line, 'text-red-700 dark:text-red-300')}>{line.text}</div>)}
-          {warningLines.map((line, i) => <div key={`w-${i}`} className={inlineLineClass(line, 'text-yellow-700 dark:text-yellow-300')}>{line.text}</div>)}
+
+      {showCurrent && (
+        summary.current.length > 0 ? (
+          <div className="space-y-1.5">
+            {summary.current.map((problem, i) => <ProblemLine key={`c-${i}`} problem={problem} />)}
+          </div>
+        ) : eventLines && eventLines.length > 0 ? (
+          <div className="space-y-1">
+            {eventLines.map((line, i) => (
+              <div key={`ev-${i}`} className={inlineLineClass(line, isError ? 'text-red-700 dark:text-red-300' : 'text-yellow-700 dark:text-yellow-300')}>{line.text}</div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 dark:text-gray-400">No message text was reported for this run.</p>
+        )
+      )}
+
+      {showRecent && (
+        <div className={`space-y-1.5 ${showCurrent ? 'mt-3 pt-3 border-t border-gray-200/70 dark:border-gray-700/70' : ''}`}>
+          {showCurrent && (
+            <div className="text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">Earlier runs, last 24 hours</div>
+          )}
+          {summary.recent.map((problem, i) => <ProblemLine key={`r-${i}`} problem={problem} stamped />)}
         </div>
-      ) : (
-        <p className="text-xs text-gray-500 dark:text-gray-400">No message text was reported for this run.</p>
       )}
     </div>
   )
