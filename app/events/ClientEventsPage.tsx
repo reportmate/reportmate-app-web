@@ -224,6 +224,7 @@ function EventsPageContent() {
   const searchParams = useSearchParams()
   
   const EVENTS_PER_PAGE = 100  // 100 events per batch for infinite scroll
+  const LIVE_REFRESH_MS = 60 * 1000  // the dashboard widget's polling cadence
   
   // Valid event categories - filter out everything else
   // Bundle events using the shared bundling logic
@@ -332,6 +333,44 @@ function EventsPageContent() {
       setLoadingMore(false)
     }
   }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE, mergeIntoCache])
+
+  // Keep the feed live the way the dashboard widget is: poll the newest page
+  // on the widget's cadence and merge it into the cache, leaving the scroll
+  // position and the paging offset alone. Skipped while the tab is hidden or a
+  // full load is in flight. A display left running past midnight would
+  // otherwise keep yesterday's default end date and stop seeing new events, so
+  // an untouched default range rolls forward with the calendar.
+  const defaultEndDateRef = useRef(endDate)
+  useEffect(() => {
+    const refreshLatest = async () => {
+      if (document.hidden || loadingRef.current) return
+      const today = new Date().toISOString().split('T')[0]
+      if (endDate === defaultEndDateRef.current && endDate < today) {
+        defaultEndDateRef.current = today
+        setEndDate(today)
+        return
+      }
+      const queryParams = new URLSearchParams()
+      queryParams.append('limit', EVENTS_PER_PAGE.toString())
+      queryParams.append('offset', '0')
+      if (startDate) queryParams.append('startDate', new Date(startDate + 'T00:00:00.000Z').toISOString())
+      if (endDate) queryParams.append('endDate', new Date(endDate + 'T23:59:59.999Z').toISOString())
+      if (activeFilters.size > 0) queryParams.append('type', [...activeFilters].join(','))
+      try {
+        const response = await fetch(`/api/events?${queryParams.toString()}`)
+        if (!response.ok) return
+        const data = await response.json()
+        if (data.success && Array.isArray(data.events)) {
+          const fresh = data.events.filter((event: Event) => VALID_EVENT_KINDS.includes(event.kind?.toLowerCase()))
+          setEvents(mergeIntoCache(fresh))
+        }
+      } catch {
+        // the next tick retries
+      }
+    }
+    const timer = setInterval(refreshLatest, LIVE_REFRESH_MS)
+    return () => clearInterval(timer)
+  }, [startDate, endDate, activeFilters, EVENTS_PER_PAGE, LIVE_REFRESH_MS, mergeIntoCache])
 
   // Initial fetch on mount or date range change (full skeleton)
   useEffect(() => {
