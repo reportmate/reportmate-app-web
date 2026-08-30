@@ -88,11 +88,23 @@ export interface InventorySettings {
   fields: InventoryFieldMapping[]
 }
 
+/** How a kiosk (wall display) session presents the app. Applied only to viewer sessions. */
+export interface KioskSettings {
+  /** Page a display opens on and returns to after idle time. */
+  homePath: string
+  /** Page zoom, 1 = 100%. */
+  zoom: number
+  /** Minutes without input before the display returns home; 0 disables the return. */
+  idleMinutes: number
+  theme: "dark" | "light" | "system"
+}
+
 export interface SettingsDocument {
   schemaVersion: number
   general?: GeneralSettings
   inventory?: InventorySettings
   security?: SecurityConfig
+  kiosk?: KioskSettings
 }
 
 /** Shape returned by GET /api/settings (proxy → FastAPI). */

@@ -1,8 +1,20 @@
 'use client'
 
-import { useSession, signIn } from 'next-auth/react'
+import { useSession, signIn, getSession } from 'next-auth/react'
 import { useEffect, ReactNode } from 'react'
 import { usePathname } from 'next/navigation'
+
+// A kiosk session renews through the middleware on any viewer page request.
+// A redirect (no session, no kiosk cookie) surfaces as an opaque response.
+async function renewKioskSession(): Promise<boolean> {
+  try {
+    const response = await fetch('/events', { method: 'HEAD', cache: 'no-store', redirect: 'manual', credentials: 'same-origin' })
+    if (!response.ok) return false
+    return Boolean(await getSession())
+  } catch {
+    return false
+  }
+}
 
 interface AutoAuthProps {
   children: ReactNode
@@ -52,12 +64,25 @@ export default function AutoAuth({ children }: AutoAuthProps) {
 
     // If not authenticated, automatically sign in with Entra ID
     if (status === 'unauthenticated') {
-      console.log('Auto-redirecting to Entra ID SSO...')
-      signIn('azure-ad', { 
-        callbackUrl: pathname || '/dashboard',
-        redirect: true 
+      let cancelled = false
+      // The session endpoint is public, so a kiosk whose 24h session JWT
+      // lapsed reads as unauthenticated here before the middleware ever sees a
+      // page request. Touch a viewer page first: the middleware renews the
+      // session from the pinned kiosk cookie, and a reload picks it up. Only a
+      // request that still has no session goes to Entra.
+      renewKioskSession().then(renewed => {
+        if (cancelled) return
+        if (renewed) {
+          window.location.reload()
+          return
+        }
+        console.log('Auto-redirecting to Entra ID SSO...')
+        signIn('azure-ad', {
+          callbackUrl: pathname || '/dashboard',
+          redirect: true
+        })
       })
-      return
+      return () => { cancelled = true }
     }
   }, [isDevelopment, status, pathname])
 
