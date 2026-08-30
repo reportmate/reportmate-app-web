@@ -9,13 +9,14 @@ import { ADMIN_ROLE } from '../../lib/auth-roles'
 import Link from 'next/link'
 import { InventoryMappingEditor } from '../../src/components/settings/InventoryMappingEditor'
 import { SecurityRulesEditor } from '../../src/components/settings/SecurityRulesEditor'
+import { KioskSettingsEditor } from '../../src/components/settings/KioskSettingsEditor'
 import { useSettings } from '../../src/providers/SettingsProvider'
 
 type MaintStatus = { type: 'idle' | 'loading' | 'success' | 'error'; message?: string }
 
 export default function ClientSettingsPage() {
   const { isFirstTime } = useSettings()
-  const [activeSection, setActiveSection] = useState<'general' | 'inventory' | 'rules' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
+  const [activeSection, setActiveSection] = useState<'general' | 'inventory' | 'rules' | 'kiosk' | 'modules' | 'security' | 'integrations' | 'maintenance'>('general')
   const [clearDays, setClearDays] = useState(10)
   const [clearStatus, setClearStatus] = useState<MaintStatus>({ type: 'idle' })
   const [deleteSerial, setDeleteSerial] = useState('')
@@ -34,10 +35,11 @@ export default function ClientSettingsPage() {
     { id: 'general', name: 'General', icon: '' },
     { id: 'inventory', name: 'Inventory Mapping', icon: '' },
     { id: 'rules', name: 'Security Rules', icon: '' },
+    { id: 'kiosk', name: 'Kiosk Displays', icon: '' },
     { id: 'maintenance', name: 'Maintenance', icon: '' },
   ]
   const menuItems = isDemoMode
-    ? allMenuItems.filter((i) => ['general', 'inventory', 'rules'].includes(i.id))
+    ? allMenuItems.filter((i) => ['general', 'inventory', 'rules', 'kiosk'].includes(i.id))
     : allMenuItems
 
   async function handleClearInstallsErrors() {
@@ -223,6 +225,15 @@ export default function ClientSettingsPage() {
                     Security Rules
                   </h2>
                   <SecurityRulesEditor readOnly={!canEdit} />
+                </div>
+              )}
+
+              {activeSection === 'kiosk' && (
+                <div className="p-6">
+                  <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                    Kiosk Displays
+                  </h2>
+                  <KioskSettingsEditor readOnly={!canEdit} />
                 </div>
               )}
 

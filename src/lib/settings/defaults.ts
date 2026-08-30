@@ -6,6 +6,7 @@
 
 import {
   InventoryFieldMapping,
+  KioskSettings,
   SecurityConfig,
   SettingsDocument,
 } from "./types"
@@ -42,11 +43,20 @@ export const DEFAULT_SECURITY_CONFIG: SecurityConfig = {
   rules: [],
 }
 
+/** A wall display: the events feed, a little larger, dark, back home after five idle minutes. */
+export const DEFAULT_KIOSK_SETTINGS: KioskSettings = {
+  homePath: "/events",
+  zoom: 1.25,
+  idleMinutes: 5,
+  theme: "dark",
+}
+
 export const DEFAULT_SETTINGS: SettingsDocument = {
   schemaVersion: CURRENT_SCHEMA_VERSION,
   general: { onboardingCompletedAt: null },
   inventory: { fields: DEFAULT_INVENTORY_FIELDS },
   security: DEFAULT_SECURITY_CONFIG,
+  kiosk: DEFAULT_KIOSK_SETTINGS,
 }
 
 /** Starter rules seeded by onboarding: shared/lab devices aren't expected to be
@@ -82,5 +92,6 @@ export function withDefaults(doc: SettingsDocument | null | undefined): Settings
       defaults: { ...structuredClone(DEFAULT_SECURITY_CONFIG.defaults), ...(doc.security?.defaults ?? {}) },
       rules: doc.security?.rules ? structuredClone(doc.security.rules) : [],
     },
+    kiosk: { ...DEFAULT_KIOSK_SETTINGS, ...(doc.kiosk ?? {}) },
   }
 }
