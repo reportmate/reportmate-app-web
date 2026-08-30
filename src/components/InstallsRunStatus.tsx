@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from 'react'
 import { extractInlineDetails, fetchEventPayload, inlineLineClass, type InlineLine } from '../lib/eventInlineDetails'
 import { collectSystemProblems, type SystemProblem } from '../lib/installs/systemProblems'
+import { formatRelativeTime } from '../lib/time'
 
 interface InstallsRunStatusProps {
   serialNumber?: string
@@ -22,12 +23,13 @@ export function lastRunFailed(installs: any): boolean {
 }
 
 const formatStamp = (problem: SystemProblem): string | null => {
-  if (problem.sessionId) return problem.sessionId
+  const parts: string[] = []
+  if (problem.sessionId) parts.push(problem.sessionId)
   if (problem.time) {
     const parsed = new Date(problem.time)
-    if (!Number.isNaN(parsed.getTime())) return parsed.toLocaleString()
+    if (!Number.isNaN(parsed.getTime())) parts.push(formatRelativeTime(problem.time))
   }
-  return null
+  return parts.length ? parts.join(' · ') : null
 }
 
 const ProblemLine: React.FC<{ problem: SystemProblem; stamped?: boolean }> = ({ problem, stamped = false }) => {
@@ -97,7 +99,11 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
           <span className="text-sm text-gray-600 dark:text-gray-400">The run did not complete, so no items were reported.</span>
         )}
         {!showCurrent && showRecent && (
-          <span className="text-sm text-gray-600 dark:text-gray-400">The latest run was clean; these are from the last 24 hours.</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {summary.latestSessionId
+              ? `The most recent run (${summary.latestSessionId}${summary.latestTime ? `, ${formatRelativeTime(summary.latestTime)}` : ''}) reported no problems; these came from earlier runs in the last 24 hours.`
+              : 'The most recent run reported no problems; these came from earlier runs in the last 24 hours.'}
+          </span>
         )}
       </div>
 

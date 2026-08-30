@@ -16,6 +16,9 @@ export interface SystemProblem {
 }
 
 export interface SystemProblemsSummary {
+  /** The most recent finished session, so the card can name it. */
+  latestSessionId?: string
+  latestTime?: string
   /** Problems from the most recent finished session. */
   current: SystemProblem[]
   /** Problems from earlier sessions inside the window, newest first. */
@@ -51,6 +54,8 @@ export function collectSystemProblems(installs: any): SystemProblemsSummary {
     if (sessions.length > 0) {
       const cutoff = Date.now() - RECENT_WINDOW_MS
       const summary: SystemProblemsSummary = {
+        latestSessionId: String(sessions[0]?.session_id || sessions[0]?.sessionId || ''),
+        latestTime: String(sessions[0]?.end_time || sessions[0]?.endTime || sessions[0]?.start_time || sessions[0]?.startTime || ''),
         current: [],
         recent: [],
         latestFailed: String(sessions[0]?.status || '').toLowerCase() === 'failed'
@@ -99,6 +104,8 @@ export function collectSystemProblems(installs: any): SystemProblemsSummary {
     if (sessions.length === 0) return empty
     const cutoff = Date.now() - RECENT_WINDOW_MS
     const summary: SystemProblemsSummary = {
+      latestSessionId: String(sessions[0]?.session_id || sessions[0]?.sessionId || ''),
+      latestTime: String(sessions[0]?.end_time || sessions[0]?.endTime || sessions[0]?.start_time || sessions[0]?.startTime || ''),
       current: [],
       recent: [],
       latestFailed: ['failed', 'error'].includes(String(sessions[0]?.status || '').toLowerCase()),
