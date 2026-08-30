@@ -54,15 +54,18 @@ export function collectSystemProblems(installs: any): SystemProblemsSummary {
         current: [],
         recent: [],
         latestFailed: String(sessions[0]?.status || '').toLowerCase() === 'failed'
-          || (sessions[0]?.error_items || []).length > 0,
+          || ((sessions[0]?.error_items ?? sessions[0]?.errorItems ?? []) as any[]).length > 0,
         latestItemless: !Array.isArray(munki.items) || munki.items.length === 0,
       }
       sessions.slice(0, MAX_SESSIONS).forEach((session, index) => {
-        const time = String(session?.end_time || session?.start_time || '')
+        // Sessions arrive snake_case from the client but may be camelCased by
+        // normalizeKeys before they reach here; accept either spelling.
+        const time = String(session?.end_time || session?.endTime || session?.start_time || session?.startTime || '')
         if (index > 0 && time && new Date(time).getTime() < cutoff) return
-        const sessionId = String(session?.session_id || '')
-        for (const [key, tone] of [['error_items', 'error'], ['warning_items', 'warning']] as const) {
-          for (const problem of (session?.[key] || []) as any[]) {
+        const sessionId = String(session?.session_id || session?.sessionId || '')
+        for (const [keys, tone] of [[['error_items', 'errorItems'], 'error'], [['warning_items', 'warningItems'], 'warning']] as const) {
+          const list = (session?.[keys[0]] ?? session?.[keys[1]] ?? []) as any[]
+          for (const problem of list) {
             if (!nameless(problem)) continue
             const message = messageOf(problem)
             if (!message) continue
@@ -102,19 +105,20 @@ export function collectSystemProblems(installs: any): SystemProblemsSummary {
       latestItemless: !Array.isArray(cimian.items) || cimian.items.length === 0,
     }
     sessions.slice(0, MAX_SESSIONS).forEach((session, index) => {
-      const time = String(session?.end_time || session?.start_time || '')
+      const time = String(session?.end_time || session?.endTime || session?.start_time || session?.startTime || '')
       if (index > 0 && time && new Date(time).getTime() < cutoff) return
       const status = String(session?.status || '').toLowerCase()
       if (!['failed', 'error'].includes(status)) return
       // Cimian sessions carry counts rather than message text; the failed
       // session itself is the system-level fact worth surfacing.
       const failures = Number(session?.failures ?? session?.packages_failed ?? 0)
+      const id = session?.session_id || session?.sessionId || ''
       const message = failures > 0
-        ? `Run ${session?.session_id || ''} failed (${failures} failure${failures === 1 ? '' : 's'})`
-        : `Run ${session?.session_id || ''} failed`
+        ? `Run ${id} failed (${failures} failure${failures === 1 ? '' : 's'})`
+        : `Run ${id} failed`
       const target = index === 0 ? summary.current : summary.recent
       if (!target.some(p => p.message === message) && !summary.current.some(p => p.message === message)) {
-        target.push({ tone: 'error', message, sessionId: String(session?.session_id || ''), time })
+        target.push({ tone: 'error', message, sessionId: String(id), time })
       }
     })
     return summary
