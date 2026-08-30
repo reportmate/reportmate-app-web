@@ -11,6 +11,7 @@
 import React, { useEffect, useState } from 'react'
 import { extractInlineDetails, fetchEventPayload, inlineLineClass, type InlineLine } from '../lib/eventInlineDetails'
 import { collectSystemProblems, type SystemProblem } from '../lib/installs/systemProblems'
+import { itemNameFromMessage } from '../lib/installs/status'
 import { formatRelativeTime } from '../lib/time'
 
 interface InstallsRunStatusProps {
@@ -69,7 +70,11 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
         const payload = await fetchEventPayload(String(installsEvent.id))
         if (cancelled) return
         const extracted = extractInlineDetails(payload)
-        setEventLines([...extracted.errors, ...extracted.warnings])
+        // The event carries everything the run said; keep only system-level
+        // lines here — item-attributable ones live on their items.
+        const systemOnly = (line: InlineLine) =>
+          !line.name && !/^installer:/i.test(line.text) && !/^-{3,}/.test(line.text) && itemNameFromMessage(line.text) === null
+        setEventLines([...extracted.errors, ...extracted.warnings].filter(systemOnly).slice(0, 10))
       })
       .catch(() => { /* the card still states the outcome without text */ })
     return () => { cancelled = true }
@@ -119,7 +124,11 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
             ))}
           </div>
         ) : (
-          <p className="text-xs text-gray-500 dark:text-gray-400">No message text was reported for this run.</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            {summary.latestFailed
+              ? 'The failure detail is on the item that failed, in the table below.'
+              : 'No message text was reported for this run.'}
+          </p>
         )
       )}
 
