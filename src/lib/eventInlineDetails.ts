@@ -29,12 +29,14 @@ const RESERVED_PAYLOAD_KEYS = new Set([
 // A line is either a run message (sentence from the client) or an item
 // ("Name version"); the flag decides how the row renders it.
 export type InlineLine = { text: string; isMessage: boolean; name?: string; version?: string; message?: string }
-export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; warnings: InlineLine[]; successes: string[] } => {
+export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; warnings: InlineLine[]; successes: string[]; isRemoval: boolean } => {
   const errors: InlineLine[] = []
   const warnings: InlineLine[] = []
   const successes: string[] = []
-  if (!payload || typeof payload !== 'object') return { errors, warnings, successes }
+  if (!payload || typeof payload !== 'object') return { errors, warnings, successes, isRemoval: false }
   const p = payload as Record<string, any>
+  // A removal run is a success, but reads in the Removed colour rather than green.
+  const isRemoval = String(p.action || '').toLowerCase() === 'remove' || Array.isArray(p.removed_items)
 
   const pushString = (target: InlineLine[], val: unknown) => {
     if (typeof val === 'string' && val.trim()) {
@@ -107,6 +109,7 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
     errors: dedupe(errors),
     warnings: dedupe(warnings),
     successes: Array.from(new Set(successes)),
+    isRemoval,
   }
 }
 
