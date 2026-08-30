@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import DeviceEventsSimple from '../DeviceEventsSimple'
 import { bundleEvents, type FleetEvent } from '../../lib/eventBundling'
-import { CheckCircle2, XCircle, AlertTriangle, Info, Server } from 'lucide-react'
+import { CheckCircle2, AlertCircle, AlertTriangle, Info, Zap } from 'lucide-react'
 import { DebugAccordion } from '../DebugAccordion'
 
 const VALID_EVENT_KINDS: ReadonlyArray<string> = ['info', 'error', 'warning', 'success', 'system']
@@ -15,9 +15,9 @@ const VALID_EVENT_KINDS: ReadonlyArray<string> = ['info', 'error', 'warning', 's
 const EVENT_FILTERS = [
   { key: 'success', label: 'Success', icon: CheckCircle2, color: 'green' },
   { key: 'warning', label: 'Warnings', icon: AlertTriangle, color: 'yellow' },
-  { key: 'error', label: 'Errors', icon: XCircle, color: 'red' },
+  { key: 'error', label: 'Errors', icon: AlertCircle, color: 'red' },
+  { key: 'system', label: 'System', icon: Zap, color: 'purple' },
   { key: 'info', label: 'Info', icon: Info, color: 'blue' },
-  { key: 'system', label: 'System', icon: Server, color: 'purple' },
 ] as const
 
 // Get styling for filter buttons

@@ -48,15 +48,18 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
   }, [eventId, kind, isBundle, autoFetch, payload])
 
   const extracted = extractInlineDetails(payload)
-  // Items-only rows still list the package a run message is about
-  // ("Could not process item X" becomes "X"); messages naming nothing stay
-  // in the expanded view.
+  // Items-only rows list the package each problem is about. Structured items
+  // (warning_items / error_items / failed_items) carry the name outright; a
+  // legacy run message gives it up by pattern ("Could not process item X" →
+  // "X"). Messages naming nothing stay in the expanded view.
   const toItems = (lines: InlineLine[]): InlineLine[] => {
     const out: InlineLine[] = []
     for (const line of lines) {
       if (!line.isMessage) { out.push(line); continue }
-      const name = itemNameFromMessage(line.text)
-      if (name && !out.some(l => l.text === name)) out.push({ text: name, isMessage: false })
+      const name = line.name || itemNameFromMessage(line.text)
+      if (!name) continue
+      const text = line.version ? `${name} ${line.version}` : name
+      if (!out.some(l => l.text === text)) out.push({ text, isMessage: false })
     }
     return out
   }
@@ -64,11 +67,15 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
   const warnings = itemsOnly ? toItems(extracted.warnings) : extracted.warnings
   const successes = extracted.successes
   const hasDetails = errors.length > 0 || warnings.length > 0 || successes.length > 0
+  // Removals read in the Removed colour, matching the status pill; the summary
+  // text says "removed" before the payload has even loaded.
+  const isRemoval = extracted.isRemoval || /\bremoved$/i.test(summary.trim())
+  const successTone = isRemoval ? 'text-purple-700 dark:text-purple-300' : 'text-green-700 dark:text-green-300'
 
   if (!hasDetails) {
     return (
       <div className={className}>
-        <div className={`text-sm break-words ${SUMMARY_TONE[kind.toLowerCase()] || 'text-gray-900 dark:text-white'}`}>{summary}</div>
+        <div className={`text-sm break-words ${kind.toLowerCase() === 'success' ? successTone : (SUMMARY_TONE[kind.toLowerCase()] || 'text-gray-900 dark:text-white')}`}>{summary}</div>
         {loading && <div className="text-xs text-gray-400 dark:text-gray-500 mt-1 italic">Loading details…</div>}
       </div>
     )
@@ -83,7 +90,7 @@ export const EventInlineLines: React.FC<EventInlineLinesProps> = ({ eventId, kin
         <div key={`w-${i}`} className={inlineLineClass(m, 'text-yellow-700 dark:text-yellow-300')}>{m.text}</div>
       ))}
       {successes.map((m, i) => (
-        <div key={`s-${i}`} className="text-sm text-green-700 dark:text-green-300 break-words">{m}</div>
+        <div key={`s-${i}`} className={`text-sm break-words ${successTone}`}>{m}</div>
       ))}
     </div>
   )

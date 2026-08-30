@@ -1,3 +1,4 @@
+import { splitLogText } from '../../logText'
 import { normalizeCimianTimestamp, isCimianSessionId } from '../../time'
 
 /**
@@ -870,9 +871,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           }
         }
         
+        const cimianErrorText = splitLogText(item.lastError)
         packageInfo.errors?.push({
           id: `${item.id || item.name}-last-error`,
-          message: item.lastError,
+          message: cimianErrorText.message,
+          details: cimianErrorText.details,
           timestamp: errorTimestamp,
           code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'ERROR',
           package: item.name || item.displayName,
@@ -904,9 +907,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           }
         }
         
+        const cimianWarningText = splitLogText(item.lastWarning)
         packageInfo.warnings?.push({
           id: `${item.id || item.name}-last-warning`,
-          message: item.lastWarning,
+          message: cimianWarningText.message,
+          details: cimianWarningText.details,
           timestamp: warningTimestamp,
           code: item.hasInstallLoop ? 'INSTALL_LOOP' : 'WARNING',
           package: item.name || item.displayName,
@@ -1155,9 +1160,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
       
       if (lastError && lastError.trim()) {
         if (!pkg.errors) pkg.errors = []
+        const munkiErrorText = splitLogText(lastError)
         pkg.errors.push({
           id: `munki-item-error-${pkg.id}`,
-          message: lastError,
+          message: munkiErrorText.message,
+          details: munkiErrorText.details,
           timestamp: installs.munki.endTime || new Date().toISOString(),
           code: 'MUNKI_ERROR',
           package: pkg.name
@@ -1165,9 +1172,11 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
         pkg.status = 'Error'
       } else if (lastWarning && lastWarning.trim()) {
         if (!pkg.warnings) pkg.warnings = []
+        const munkiWarningText = splitLogText(lastWarning)
         pkg.warnings.push({
           id: `munki-item-warning-${pkg.id}`,
-          message: lastWarning,
+          message: munkiWarningText.message,
+          details: munkiWarningText.details,
           timestamp: installs.munki.endTime || new Date().toISOString(),
           code: 'MUNKI_WARNING',
           package: pkg.name

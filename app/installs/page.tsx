@@ -2449,13 +2449,13 @@ function InstallsPageContent() {
                     }}
                     title="Click to show all devices with errors"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'errors' && !searchQuery ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className={`text-base font-medium flex items-center gap-2 whitespace-nowrap ${itemsStatusFilter === 'errors' && !searchQuery ? 'text-red-700 dark:text-red-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Items with Errors
                     </h3>
-                    <span className="text-sm font-semibold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold whitespace-nowrap text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
                       {itemsWithErrors.reduce((sum, item) => sum + item.count, 0)} total
                     </span>
                   </div>
@@ -2526,7 +2526,7 @@ function InstallsPageContent() {
                                   }
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-red-700 dark:text-red-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className={`px-4 py-2 text-sm break-words ${isSelected ? 'text-red-700 dark:text-red-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-red-600 dark:text-red-400">
@@ -2565,13 +2565,13 @@ function InstallsPageContent() {
                     }}
                     title="Click to show all devices with warnings"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'warnings' && !searchQuery ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className={`text-base font-medium flex items-center gap-2 whitespace-nowrap ${itemsStatusFilter === 'warnings' && !searchQuery ? 'text-amber-700 dark:text-amber-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                       Items with Warnings
                     </h3>
-                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold whitespace-nowrap text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 px-2 py-0.5 rounded-full">
                       {itemsWithWarnings.reduce((sum, item) => sum + item.count, 0)} total
                     </span>
                   </div>
@@ -2642,7 +2642,7 @@ function InstallsPageContent() {
                                   }
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-amber-700 dark:text-amber-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className={`px-4 py-2 text-sm break-words ${isSelected ? 'text-amber-700 dark:text-amber-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-amber-600 dark:text-amber-400">
@@ -2681,13 +2681,13 @@ function InstallsPageContent() {
                     }}
                     title="Click to show all devices with pending updates"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'pending' && !searchQuery ? 'text-cyan-700 dark:text-cyan-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className={`text-base font-medium flex items-center gap-2 whitespace-nowrap ${itemsStatusFilter === 'pending' && !searchQuery ? 'text-cyan-700 dark:text-cyan-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-cyan-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Items with Pending
                     </h3>
-                    <span className="text-sm font-semibold text-cyan-600 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-900/30 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold whitespace-nowrap text-cyan-600 dark:text-cyan-400 bg-cyan-100 dark:bg-cyan-900/30 px-2 py-0.5 rounded-full">
                       {itemsWithPending.reduce((sum, item) => sum + item.count, 0)} total
                     </span>
                   </div>
@@ -2758,7 +2758,7 @@ function InstallsPageContent() {
                                   }
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-cyan-700 dark:text-cyan-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className={`px-4 py-2 text-sm break-words ${isSelected ? 'text-cyan-700 dark:text-cyan-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-cyan-600 dark:text-cyan-400">
@@ -2794,13 +2794,13 @@ function InstallsPageContent() {
                     }}
                     title="Click to show all devices that completed an install in their most recent run"
                   >
-                    <h3 className={`text-lg font-medium flex items-center gap-2 ${itemsStatusFilter === 'success' && !searchQuery ? 'text-green-700 dark:text-green-300' : 'text-gray-900 dark:text-white'}`}>
+                    <h3 className={`text-base font-medium flex items-center gap-2 whitespace-nowrap ${itemsStatusFilter === 'success' && !searchQuery ? 'text-green-700 dark:text-green-300' : 'text-gray-900 dark:text-white'}`}>
                       <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       Items Installed
                     </h3>
-                    <span className="text-sm font-semibold text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
+                    <span className="text-xs font-semibold whitespace-nowrap text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full">
                       {itemsWithSuccess.reduce((sum, item) => sum + item.count, 0)} total
                     </span>
                   </div>
@@ -2845,7 +2845,7 @@ function InstallsPageContent() {
                                   }
                                 }}
                               >
-                                <td className={`px-4 py-2 text-sm truncate max-w-[200px] ${isSelected ? 'text-green-700 dark:text-green-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
+                                <td className={`px-4 py-2 text-sm break-words ${isSelected ? 'text-green-700 dark:text-green-300 font-semibold' : 'text-gray-900 dark:text-white'}`} title={item.name}>
                                   {item.name}
                                 </td>
                                 <td className="px-4 py-2 text-sm text-right font-semibold text-green-600 dark:text-green-400">
@@ -3583,7 +3583,7 @@ function InstallsPageContent() {
                 <div className="relative flex-1 max-w-md">
                   <input
                     type="text"
-                    placeholder="Search installs, devices, versions..."
+                    placeholder="Search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full px-4 py-2 pl-10 pr-10 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
@@ -3644,28 +3644,6 @@ function InstallsPageContent() {
                       </>
                     )}
                   </div>
-                )}
-                {/* Clear Filter(s) Button - Show when any filter is active */}
-                {(searchQuery || itemsStatusFilter !== 'all' || deviceStatusFilter !== 'all' || installStatusFilter !== 'all' || selectedUsages.length > 0 || selectedCatalogs.length > 0 || selectedFleets.length > 0 || selectedAreas.length > 0 || selectedPlatforms.length > 0 || selectedRooms.length > 0 || selectedManifest || selectedSoftwareRepo || selectedMunkiVersion || selectedCimianVersion) && (
-                  <button
-                    onClick={() => {
-                      setItemsStatusFilter('all')
-                      setDeviceStatusFilter('all')
-                      setInstallStatusFilter('all')
-                      setSearchQuery('')
-                      clearAllFilters()
-                      setSelectedManifest('')
-                      setSelectedSoftwareRepo('')
-                      setSelectedMunkiVersion('')
-                      setSelectedCimianVersion('')
-                    }}
-                    className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Clear Filter(s)
-                  </button>
                 )}
                 {/* New Report Button - Only show for generated reports when NO widget filters are active */}
                 {hasGeneratedReport && installs.length > 0 && !loading && itemsStatusFilter === 'all' && !selectedManifest && !selectedSoftwareRepo && !selectedMunkiVersion && !selectedCimianVersion && (
