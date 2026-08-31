@@ -1166,7 +1166,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           message: munkiErrorText.message,
           details: munkiErrorText.details,
           timestamp: installs.munki.endTime || new Date().toISOString(),
-          code: 'MUNKI_ERROR',
+          code: (pkg as any).hasInstallLoop ? 'INSTALL_LOOP' : 'MUNKI_ERROR',
           package: pkg.name
         })
         pkg.status = 'Error'
@@ -1178,7 +1178,7 @@ export function extractInstalls(deviceModules: any): InstallsInfo {
           message: munkiWarningText.message,
           details: munkiWarningText.details,
           timestamp: installs.munki.endTime || new Date().toISOString(),
-          code: 'MUNKI_WARNING',
+          code: (pkg as any).hasInstallLoop ? 'INSTALL_LOOP' : 'MUNKI_WARNING',
           package: pkg.name
         })
         if (pkg.status !== 'Error') pkg.status = 'Warning'
