@@ -156,3 +156,25 @@ export function logRootLabel(root: Pick<LogRoot, 'name' | 'tool'>): string {
   if (stripped) return stripped
   return root.tool.charAt(0).toUpperCase() + root.tool.slice(1)
 }
+
+/**
+ * The product behind a log root, by platform: the Managed Installs root is
+ * Munki on a Mac and Cimian on Windows, Managed State is Outset or StartSet,
+ * and so on. Roots no product claims fall back to the directory label.
+ */
+const PRODUCT_NAMES: Record<string, { mac: string; windows: string }> = {
+  installs: { mac: 'Munki', windows: 'Cimian' },
+  bootstrap: { mac: 'BootstrapMate', windows: 'BootstrapMate' },
+  reports: { mac: 'ReportMate', windows: 'ReportMate' },
+  state: { mac: 'Outset', windows: 'StartSet' },
+  encryption: { mac: 'Crypt', windows: 'Crypt Escrow' },
+  users: { mac: 'ManageUsers', windows: 'ManageUsers' },
+  utilities: { mac: 'Utilities', windows: 'Utilities' },
+}
+
+export function logProductName(root: Pick<LogRoot, 'name' | 'tool'>, platform?: string): string {
+  const names = PRODUCT_NAMES[root.tool.toLowerCase()]
+  if (!names) return logRootLabel(root)
+  const isWindows = (platform || '').toLowerCase().startsWith('win')
+  return isWindows ? names.windows : names.mac
+}

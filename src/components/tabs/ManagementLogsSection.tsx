@@ -13,7 +13,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CopyButton } from '../ui/CopyButton'
-import { extractLogs, logRootLabel, normalizeLogRoot, type LogFileEntry, type LogRoot, type LogsInfo, type LogTail } from '../../lib/data-processing/modules/logs'
+import { extractLogs, logProductName, normalizeLogRoot, type LogFileEntry, type LogRoot, type LogsInfo, type LogTail } from '../../lib/data-processing/modules/logs'
 
 interface ManagementLogsSectionProps {
   serialNumber?: string
@@ -217,15 +217,17 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Logs</span>
+          {!expanded && (
           <span className="hidden sm:flex items-center gap-1.5 ml-2 min-w-0 overflow-hidden">
             {roots.map((root) => (
               <span key={root.tool} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
-                {logRootLabel(root)}
+                {logProductName(root, logs.platform)}
                 {(root.errorCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
                 {(root.errorCount ?? 0) === 0 && (root.warningCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
               </span>
             ))}
           </span>
+          )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {totalErrors > 0 && <span className="text-xs font-medium text-red-600 dark:text-red-400">{totalErrors} errors</span>}
@@ -257,7 +259,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <span>{logRootLabel(root)}</span>
+                  <span>{logProductName(root, logs.platform)}</span>
                   {errors > 0 && (
                     <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{errors}</span>
                   )}

@@ -32,7 +32,7 @@ export { extractInventory, type InventoryInfo } from './inventory'
 export { extractManagement, type ManagementInfo } from './management'
 
 // Logs module
-export { extractLogs, logRootLabel, type LogsInfo, type LogRoot, type LogFileEntry, type LogSessionSummary, type LogTail } from './logs'
+export { extractLogs, logRootLabel, logProductName, type LogsInfo, type LogRoot, type LogFileEntry, type LogSessionSummary, type LogTail } from './logs'
 
 // Network module
 export { extractNetwork, type NetworkInfo, type NetworkInterface } from './network'
