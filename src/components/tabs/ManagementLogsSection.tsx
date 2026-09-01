@@ -74,6 +74,68 @@ function sessionTone(status?: string): string {
   return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
 }
 
+/**
+ * events.jsonl lines are structured records (Cimian, the Munki fork, StartSet
+ * all write one JSON object per line). Show the fields a reader scans for and
+ * keep the whole record one click away; anything that does not parse is
+ * shown as the raw line.
+ */
+interface JsonlEvent {
+  raw: string
+  parsed: Record<string, unknown> | null
+  timestamp?: string
+  level?: string
+  eventType?: string
+  item?: string
+  version?: string
+  message?: string
+}
+
+function firstString(obj: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = obj[key]
+    if (typeof value === 'string' && value.trim()) return value
+    if (typeof value === 'number') return String(value)
+  }
+  return undefined
+}
+
+function parseJsonlLine(raw: string): JsonlEvent {
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith('{')) return { raw, parsed: null }
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return { raw, parsed: null }
+    const obj = parsed as Record<string, unknown>
+    return {
+      raw,
+      parsed: obj,
+      timestamp: firstString(obj, ['timestamp', 'time', 'ts', 'date']),
+      level: firstString(obj, ['level', 'severity']),
+      eventType: firstString(obj, ['event_type', 'eventType', 'type', 'event']),
+      item: firstString(obj, ['package_name', 'packageName', 'item_name', 'itemName', 'name', 'display_name']),
+      version: firstString(obj, ['package_version', 'packageVersion', 'target_version', 'version']),
+      message: firstString(obj, ['message', 'msg', 'status_reason', 'error']),
+    }
+  } catch {
+    return { raw, parsed: null }
+  }
+}
+
+function formatEventTime(value?: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+}
+
+function levelTone(level?: string): 'error' | 'warning' | 'plain' {
+  const l = (level || '').toUpperCase()
+  if (l.startsWith('ERR') || l === 'FAULT' || l === 'CRITICAL' || l === 'FATAL') return 'error'
+  if (l.startsWith('WARN') || l === 'WRN') return 'warning'
+  return 'plain'
+}
+
 /** Files the viewer can open: the tails, in the order the client sent them (primary first). */
 function tailByFile(tails: LogTail[]): Map<string, LogTail> {
   const map = new Map<string, LogTail>()
@@ -163,6 +225,18 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     if (!needle) return tailLines
     return tailLines.filter(line => line.toLowerCase().includes(needle))
   }, [tailLines, filter])
+  const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
+  const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
+  const visibleEvents = useMemo(() => (isJsonl ? visibleLines.map(parseJsonlLine) : []), [isJsonl, visibleLines])
+  // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
+  const prettyJson = useMemo(() => {
+    if (!isJson || tailLines.length === 0) return null
+    try {
+      return JSON.stringify(JSON.parse(tailLines.join('\n')), null, 2)
+    } catch {
+      return null
+    }
+  }, [isJson, tailLines])
 
   const totalErrors = roots.reduce((n, r) => n + (r.errorCount ?? 0), 0)
   const totalWarnings = roots.reduce((n, r) => n + (r.warningCount ?? 0), 0)
@@ -409,6 +483,49 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load log: {tailState.message}</div>
                   ) : tailLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
+                  ) : prettyJson !== null && !filter.trim() ? (
+                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
+                  ) : isJsonl ? (
+                    <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
+                      {visibleEvents.map((event, index) => {
+                        if (!event.parsed) {
+                          return (
+                            <div key={index} className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all">{event.raw}</div>
+                          )
+                        }
+                        const tone = levelTone(event.level)
+                        const levelCls = tone === 'error'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : tone === 'warning'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                        return (
+                          <details key={index} className="group">
+                            <summary className="cursor-pointer list-none px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40">
+                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                <span className="font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatEventTime(event.timestamp)}</span>
+                                {event.level && (
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
+                                )}
+                                {event.eventType && (
+                                  <span className="text-xs text-gray-600 dark:text-gray-400">{event.eventType.replace(/_/g, ' ')}</span>
+                                )}
+                                {event.item && (
+                                  <span className="text-xs font-medium text-gray-900 dark:text-white">
+                                    {event.item}
+                                    {event.version && <span className="font-normal text-gray-500 dark:text-gray-400"> {event.version}</span>}
+                                  </span>
+                                )}
+                                {event.message && (
+                                  <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 break-words">{event.message}</span>
+                                )}
+                              </div>
+                            </summary>
+                            <pre className="mx-4 mb-3 p-3 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto rounded whitespace-pre-wrap break-all">{JSON.stringify(event.parsed, null, 2)}</pre>
+                          </details>
+                        )
+                      })}
+                    </div>
                   ) : (
                     <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto">
                       {visibleLines.map((line, index) => {
