@@ -1,12 +1,13 @@
 /**
- * Logs Module - Reader Only
+ * Management Logs - Reader Only
  *
  * Both clients survey the platform's management-tool log roots
  * (C:\ProgramData\Managed*\logs on Windows, /Library/Managed * /logs on macOS)
- * and report, per root, the file inventory, the latest session summary and a
- * capped tail of the primary log. The API strips the tails from the device and
- * module payloads; /api/device/[serial]/logs/[tool] serves one root with its
- * tails. This reader only normalises the shape.
+ * and report them as the `logs` section of the management module: per root,
+ * the file inventory, the latest session summary, error and warning counts and
+ * capped tails of the most relevant logs. The API strips the tails from the
+ * device, info and module payloads; /api/device/[serial]/logs/[tool] serves one
+ * root with its tails. This reader only normalises the shape.
  */
 
 export interface LogFileEntry {
@@ -133,11 +134,11 @@ export function normalizeLogRoot(raw: any): LogRoot | null {
 }
 
 /**
- * Read the logs module. Returns null when the device has never reported it,
- * which the UI renders as an empty state rather than inventing content.
+ * Read the management module's logs section. Returns null when the device has
+ * never reported it, which the UI renders by omitting the section entirely.
  */
 export function extractLogs(modules: any): LogsInfo | null {
-  const raw = modules?.logs
+  const raw = modules?.management?.logs
   if (!raw || typeof raw !== 'object') return null
   const roots = Array.isArray(raw.roots)
     ? raw.roots.map(normalizeLogRoot).filter((r: LogRoot | null): r is LogRoot => r !== null)
