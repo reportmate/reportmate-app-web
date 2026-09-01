@@ -10,6 +10,7 @@ import React, { useState, useMemo } from 'react'
 import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
+import { ManagementLogsSection } from './ManagementLogsSection'
 
 // Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
 function parseBool(value: any): boolean {
@@ -1334,6 +1335,9 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
           </div>
         )}
       </div>
+
+      {/* Management tool logs - one inner tab per Managed logs root */}
+      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} />
 
       {/* Configuration Profiles Section - macOS profiles and Windows policy branches alike */}
       {profileEntries.length > 0 && (
