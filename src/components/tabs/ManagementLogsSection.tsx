@@ -4,19 +4,22 @@
  * Collapsible card, one inner tab per management-tool log root the device
  * reported (Managed Installs, Managed Bootstrap, Managed Reports, ...), and a
  * log picker inside each tab because every tool writes more than one file.
- * The module summary is fetched once; a tool's tails are fetched the first
- * time its tab is opened. Tools the device is not reporting never appear, and
- * a device with no logs module at all renders nothing.
+ * The summary comes from the management module's logs section, already on
+ * the page; a tool's tails are fetched the first time its tab is opened.
+ * Tools the device is not reporting never appear, and a device whose
+ * management module has no logs section renders nothing.
  */
 
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { CopyButton } from '../ui/CopyButton'
-import { extractLogs, logProductName, normalizeLogRoot, type LogFileEntry, type LogRoot, type LogsInfo, type LogTail } from '../../lib/data-processing/modules/logs'
+import { logProductName, normalizeLogRoot, type LogFileEntry, type LogRoot, type LogsInfo, type LogTail } from '../../lib/data-processing/modules/logs'
 
 interface ManagementLogsSectionProps {
   serialNumber?: string
+  /** The management module's logs section, read by extractLogs; null hides the card */
+  logs: LogsInfo | null
 }
 
 type TailState =
@@ -143,8 +146,7 @@ function tailByFile(tails: LogTail[]): Map<string, LogTail> {
   return map
 }
 
-export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber }) => {
-  const [logs, setLogs] = useState<LogsInfo | null>(null)
+export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs }) => {
   const [expanded, setExpanded] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [tails, setTails] = useState<Record<string, TailState>>({})
@@ -155,33 +157,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   // keyed by tool, so a late response is never applied to the wrong tab.
   const requestedTails = useRef<Set<string>>(new Set())
 
-  // Load the module summary (tails already stripped by the API). A device that
-  // has not reported the module, or a failed fetch, leaves the section hidden.
+  // A new device (or a refreshed management module) resets the tool selection
+  // and the fetched tails.
   useEffect(() => {
-    let cancelled = false
-    setLogs(null)
     setTails({})
-    setActiveTool(null)
     requestedTails.current = new Set()
-    if (!serialNumber) return
-
-    fetch(`/api/device/${encodeURIComponent(serialNumber)}/modules/logs`)
-      .then(async (response) => {
-        if (cancelled || !response.ok) return
-        const result = await response.json()
-        if (cancelled) return
-        const info = result?.success && result.data ? extractLogs({ logs: result.data }) : null
-        if (info && info.roots.length > 0) {
-          setLogs(info)
-          setActiveTool(info.roots[0].tool)
-        }
-      })
-      .catch((error) => {
-        console.error('[MANAGEMENT LOGS] Failed to load logs module:', error)
-      })
-
-    return () => { cancelled = true }
-  }, [serialNumber])
+    setActiveTool(logs && logs.roots.length > 0 ? logs.roots[0].tool : null)
+  }, [serialNumber, logs])
 
   // Fetch a tool's tails the first time its tab is opened while expanded.
   useEffect(() => {

@@ -11,6 +11,7 @@ import { Icons } from '../widgets/shared'
 import { convertPowerShellObjects } from '../../lib/utils/powershell-parser'
 import { CopyButton } from '../ui/CopyButton'
 import { ManagementLogsSection } from './ManagementLogsSection'
+import { extractLogs } from '../../lib/data-processing/modules/logs'
 
 // Helper to parse osquery boolean strings ("true", "false", "1", "0") to boolean
 function parseBool(value: any): boolean {
@@ -214,6 +215,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
   const managedPolicies = management.managed_policies || management.managedPolicies || []
   const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
   const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
+  const managementLogs = extractLogs({ management })
   
   // Toggle profile expansion
   const toggleProfile = (identifier: string) => {
@@ -1337,7 +1339,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       </div>
 
       {/* Management tool logs - one inner tab per Managed logs root */}
-      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} />
+      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} logs={managementLogs} />
 
       {/* Configuration Profiles Section - macOS profiles and Windows policy branches alike */}
       {profileEntries.length > 0 && (
