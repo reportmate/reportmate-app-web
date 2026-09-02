@@ -13,6 +13,18 @@ import { calculateDeviceStatus } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 // WebPubSub message types for JSON subprotocol
+interface WebPubSubMessage {
+  type: "message" | "system" | "ack"
+  from?: string
+  group?: string
+  data?: unknown
+  dataType?: string
+  event?: string
+  connectionId?: string
+  userId?: string
+  message?: string
+}
+
 // FleetEvent interface for events from /api/events
 interface FleetEvent {
   id: string
@@ -90,13 +102,15 @@ export default function ClientDashboard() {
   const [, setTimeUpdateCounter] = useState(0)
   const [installStats, setInstallStats] = useState<InstallStatsData | null>(null)
   const [installStatsLoading, setInstallStatsLoading] = useState(true)
-  // Events arrive by polling only; there is no longer a WebSocket path to negotiate.
-  const [connectionStatus, setConnectionStatus] = useState<string>("polling")
+  const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
   const [lastUpdateTime, setLastUpdateTime] = useState<Date | null>(null)
   const [mounted, setMounted] = useState(false)
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   const _fetchAbortRef = useRef(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
   const { platformFilter, isPlatformVisible } = usePlatformFilterSafe()
   
   // Filter devices by platform
@@ -309,7 +323,11 @@ export default function ClientDashboard() {
     // Initial load
     fetchDashboardData(true)
     
-    // Refresh devices + installStats + events every 30 seconds
+    // Refresh devices + installStats + events every 30 seconds. This runs even
+    // while the WebSocket is connected: the socket carries events only, whereas
+    // this call is also the sole source of the device list and of the
+    // pre-aggregated installStats behind the Errors/Warnings tiles. Skipping it
+    // while connected froze those tiles against a live-updating event table.
     const interval = setInterval(() => {
       fetchDashboardData(false)
     }, 30000)
@@ -317,6 +335,133 @@ export default function ClientDashboard() {
     return () => {
       aborted = true
       clearInterval(interval)
+    }
+  }, [])
+
+  // SignalR WebSocket connection for real-time events
+  useEffect(() => {
+    let isActive = true
+    let reconnectTimeout: NodeJS.Timeout | null = null
+
+    async function connectWebSocket() {
+      if (!isActive) return
+
+      try {
+        // Opt out only by setting the flag to "false" explicitly. The previous
+        // version required NEXT_PUBLIC_ENABLE_SIGNALR === "true", which tied the
+        // live feed to a build arg on the deploy pipeline; when that arg was
+        // dropped the feature went dark with no other signal.
+        if (process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "false") {
+          setConnectionStatus('polling')
+          return
+        }
+
+        setConnectionStatus('connecting')
+
+        // Negotiate through the same-origin BFF proxy, never the public FastAPI
+        // URL. Minting a live-stream token requires authentication, and only the
+        // proxy holds the internal secret — the browser calling FastAPI directly
+        // got a 401 every time, which is why this hub logged zero connections
+        // for the whole time the feature was nominally enabled.
+        const negotiateResponse = await Promise.race([
+          fetch('/api/v1/negotiate?device=dashboard', { cache: 'no-store' }),
+          new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
+          )
+        ]) as Response
+
+        if (!negotiateResponse.ok) {
+          throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
+        }
+
+        const negotiateData = await negotiateResponse.json()
+
+        if (negotiateData.error || !negotiateData.url) {
+          throw new Error(negotiateData.error || 'WebPubSub not available')
+        }
+
+        if (!isActive) return
+
+        // Connect using native WebSocket with Azure Web PubSub JSON subprotocol
+        const ws = new WebSocket(negotiateData.url, 'json.webpubsub.azure.v1')
+        wsRef.current = ws
+
+        ws.onopen = () => {
+          if (!isActive) {
+            ws.close()
+            return
+          }
+          setConnectionStatus('connected')
+          reconnectAttemptsRef.current = 0
+          setLastUpdateTime(new Date())
+        }
+
+        ws.onmessage = (event) => {
+          if (!isActive) return
+          try {
+            const message: WebPubSubMessage = JSON.parse(event.data)
+
+            if (message.type === 'message') {
+              const eventData = message.data as FleetEvent
+              if (eventData && eventData.id) {
+                setEvents(prev => {
+                  // Avoid duplicates
+                  const exists = prev.some(e => e.id === eventData.id)
+                  if (exists) return prev
+                  // Add new event at the beginning, keep last 300
+                  return [eventData, ...prev].slice(0, 1000)
+                })
+                setLastUpdateTime(new Date())
+              }
+            }
+          } catch {
+            // Silently ignore parse errors
+          }
+        }
+
+        ws.onerror = () => {
+          // Error handled in onclose
+        }
+
+        ws.onclose = () => {
+          wsRef.current = null
+
+          if (!isActive) return
+
+          // Attempt reconnect with exponential backoff
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
+            reconnectAttemptsRef.current++
+            setConnectionStatus('reconnecting')
+            reconnectTimeout = setTimeout(connectWebSocket, delay)
+          } else {
+            setConnectionStatus('polling')
+          }
+        }
+      } catch {
+        if (isActive) {
+          setConnectionStatus('polling')
+        }
+      }
+    }
+
+    // Start WebSocket connection
+    connectWebSocket()
+
+    return () => {
+      isActive = false
+
+      // Cleanup WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
+
+      // Cleanup reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
+      }
     }
   }, [])
 
