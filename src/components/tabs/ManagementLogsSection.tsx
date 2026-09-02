@@ -156,6 +156,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   // Tools whose tails have been requested for the current serial; results are
   // keyed by tool, so a late response is never applied to the wrong tab.
   const requestedTails = useRef<Set<string>>(new Set())
+  // Mirror of the tail states for the fetch effect, which must not re-run on
+  // every state change; bumped by Retry and by re-opening a failed tab.
+  const tailsRef = useRef<Record<string, TailState>>({})
+  tailsRef.current = tails
+  const [retryNonce, setRetryNonce] = useState(0)
 
   // A new device (or a refreshed management module) resets the tool selection
   // and the fetched tails.
@@ -165,10 +170,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     setActiveTool(logs && logs.roots.length > 0 ? logs.roots[0].tool : null)
   }, [serialNumber, logs])
 
-  // Fetch a tool's tails the first time its tab is opened while expanded.
+  // Fetch a tool's tails the first time its tab is opened while expanded. A
+  // failed fetch is retried when the tab is opened again or Retry is pressed;
+  // a transient server error must not stick until a full reload.
   useEffect(() => {
     if (!serialNumber || !activeTool || !expanded) return
-    if (requestedTails.current.has(activeTool)) return
+    const previous = tailsRef.current[activeTool]
+    if (requestedTails.current.has(activeTool) && previous?.state !== 'error') return
     requestedTails.current.add(activeTool)
 
     const tool = activeTool
@@ -186,7 +194,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
       .catch((error) => {
         if (stillCurrent()) setTails(prev => ({ ...prev, [tool]: { state: 'error', message: error instanceof Error ? error.message : String(error) } }))
       })
-  }, [serialNumber, activeTool, expanded])
+  }, [serialNumber, activeTool, expanded, retryNonce])
 
   const roots = useMemo(() => logs?.roots ?? [], [logs])
   const active = useMemo(() => roots.find(r => r.tool === activeTool) ?? null, [roots, activeTool])
@@ -248,7 +256,10 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   const selectTool = (tool: string) => {
     setActiveTool(tool)
     setFilter('')
+    if (tails[tool]?.state === 'error') setRetryNonce(n => n + 1)
   }
+
+  const retryTail = () => setRetryNonce(n => n + 1)
 
   const selectFile = (file: string) => {
     if (!activeTool) return
@@ -462,7 +473,15 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   {!tailState || tailState.state === 'loading' ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">Loading log...</div>
                   ) : tailState.state === 'error' ? (
-                    <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">Failed to load log: {tailState.message}</div>
+                    <div className="p-6 text-center text-sm text-red-600 dark:text-red-400">
+                      <div>Failed to load log: {tailState.message}</div>
+                      <button
+                        onClick={retryTail}
+                        className="mt-3 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        Retry
+                      </button>
+                    </div>
                   ) : tailLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
                   ) : prettyJson !== null && !filter.trim() ? (
