@@ -68,6 +68,11 @@ interface UtilizationApp {
   userCount: number
   activeDeviceCount?: number
   activeUserCount?: number
+  // Devices whose applications inventory lists the app, folded by the same
+  // alias rules as the usage row. This is the install figure; deviceCount
+  // is not (it bottoms out at the last baseline reset and, on macOS, only
+  // sees GUI sessions).
+  installedDeviceCount?: number
   lastUsed: string | null
   firstUsed: string | null
   devices: string[]
@@ -2202,7 +2207,7 @@ function ApplicationsPageContent() {
                         app.totalHours.toFixed(1),
                         app.launchCount,
                         app.activeDeviceCount ?? '',
-                        app.deviceCount,
+                        app.installedDeviceCount ?? '',
                         app.activeUserCount ?? '',
                         app.userCount,
                         app.lastUsed || '',
@@ -3338,9 +3343,9 @@ function ApplicationsPageContent() {
                             <div className={`text-sm ${(app.activeDeviceCount ?? 0) > 0 ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
                               {app.activeDeviceCount ?? app.deviceCount}
                             </div>
-                            {app.activeDeviceCount != null && app.activeDeviceCount !== app.deviceCount && (
-                              <div className="text-xs text-gray-500 dark:text-gray-400" title="Devices with any usage row, including background-only process time">
-                                {app.deviceCount} installed
+                            {app.installedDeviceCount != null && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400" title="Devices whose applications inventory lists this app">
+                                {app.installedDeviceCount} installed
                               </div>
                             )}
                           </td>
