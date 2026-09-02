@@ -125,6 +125,46 @@ function parseJsonlLine(raw: string): JsonlEvent {
   }
 }
 
+/**
+ * MDM agent logs are structured lines rather than JSON. Two formats are
+ * recognised and shown as event rows like events.jsonl:
+ *   CMTrace (Intune Management Extension on Windows):
+ *     <![LOG[message]LOG]!><time="HH:mm:ss.fffffff" date="M-d-yyyy" component="X" context="" type="1|2|3" thread="n" file="">
+ *   Intune MDM daemon on the Mac:
+ *     yyyy-MM-dd HH:mm:ss:SSS | IntuneMDM-Daemon | I|W|E | thread | Logger | message
+ */
+const CMTRACE_PATTERN = /^<!\[LOG\[([\s\S]*?)\]LOG\]!><time="([^"]*)"\s+date="([^"]*)"\s+component="([^"]*)"(?:\s+context="[^"]*")?\s+type="(\d)"(?:\s+thread="([^"]*)")?(?:\s+file="[^"]*")?>\s*$/
+const INTUNE_DAEMON_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}):(\d{3}) \| ([^|]+?) \| ([IWE]) \| ([^|]*?) \| ([^|]*?) \| ([\s\S]*)$/
+
+const CMTRACE_LEVELS: Record<string, string> = { '1': 'INFO', '2': 'WARN', '3': 'ERROR' }
+const DAEMON_LEVELS: Record<string, string> = { I: 'INFO', W: 'WARN', E: 'ERROR' }
+
+function parseStructuredLine(raw: string): JsonlEvent {
+  const cm = CMTRACE_PATTERN.exec(raw)
+  if (cm) {
+    const [, message, time, date, component, type, thread] = cm
+    const [m, d, y] = date.split('-')
+    const iso = y && m && d ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}T${time.replace(/[+-]\d+$/, '')}` : undefined
+    const parsed = { time, date, component, type, thread, message }
+    return { raw, parsed, timestamp: iso, level: CMTRACE_LEVELS[type] ?? type, eventType: component, message }
+  }
+  const dm = INTUNE_DAEMON_PATTERN.exec(raw)
+  if (dm) {
+    const [, stamp, millis, process, level, thread, logger, message] = dm
+    const parsed = { timestamp: `${stamp}.${millis}`, process: process.trim(), level, thread: thread.trim(), logger: logger.trim(), message }
+    return { raw, parsed, timestamp: `${stamp.replace(' ', 'T')}.${millis}`, level: DAEMON_LEVELS[level] ?? level, eventType: logger.trim(), message }
+  }
+  return { raw, parsed: null }
+}
+
+/** True when most of the sampled lines are CMTrace or Intune daemon records. */
+function isStructuredTail(lines: string[]): boolean {
+  const sample = lines.slice(0, 40)
+  if (sample.length === 0) return false
+  const hits = sample.filter(line => CMTRACE_PATTERN.test(line) || INTUNE_DAEMON_PATTERN.test(line)).length
+  return hits * 2 >= sample.length
+}
+
 function formatEventTime(value?: string): string {
   if (!value) return ''
   const date = new Date(value)
@@ -217,7 +257,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [tailLines, filter])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
-  const visibleEvents = useMemo(() => (isJsonl ? visibleLines.map(parseJsonlLine) : []), [isJsonl, visibleLines])
+  const isStructured = useMemo(() => !isJsonl && !isJson && isStructuredTail(tailLines), [isJsonl, isJson, tailLines])
+  const showEvents = isJsonl || isStructured
+  const visibleEvents = useMemo(() => {
+    if (isJsonl) return visibleLines.map(parseJsonlLine)
+    if (isStructured) return visibleLines.map(parseStructuredLine)
+    return []
+  }, [isJsonl, isStructured, visibleLines])
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
   const prettyJson = useMemo(() => {
     if (!isJson || tailLines.length === 0) return null
@@ -486,7 +532,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
                   ) : prettyJson !== null && !filter.trim() ? (
                     <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
-                  ) : isJsonl ? (
+                  ) : showEvents ? (
                     <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                       {visibleEvents.map((event, index) => {
                         if (!event.parsed) {
