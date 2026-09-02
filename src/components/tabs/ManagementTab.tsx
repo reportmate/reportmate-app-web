@@ -769,9 +769,22 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   </div>
                 </div>
 
+                {/* UUID - the identifier MDM commands and inventory key on */}
+                {deviceIdentifiers.uuid && (
+                  <div className="flex flex-col gap-1 pt-2">
+                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">UUID</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                        {deviceIdentifiers.uuid}
+                      </span>
+                      <CopyButton value={deviceIdentifiers.uuid} />
+                    </div>
+                  </div>
+                )}
+
                 {/* MDM Server URL - Full URL visible */}
                 {serverUrl && (
-                  <div className="flex flex-col gap-1 pt-2">
+                  <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Server URL</span>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
@@ -791,60 +804,6 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                         {mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl}
                       </span>
                       <CopyButton value={mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl} />
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Mac: Device Identifiers */}
-          {isMac && (deviceIdentifiers.uuid || deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number || deviceIdentifiers.hardware_model || deviceIdentifiers.model || deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag || deviceIdentifiers.provisioning_udid) && (
-            <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Device Identifiers</h3>
-              <div className="space-y-3">
-                {deviceIdentifiers.uuid && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">UUID</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
-                        {deviceIdentifiers.uuid}
-                      </span>
-                      <CopyButton value={deviceIdentifiers.uuid} />
-                    </div>
-                  </div>
-                )}
-                {(deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number) && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Serial Number</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
-                        {deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number}
-                      </span>
-                      <CopyButton value={deviceIdentifiers.hardware_serial || deviceIdentifiers.serialNumber || deviceIdentifiers.serial_number} />
-                    </div>
-                  </div>
-                )}
-                {(deviceIdentifiers.hardware_model || deviceIdentifiers.model) && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Model</span>
-                    <span className="text-sm text-gray-900 dark:text-white">{deviceIdentifiers.hardware_model || deviceIdentifiers.model}</span>
-                  </div>
-                )}
-                {(deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag) && (
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Asset Tag</span>
-                    <span className="text-sm text-gray-900 dark:text-white">{deviceIdentifiers.asset_tag || deviceIdentifiers.assetTag}</span>
-                  </div>
-                )}
-                {deviceIdentifiers.provisioning_udid && (
-                  <div className="flex flex-col gap-1">
-                    <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Provisioning UDID</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
-                        {deviceIdentifiers.provisioning_udid}
-                      </span>
-                      <CopyButton value={deviceIdentifiers.provisioning_udid} />
                     </div>
                   </div>
                 )}
