@@ -36,7 +36,7 @@ export interface LogTail {
 }
 
 export interface LogRoot {
-  /** Stable key derived from the directory name: installs, bootstrap, reports, state, encryption, users, utilities */
+  /** Stable key derived from the directory name: installs, bootstrap, reports, state, encryption, users, utilities, notifications, plus mdm and installer */
   tool: string
   /** Directory display name, e.g. "Managed Installs" */
   name: string
@@ -188,6 +188,7 @@ const PRODUCT_NAMES: Record<string, { mac: string; windows: string }> = {
   encryption: { mac: 'Crypt', windows: 'Crypt Escrow' },
   users: { mac: 'ManageUsers', windows: 'ManageUsers' },
   utilities: { mac: 'Utilities', windows: 'Utilities' },
+  notifications: { mac: 'swiftDialog', windows: 'csharpDialog' },
   installer: { mac: 'Installer', windows: 'Installer' },
 }
 
