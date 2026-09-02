@@ -11,6 +11,19 @@ export interface FleetEvent {
   payload: Record<string, unknown>
 }
 
+// WebPubSub message types for JSON subprotocol
+interface WebPubSubMessage {
+  type: "message" | "system" | "ack"
+  from?: string
+  group?: string
+  data?: unknown
+  dataType?: string
+  event?: string
+  connectionId?: string
+  userId?: string
+  message?: string
+}
+
 export function useLiveEvents() {
   const [events, setEvents] = useState<FleetEvent[]>([])
   const [connectionStatus, setConnectionStatus] = useState<string>("connecting")
@@ -19,6 +32,10 @@ export function useLiveEvents() {
   const [loadingProgress, setLoadingProgress] = useState({ current: 0, total: 0 })
   const [loadingMessage, setLoadingMessage] = useState<string>('')
   
+  const wsRef = useRef<WebSocket | null>(null)
+  const reconnectAttemptsRef = useRef(0)
+  const maxReconnectAttempts = 5
+
   // Ensure we're mounted before showing time-dependent data
   useEffect(() => {
     setMounted(true)
@@ -156,6 +173,7 @@ export function useLiveEvents() {
   useEffect(() => {
     let pollingInterval: NodeJS.Timeout | null = null
     let progressInterval: NodeJS.Timeout | null = null
+    let reconnectTimeout: NodeJS.Timeout | null = null
     let isActive = true // Track if component is still active
     
     // Function to fetch events from local API
@@ -216,14 +234,159 @@ export function useLiveEvents() {
       }, 60000)
     }
     
-    // Events arrive by polling only. The dashboard used to negotiate a Web
-    // PubSub connection first, but that hub was removed (nothing had opened a
-    // connection to it in 30 days: negotiate was auth-gated, so every browser
-    // got a 401 and fell back to this path anyway).
-    startPolling()
+    async function connectWebSocket() {
+      if (!isActive) return
+      
+      try {
+        setConnectionStatus("connecting")
+        
+        // Start progress simulation
+        const estimatedTotal = 50
+        let progress = 0
+        progressInterval = setInterval(() => {
+          if (progress < Math.floor(estimatedTotal * 0.85)) {
+            progress += 3
+            setLoadingMessage('Connecting to event stream...')
+          } else if (progress < Math.floor(estimatedTotal * 0.95)) {
+            progress += 1
+            setLoadingMessage('Negotiating connection...')
+          } else if (progress < Math.floor(estimatedTotal * 0.995)) {
+            progress += 0.5
+            setLoadingMessage('Loading events...')
+          }
+          setLoadingProgress({ current: Math.floor(progress), total: estimatedTotal })
+        }, 200)
+        
+        // Check if WebPubSub is enabled
+        const isEnabled = process.env.NEXT_PUBLIC_ENABLE_SIGNALR === "true"
+
+        if (!isEnabled) {
+          if (isActive) {
+            if (progressInterval) {
+              clearInterval(progressInterval)
+              progressInterval = null
+            }
+            startPolling()
+          }
+          return
+        }
+        
+        // Get negotiate token via the session-gated BFF proxy (same-origin,
+        // carries the auth cookie; the proxy adds the internal secret upstream)
+        const negotiateResponse = await Promise.race([
+          fetch('/api/v1/negotiate?device=dashboard'),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Negotiate timeout')), 10000)
+          )
+        ]) as Response
+        
+        if (!negotiateResponse.ok) {
+          throw new Error(`Negotiate failed: ${negotiateResponse.status}`)
+        }
+        
+        const negotiateData = await negotiateResponse.json()
+        
+        // Check if negotiate returned an error
+        if (negotiateData.error || !negotiateData.url) {
+          console.warn('WebPubSub negotiate returned error:', negotiateData.error || 'No URL')
+          throw new Error(negotiateData.error || 'WebPubSub not available')
+        }
+        
+        if (!isActive) return
+        
+        // Connect using native WebSocket with Azure Web PubSub JSON subprotocol
+        const ws = new WebSocket(negotiateData.url, 'json.webpubsub.azure.v1')
+        wsRef.current = ws
+        
+        ws.onopen = () => {
+          if (!isActive) {
+            ws.close()
+            return
+          }
+          setConnectionStatus("connected")
+          reconnectAttemptsRef.current = 0
+          setLastUpdateTime(new Date())
+          
+          // Clear progress interval
+          if (progressInterval) {
+            clearInterval(progressInterval)
+            progressInterval = null
+          }
+          
+          // Fetch initial events
+          fetchLocalEvents()
+        }
+        
+        ws.onmessage = (event) => {
+          if (!isActive) return
+          try {
+            const message: WebPubSubMessage = JSON.parse(event.data)
+            
+            if (message.type === "message") {
+              const eventData = message.data as FleetEvent
+              if (eventData && eventData.id) {
+                setEvents(prev => {
+                  const existingIds = new Set(prev.map(e => e.id))
+                  if (!existingIds.has(eventData.id)) {
+                    const sanitized = sanitizeEventForDisplay(eventData)
+                    setLastUpdateTime(new Date())
+                    return [sanitized, ...prev].slice(0, 1000)
+                  }
+                  return prev
+                })
+              }
+            }
+          } catch (error) {
+            console.error("Failed to parse WebSocket message:", error)
+          }
+        }
+        
+        ws.onerror = (error) => {
+          console.error("WebSocket error:", error)
+        }
+        
+        ws.onclose = () => {
+          if (!isActive) return
+          wsRef.current = null
+          
+          // Attempt reconnection with exponential backoff
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000)
+            reconnectAttemptsRef.current++
+            setConnectionStatus("reconnecting")
+            
+            reconnectTimeout = setTimeout(() => {
+              if (isActive) connectWebSocket()
+            }, delay)
+          } else {
+            startPolling()
+          }
+        }
+        
+      } catch (error) {
+        if (!isActive) return
+        console.error("WebSocket connection failed:", error)
+        
+        if (progressInterval) {
+          clearInterval(progressInterval)
+          progressInterval = null
+        }
+        
+        setConnectionStatus("error")
+        startPolling()
+      }
+    }
+
+    connectWebSocket()
 
     return () => {
       isActive = false
+      
+      // Cleanup WebSocket connection
+      if (wsRef.current) {
+        wsRef.current.close()
+        wsRef.current = null
+      }
       
       // Cleanup polling interval
       if (pollingInterval) {
@@ -235,6 +398,12 @@ export function useLiveEvents() {
       if (progressInterval) {
         clearInterval(progressInterval)
         progressInterval = null
+      }
+      
+      // Cleanup reconnect timeout
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
       }
     }
   }, [sanitizeEventForDisplay])

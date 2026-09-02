@@ -201,3 +201,14 @@ test.describe('FastAPI Unauthenticated Rejects', () => {
     expect([401, 403]).toContain(res.status())
   })
 })
+
+test.describe('FastAPI Negotiate Endpoint', () => {
+
+  test('GET /api/v1/negotiate - exists and refuses anonymous callers', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/negotiate`)
+    // The endpoint mints a live-stream access token, so an unauthenticated
+    // caller must be rejected rather than served. A 404 here means the route
+    // moved and the dashboard proxy is pointing at nothing.
+    expect([401, 403]).toContain(res.status())
+  })
+})

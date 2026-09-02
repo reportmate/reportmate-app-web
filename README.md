@@ -1,10 +1,10 @@
 # ReportMate Web Dashboard
 
-A Next.js-based dashboard for monitoring fleet events, part of the ReportMate ecosystem.
+A Next.js-based real-time dashboard for monitoring fleet events via SignalR, part of the ReportMate ecosystem.
 
 ## Features
 
-- **Event Feed** refreshed by polling the API
+- **Real-time Event Streaming** via SignalR with automatic reconnection
 - **Professional Dashboard UI** inspired by MunkiReport's event module
 - **Status-based Event Display** with color-coded indicators and icons
 - **Smart Payload Formatting** that adapts to different data types
@@ -39,7 +39,10 @@ cp .env.local.example .env.local
 Configure your environment variables in `.env.local`:
 
 ```env
+NEXT_PUBLIC_WPS_URL=wss://<your-pubsub>.webpubsub.azure.com/client/?hub=fleet
+NEXT_PUBLIC_WPS_TOKEN=<jwt-from-/api/negotiate>
 API_BASE_URL=https://your-functions-api.azurewebsites.net
+NEXT_PUBLIC_ENABLE_SIGNALR=true
 ```
 
 ### 3. Development
@@ -60,7 +63,7 @@ pnpm start
 ## Dashboard Features
 
 ### Main Dashboard (`/dashboard`)
-- Event monitoring
+- Real-time event monitoring
 - Device status overview
 - Event timeline with filtering
 - Connection status indicators
@@ -99,7 +102,7 @@ Test the backend connection:
 
 ```bash
 # Health check
-curl https://reportmate-api.azurewebsites.net/api/v1/health
+curl https://reportmate-api.azurewebsites.net/api/negotiate?device=test-device
 
 # Send test event
 curl -X POST https://reportmate-api.azurewebsites.net/api/ingest \
@@ -132,6 +135,7 @@ The Dockerfile is optimized for production deployment with:
 
 - **Framework**: Next.js 15 with App Router
 - **Styling**: Tailwind CSS 4.x
+- **Real-time**: SignalR (@microsoft/signalr)
 - **Type Safety**: TypeScript
 - **Package Manager**: pnpm
 - **Deployment**: Docker + Azure Container Apps
@@ -142,7 +146,9 @@ The Dockerfile is optimized for production deployment with:
 
 | Variable | Description | Required |
 |----------|-------------|----------|
+| `NEXT_PUBLIC_WPS_URL` | Azure Web PubSub WebSocket URL | Yes |
 | `API_BASE_URL` | Backend API base URL | Yes |
+| `NEXT_PUBLIC_ENABLE_SIGNALR` | Enable real-time features | No (default: true) |
 
 ### Next.js Configuration
 
