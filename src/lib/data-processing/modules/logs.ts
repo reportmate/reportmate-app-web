@@ -147,8 +147,25 @@ export function extractLogs(modules: any): LogsInfo | null {
     platform: pick(raw, 'platform'),
     collectedAt: pick(raw, 'collectedAt', 'collected_at') ?? pick(raw, 'collectionTimestamp'),
     moduleVersion: pick(raw, 'moduleVersion', 'module_version'),
-    roots,
+    roots: orderLogRoots(roots),
   }
+}
+
+/**
+ * Tab order: the MDM root first, then the management tools in the order the
+ * client reported them, then the OS installer log last.
+ */
+export function orderLogRoots(roots: LogRoot[]): LogRoot[] {
+  const rank = (root: LogRoot): number => {
+    const tool = root.tool.toLowerCase()
+    if (tool === 'mdm') return 0
+    if (tool === 'installer') return 2
+    return 1
+  }
+  return roots
+    .map((root, index) => ({ root, index }))
+    .sort((a, b) => rank(a.root) - rank(b.root) || a.index - b.index)
+    .map(({ root }) => root)
 }
 
 /** "Managed Installs" -> "Installs"; falls back to the tool key in title case */
@@ -171,10 +188,14 @@ const PRODUCT_NAMES: Record<string, { mac: string; windows: string }> = {
   encryption: { mac: 'Crypt', windows: 'Crypt Escrow' },
   users: { mac: 'ManageUsers', windows: 'ManageUsers' },
   utilities: { mac: 'Utilities', windows: 'Utilities' },
+  installer: { mac: 'Installer', windows: 'Installer' },
 }
 
 export function logProductName(root: Pick<LogRoot, 'name' | 'tool'>, platform?: string): string {
-  const names = PRODUCT_NAMES[root.tool.toLowerCase()]
+  const tool = root.tool.toLowerCase()
+  // The MDM root is named after the agent the client found (Intune, Jamf, ...).
+  if (tool === 'mdm') return (root.name || '').trim() || 'MDM'
+  const names = PRODUCT_NAMES[tool]
   if (!names) return logRootLabel(root)
   const isWindows = (platform || '').toLowerCase().startsWith('win')
   return isWindows ? names.windows : names.mac
