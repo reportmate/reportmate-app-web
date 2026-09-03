@@ -455,19 +455,6 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Last written</div>
                   <div className="text-sm text-gray-900 dark:text-white">{formatWhen(active.newestModified) || 'Unknown'}</div>
                 </div>
-                {((active.errorCount ?? 0) > 0 || (active.warningCount ?? 0) > 0) && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">In the primary log</div>
-                    <div className="flex items-center gap-2 text-sm">
-                      {(active.errorCount ?? 0) > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{active.errorCount} errors</span>
-                      )}
-                      {(active.warningCount ?? 0) > 0 && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">{active.warningCount} warnings</span>
-                      )}
-                    </div>
-                  </div>
-                )}
                 {active.latestSession && (
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Latest run</div>
@@ -481,6 +468,12 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                       {(active.latestSession.errors ?? 0) > 0 && <span className="text-red-600 dark:text-red-400">{active.latestSession.errors} errors</span>}
                       {(active.latestSession.warnings ?? 0) > 0 && <span className="text-amber-600 dark:text-amber-400">{active.latestSession.warnings} warnings</span>}
                     </div>
+                  </div>
+                )}
+                {active.version && (
+                  <div className="ml-auto text-right">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Version</div>
+                    <div className="text-sm font-mono text-gray-900 dark:text-white">{active.version}</div>
                   </div>
                 )}
               </div>

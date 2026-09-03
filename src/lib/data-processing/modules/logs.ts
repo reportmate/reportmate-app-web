@@ -45,6 +45,8 @@ export interface LogRoot {
   fileCount?: number
   totalBytes?: number
   newestModified?: string
+  /** Version of the tool that owns the root, as the client read it from the installed package or bundle */
+  version?: string
   files: LogFileEntry[]
   latestSession?: LogSessionSummary | null
   /** Relative path of the log the viewer opens first */
@@ -124,6 +126,7 @@ export function normalizeLogRoot(raw: any): LogRoot | null {
     fileCount: toNumber(pick(raw, 'fileCount', 'file_count')),
     totalBytes: toNumber(pick(raw, 'totalBytes', 'total_bytes')),
     newestModified: pick(raw, 'newestModified', 'newest_modified'),
+    version: pick(raw, 'version', 'toolVersion'),
     files,
     latestSession,
     primaryLog: pick(raw, 'primaryLog', 'primary_log'),
