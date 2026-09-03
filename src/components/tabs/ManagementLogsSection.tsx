@@ -276,6 +276,73 @@ function liftTag(event: JsonlEvent): JsonlEvent {
   return { ...event, tag: m[1], message: m[2] }
 }
 
+/**
+ * A .json tail (session.json, status.json) as a tree: objects and arrays open
+ * by default with their size, scalars keyed and coloured by type. Lists of
+ * scalars are shown inline so a package list reads as one line.
+ */
+const JsonValue: React.FC<{ value: unknown; name?: string; depth: number }> = ({ value, name, depth }) => {
+  const label = name !== undefined ? <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{name}</span> : null
+  if (value === null || value === undefined) {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">null</span></div>
+  }
+  if (typeof value === 'boolean') {
+    return <div className="flex gap-2 py-0.5">{label}<span className={value ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}>{String(value)}</span></div>
+  }
+  if (typeof value === 'number') {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-sky-700 dark:text-sky-300 tabular-nums">{String(value)}</span></div>
+  }
+  if (typeof value === 'string') {
+    return <div className="flex gap-2 py-0.5 min-w-0">{label}<span className="text-gray-900 dark:text-white break-all">{value === '' ? <span className="text-gray-400 dark:text-gray-500 italic">empty</span> : value}</span></div>
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">empty list</span></div>
+    }
+    const scalars = value.every(v => v === null || ['string', 'number', 'boolean'].includes(typeof v))
+    if (scalars) {
+      return (
+        <div className="flex gap-2 py-0.5 min-w-0">
+          {label}
+          <span className="text-gray-900 dark:text-white break-words">{value.map(v => String(v)).join(', ')}</span>
+          <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">{value.length}</span>
+        </div>
+      )
+    }
+    return (
+      <details open={depth < 2} className="py-0.5">
+        <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+          <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+          {label}
+          <span className="text-gray-400 dark:text-gray-500">{value.length} items</span>
+        </summary>
+        <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700">
+          {value.map((item, index) => <JsonValue key={index} value={item} name={String(index)} depth={depth + 1} />)}
+        </div>
+      </details>
+    )
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (entries.length === 0) {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">empty</span></div>
+  }
+  if (name === undefined) {
+    return <div>{entries.map(([key, child]) => <JsonValue key={key} value={child} name={key} depth={depth + 1} />)}</div>
+  }
+  return (
+    <details open={depth < 2} className="py-0.5">
+      <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+        <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+        {label}
+        <span className="text-gray-400 dark:text-gray-500">{entries.length} fields</span>
+      </summary>
+      <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700">
+        {entries.map(([key, child]) => <JsonValue key={key} value={child} name={key} depth={depth + 1} />)}
+      </div>
+    </details>
+  )
+}
+
 /** The pill classes for a message tag: outcomes carry a colour, phases stay neutral. */
 function tagClass(tag: string): string {
   const t = tag.toUpperCase()
@@ -467,10 +534,10 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [classifiedLines])
   const toggleLevel = (key: keyof LevelFilter) => setLevelFilter(current => ({ ...current, [key]: !current[key] }))
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
-  const prettyJson = useMemo(() => {
+  const jsonDocument = useMemo<unknown>(() => {
     if (!isJson || tailLines.length === 0) return null
     try {
-      return JSON.stringify(JSON.parse(tailLines.join('\n')), null, 2)
+      return JSON.parse(tailLines.join('\n'))
     } catch {
       return null
     }
@@ -765,8 +832,10 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   ) : tailLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
-                  ) : prettyJson !== null && !filter.trim() ? (
-                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
+                  ) : jsonDocument !== null && !filter.trim() ? (
+                    <div className="p-4 text-xs font-mono max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto">
+                      <JsonValue value={jsonDocument} depth={0} />
+                    </div>
                   ) : visibleLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No lines match the current filters</div>
                   ) : showEvents ? (
