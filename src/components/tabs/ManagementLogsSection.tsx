@@ -125,6 +125,8 @@ interface JsonlEvent {
   parsed: Record<string, unknown> | null
   timestamp?: string
   level?: string
+  /** A status tag the tool put at the start of the message, e.g. PROGRESS, SUB-PROGRESS, SUCCESS, SKIPPED, SECTION */
+  tag?: string
   eventType?: string
   item?: string
   version?: string
@@ -240,6 +242,22 @@ function stitchCmTrace(lines: string[]): string[] {
   }
   if (open !== null) out.push(open)
   return out
+}
+
+/**
+ * Tools mark phases inside the message with an uppercase bracketed tag:
+ * `[PROGRESS] Processing: X`, `[SUB-PROGRESS] Downloaded: 8.1 MB`,
+ * `[SUCCESS] ...`, `[SKIPPED] ...`, `[SECTION] ...`. The tag becomes its own
+ * pill and leaves the message. Mixed-case brackets such as `[TamperProtection]`
+ * are component names, not tags, and stay in the text.
+ */
+const MESSAGE_TAG = /^\[([A-Z][A-Z0-9_-]{1,19})\]\s*([\s\S]*)$/
+
+function liftTag(event: JsonlEvent): JsonlEvent {
+  if (!event.message) return event
+  const m = MESSAGE_TAG.exec(event.message)
+  if (!m) return event
+  return { ...event, tag: m[1], message: m[2] }
 }
 
 /** A level label for a line with no level field, from its words; undefined when it reads as plain information. */
@@ -379,7 +397,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   // filter then narrow that list, and the event view reuses the parse.
   const classifiedLines = useMemo(() => {
     return tailLines.map(line => {
-      const event = isJsonl ? parseJsonlLine(line) : isStructured ? parseStructuredLine(line) : null
+      const event = isJsonl ? liftTag(parseJsonlLine(line)) : isStructured ? liftTag(parseStructuredLine(line)) : null
       const level: LineLevel = event?.parsed ? levelTone(event.level) : lineTone(line)
       return { line, event, level }
     })
@@ -736,6 +754,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                                 <span className="font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatEventTime(event.timestamp)}</span>
                                 {event.level && (
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
+                                )}
+                                {event.tag && (
+                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium uppercase tracking-wide whitespace-nowrap bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">{event.tag}</span>
                                 )}
                                 {event.eventType && (
                                   <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
