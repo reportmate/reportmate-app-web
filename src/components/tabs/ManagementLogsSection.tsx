@@ -314,7 +314,7 @@ const JsonValue: React.FC<{ value: unknown; name?: string; depth: number }> = ({
     }
     if (scalars) {
       return (
-        <details className="py-0.5">
+        <details open className="py-0.5">
           <summary className="cursor-pointer list-none flex gap-2 items-baseline">
             <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
             {label}
