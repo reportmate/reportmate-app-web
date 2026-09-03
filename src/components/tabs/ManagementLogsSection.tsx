@@ -286,6 +286,22 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [activeTool, selectedFile, availableTails, loadedRoot])
   const currentTail = currentFile ? availableTails.get(currentFile) ?? null : null
   const tailLines = useMemo(() => currentTail?.lines ?? [], [currentTail])
+  // The worst level found in each tailed file, for the dot beside its name.
+  const fileTone = useMemo(() => {
+    const tones = new Map<string, LineLevel>()
+    for (const tail of loadedRoot?.tails ?? []) {
+      if (!tail.file) continue
+      const jsonl = tail.file.toLowerCase().endsWith('.jsonl')
+      let worst: LineLevel = 'plain'
+      for (const line of tail.lines ?? []) {
+        const level = jsonl ? levelTone(parseJsonlLine(line).level) : lineTone(line)
+        if (level === 'error') { worst = 'error'; break }
+        if (level === 'warning') worst = 'warning'
+      }
+      tones.set(tail.file, worst)
+    }
+    return tones
+  }, [loadedRoot])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
   const isStructured = useMemo(() => !isJsonl && !isJson && isStructuredTail(tailLines), [isJsonl, isJson, tailLines])
@@ -329,8 +345,6 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     }
   }, [isJson, tailLines])
 
-  const totalErrors = roots.reduce((n, r) => n + (r.errorCount ?? 0), 0)
-  const totalWarnings = roots.reduce((n, r) => n + (r.warningCount ?? 0), 0)
 
   if (!logs || roots.length === 0) return null
 
@@ -383,8 +397,6 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
           <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</span>
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
-          {totalErrors > 0 && <span className="text-xs font-medium text-red-600 dark:text-red-400">{totalErrors} errors</span>}
-          {totalWarnings > 0 && <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{totalWarnings} warnings</span>}
           {logs.collectedAt && <span className="hidden md:inline text-xs text-gray-500 dark:text-gray-400">{formatWhen(logs.collectedAt)}</span>}
         </div>
       </div>
@@ -477,7 +489,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                               onClick={() => tail.file && selectFile(tail.file)}
                               className={`w-full text-left px-3 py-2 transition-colors ${isCurrent ? 'bg-gray-100 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                             >
-                              <div className="text-xs font-mono text-gray-900 dark:text-white break-all">{tail.file}</div>
+                              <div className="flex items-start gap-2 min-w-0">
+                                <div className="text-xs font-mono text-gray-900 dark:text-white break-all min-w-0">{tail.file}</div>
+                                {fileTone.get(tail.file ?? '') === 'error' && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Errors in this log" />}
+                                {fileTone.get(tail.file ?? '') === 'warning' && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Warnings in this log" />}
+                              </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {entry ? formatBytes(entry.bytes) : ''}
                                 {entry?.modified ? ` · ${formatWhen(entry.modified)}` : ''}
