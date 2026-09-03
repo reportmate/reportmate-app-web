@@ -247,11 +247,12 @@ function stitchCmTrace(lines: string[]): string[] {
 /**
  * Tools mark phases inside the message with an uppercase bracketed tag:
  * `[PROGRESS] Processing: X`, `[SUB-PROGRESS] Downloaded: 8.1 MB`,
- * `[SUCCESS] ...`, `[SKIPPED] ...`, `[SECTION] ...`. The tag becomes its own
- * pill and leaves the message. Mixed-case brackets such as `[TamperProtection]`
- * are component names, not tags, and stay in the text.
+ * `[SUCCESS] ...`, `[SKIPPED] ...`, `[SECTION] ...`, and agents name their
+ * subsystem the same way: `[Flighting] ...`, `[TamperProtection] ...`. Whatever
+ * leads the message in brackets becomes its own pill and leaves the text;
+ * uppercase outcome tags carry a colour, the rest stay neutral.
  */
-const MESSAGE_TAG = /^\[([A-Z][A-Z0-9_-]{1,19})\]\s*([\s\S]*)$/
+const MESSAGE_TAG = /^\[([A-Za-z][A-Za-z0-9 ._:-]{0,39})\]\s*([\s\S]*)$/
 
 function liftTag(event: JsonlEvent): JsonlEvent {
   if (!event.message) return event
@@ -784,7 +785,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
                                 )}
                                 {event.tag && (
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium uppercase tracking-wide whitespace-nowrap border ${tagClass(event.tag)}`}>{event.tag}</span>
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium whitespace-nowrap border ${tagClass(event.tag)}`}>{event.tag}</span>
                                 )}
                                 {event.eventType && !uniformComponent && (
                                   <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
