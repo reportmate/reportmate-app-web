@@ -260,6 +260,21 @@ function liftTag(event: JsonlEvent): JsonlEvent {
   return { ...event, tag: m[1], message: m[2] }
 }
 
+/** The pill classes for a message tag: outcomes carry a colour, phases stay neutral. */
+function tagClass(tag: string): string {
+  const t = tag.toUpperCase()
+  if (t === 'SUCCESS' || t === 'DONE' || t === 'COMPLETE' || t === 'COMPLETED' || t === 'INSTALLED' || t === 'OK') {
+    return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+  }
+  if (t === 'RETRY' || t === 'RETRYING' || t === 'TIMEOUT') {
+    return 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800'
+  }
+  if (t === 'FAILED' || t === 'FAILURE' || t === 'FAIL') {
+    return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+  }
+  return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+}
+
 /** A level label for a line with no level field, from its words; undefined when it reads as plain information. */
 function wordLevel(text: string): string | undefined {
   const tone = lineTone(text)
@@ -756,7 +771,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
                                 )}
                                 {event.tag && (
-                                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium uppercase tracking-wide whitespace-nowrap bg-gray-100 text-gray-600 border border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">{event.tag}</span>
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium uppercase tracking-wide whitespace-nowrap border ${tagClass(event.tag)}`}>{event.tag}</span>
                                 )}
                                 {event.eventType && (
                                   <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
