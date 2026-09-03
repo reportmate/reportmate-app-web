@@ -173,10 +173,25 @@ function parseJsonlLine(raw: string): JsonlEvent {
 const CMTRACE_PATTERN = /^<!\[LOG\[([\s\S]*?)\]LOG\]!><time="([^"]*)"\s+date="([^"]*)"\s+component="([^"]*)"(?:\s+context="[^"]*")?\s+type="(\d)"(?:\s+thread="([^"]*)")?(?:\s+file="[^"]*")?>\s*$/
 const INTUNE_DAEMON_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}):(\d{3}) \| ([^|]+?) \| ([IWE]) \| ([^|]*?) \| ([^|]*?) \| ([\s\S]*)$/
 
+/** The convention's own line: `[yyyy-MM-dd HH:mm:ss] LEVEL  message` (level padded to five). */
+const CONVENTION_PATTERN = /^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\]\s+(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\s+([\s\S]*)$/
+/** Munki: `Sep 02 2026 14:27:03 -0700 message`. */
+const MUNKI_PATTERN = /^([A-Z][a-z]{2}) (\d{2}) (\d{4}) (\d{2}:\d{2}:\d{2}) [+-]\d{4} ([\s\S]*)$/
+/** macOS install.log and other syslog-style lines: `2026-09-02 14:27:03-07 host process[pid]: message`. */
+const SYSLOG_PATTERN = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:[+-]\d{2})? (\S+) ([^\[:\s]+)(?:\[\d+\])?: ([\s\S]*)$/
+/** Anything that leads with a date and time, ISO-ish, with or without zone: the rest is the message. */
+const STAMPED_PATTERN = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:[.,:]\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+([\s\S]*)$/
+const MONTHS: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 const CMTRACE_LEVELS: Record<string, string> = { '1': 'INFO', '2': 'WARN', '3': 'ERROR' }
 const DAEMON_LEVELS: Record<string, string> = { I: 'INFO', W: 'WARN', E: 'ERROR' }
 
 function parseStructuredLine(raw: string): JsonlEvent {
+  const cv = CONVENTION_PATTERN.exec(raw)
+  if (cv) {
+    const [, day, clock, level, message] = cv
+    const parsed = { timestamp: `${day} ${clock}`, level, message }
+    return { raw, parsed, timestamp: `${day}T${clock}`, level, message }
+  }
   const cm = CMTRACE_PATTERN.exec(raw)
   if (cm) {
     const [, message, time, date, component, type, thread] = cm
@@ -191,15 +206,33 @@ function parseStructuredLine(raw: string): JsonlEvent {
     const parsed = { timestamp: `${stamp}.${millis}`, process: process.trim(), level, thread: thread.trim(), logger: logger.trim(), message }
     return { raw, parsed, timestamp: `${stamp.replace(' ', 'T')}.${millis}`, level: DAEMON_LEVELS[level] ?? level, eventType: logger.trim(), message }
   }
+  const mk = MUNKI_PATTERN.exec(raw)
+  if (mk) {
+    const [, mon, day, year, clock, message] = mk
+    const stamp = `${year}-${MONTHS[mon] ?? '01'}-${day}T${clock}`
+    return { raw, parsed: { timestamp: stamp, message }, timestamp: stamp, level: wordLevel(message), message }
+  }
+  const sl = SYSLOG_PATTERN.exec(raw)
+  if (sl) {
+    const [, day, clock, host, process, message] = sl
+    return { raw, parsed: { timestamp: `${day} ${clock}`, host, process, message }, timestamp: `${day}T${clock}`, level: wordLevel(message), eventType: process, message }
+  }
+  const st = STAMPED_PATTERN.exec(raw)
+  if (st) {
+    const [, day, clock, message] = st
+    return { raw, parsed: { timestamp: `${day} ${clock}`, message }, timestamp: `${day}T${clock}`, level: wordLevel(message), message }
+  }
   return { raw, parsed: null }
 }
 
 /** True when most of the sampled lines are CMTrace or Intune daemon records. */
-function isStructuredTail(lines: string[]): boolean {
-  const sample = lines.slice(0, 40)
-  if (sample.length === 0) return false
-  const hits = sample.filter(line => CMTRACE_PATTERN.test(line) || INTUNE_DAEMON_PATTERN.test(line)).length
-  return hits * 2 >= sample.length
+/** A level label for a line with no level field, from its words; undefined when it reads as plain information. */
+function wordLevel(text: string): string | undefined {
+  const tone = lineTone(text)
+  if (tone === 'error') return 'ERROR'
+  if (tone === 'warning') return 'WARN'
+  if (tone === 'debug') return 'DEBUG'
+  return undefined
 }
 
 function formatEventTime(value?: string): string {
@@ -319,7 +352,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [loadedRoot])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
-  const isStructured = useMemo(() => !isJsonl && !isJson && isStructuredTail(tailLines), [isJsonl, isJson, tailLines])
+  // Every text log is shown as rows: lines with a recognised shape become
+  // events with a time, level and message, the rest keep their raw text.
+  const isStructured = !isJsonl && !isJson
   const showEvents = isJsonl || isStructured
   // Every line is parsed once with its level; the text filter and the level
   // filter then narrow that list, and the event view reuses the parse.
@@ -655,8 +690,16 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     <div className="max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                       {visibleEvents.map((event, index) => {
                         if (!event.parsed) {
+                          const rawTone = lineTone(event.raw)
+                          const rawCls = rawTone === 'error'
+                            ? 'text-red-700 dark:text-red-300'
+                            : rawTone === 'warning'
+                              ? 'text-amber-700 dark:text-amber-300'
+                              : rawTone === 'debug'
+                                ? 'text-gray-500 dark:text-gray-500'
+                                : 'text-gray-700 dark:text-gray-300'
                           return (
-                            <div key={index} className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all">{event.raw}</div>
+                            <div key={index} className={`px-4 py-2 font-mono text-xs whitespace-pre-wrap break-all ${rawCls}`}>{event.raw || ' '}</div>
                           )
                         }
                         const tone = levelTone(event.level)
@@ -670,25 +713,29 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                         return (
                           <details key={index} className="group">
                             <summary className="cursor-pointer list-none px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                              <div className="flex items-center gap-x-3 min-w-0">
                                 <span className="font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatEventTime(event.timestamp)}</span>
                                 {event.level && (
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
                                 )}
                                 {event.eventType && (
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">{event.eventType.replace(/_/g, ' ')}</span>
+                                  <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
                                 )}
                                 {event.item && (
-                                  <span className="text-xs font-medium text-gray-900 dark:text-white">
+                                  <span className="text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                     {event.item}
                                     {event.version && <span className="font-normal text-gray-500 dark:text-gray-400"> {event.version}</span>}
                                   </span>
                                 )}
                                 {event.message && (
-                                  <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 break-words">{event.message}</span>
+                                  <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 flex-1 truncate">{event.message}</span>
                                 )}
                               </div>
                             </summary>
+                            {/* Expanded: the whole message, then every field the line carried */}
+                            {event.message && (
+                              <div className="mx-4 mb-2 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">{event.message}</div>
+                            )}
                             <pre className="mx-4 mb-3 p-3 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto rounded whitespace-pre-wrap break-all">{JSON.stringify(event.parsed, null, 2)}</pre>
                           </details>
                         )
