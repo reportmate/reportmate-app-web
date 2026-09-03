@@ -214,7 +214,6 @@ function tailByFile(tails: LogTail[]): Map<string, LogTail> {
 }
 
 export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs }) => {
-  const [expanded, setExpanded] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [tails, setTails] = useState<Record<string, TailState>>({})
   const [selectedFile, setSelectedFile] = useState<Record<string, string>>({})
@@ -247,11 +246,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNumber, logsKey])
 
-  // Fetch a tool's tails the first time its tab is opened while expanded. A
+  // Fetch a tool's tails the first time its tab is opened. A
   // failed fetch is retried when the tab is opened again or Retry is pressed;
   // a transient server error must not stick until a full reload.
   useEffect(() => {
-    if (!serialNumber || !activeTool || !expanded) return
+    if (!serialNumber || !activeTool) return
     const previous = tailsRef.current[activeTool]
     if (requestedTails.current.has(activeTool) && previous?.state !== 'error') return
     requestedTails.current.add(activeTool)
@@ -271,7 +270,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
       .catch((error) => {
         if (stillCurrent()) setTails(prev => ({ ...prev, [tool]: { state: 'error', message: error instanceof Error ? error.message : String(error) } }))
       })
-  }, [serialNumber, activeTool, expanded, retryNonce])
+  }, [serialNumber, activeTool, retryNonce])
 
   const roots = useMemo(() => logs?.roots ?? [], [logs])
   const active = useMemo(() => roots.find(r => r.tool === activeTool) ?? null, [roots, activeTool])
@@ -375,43 +374,25 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Accordion header - the same affordance as the Installs run log */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        aria-expanded={expanded}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-      >
+      {/* Always open: the log viewer is the point of this card, and the MDM root alone is worth the space */}
+      <div className="w-full px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <svg className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</span>
-          {!expanded && (
-          <span className="hidden sm:flex items-center gap-1.5 ml-2 min-w-0 overflow-hidden">
-            {roots.map((root) => (
-              <span key={root.tool} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
-                {logProductName(root, logs.platform)}
-                {(root.errorCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-                {(root.errorCount ?? 0) === 0 && (root.warningCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-              </span>
-            ))}
-          </span>
-          )}
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {totalErrors > 0 && <span className="text-xs font-medium text-red-600 dark:text-red-400">{totalErrors} errors</span>}
           {totalWarnings > 0 && <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{totalWarnings} warnings</span>}
           {logs.collectedAt && <span className="hidden md:inline text-xs text-gray-500 dark:text-gray-400">{formatWhen(logs.collectedAt)}</span>}
-          <svg className={`w-5 h-5 text-gray-500 transition-transform ${expanded ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
         </div>
-      </button>
+      </div>
 
-      {expanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
+      <div className="border-t border-gray-200 dark:border-gray-700">
           {/* Tool tabs - one per reported root, equal widths on a single row that narrows as roots are added.
               Error and warning counts live in the root facts below, not on the tabs. */}
+          {roots.length > 1 && (
           <div className="px-6 pt-4 grid grid-flow-col auto-cols-fr gap-2" role="tablist" aria-label="Management tools">
             {roots.map((root) => {
               const isActive = root.tool === activeTool
@@ -432,6 +413,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
               )
             })}
           </div>
+          )}
 
           {active && (
             <div className="p-6 space-y-5">
@@ -696,7 +678,6 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }
