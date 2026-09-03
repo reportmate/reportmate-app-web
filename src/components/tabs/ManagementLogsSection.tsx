@@ -306,7 +306,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
       let errors = false
       let warnings = false
       for (const line of tail.lines ?? []) {
-        const level = jsonl ? levelTone(parseJsonlLine(line).level) : lineTone(line)
+        // Same classification as the viewer: JSONL and structured (CMTrace, Intune daemon) lines by their level field, the rest by the line.
+        const event = jsonl ? parseJsonlLine(line) : parseStructuredLine(line)
+        const level = event.parsed ? levelTone(event.level) : lineTone(line)
         if (level === 'error') errors = true
         else if (level === 'warning') warnings = true
         if (errors && warnings) break
