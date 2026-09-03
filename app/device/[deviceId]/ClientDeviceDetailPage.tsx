@@ -428,6 +428,15 @@ export default function ClientDeviceDetailPage() {
     }
   }, [deviceId])
 
+  // The Management tab's log viewer shows each tool's installed version from
+  // the installs module when the client did not report one on the log root.
+  useEffect(() => {
+    if (activeTab === 'management' && !isModuleLoaded('installs')) {
+      requestModule('installs').catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, deviceId])
+
   // Prefetch module data on hover
   const handleTabHover = (tabId: TabType) => {
     if (tabId !== 'info' && !isModuleLoaded(tabId)) {
@@ -1200,7 +1209,10 @@ export default function ClientDeviceDetailPage() {
 
         {/* Management Tab - Already in info, just display */}
         {activeTab === 'management' && (
-          <ManagementTab device={deviceInfo as unknown as Record<string, unknown>} />
+          <ManagementTab
+            device={deviceInfo as unknown as Record<string, unknown>}
+            installs={isModuleLoaded('installs') ? (getModuleData('installs') as unknown) : undefined}
+          />
         )}
 
         {/* System Tab - Progressive loading */}

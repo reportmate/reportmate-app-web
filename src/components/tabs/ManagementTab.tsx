@@ -155,9 +155,11 @@ function detectMacFromData(mdmEnrollment: any): boolean {
 
 interface ManagementTabProps {
   device: Record<string, unknown>
+  /** The installs module, when loaded: the log viewer reads tool versions from it as a fallback */
+  installs?: unknown
 }
 
-export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
+export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs }) => {
   // State for profile accordion expansion
   const [expandedProfiles, setExpandedProfiles] = useState<Set<string>>(new Set())
   // State for managed policies accordion expansion
@@ -1298,7 +1300,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
       </div>
 
       {/* Management tool logs - one inner tab per Managed logs root */}
-      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} logs={managementLogs} />
+      <ManagementLogsSection serialNumber={(device as any)?.serialNumber} logs={managementLogs} installs={installs} />
 
       {/* Configuration Profiles Section - macOS profiles and Windows policy branches alike */}
       {profileEntries.length > 0 && (
