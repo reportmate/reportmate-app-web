@@ -61,11 +61,37 @@ function formatDuration(seconds?: number): string {
 
 const ERROR_LINE = /\b(ERROR|ERR|FAULT|CRITICAL|FATAL)\b/
 const WARNING_LINE = /\b(WARN|WARNING|WRN)\b/
+const DEBUG_LINE = /\b(DEBUG|DBG|VERBOSE|TRACE)\b/
 
-function lineTone(line: string): 'error' | 'warning' | 'plain' {
+/** Where a line sits in the level vocabulary the convention uses: ERROR, WARN, INFO, DEBUG. */
+type LineLevel = 'error' | 'warning' | 'debug' | 'plain'
+
+function lineTone(line: string): LineLevel {
   if (ERROR_LINE.test(line)) return 'error'
   if (WARNING_LINE.test(line)) return 'warning'
+  if (DEBUG_LINE.test(line)) return 'debug'
   return 'plain'
+}
+
+/**
+ * Level filter state. Errors and warnings narrow the view to those levels when
+ * either is on; debug lines are hidden unless asked for, so a verbose log reads
+ * as its INFO story by default.
+ */
+interface LevelFilter {
+  errors: boolean
+  warnings: boolean
+  debug: boolean
+}
+
+const DEFAULT_LEVEL_FILTER: LevelFilter = { errors: false, warnings: false, debug: false }
+
+function passesLevelFilter(level: LineLevel, filter: LevelFilter): boolean {
+  if (level === 'debug') return filter.debug && !filter.errors && !filter.warnings
+  if (filter.errors || filter.warnings) {
+    return (level === 'error' && filter.errors) || (level === 'warning' && filter.warnings)
+  }
+  return true
 }
 
 function sessionTone(status?: string): string {
@@ -172,10 +198,11 @@ function formatEventTime(value?: string): string {
   return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
-function levelTone(level?: string): 'error' | 'warning' | 'plain' {
+function levelTone(level?: string): LineLevel {
   const l = (level || '').toUpperCase()
   if (l.startsWith('ERR') || l === 'FAULT' || l === 'CRITICAL' || l === 'FATAL') return 'error'
   if (l.startsWith('WARN') || l === 'WRN') return 'warning'
+  if (l.startsWith('DEBUG') || l === 'DBG' || l === 'VERBOSE' || l === 'TRACE') return 'debug'
   return 'plain'
 }
 
@@ -192,6 +219,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   const [tails, setTails] = useState<Record<string, TailState>>({})
   const [selectedFile, setSelectedFile] = useState<Record<string, string>>({})
   const [filter, setFilter] = useState('')
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>(DEFAULT_LEVEL_FILTER)
   const [copied, setCopied] = useState(false)
   // Tools whose tails have been requested for the current serial; results are
   // keyed by tool, so a late response is never applied to the wrong tab.
@@ -203,12 +231,21 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   const [retryNonce, setRetryNonce] = useState(0)
 
   // A new device (or a refreshed management module) resets the tool selection
-  // and the fetched tails.
+  // and the fetched tails. The reset is keyed on what the survey reported, not
+  // on the object identity of `logs`: the parent recomputes that object on
+  // every render, and a reset landing between a tail request and its response
+  // discarded the response and left the tab on "Loading log..." for good.
+  const logsKey = useMemo(
+    () => (logs?.roots ?? []).map(r => `${r.tool}:${r.newestModified ?? ''}:${r.fileCount ?? ''}:${r.totalBytes ?? ''}`).join('|'),
+    [logs]
+  )
+  const firstTool = logs && logs.roots.length > 0 ? logs.roots[0].tool : null
   useEffect(() => {
     setTails({})
     requestedTails.current = new Set()
-    setActiveTool(logs && logs.roots.length > 0 ? logs.roots[0].tool : null)
-  }, [serialNumber, logs])
+    setActiveTool(firstTool)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serialNumber, logsKey])
 
   // Fetch a tool's tails the first time its tab is opened while expanded. A
   // failed fetch is retried when the tab is opened again or Retry is pressed;
@@ -250,20 +287,39 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [activeTool, selectedFile, availableTails, loadedRoot])
   const currentTail = currentFile ? availableTails.get(currentFile) ?? null : null
   const tailLines = useMemo(() => currentTail?.lines ?? [], [currentTail])
-  const visibleLines = useMemo(() => {
-    const needle = filter.trim().toLowerCase()
-    if (!needle) return tailLines
-    return tailLines.filter(line => line.toLowerCase().includes(needle))
-  }, [tailLines, filter])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
   const isStructured = useMemo(() => !isJsonl && !isJson && isStructuredTail(tailLines), [isJsonl, isJson, tailLines])
   const showEvents = isJsonl || isStructured
-  const visibleEvents = useMemo(() => {
-    if (isJsonl) return visibleLines.map(parseJsonlLine)
-    if (isStructured) return visibleLines.map(parseStructuredLine)
-    return []
-  }, [isJsonl, isStructured, visibleLines])
+  // Every line is parsed once with its level; the text filter and the level
+  // filter then narrow that list, and the event view reuses the parse.
+  const classifiedLines = useMemo(() => {
+    return tailLines.map(line => {
+      const event = isJsonl ? parseJsonlLine(line) : isStructured ? parseStructuredLine(line) : null
+      const level: LineLevel = event?.parsed ? levelTone(event.level) : lineTone(line)
+      return { line, event, level }
+    })
+  }, [tailLines, isJsonl, isStructured])
+  const levelCounts = useMemo(() => {
+    const counts = { error: 0, warning: 0, debug: 0 }
+    for (const entry of classifiedLines) {
+      if (entry.level !== 'plain') counts[entry.level] += 1
+    }
+    return counts
+  }, [classifiedLines])
+  const visibleEntries = useMemo(() => {
+    const needle = filter.trim().toLowerCase()
+    return classifiedLines.filter(entry =>
+      passesLevelFilter(entry.level, levelFilter) && (!needle || entry.line.toLowerCase().includes(needle))
+    )
+  }, [classifiedLines, filter, levelFilter])
+  const visibleLines = useMemo(() => visibleEntries.map(entry => entry.line), [visibleEntries])
+  const visibleEvents = useMemo(
+    () => (showEvents ? visibleEntries.map(entry => entry.event ?? { raw: entry.line, parsed: null }) : []),
+    [showEvents, visibleEntries]
+  )
+  const filtering = Boolean(filter.trim()) || levelFilter.errors || levelFilter.warnings || levelFilter.debug
+  const toggleLevel = (key: keyof LevelFilter) => setLevelFilter(current => ({ ...current, [key]: !current[key] }))
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
   const prettyJson = useMemo(() => {
     if (!isJson || tailLines.length === 0) return null
@@ -329,7 +385,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
           <svg className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
-          <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Logs</span>
+          <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</span>
           {!expanded && (
           <span className="hidden sm:flex items-center gap-1.5 ml-2 min-w-0 overflow-hidden">
             {roots.map((root) => (
@@ -366,7 +422,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => selectTool(root.tool)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                  className={`inline-flex h-9 items-center gap-2 px-3 rounded-md text-sm font-medium border transition-colors ${
                     isActive
                       ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
@@ -504,12 +560,61 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                         placeholder="Filter lines"
                         className="w-44 px-3 py-1.5 text-sm border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400"
                       />
+                      {!isJson && tailLines.length > 0 && (
+                        <div className="flex items-center gap-1.5" role="group" aria-label="Filter by level">
+                          <button
+                            type="button"
+                            onClick={() => toggleLevel('errors')}
+                            aria-pressed={levelFilter.errors}
+                            disabled={levelCounts.error === 0}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
+                              levelFilter.errors
+                                ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                            }`}
+                            title={levelFilter.errors ? 'Showing errors' : 'Show only errors'}
+                          >
+                            Errors
+                            <span className={`font-mono tabular-nums ${levelFilter.errors ? '' : 'text-gray-400 dark:text-gray-500'}`}>{levelCounts.error}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleLevel('warnings')}
+                            aria-pressed={levelFilter.warnings}
+                            disabled={levelCounts.warning === 0}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
+                              levelFilter.warnings
+                                ? 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                            }`}
+                            title={levelFilter.warnings ? 'Showing warnings' : 'Show only warnings'}
+                          >
+                            Warnings
+                            <span className={`font-mono tabular-nums ${levelFilter.warnings ? '' : 'text-gray-400 dark:text-gray-500'}`}>{levelCounts.warning}</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => toggleLevel('debug')}
+                            aria-pressed={levelFilter.debug}
+                            disabled={levelCounts.debug === 0}
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-40 disabled:cursor-default ${
+                              levelFilter.debug
+                                ? 'bg-gray-100 text-gray-900 border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600'
+                                : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
+                            }`}
+                            title={levelFilter.debug ? 'Hiding debug lines on next click' : 'Show debug lines'}
+                          >
+                            Debug
+                            <span className={`font-mono tabular-nums ${levelFilter.debug ? '' : 'text-gray-400 dark:text-gray-500'}`}>{levelCounts.debug}</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                     <div className="text-xs text-gray-500 dark:text-gray-400 min-w-0 truncate">
                       <span className="font-mono">{currentFile || ''}</span>
                       {tailLines.length > 0 && (
                         <span className="ml-2">
-                          {filter.trim() ? `${visibleLines.length} of ${tailLines.length} lines` : `last ${tailLines.length} lines`}
+                          {filtering ? `${visibleLines.length} of ${tailLines.length} lines` : `last ${tailLines.length} lines`}
                           {currentTail?.truncated ? ', truncated' : ''}
                         </span>
                       )}
@@ -532,6 +637,8 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
                   ) : prettyJson !== null && !filter.trim() ? (
                     <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
+                  ) : visibleLines.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No lines match the current filters</div>
                   ) : showEvents ? (
                     <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                       {visibleEvents.map((event, index) => {
@@ -545,7 +652,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                           ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                           : tone === 'warning'
                             ? 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'
-                            : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                            : tone === 'debug'
+                              ? 'bg-gray-50 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                              : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
                         return (
                           <details key={index} className="group">
                             <summary className="cursor-pointer list-none px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40">
@@ -577,7 +686,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto">
                       {visibleLines.map((line, index) => {
                         const tone = lineTone(line)
-                        const cls = tone === 'error' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : ''
+                        const cls = tone === 'error' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : tone === 'debug' ? 'text-gray-500' : ''
                         return <div key={index} className={`whitespace-pre-wrap ${cls}`}>{line || ' '}</div>
                       })}
                     </pre>
