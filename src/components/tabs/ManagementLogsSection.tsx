@@ -422,7 +422,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => selectTool(root.tool)}
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium border transition-colors ${
+                  className={`inline-flex h-9 items-center gap-2 px-3 rounded-md text-sm font-medium border transition-colors ${
                     isActive
                       ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
