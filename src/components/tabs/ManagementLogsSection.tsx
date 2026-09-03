@@ -436,6 +436,19 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     [showEvents, visibleEntries]
   )
   const filtering = Boolean(filter.trim()) || levelFilter.errors || levelFilter.warnings || levelFilter.debug
+  // A component that is the same on every row of the file says nothing per
+  // row (IntuneManagementExtension.log is all IntuneManagementExtension), so
+  // it is left to the expanded detail and the row keeps the space.
+  const uniformComponent = useMemo(() => {
+    let seen: string | undefined
+    for (const entry of classifiedLines) {
+      const type = entry.event?.eventType
+      if (!type) continue
+      if (seen === undefined) seen = type
+      else if (seen !== type) return false
+    }
+    return seen !== undefined
+  }, [classifiedLines])
   const toggleLevel = (key: keyof LevelFilter) => setLevelFilter(current => ({ ...current, [key]: !current[key] }))
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
   const prettyJson = useMemo(() => {
@@ -773,7 +786,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                                 {event.tag && (
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium uppercase tracking-wide whitespace-nowrap border ${tagClass(event.tag)}`}>{event.tag}</span>
                                 )}
-                                {event.eventType && (
+                                {event.eventType && !uniformComponent && (
                                   <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
                                 )}
                                 {event.item && (
