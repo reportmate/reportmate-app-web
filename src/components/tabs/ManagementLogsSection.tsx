@@ -300,13 +300,30 @@ const JsonValue: React.FC<{ value: unknown; name?: string; depth: number }> = ({
       return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">empty list</span></div>
     }
     const scalars = value.every(v => v === null || ['string', 'number', 'boolean'].includes(typeof v))
-    if (scalars) {
+    const inline = scalars ? value.map(v => String(v)).join(', ') : ''
+    // A short list of scalars reads as one line; a long one folds to its count
+    // and opens to one item per line, so a 236-package list does not swamp the view.
+    if (scalars && value.length <= 8 && inline.length <= 120) {
       return (
         <div className="flex gap-2 py-0.5 min-w-0">
           {label}
-          <span className="text-gray-900 dark:text-white break-words">{value.map(v => String(v)).join(', ')}</span>
+          <span className="text-gray-900 dark:text-white break-words">{inline}</span>
           <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">{value.length}</span>
         </div>
+      )
+    }
+    if (scalars) {
+      return (
+        <details className="py-0.5">
+          <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+            <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+            {label}
+            <span className="text-gray-400 dark:text-gray-500">{value.length} items</span>
+          </summary>
+          <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700 columns-2 xl:columns-3 gap-6">
+            {value.map((item, index) => <div key={index} className="py-0.5 text-gray-900 dark:text-white break-all">{String(item)}</div>)}
+          </div>
+        </details>
       )
     }
     return (
