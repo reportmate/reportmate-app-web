@@ -774,7 +774,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <div className="flex flex-col gap-1 pt-2">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">UUID</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                      <span className="text-xs font-mono text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto min-w-0 max-w-full bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
                         {deviceIdentifiers.uuid}
                       </span>
                       <CopyButton value={deviceIdentifiers.uuid} />
@@ -787,7 +787,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Server URL</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                      <span className="text-xs font-mono text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto min-w-0 max-w-full bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
                         {serverUrl}
                       </span>
                       <CopyButton value={serverUrl} />
@@ -800,7 +800,7 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device }) => {
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Check-in URL</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-mono text-gray-900 dark:text-white break-all bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
+                      <span className="text-xs font-mono text-gray-900 dark:text-white whitespace-nowrap overflow-x-auto min-w-0 max-w-full bg-gray-50 dark:bg-gray-900 px-2 py-1 rounded">
                         {mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl}
                       </span>
                       <CopyButton value={mdmEnrollment.checkin_url || mdmEnrollment.checkinUrl} />

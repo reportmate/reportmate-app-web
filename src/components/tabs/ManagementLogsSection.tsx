@@ -66,7 +66,18 @@ const DEBUG_LINE = /\b(DEBUG|DBG|VERBOSE|TRACE)\b/
 /** Where a line sits in the level vocabulary the convention uses: ERROR, WARN, INFO, DEBUG. */
 type LineLevel = 'error' | 'warning' | 'debug' | 'plain'
 
+/** `[yyyy-MM-dd HH:mm:ss] LEVEL  message`: the level token is authoritative, so an INFO line that mentions CRITICAL stays INFO. */
+const CONVENTION_LEVEL = /^\[[^\]]+\]\s+\[?(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?\b/i
+
 function lineTone(line: string): LineLevel {
+  const stamped = CONVENTION_LEVEL.exec(line)
+  if (stamped) {
+    const token = stamped[1].toUpperCase()
+    if (token === 'ERROR' || token === 'FATAL' || token === 'CRITICAL') return 'error'
+    if (token === 'WARN' || token === 'WARNING') return 'warning'
+    if (token === 'DEBUG') return 'debug'
+    return 'plain'
+  }
   if (ERROR_LINE.test(line)) return 'error'
   if (WARNING_LINE.test(line)) return 'warning'
   if (DEBUG_LINE.test(line)) return 'debug'
@@ -114,6 +125,8 @@ interface JsonlEvent {
   parsed: Record<string, unknown> | null
   timestamp?: string
   level?: string
+  /** A status tag the tool put at the start of the message, e.g. PROGRESS, SUB-PROGRESS, SUCCESS, SKIPPED, SECTION */
+  tag?: string
   eventType?: string
   item?: string
   version?: string
@@ -162,10 +175,40 @@ function parseJsonlLine(raw: string): JsonlEvent {
 const CMTRACE_PATTERN = /^<!\[LOG\[([\s\S]*?)\]LOG\]!><time="([^"]*)"\s+date="([^"]*)"\s+component="([^"]*)"(?:\s+context="[^"]*")?\s+type="(\d)"(?:\s+thread="([^"]*)")?(?:\s+file="[^"]*")?>\s*$/
 const INTUNE_DAEMON_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}):(\d{3}) \| ([^|]+?) \| ([IWE]) \| ([^|]*?) \| ([^|]*?) \| ([\s\S]*)$/
 
+/** The convention's own line: `[yyyy-MM-dd HH:mm:ss] LEVEL  message` (level padded to five). */
+const CONVENTION_PATTERN = /^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\]\s+(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\s+([\s\S]*)$/
+/**
+ * A bracketed stamp with no level token, or with the level itself in brackets
+ * (older BootstrapMate builds, the ESP install wrapper):
+ * `[2026-08-25 14:52:59] message` and `[2026-09-01 03:02:27.255] [Debug] message`.
+ */
+const BRACKET_STAMP = /^\[(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:[.,]\d+)?\]\s*([\s\S]*)$/
+const BRACKET_LEVEL = /^\[(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\]\s*([\s\S]*)$/i
+/** Munki: `Sep 02 2026 14:27:03 -0700 message`. */
+const MUNKI_PATTERN = /^([A-Z][a-z]{2}) (\d{2}) (\d{4}) (\d{2}:\d{2}:\d{2}) [+-]\d{4} ([\s\S]*)$/
+/** macOS install.log and other syslog-style lines: `2026-09-02 14:27:03-07 host process[pid]: message`. */
+const SYSLOG_PATTERN = /^(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})(?:[+-]\d{2})? (\S+) ([^\[:\s]+)(?:\[\d+\])?: ([\s\S]*)$/
+/** Anything that leads with a date and time, ISO-ish, with or without zone: the rest is the message. */
+const STAMPED_PATTERN = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:[.,:]\d+)?(?:Z|[+-]\d{2}:?\d{2})?\s+([\s\S]*)$/
+const MONTHS: Record<string, string> = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' }
 const CMTRACE_LEVELS: Record<string, string> = { '1': 'INFO', '2': 'WARN', '3': 'ERROR' }
 const DAEMON_LEVELS: Record<string, string> = { I: 'INFO', W: 'WARN', E: 'ERROR' }
 
 function parseStructuredLine(raw: string): JsonlEvent {
+  const cv = CONVENTION_PATTERN.exec(raw)
+  if (cv) {
+    const [, day, clock, level, message] = cv
+    const parsed = { timestamp: `${day} ${clock}`, level, message }
+    return { raw, parsed, timestamp: `${day}T${clock}`, level, message }
+  }
+  const bs = BRACKET_STAMP.exec(raw)
+  if (bs) {
+    const [, day, clock, rest] = bs
+    const lv = BRACKET_LEVEL.exec(rest)
+    const level = lv ? lv[1].toUpperCase().replace('WARNING', 'WARN') : wordLevel(rest)
+    const message = lv ? lv[2] : rest
+    return { raw, parsed: { timestamp: `${day} ${clock}`, ...(level ? { level } : {}), message }, timestamp: `${day}T${clock}`, level, message }
+  }
   const cm = CMTRACE_PATTERN.exec(raw)
   if (cm) {
     const [, message, time, date, component, type, thread] = cm
@@ -180,15 +223,165 @@ function parseStructuredLine(raw: string): JsonlEvent {
     const parsed = { timestamp: `${stamp}.${millis}`, process: process.trim(), level, thread: thread.trim(), logger: logger.trim(), message }
     return { raw, parsed, timestamp: `${stamp.replace(' ', 'T')}.${millis}`, level: DAEMON_LEVELS[level] ?? level, eventType: logger.trim(), message }
   }
+  const mk = MUNKI_PATTERN.exec(raw)
+  if (mk) {
+    const [, mon, day, year, clock, message] = mk
+    const stamp = `${year}-${MONTHS[mon] ?? '01'}-${day}T${clock}`
+    return { raw, parsed: { timestamp: stamp, message }, timestamp: stamp, level: wordLevel(message), message }
+  }
+  const sl = SYSLOG_PATTERN.exec(raw)
+  if (sl) {
+    const [, day, clock, host, process, message] = sl
+    return { raw, parsed: { timestamp: `${day} ${clock}`, host, process, message }, timestamp: `${day}T${clock}`, level: wordLevel(message), eventType: process, message }
+  }
+  const st = STAMPED_PATTERN.exec(raw)
+  if (st) {
+    const [, day, clock, message] = st
+    return { raw, parsed: { timestamp: `${day} ${clock}`, message }, timestamp: `${day}T${clock}`, level: wordLevel(message), message }
+  }
   return { raw, parsed: null }
 }
 
 /** True when most of the sampled lines are CMTrace or Intune daemon records. */
-function isStructuredTail(lines: string[]): boolean {
-  const sample = lines.slice(0, 40)
-  if (sample.length === 0) return false
-  const hits = sample.filter(line => CMTRACE_PATTERN.test(line) || INTUNE_DAEMON_PATTERN.test(line)).length
-  return hits * 2 >= sample.length
+function stitchCmTrace(lines: string[]): string[] {
+  const out: string[] = []
+  let open: string | null = null
+  for (const line of lines) {
+    if (open !== null) {
+      open += '\n' + line
+      if (/\]LOG\]!>.*>\s*$/.test(line)) { out.push(open); open = null }
+      continue
+    }
+    if (line.startsWith('<![LOG[') && !/\]LOG\]!>.*>\s*$/.test(line)) { open = line; continue }
+    out.push(line)
+  }
+  if (open !== null) out.push(open)
+  return out
+}
+
+/**
+ * Tools mark phases inside the message with an uppercase bracketed tag:
+ * `[PROGRESS] Processing: X`, `[SUB-PROGRESS] Downloaded: 8.1 MB`,
+ * `[SUCCESS] ...`, `[SKIPPED] ...`, `[SECTION] ...`, and agents name their
+ * subsystem the same way: `[Flighting] ...`, `[TamperProtection] ...`. Whatever
+ * leads the message in brackets becomes its own pill and leaves the text;
+ * uppercase outcome tags carry a colour, the rest stay neutral.
+ */
+const MESSAGE_TAG = /^\[([A-Za-z][A-Za-z0-9 ._:-]{0,39})\]\s*([\s\S]*)$/
+
+function liftTag(event: JsonlEvent): JsonlEvent {
+  if (!event.message) return event
+  const m = MESSAGE_TAG.exec(event.message)
+  if (!m) return event
+  return { ...event, tag: m[1], message: m[2] }
+}
+
+/**
+ * A .json tail (session.json, status.json) as a tree: objects and arrays open
+ * by default with their size, scalars keyed and coloured by type. Lists of
+ * scalars are shown inline so a package list reads as one line.
+ */
+const JsonValue: React.FC<{ value: unknown; name?: string; depth: number }> = ({ value, name, depth }) => {
+  const label = name !== undefined ? <span className="text-gray-500 dark:text-gray-400 whitespace-nowrap">{name}</span> : null
+  if (value === null || value === undefined) {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">null</span></div>
+  }
+  if (typeof value === 'boolean') {
+    return <div className="flex gap-2 py-0.5">{label}<span className={value ? 'text-green-700 dark:text-green-300' : 'text-gray-600 dark:text-gray-400'}>{String(value)}</span></div>
+  }
+  if (typeof value === 'number') {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-sky-700 dark:text-sky-300 tabular-nums">{String(value)}</span></div>
+  }
+  if (typeof value === 'string') {
+    return <div className="flex gap-2 py-0.5 min-w-0">{label}<span className="text-gray-900 dark:text-white break-all">{value === '' ? <span className="text-gray-400 dark:text-gray-500 italic">empty</span> : value}</span></div>
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) {
+      return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">empty list</span></div>
+    }
+    const scalars = value.every(v => v === null || ['string', 'number', 'boolean'].includes(typeof v))
+    const inline = scalars ? value.map(v => String(v)).join(', ') : ''
+    // A short list of scalars reads as one line; a long one folds to its count
+    // and opens to one item per line, so a 236-package list does not swamp the view.
+    if (scalars && value.length <= 8 && inline.length <= 120) {
+      return (
+        <div className="flex gap-2 py-0.5 min-w-0">
+          {label}
+          <span className="text-gray-900 dark:text-white break-words">{inline}</span>
+          <span className="text-gray-400 dark:text-gray-500 whitespace-nowrap">{value.length}</span>
+        </div>
+      )
+    }
+    if (scalars) {
+      return (
+        <details open className="py-0.5">
+          <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+            <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+            {label}
+            <span className="text-gray-400 dark:text-gray-500">{value.length} items</span>
+          </summary>
+          <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700 columns-2 xl:columns-3 gap-6">
+            {value.map((item, index) => <div key={index} className="py-0.5 text-gray-900 dark:text-white break-all">{String(item)}</div>)}
+          </div>
+        </details>
+      )
+    }
+    return (
+      <details open={depth < 2} className="py-0.5">
+        <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+          <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+          {label}
+          <span className="text-gray-400 dark:text-gray-500">{value.length} items</span>
+        </summary>
+        <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700">
+          {value.map((item, index) => <JsonValue key={index} value={item} name={String(index)} depth={depth + 1} />)}
+        </div>
+      </details>
+    )
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+  if (entries.length === 0) {
+    return <div className="flex gap-2 py-0.5">{label}<span className="text-gray-400 dark:text-gray-500 italic">empty</span></div>
+  }
+  if (name === undefined) {
+    return <div>{entries.map(([key, child]) => <JsonValue key={key} value={child} name={key} depth={depth + 1} />)}</div>
+  }
+  return (
+    <details open={depth < 2} className="py-0.5">
+      <summary className="cursor-pointer list-none flex gap-2 items-baseline">
+        <span className="text-gray-400 dark:text-gray-500 select-none">▸</span>
+        {label}
+        <span className="text-gray-400 dark:text-gray-500">{entries.length} fields</span>
+      </summary>
+      <div className="ml-4 pl-3 border-l border-gray-200 dark:border-gray-700">
+        {entries.map(([key, child]) => <JsonValue key={key} value={child} name={key} depth={depth + 1} />)}
+      </div>
+    </details>
+  )
+}
+
+/** The pill classes for a message tag: outcomes carry a colour, phases stay neutral. */
+function tagClass(tag: string): string {
+  const t = tag.toUpperCase()
+  if (t === 'SUCCESS' || t === 'DONE' || t === 'COMPLETE' || t === 'COMPLETED' || t === 'INSTALLED' || t === 'OK') {
+    return 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/30 dark:text-green-300 dark:border-green-800'
+  }
+  if (t === 'RETRY' || t === 'RETRYING' || t === 'TIMEOUT') {
+    return 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800'
+  }
+  if (t === 'FAILED' || t === 'FAILURE' || t === 'FAIL') {
+    return 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800'
+  }
+  return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600'
+}
+
+/** A level label for a line with no level field, from its words; undefined when it reads as plain information. */
+function wordLevel(text: string): string | undefined {
+  const tone = lineTone(text)
+  if (tone === 'error') return 'ERROR'
+  if (tone === 'warning') return 'WARN'
+  if (tone === 'debug') return 'DEBUG'
+  return undefined
 }
 
 function formatEventTime(value?: string): string {
@@ -214,7 +407,6 @@ function tailByFile(tails: LogTail[]): Map<string, LogTail> {
 }
 
 export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs }) => {
-  const [expanded, setExpanded] = useState(false)
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [tails, setTails] = useState<Record<string, TailState>>({})
   const [selectedFile, setSelectedFile] = useState<Record<string, string>>({})
@@ -247,11 +439,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serialNumber, logsKey])
 
-  // Fetch a tool's tails the first time its tab is opened while expanded. A
+  // Fetch a tool's tails the first time its tab is opened. A
   // failed fetch is retried when the tab is opened again or Retry is pressed;
   // a transient server error must not stick until a full reload.
   useEffect(() => {
-    if (!serialNumber || !activeTool || !expanded) return
+    if (!serialNumber || !activeTool) return
     const previous = tailsRef.current[activeTool]
     if (requestedTails.current.has(activeTool) && previous?.state !== 'error') return
     requestedTails.current.add(activeTool)
@@ -271,7 +463,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
       .catch((error) => {
         if (stillCurrent()) setTails(prev => ({ ...prev, [tool]: { state: 'error', message: error instanceof Error ? error.message : String(error) } }))
       })
-  }, [serialNumber, activeTool, expanded, retryNonce])
+  }, [serialNumber, activeTool, retryNonce])
 
   const roots = useMemo(() => logs?.roots ?? [], [logs])
   const active = useMemo(() => roots.find(r => r.tool === activeTool) ?? null, [roots, activeTool])
@@ -286,16 +478,41 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     return first ?? null
   }, [activeTool, selectedFile, availableTails, loadedRoot])
   const currentTail = currentFile ? availableTails.get(currentFile) ?? null : null
-  const tailLines = useMemo(() => currentTail?.lines ?? [], [currentTail])
+  // A CMTrace record can span several physical lines when its message holds
+  // newlines; the client tails by line, so stitch a record back together from
+  // its `<![LOG[` opener to the line that closes it, and the row reads whole.
+  const tailLines = useMemo(() => stitchCmTrace(currentTail?.lines ?? []), [currentTail])
+  // Whether each tailed file holds error and warning lines, for the dots beside its name.
+  const fileFlags = useMemo(() => {
+    const flags = new Map<string, { errors: boolean; warnings: boolean }>()
+    for (const tail of loadedRoot?.tails ?? []) {
+      if (!tail.file) continue
+      const jsonl = tail.file.toLowerCase().endsWith('.jsonl')
+      let errors = false
+      let warnings = false
+      for (const line of tail.lines ?? []) {
+        // Same classification as the viewer: JSONL and structured (CMTrace, Intune daemon) lines by their level field, the rest by the line.
+        const event = jsonl ? parseJsonlLine(line) : parseStructuredLine(line)
+        const level = event.parsed ? levelTone(event.level) : lineTone(line)
+        if (level === 'error') errors = true
+        else if (level === 'warning') warnings = true
+        if (errors && warnings) break
+      }
+      flags.set(tail.file, { errors, warnings })
+    }
+    return flags
+  }, [loadedRoot])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
-  const isStructured = useMemo(() => !isJsonl && !isJson && isStructuredTail(tailLines), [isJsonl, isJson, tailLines])
+  // Every text log is shown as rows: lines with a recognised shape become
+  // events with a time, level and message, the rest keep their raw text.
+  const isStructured = !isJsonl && !isJson
   const showEvents = isJsonl || isStructured
   // Every line is parsed once with its level; the text filter and the level
   // filter then narrow that list, and the event view reuses the parse.
   const classifiedLines = useMemo(() => {
     return tailLines.map(line => {
-      const event = isJsonl ? parseJsonlLine(line) : isStructured ? parseStructuredLine(line) : null
+      const event = isJsonl ? liftTag(parseJsonlLine(line)) : isStructured ? liftTag(parseStructuredLine(line)) : null
       const level: LineLevel = event?.parsed ? levelTone(event.level) : lineTone(line)
       return { line, event, level }
     })
@@ -319,19 +536,30 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     [showEvents, visibleEntries]
   )
   const filtering = Boolean(filter.trim()) || levelFilter.errors || levelFilter.warnings || levelFilter.debug
+  // A component that is the same on every row of the file says nothing per
+  // row (IntuneManagementExtension.log is all IntuneManagementExtension), so
+  // it is left to the expanded detail and the row keeps the space.
+  const uniformComponent = useMemo(() => {
+    let seen: string | undefined
+    for (const entry of classifiedLines) {
+      const type = entry.event?.eventType
+      if (!type) continue
+      if (seen === undefined) seen = type
+      else if (seen !== type) return false
+    }
+    return seen !== undefined
+  }, [classifiedLines])
   const toggleLevel = (key: keyof LevelFilter) => setLevelFilter(current => ({ ...current, [key]: !current[key] }))
   // A .json tail is one document (session.json, status.json); pretty-print it when it parses whole.
-  const prettyJson = useMemo(() => {
+  const jsonDocument = useMemo<unknown>(() => {
     if (!isJson || tailLines.length === 0) return null
     try {
-      return JSON.stringify(JSON.parse(tailLines.join('\n')), null, 2)
+      return JSON.parse(tailLines.join('\n'))
     } catch {
       return null
     }
   }, [isJson, tailLines])
 
-  const totalErrors = roots.reduce((n, r) => n + (r.errorCount ?? 0), 0)
-  const totalWarnings = roots.reduce((n, r) => n + (r.warningCount ?? 0), 0)
 
   if (!logs || roots.length === 0) return null
 
@@ -358,6 +586,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   const selectTool = (tool: string) => {
     setActiveTool(tool)
     setFilter('')
+    setLevelFilter(DEFAULT_LEVEL_FILTER)
     if (tails[tool]?.state === 'error') setRetryNonce(n => n + 1)
   }
 
@@ -367,78 +596,52 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     if (!activeTool) return
     setSelectedFile(prev => ({ ...prev, [activeTool]: file }))
     setFilter('')
+    setLevelFilter(DEFAULT_LEVEL_FILTER)
   }
 
+  const totalFiles = roots.reduce((n, r) => n + (r.fileCount ?? r.files.length), 0)
+  const totalBytes = roots.reduce((n, r) => n + (r.totalBytes ?? 0), 0)
   const filesWithoutTails: LogFileEntry[] = active
     ? active.files.filter(f => !availableTails.has(f.path))
     : []
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-      {/* Accordion header - the same affordance as the Installs run log */}
-      <button
-        onClick={() => setExpanded(v => !v)}
-        aria-expanded={expanded}
-        className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          <svg className="w-5 h-5 text-gray-500 dark:text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-          </svg>
-          <span className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</span>
-          {!expanded && (
-          <span className="hidden sm:flex items-center gap-1.5 ml-2 min-w-0 overflow-hidden">
-            {roots.map((root) => (
-              <span key={root.tool} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300 whitespace-nowrap">
-                {logProductName(root, logs.platform)}
-                {(root.errorCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
-                {(root.errorCount ?? 0) === 0 && (root.warningCount ?? 0) > 0 && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
-              </span>
-            ))}
-          </span>
-          )}
-        </div>
-        <div className="flex items-center gap-3 flex-shrink-0">
-          {totalErrors > 0 && <span className="text-xs font-medium text-red-600 dark:text-red-400">{totalErrors} errors</span>}
-          {totalWarnings > 0 && <span className="text-xs font-medium text-amber-600 dark:text-amber-400">{totalWarnings} warnings</span>}
-          {logs.collectedAt && <span className="hidden md:inline text-xs text-gray-500 dark:text-gray-400">{formatWhen(logs.collectedAt)}</span>}
-          <svg className={`w-5 h-5 text-gray-500 transition-transform ${expanded ? 'transform rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </div>
-      </button>
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+      {/* Always open: the log viewer is the point of this card, and the MDM root alone is worth the space */}
+      <div className="px-6 py-4">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Management Tools Logs</h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Logs collected from the management tools on this device ({roots.length} {roots.length === 1 ? 'tool' : 'tools'}, {totalFiles} files
+          {totalBytes > 0 && <>, {formatBytes(totalBytes)}</>}
+          {logs.collectedAt && <>, collected {formatWhen(logs.collectedAt)}</>})
+        </p>
+      </div>
 
-      {expanded && (
-        <div className="border-t border-gray-200 dark:border-gray-700">
-          {/* Tool tabs - one per reported root, wraps as the estate grows */}
-          <div className="px-6 pt-4 flex flex-wrap gap-2" role="tablist" aria-label="Management tools">
+      <div className="border-t border-gray-200 dark:border-gray-700">
+          {/* Tool tabs - one per reported root, equal widths on a single row that narrows as roots are added.
+              Error and warning counts live in the root facts below, not on the tabs. */}
+          {roots.length > 1 && (
+          <div className="px-6 pt-4 grid grid-flow-col auto-cols-fr gap-2" role="tablist" aria-label="Management tools">
             {roots.map((root) => {
               const isActive = root.tool === activeTool
-              const errors = root.errorCount ?? 0
-              const warnings = root.warningCount ?? 0
               return (
                 <button
                   key={root.tool}
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => selectTool(root.tool)}
-                  className={`inline-flex h-9 items-center gap-2 px-3 rounded-md text-sm font-medium border transition-colors ${
+                  className={`inline-flex h-9 min-w-0 items-center justify-center px-2 rounded-md text-sm font-medium border transition-colors ${
                     isActive
-                      ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                      ? 'bg-gray-900 text-white border-gray-900 dark:bg-gray-600 dark:text-white dark:border-gray-500'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <span>{logProductName(root, logs.platform)}</span>
-                  {errors > 0 && (
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{errors}</span>
-                  )}
-                  {warnings > 0 && (
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-amber-400 text-gray-900' : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'}`}>{warnings}</span>
-                  )}
+                  <span className="truncate">{logProductName(root, logs.platform)}</span>
                 </button>
               )
             })}
           </div>
+          )}
 
           {active && (
             <div className="p-6 space-y-5">
@@ -477,12 +680,20 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   </div>
                 )}
+                {active.version && (
+                  <div className="ml-auto text-right">
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Version</div>
+                    <div className="text-sm font-mono text-gray-900 dark:text-white">{active.version}</div>
+                  </div>
+                )}
               </div>
 
               {/* Log picker on the left, viewer on the right */}
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,300px)_1fr] gap-4">
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden self-start">
-                  <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">Logs</div>
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,300px)_1fr] gap-4 lg:h-[640px]">
+                {/* The picker fills the column: it stretches to the viewer's height and scrolls inside. */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col min-h-0 max-h-[480px] lg:max-h-none lg:h-full">
+                  <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">Logs</div>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
                   {tailState?.state === 'loaded' ? (
                     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                       {loadedRoot!.tails.map((tail) => {
@@ -494,7 +705,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                               onClick={() => tail.file && selectFile(tail.file)}
                               className={`w-full text-left px-3 py-2 transition-colors ${isCurrent ? 'bg-gray-100 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-700/50'}`}
                             >
-                              <div className="text-xs font-mono text-gray-900 dark:text-white break-all">{tail.file}</div>
+                              <div className="flex items-start gap-2 min-w-0">
+                                <div className="text-xs font-mono text-gray-900 dark:text-white break-all min-w-0">{tail.file}</div>
+                                {fileFlags.get(tail.file ?? '')?.errors && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Errors in this log" />}
+                                {fileFlags.get(tail.file ?? '')?.warnings && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Warnings in this log" />}
+                              </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {entry ? formatBytes(entry.bytes) : ''}
                                 {entry?.modified ? ` · ${formatWhen(entry.modified)}` : ''}
@@ -510,11 +725,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   )}
                   {filesWithoutTails.length > 0 && (
-                    <details className="border-t border-gray-200 dark:border-gray-700">
-                      <summary className="cursor-pointer px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        {filesWithoutTails.length} more files
-                      </summary>
-                      <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50">
+                    <div className="border-t border-gray-200 dark:border-gray-700">
+                      <div className="px-3 py-1.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase bg-gray-50/60 dark:bg-gray-900/30">Not tailed</div>
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-700/50">
                         {filesWithoutTails.map((file) => (
                           <li key={file.path} className="px-3 py-1.5">
                             <div className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all">{file.path}</div>
@@ -522,12 +735,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                           </li>
                         ))}
                       </ul>
-                    </details>
+                    </div>
                   )}
+                  </div>
                 </div>
 
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden min-w-0">
-                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden min-w-0 flex flex-col lg:h-full">
+                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={copyTail}
@@ -635,16 +849,26 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   ) : tailLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
-                  ) : prettyJson !== null && !filter.trim() ? (
-                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
+                  ) : jsonDocument !== null && !filter.trim() ? (
+                    <div className="p-4 text-xs font-mono max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto">
+                      <JsonValue value={jsonDocument} depth={0} />
+                    </div>
                   ) : visibleLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No lines match the current filters</div>
                   ) : showEvents ? (
-                    <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
+                    <div className="max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                       {visibleEvents.map((event, index) => {
                         if (!event.parsed) {
+                          const rawTone = lineTone(event.raw)
+                          const rawCls = rawTone === 'error'
+                            ? 'text-red-700 dark:text-red-300'
+                            : rawTone === 'warning'
+                              ? 'text-amber-700 dark:text-amber-300'
+                              : rawTone === 'debug'
+                                ? 'text-gray-500 dark:text-gray-500'
+                                : 'text-gray-700 dark:text-gray-300'
                           return (
-                            <div key={index} className="px-4 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-all">{event.raw}</div>
+                            <div key={index} className={`px-4 py-2 font-mono text-xs whitespace-pre-wrap break-all ${rawCls}`}>{event.raw || ' '}</div>
                           )
                         }
                         const tone = levelTone(event.level)
@@ -658,32 +882,39 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                         return (
                           <details key={index} className="group">
                             <summary className="cursor-pointer list-none px-4 py-2 hover:bg-gray-50 dark:hover:bg-gray-700/40">
-                              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                              <div className="flex items-center gap-x-3 min-w-0">
                                 <span className="font-mono text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{formatEventTime(event.timestamp)}</span>
                                 {event.level && (
                                   <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold uppercase ${levelCls}`}>{event.level}</span>
                                 )}
-                                {event.eventType && (
-                                  <span className="text-xs text-gray-600 dark:text-gray-400">{event.eventType.replace(/_/g, ' ')}</span>
+                                {event.tag && (
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium whitespace-nowrap border ${tagClass(event.tag)}`}>{event.tag}</span>
+                                )}
+                                {event.eventType && !uniformComponent && (
+                                  <span className="text-xs text-gray-600 dark:text-gray-400 whitespace-nowrap">{event.eventType.replace(/_/g, ' ')}</span>
                                 )}
                                 {event.item && (
-                                  <span className="text-xs font-medium text-gray-900 dark:text-white">
+                                  <span className="text-xs font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                     {event.item}
                                     {event.version && <span className="font-normal text-gray-500 dark:text-gray-400"> {event.version}</span>}
                                   </span>
                                 )}
                                 {event.message && (
-                                  <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 break-words">{event.message}</span>
+                                  <span className="text-xs text-gray-700 dark:text-gray-300 min-w-0 flex-1 truncate">{event.message}</span>
                                 )}
                               </div>
                             </summary>
+                            {/* Expanded: the whole message, then every field the line carried */}
+                            {event.message && (
+                              <div className="mx-4 mb-2 text-xs text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">{event.message}</div>
+                            )}
                             <pre className="mx-4 mb-3 p-3 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto rounded whitespace-pre-wrap break-all">{JSON.stringify(event.parsed, null, 2)}</pre>
                           </details>
                         )
                       })}
                     </div>
                   ) : (
-                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto">
                       {visibleLines.map((line, index) => {
                         const tone = lineTone(line)
                         const cls = tone === 'error' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : tone === 'debug' ? 'text-gray-500' : ''
@@ -696,7 +927,6 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
             </div>
           )}
         </div>
-      )}
     </div>
   )
 }
