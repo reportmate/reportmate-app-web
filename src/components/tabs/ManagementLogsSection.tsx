@@ -67,12 +67,12 @@ const DEBUG_LINE = /\b(DEBUG|DBG|VERBOSE|TRACE)\b/
 type LineLevel = 'error' | 'warning' | 'debug' | 'plain'
 
 /** `[yyyy-MM-dd HH:mm:ss] LEVEL  message`: the level token is authoritative, so an INFO line that mentions CRITICAL stays INFO. */
-const CONVENTION_LEVEL = /^\[[^\]]+\]\s+(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\b/
+const CONVENTION_LEVEL = /^\[[^\]]+\]\s+\[?(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\]?\b/i
 
 function lineTone(line: string): LineLevel {
   const stamped = CONVENTION_LEVEL.exec(line)
   if (stamped) {
-    const token = stamped[1]
+    const token = stamped[1].toUpperCase()
     if (token === 'ERROR' || token === 'FATAL' || token === 'CRITICAL') return 'error'
     if (token === 'WARN' || token === 'WARNING') return 'warning'
     if (token === 'DEBUG') return 'debug'
@@ -177,6 +177,13 @@ const INTUNE_DAEMON_PATTERN = /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}):(\d{3}) \|
 
 /** The convention's own line: `[yyyy-MM-dd HH:mm:ss] LEVEL  message` (level padded to five). */
 const CONVENTION_PATTERN = /^\[(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2}:\d{2})\]\s+(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\s+([\s\S]*)$/
+/**
+ * A bracketed stamp with no level token, or with the level itself in brackets
+ * (older BootstrapMate builds, the ESP install wrapper):
+ * `[2026-08-25 14:52:59] message` and `[2026-09-01 03:02:27.255] [Debug] message`.
+ */
+const BRACKET_STAMP = /^\[(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?:[.,]\d+)?\]\s*([\s\S]*)$/
+const BRACKET_LEVEL = /^\[(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\]\s*([\s\S]*)$/i
 /** Munki: `Sep 02 2026 14:27:03 -0700 message`. */
 const MUNKI_PATTERN = /^([A-Z][a-z]{2}) (\d{2}) (\d{4}) (\d{2}:\d{2}:\d{2}) [+-]\d{4} ([\s\S]*)$/
 /** macOS install.log and other syslog-style lines: `2026-09-02 14:27:03-07 host process[pid]: message`. */
@@ -193,6 +200,14 @@ function parseStructuredLine(raw: string): JsonlEvent {
     const [, day, clock, level, message] = cv
     const parsed = { timestamp: `${day} ${clock}`, level, message }
     return { raw, parsed, timestamp: `${day}T${clock}`, level, message }
+  }
+  const bs = BRACKET_STAMP.exec(raw)
+  if (bs) {
+    const [, day, clock, rest] = bs
+    const lv = BRACKET_LEVEL.exec(rest)
+    const level = lv ? lv[1].toUpperCase().replace('WARNING', 'WARN') : wordLevel(rest)
+    const message = lv ? lv[2] : rest
+    return { raw, parsed: { timestamp: `${day} ${clock}`, ...(level ? { level } : {}), message }, timestamp: `${day}T${clock}`, level, message }
   }
   const cm = CMTRACE_PATTERN.exec(raw)
   if (cm) {
