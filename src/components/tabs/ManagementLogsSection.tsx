@@ -226,6 +226,22 @@ function parseStructuredLine(raw: string): JsonlEvent {
 }
 
 /** True when most of the sampled lines are CMTrace or Intune daemon records. */
+function stitchCmTrace(lines: string[]): string[] {
+  const out: string[] = []
+  let open: string | null = null
+  for (const line of lines) {
+    if (open !== null) {
+      open += '\n' + line
+      if (/\]LOG\]!>.*>\s*$/.test(line)) { out.push(open); open = null }
+      continue
+    }
+    if (line.startsWith('<![LOG[') && !/\]LOG\]!>.*>\s*$/.test(line)) { open = line; continue }
+    out.push(line)
+  }
+  if (open !== null) out.push(open)
+  return out
+}
+
 /** A level label for a line with no level field, from its words; undefined when it reads as plain information. */
 function wordLevel(text: string): string | undefined {
   const tone = lineTone(text)
@@ -329,7 +345,10 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     return first ?? null
   }, [activeTool, selectedFile, availableTails, loadedRoot])
   const currentTail = currentFile ? availableTails.get(currentFile) ?? null : null
-  const tailLines = useMemo(() => currentTail?.lines ?? [], [currentTail])
+  // A CMTrace record can span several physical lines when its message holds
+  // newlines; the client tails by line, so stitch a record back together from
+  // its `<![LOG[` opener to the line that closes it, and the row reads whole.
+  const tailLines = useMemo(() => stitchCmTrace(currentTail?.lines ?? []), [currentTail])
   // Whether each tailed file holds error and warning lines, for the dots beside its name.
   const fileFlags = useMemo(() => {
     const flags = new Map<string, { errors: boolean; warnings: boolean }>()
