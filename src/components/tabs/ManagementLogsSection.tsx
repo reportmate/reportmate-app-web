@@ -66,7 +66,18 @@ const DEBUG_LINE = /\b(DEBUG|DBG|VERBOSE|TRACE)\b/
 /** Where a line sits in the level vocabulary the convention uses: ERROR, WARN, INFO, DEBUG. */
 type LineLevel = 'error' | 'warning' | 'debug' | 'plain'
 
+/** `[yyyy-MM-dd HH:mm:ss] LEVEL  message`: the level token is authoritative, so an INFO line that mentions CRITICAL stays INFO. */
+const CONVENTION_LEVEL = /^\[[^\]]+\]\s+(DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)\b/
+
 function lineTone(line: string): LineLevel {
+  const stamped = CONVENTION_LEVEL.exec(line)
+  if (stamped) {
+    const token = stamped[1]
+    if (token === 'ERROR' || token === 'FATAL' || token === 'CRITICAL') return 'error'
+    if (token === 'WARN' || token === 'WARNING') return 'warning'
+    if (token === 'DEBUG') return 'debug'
+    return 'plain'
+  }
   if (ERROR_LINE.test(line)) return 'error'
   if (WARNING_LINE.test(line)) return 'warning'
   if (DEBUG_LINE.test(line)) return 'debug'
@@ -286,21 +297,23 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   }, [activeTool, selectedFile, availableTails, loadedRoot])
   const currentTail = currentFile ? availableTails.get(currentFile) ?? null : null
   const tailLines = useMemo(() => currentTail?.lines ?? [], [currentTail])
-  // The worst level found in each tailed file, for the dot beside its name.
-  const fileTone = useMemo(() => {
-    const tones = new Map<string, LineLevel>()
+  // Whether each tailed file holds error and warning lines, for the dots beside its name.
+  const fileFlags = useMemo(() => {
+    const flags = new Map<string, { errors: boolean; warnings: boolean }>()
     for (const tail of loadedRoot?.tails ?? []) {
       if (!tail.file) continue
       const jsonl = tail.file.toLowerCase().endsWith('.jsonl')
-      let worst: LineLevel = 'plain'
+      let errors = false
+      let warnings = false
       for (const line of tail.lines ?? []) {
         const level = jsonl ? levelTone(parseJsonlLine(line).level) : lineTone(line)
-        if (level === 'error') { worst = 'error'; break }
-        if (level === 'warning') worst = 'warning'
+        if (level === 'error') errors = true
+        else if (level === 'warning') warnings = true
+        if (errors && warnings) break
       }
-      tones.set(tail.file, worst)
+      flags.set(tail.file, { errors, warnings })
     }
-    return tones
+    return flags
   }, [loadedRoot])
   const isJsonl = Boolean(currentFile && currentFile.toLowerCase().endsWith('.jsonl'))
   const isJson = Boolean(currentFile && currentFile.toLowerCase().endsWith('.json'))
@@ -490,8 +503,8 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                             >
                               <div className="flex items-start gap-2 min-w-0">
                                 <div className="text-xs font-mono text-gray-900 dark:text-white break-all min-w-0">{tail.file}</div>
-                                {fileTone.get(tail.file ?? '') === 'error' && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Errors in this log" />}
-                                {fileTone.get(tail.file ?? '') === 'warning' && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Warnings in this log" />}
+                                {fileFlags.get(tail.file ?? '')?.errors && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" title="Errors in this log" />}
+                                {fileFlags.get(tail.file ?? '')?.warnings && <span className="mt-1 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" title="Warnings in this log" />}
                               </div>
                               <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {entry ? formatBytes(entry.bytes) : ''}
