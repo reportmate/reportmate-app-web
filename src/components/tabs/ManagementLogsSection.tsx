@@ -20,6 +20,8 @@ interface ManagementLogsSectionProps {
   serialNumber?: string
   /** The management module's logs section, read by extractLogs; null hides the card */
   logs: LogsInfo | null
+  /** The installs module when loaded; each root's version falls back to its tool's installed version here */
+  installs?: unknown
 }
 
 type TailState =
@@ -406,7 +408,46 @@ function tailByFile(tails: LogTail[]): Map<string, LogTail> {
   return map
 }
 
-export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs }) => {
+/**
+ * The managed item that owns each log root, per platform, for the version
+ * fallback. Munki reports items under installs.managedInstalls[] with
+ * installedVersion; Cimian under installs.cimian.items[] with itemName and
+ * installedVersion (or latestVersion once Installed). AirName is not a root.
+ */
+const TOOL_ITEMS: Record<string, { mac: string[]; windows: string[] }> = {
+  installs: { mac: ['MunkiTools', 'munkitools'], windows: ['CimianTools', 'Cimian'] },
+  bootstrap: { mac: ['BootstrapMate'], windows: ['BootstrapMate'] },
+  reports: { mac: ['ReportMate'], windows: ['ReportMate'] },
+  state: { mac: ['Outset'], windows: ['StartSet'] },
+  encryption: { mac: ['Crypt'], windows: ['Crypt', 'CryptEscrow'] },
+  users: { mac: ['ManageUsers'], windows: ['ManageUsers'] },
+  utilities: { mac: ['DockUtil'], windows: ['SbinInstaller', 'TaskbarUtil'] },
+  notifications: { mac: ['SwiftDialog'], windows: ['csharpdialog', 'CSharpDialog'] },
+}
+
+function installedVersionFor(tool: string, platform: string | undefined, installs: unknown): string | undefined {
+  if (!installs || typeof installs !== 'object') return undefined
+  const names = TOOL_ITEMS[tool]
+  if (!names) return undefined
+  const isWindows = (platform || '').toLowerCase().includes('win')
+  const wanted = (isWindows ? names.windows : names.mac).map(n => n.toLowerCase())
+  const data = installs as Record<string, unknown>
+  const munkiItems = Array.isArray(data.managedInstalls) ? (data.managedInstalls as Record<string, unknown>[]) : []
+  const cimian = data.cimian && typeof data.cimian === 'object' ? (data.cimian as Record<string, unknown>) : null
+  const cimianItems = cimian && Array.isArray(cimian.items) ? (cimian.items as Record<string, unknown>[]) : []
+  for (const item of [...munkiItems, ...cimianItems]) {
+    const name = String(item.name ?? item.itemName ?? '').toLowerCase()
+    if (!wanted.includes(name)) continue
+    const installed = typeof item.installedVersion === 'string' && item.installedVersion.trim() ? item.installedVersion.trim() : ''
+    if (installed) return installed
+    const status = String(item.currentStatus ?? item.status ?? '').toLowerCase()
+    const latest = typeof item.latestVersion === 'string' ? item.latestVersion.trim() : ''
+    if (latest && status === 'installed') return latest
+  }
+  return undefined
+}
+
+export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ serialNumber, logs, installs }) => {
   const [activeTool, setActiveTool] = useState<string | null>(null)
   const [tails, setTails] = useState<Record<string, TailState>>({})
   const [selectedFile, setSelectedFile] = useState<Record<string, string>>({})
@@ -599,6 +640,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     setLevelFilter(DEFAULT_LEVEL_FILTER)
   }
 
+  const activeVersion = active ? (active.version || installedVersionFor(active.tool, logs?.platform, installs)) : undefined
   const totalFiles = roots.reduce((n, r) => n + (r.fileCount ?? r.files.length), 0)
   const totalBytes = roots.reduce((n, r) => n + (r.totalBytes ?? 0), 0)
   const filesWithoutTails: LogFileEntry[] = active
@@ -680,10 +722,10 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   </div>
                 )}
-                {active.version && (
+                {activeVersion && (
                   <div className="ml-auto text-right">
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Version</div>
-                    <div className="text-sm font-mono text-gray-900 dark:text-white">{active.version}</div>
+                    <div className="text-sm font-mono text-gray-900 dark:text-white">{activeVersion}</div>
                   </div>
                 )}
               </div>
