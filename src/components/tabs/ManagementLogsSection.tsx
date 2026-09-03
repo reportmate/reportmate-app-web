@@ -410,31 +410,24 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
 
       {expanded && (
         <div className="border-t border-gray-200 dark:border-gray-700">
-          {/* Tool tabs - one per reported root, wraps as the estate grows */}
-          <div className="px-6 pt-4 flex flex-wrap gap-2" role="tablist" aria-label="Management tools">
+          {/* Tool tabs - one per reported root, equal widths on a single row that narrows as roots are added.
+              Error and warning counts live in the root facts below, not on the tabs. */}
+          <div className="px-6 pt-4 grid grid-flow-col auto-cols-fr gap-2" role="tablist" aria-label="Management tools">
             {roots.map((root) => {
               const isActive = root.tool === activeTool
-              const errors = root.errorCount ?? 0
-              const warnings = root.warningCount ?? 0
               return (
                 <button
                   key={root.tool}
                   role="tab"
                   aria-selected={isActive}
                   onClick={() => selectTool(root.tool)}
-                  className={`inline-flex h-9 items-center gap-2 px-3 rounded-md text-sm font-medium border transition-colors ${
+                  className={`inline-flex h-9 min-w-0 items-center justify-center px-2 rounded-md text-sm font-medium border transition-colors ${
                     isActive
-                      ? 'bg-gray-900 text-white border-gray-900 dark:bg-white dark:text-gray-900 dark:border-white'
+                      ? 'bg-gray-900 text-white border-gray-900 dark:bg-gray-600 dark:text-white dark:border-gray-500'
                       : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
                   }`}
                 >
-                  <span>{logProductName(root, logs.platform)}</span>
-                  {errors > 0 && (
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-red-500 text-white' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{errors}</span>
-                  )}
-                  {warnings > 0 && (
-                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold ${isActive ? 'bg-amber-400 text-gray-900' : 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200'}`}>{warnings}</span>
-                  )}
+                  <span className="truncate">{logProductName(root, logs.platform)}</span>
                 </button>
               )
             })}
@@ -462,6 +455,19 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Last written</div>
                   <div className="text-sm text-gray-900 dark:text-white">{formatWhen(active.newestModified) || 'Unknown'}</div>
                 </div>
+                {((active.errorCount ?? 0) > 0 || (active.warningCount ?? 0) > 0) && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">In the primary log</div>
+                    <div className="flex items-center gap-2 text-sm">
+                      {(active.errorCount ?? 0) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">{active.errorCount} errors</span>
+                      )}
+                      {(active.warningCount ?? 0) > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">{active.warningCount} warnings</span>
+                      )}
+                    </div>
+                  </div>
+                )}
                 {active.latestSession && (
                   <div>
                     <div className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase mb-1">Latest run</div>
@@ -480,9 +486,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
               </div>
 
               {/* Log picker on the left, viewer on the right */}
-              <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,300px)_1fr] gap-4">
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden self-start">
-                  <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">Logs</div>
+              <div className="grid grid-cols-1 lg:grid-cols-[minmax(220px,300px)_1fr] gap-4 lg:h-[640px]">
+                {/* The picker fills the column: it stretches to the viewer's height and scrolls inside. */}
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden flex flex-col min-h-0 max-h-[480px] lg:max-h-none lg:h-full">
+                  <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">Logs</div>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
                   {tailState?.state === 'loaded' ? (
                     <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                       {loadedRoot!.tails.map((tail) => {
@@ -510,11 +518,9 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                     </div>
                   )}
                   {filesWithoutTails.length > 0 && (
-                    <details className="border-t border-gray-200 dark:border-gray-700">
-                      <summary className="cursor-pointer px-3 py-2 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                        {filesWithoutTails.length} more files
-                      </summary>
-                      <ul className="max-h-64 overflow-y-auto divide-y divide-gray-100 dark:divide-gray-700/50">
+                    <div className="border-t border-gray-200 dark:border-gray-700">
+                      <div className="px-3 py-1.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 uppercase bg-gray-50/60 dark:bg-gray-900/30">Not tailed</div>
+                      <ul className="divide-y divide-gray-100 dark:divide-gray-700/50">
                         {filesWithoutTails.map((file) => (
                           <li key={file.path} className="px-3 py-1.5">
                             <div className="text-xs font-mono text-gray-600 dark:text-gray-400 break-all">{file.path}</div>
@@ -522,12 +528,13 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                           </li>
                         ))}
                       </ul>
-                    </details>
+                    </div>
                   )}
+                  </div>
                 </div>
 
-                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden min-w-0">
-                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">
+                <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden min-w-0 flex flex-col lg:h-full">
+                  <div className="flex flex-wrap items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={copyTail}
@@ -636,11 +643,11 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                   ) : tailLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No log lines reported</div>
                   ) : prettyJson !== null && !filter.trim() ? (
-                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
+                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto whitespace-pre-wrap break-all">{prettyJson}</pre>
                   ) : visibleLines.length === 0 ? (
                     <div className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No lines match the current filters</div>
                   ) : showEvents ? (
-                    <div className="max-h-[500px] overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
+                    <div className="max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700">
                       {visibleEvents.map((event, index) => {
                         if (!event.parsed) {
                           return (
@@ -683,7 +690,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
                       })}
                     </div>
                   ) : (
-                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] overflow-y-auto">
+                    <pre className="p-4 bg-gray-900 text-gray-100 text-xs font-mono overflow-x-auto max-h-[500px] lg:max-h-none lg:flex-1 lg:min-h-0 overflow-y-auto">
                       {visibleLines.map((line, index) => {
                         const tone = lineTone(line)
                         const cls = tone === 'error' ? 'text-red-300' : tone === 'warning' ? 'text-amber-300' : tone === 'debug' ? 'text-gray-500' : ''
