@@ -487,6 +487,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
   const selectTool = (tool: string) => {
     setActiveTool(tool)
     setFilter('')
+    setLevelFilter(DEFAULT_LEVEL_FILTER)
     if (tails[tool]?.state === 'error') setRetryNonce(n => n + 1)
   }
 
@@ -496,6 +497,7 @@ export const ManagementLogsSection: React.FC<ManagementLogsSectionProps> = ({ se
     if (!activeTool) return
     setSelectedFile(prev => ({ ...prev, [activeTool]: file }))
     setFilter('')
+    setLevelFilter(DEFAULT_LEVEL_FILTER)
   }
 
   const totalFiles = roots.reduce((n, r) => n + (r.fileCount ?? r.files.length), 0)
