@@ -185,7 +185,7 @@ const PRODUCT_NAMES: Record<string, { mac: string; windows: string }> = {
   bootstrap: { mac: 'BootstrapMate', windows: 'BootstrapMate' },
   reports: { mac: 'ReportMate', windows: 'ReportMate' },
   state: { mac: 'Outset', windows: 'StartSet' },
-  encryption: { mac: 'Crypt', windows: 'Crypt Escrow' },
+  encryption: { mac: 'Crypt', windows: 'Crypt' },
   users: { mac: 'ManageUsers', windows: 'ManageUsers' },
   utilities: { mac: 'Utilities', windows: 'Utilities' },
   notifications: { mac: 'swiftDialog', windows: 'csharpDialog' },
