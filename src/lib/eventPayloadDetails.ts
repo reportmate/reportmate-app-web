@@ -142,16 +142,32 @@ export function summarizeEventPayload(payload: unknown): EventDetailSummary {
     const items = raw.map(normalizeItem).filter((i): i is EventDetailItem => i !== null)
     if (items.length) groups.push({ key, label, tone, items })
   }
-  const flatInstalled: EventDetailItem[] = []
-  for (const [key, value] of Object.entries(p)) {
-    if (RESERVED_KEYS.has(key) || typeof value !== 'string' || !value.trim()) continue
-    // A package pair is "Name": "version"; anything named like a counter
-    // (moduleCount) or whose value is not version-shaped is context, not a package
-    if (/count$/i.test(key) || !/^\d/.test(value.trim())) continue
-    flatInstalled.push({ name: key, version: value.trim() })
+  // Older clients send a run's packages as a flat "Name": "version" map rather than
+  // an array. Munki reports no version for a removal, so those pairs arrive blank —
+  // read a blank value as a package only when every pair is blank, otherwise it is
+  // a context field that happens to be empty.
+  const flatPairs = Object.entries(p).filter(
+    ([key, value]) => !RESERVED_KEYS.has(key) && !/count$/i.test(key) && typeof value === 'string'
+  ) as Array<[string, string]>
+  const allBlank = flatPairs.length > 0 && flatPairs.every(([, value]) => value.trim() === '')
+  const flatItems: EventDetailItem[] = []
+  for (const [key, value] of flatPairs) {
+    const version = value.trim()
+    if (version === '') { if (allBlank) flatItems.push({ name: key }) }
+    else if (/^\d/.test(version)) flatItems.push({ name: key, version })
   }
-  if (flatInstalled.length && !groups.some(g => g.key === 'installed_items')) {
-    groups.push({ key: 'installed_items', label: 'Installed', tone: 'success', items: flatInstalled })
+  // A payload that only names packages, with no version on any of them, is a removal:
+  // labelling it "Installed" in green is how "2 packages removed" came to read as
+  // an install. Anything else stays the install list it has always been.
+  const flatIsRemoval = allBlank || String(p.action ?? '').toLowerCase() === 'remove'
+  const flatKey = flatIsRemoval ? 'removed_items' : 'installed_items'
+  if (flatItems.length && !groups.some(g => g.key === flatKey)) {
+    groups.push({
+      key: flatKey,
+      label: flatIsRemoval ? 'Removed' : 'Installed',
+      tone: flatIsRemoval ? 'neutral' : 'success',
+      items: flatItems,
+    })
   }
 
   const messages: EventDetailSummary['messages'] = []

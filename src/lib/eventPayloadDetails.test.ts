@@ -29,6 +29,29 @@ describe('summarizeEventPayload', () => {
     expect(s.context).toContainEqual({ label: 'Duration', value: '1m 57s' })
   })
 
+  it('lists the packages a removal run names, and does not call them installs', () => {
+    // Munki reports no version for a removal, so its packages arrive as "Name": "".
+    const s = summarizeEventPayload({ FleetMate: '', MunkiReport: '' })
+    expect(s.groups.map(g => [g.label, g.tone])).toEqual([['Removed', 'neutral']])
+    expect(s.groups[0].items.map(i => i.name)).toEqual(['FleetMate', 'MunkiReport'])
+  })
+
+  it('lists removed_items under Removed', () => {
+    const s = summarizeEventPayload({
+      action: 'remove',
+      count: 2,
+      removed_items: [{ name: 'FleetMate', version: '2026.07.18.1820' }, { name: 'MunkiReport' }],
+    })
+    expect(s.groups.map(g => [g.label, g.tone])).toEqual([['Removed', 'neutral']])
+    expect(s.groups[0].items).toHaveLength(2)
+  })
+
+  it('still reads a flat install map, and ignores a blank field beside real versions', () => {
+    const s = summarizeEventPayload({ Teams: '26213.1006.5011.1671', BBEdit: '16.0.3', clientIdentifier: '' })
+    expect(s.groups.map(g => [g.label, g.tone])).toEqual([['Installed', 'success']])
+    expect(s.groups[0].items.map(i => i.name)).toEqual(['Teams', 'BBEdit'])
+  })
+
   it('separates failed and warning items by tone', () => {
     const s = summarizeEventPayload({
       failed_items: [{ name: 'RenderingManager', version: '2026.08.27.1706' }],
