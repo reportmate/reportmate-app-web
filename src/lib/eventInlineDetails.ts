@@ -63,8 +63,11 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
   // { name, version } objects rather than a flat map, and always includes them
   // even when the summary message is a count. Read them so a multi-package run
   // can still list what it installed.
-  if (Array.isArray(p.items)) {
-    for (const item of p.items) {
+  // `removed_items` is the same shape; a removal run carries its packages there so
+  // the row can colour them as a removal rather than an install.
+  for (const list of [p.items, p.removed_items, p.installed_items]) {
+    if (!Array.isArray(list)) continue
+    for (const item of list) {
       if (typeof item === 'string') {
         if (item.trim()) successes.push(item.trim())
       } else if (item && typeof item === 'object') {
@@ -95,11 +98,17 @@ export const extractInlineDetails = (payload: unknown): { errors: InlineLine[]; 
 
   // Success payloads are a flat "package name → version" map — one line each.
   // Only a version-shaped value counts; other strings are context.
-  for (const [key, value] of Object.entries(p)) {
-    if (RESERVED_PAYLOAD_KEYS.has(key) || /count$/i.test(key)) continue
-    if (typeof value === 'string' && /^\d/.test(value.trim())) {
-      successes.push(`${key} ${value.trim()}`)
-    }
+  const flatPairs = Object.entries(p).filter(
+    ([key, value]) => !RESERVED_PAYLOAD_KEYS.has(key) && !/count$/i.test(key) && typeof value === 'string'
+  ) as Array<[string, string]>
+  // Munki reports no version for a removal, so its packages arrive as "Name": "".
+  // A blank value is only safe to read as a package when every pair is blank —
+  // otherwise it is a context field that happens to be empty.
+  const allBlank = flatPairs.length > 0 && flatPairs.every(([, value]) => value.trim() === '')
+  for (const [key, value] of flatPairs) {
+    const trimmed = value.trim()
+    if (trimmed === '') { if (allBlank) successes.push(key) }
+    else if (/^\d/.test(trimmed)) successes.push(`${key} ${trimmed}`)
   }
 
   const dedupe = (lines: InlineLine[]) => {
