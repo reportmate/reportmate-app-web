@@ -1,11 +1,12 @@
 /**
- * System-level problems from the device's managed-software runs.
+ * System-level problems from the device's latest managed-software run.
  *
  * This box exists only for problems no item can carry: manifest and catalog
  * retrieval failures, preflight and postflight errors, a failed run that
  * reported no items. Anything attributable to an item lives on that item in
  * the table and never appears here — when every problem has an item, there is
- * no box at all.
+ * no box at all. It reports the latest run only, so the next clean run clears
+ * it.
  */
 
 import React, { useEffect, useState } from 'react'
@@ -39,10 +40,13 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
   useEffect(() => {
     if (!needsEventText || !serialNumber) return
     let cancelled = false
-    fetch(`/api/device/${encodeURIComponent(serialNumber)}/modules/events?limit=5&type=error`)
+    // /modules/<name> only serves module tables, so "events" was never a module
+    // it could resolve — the box's one fallback answered 400 every time.
+    fetch(`/api/device/${encodeURIComponent(serialNumber)}/events?limit=25`)
       .then(r => (r.ok ? r.json() : null))
       .then(async result => {
-        const events: any[] = result?.data || result?.events || []
+        const events: any[] = (result?.events || result?.data || [])
+          .filter((e: any) => String(e.kind || e.eventType || '').toLowerCase() === 'error')
         const installsEvent = events.find(e => /munki|cimian|install/i.test(String(e.message || '')) || e.moduleId === 'installs' || e.module_id === 'installs') || events[0]
         if (!installsEvent || cancelled) return
         const payload = await fetchEventPayload(String(installsEvent.id))
@@ -62,8 +66,13 @@ export const InstallsRunStatus: React.FC<InstallsRunStatusProps> = ({ serialNumb
   const chrome = isError
     ? 'border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-900/20'
     : 'border-yellow-400 bg-yellow-100/80 dark:border-yellow-700 dark:bg-yellow-900/30'
+  // "Failed" is reserved for a run that produced nothing; a run that finished
+  // and reported items had errors, it did not fail.
   const badge = isError
-    ? { text: 'Last run failed', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' }
+    ? {
+        text: summary.failedWithoutItems ? 'Last run failed' : 'Last run errors',
+        className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+      }
     : { text: 'Last run warnings', className: 'bg-yellow-200 text-yellow-900 dark:bg-yellow-900 dark:text-yellow-200' }
 
   const stampParts: string[] = []
