@@ -69,12 +69,16 @@ export function collectSystemProblems(installs: any): SystemProblemsSummary {
         failedWithoutItems,
       }
     }
-    // Legacy payload: only the latest run's flattened strings exist.
+    // Munki without the structured session reports: ManagedInstallReport.plist
+    // is rewritten every run, so its flattened strings are already the latest
+    // run and nothing else. Whether the run failed comes from the run's own
+    // verdict — an error string means the run had errors, not that it failed,
+    // and a client that reports no items would otherwise turn every one of them
+    // into "the run did not complete".
     const errors = systemLines(munki.errors)
     const warnings = systemLines(munki.warnings)
     const status = String(munki.status || '').toLowerCase()
     const failed = munki.lastRunSuccess === false || munki.lastRunSuccess === 0 || status === 'error'
-      || String(munki.errors || '').trim() !== ''
     const itemless = !Array.isArray(munki.items) || munki.items.length === 0
     return {
       problems: [

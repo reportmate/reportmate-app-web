@@ -46,10 +46,47 @@ describe('system problems from the latest run', () => {
     expect(collectSystemProblems({ munki: { sessions: [failed], items } }).failedWithoutItems).toBe(false)
   })
 
-  it('reads the flattened strings of a legacy payload', () => {
+})
+
+// Munki without the structured session reports: no sessions array, no items on
+// some client builds, and the run's problems arriving as the semicolon-joined
+// strings from ManagedInstallReport.plist. Shape copied from a live device
+// running that build.
+describe('Munki without structured session reports', () => {
+  const legacyClean = { isInstalled: 1, status: 'Active', lastRunSuccess: 1, errors: null, warnings: null, items: [] }
+
+  it('reads the flattened strings of the latest run', () => {
     const summary = collectSystemProblems({
-      munki: { errors: 'Could not download catalog Production', warnings: '', items },
+      ...{ munki: { ...legacyClean, errors: 'Could not download catalog Production' } },
     })
     expect(summary.problems).toEqual([{ tone: 'error', message: 'Could not download catalog Production' }])
+  })
+
+  it('clears when the next run rewrites the report clean', () => {
+    // ManagedInstallReport.plist is rewritten every run, so the legacy payload
+    // is inherently the latest run — nothing to supersede, only to not invent.
+    expect(collectSystemProblems({ munki: legacyClean }).problems).toEqual([])
+    expect(collectSystemProblems({ munki: legacyClean }).failedWithoutItems).toBe(false)
+  })
+
+  it('does not call a run that reported errors a run that failed', () => {
+    // A client build that collects no items would otherwise turn every error
+    // into "the run did not complete, so no items were reported".
+    const summary = collectSystemProblems({
+      munki: { ...legacyClean, errors: 'Could not download catalog Production' },
+    })
+    expect(summary.failedWithoutItems).toBe(false)
+  })
+
+  it('still reports a run whose own verdict is failure', () => {
+    expect(collectSystemProblems({ munki: { ...legacyClean, lastRunSuccess: 0 } }).failedWithoutItems).toBe(true)
+    expect(collectSystemProblems({ munki: { ...legacyClean, status: 'error' } }).failedWithoutItems).toBe(true)
+  })
+
+  it('keeps warnings out of the error tone', () => {
+    const summary = collectSystemProblems({
+      munki: { ...legacyClean, warnings: 'Could not retrieve managed_installs manifest' },
+    })
+    expect(summary.problems).toEqual([{ tone: 'warning', message: 'Could not retrieve managed_installs manifest' }])
   })
 })
