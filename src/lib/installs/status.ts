@@ -139,11 +139,25 @@ function storedCategory(item: any): ItemStatusCategory {
   }
 }
 
-function statusCategory(item: any): ItemStatusCategory {
+/**
+ * Whether the tool's verdict says the item is fine. currentStatus/mappedStatus
+ * is written after the run, so Installed and Removed are judgements: an
+ * installed item's last attempt succeeded, or it would not be installed.
+ * Distinct from the 'success' category below, which means installed in the
+ * MOST RECENT run rather than merely present.
+ */
+function verdictIsGood(item: any): boolean {
+  const status = String(item?.currentStatus || item?.mappedStatus || '')
+    .toLowerCase().replace(/[ _]/g, '-')
+  if (!status || status === 'not-installed') return false
+  return ['installed', 'removed', 'uninstalled', 'install-succeeded', 'completed', 'success']
+    .includes(status)
+}
+
+function statusCategory(raw: any): ItemStatusCategory {
   // One state is spelled three ways across live payloads — "Update Available",
   // "update-available", "update_available" — so normalize before matching.
-  const status = (item?.currentStatus || item?.mappedStatus || item?.status || '')
-    .toLowerCase().replace(/[ _]/g, '-')
+  const status = String(raw || '').toLowerCase().replace(/[ _]/g, '-')
   if (!status) return null
   if (status.includes('error') || status.includes('failed') || status.includes('problem') ||
       status === 'needs-reinstall') {
@@ -204,20 +218,29 @@ export function itemCategory(item: any): ItemStatusCategory {
   const stored = storedCategory(item)
   if (stored) return stored
 
-  // Only a status naming a *problem* settles it. Installed, Removed and Pending
-  // all describe where the item stands, not how the last attempt went, and an
-  // item is often pending precisely because its last attempt warned.
-  const status = statusCategory(item)
-  if (status === 'error') return 'error'
-  if (status === 'warning') return 'warning'
+  // A verdict naming a problem settles it.
+  const verdict = statusCategory(item?.currentStatus || item?.mappedStatus)
+  if (verdict === 'error' || verdict === 'warning') return verdict
 
+  // So does a verdict saying the item is fine — nothing below can overturn it
+  // except a detected install loop.
+  if (verdictIsGood(item)) return hasInstallLoop(item) ? 'warning' : verdict
+
+  // Legacy Munki writes only `status`, a statement about presence rather than a
+  // verdict, so a message still speaks. Pending likewise says an install is
+  // owed — often owed precisely because the last attempt warned.
+  const presence = statusCategory(item?.status)
+  if (presence === 'error' || presence === 'warning') return presence
+
+  // Only consulted with no verdict. Against a verdict of Installed a bare
+  // lastAttemptStatus is not evidence: every such mismatch in the fleet carried
+  // no message, no failureCount and no warningCount.
   const attempt = attemptCategory(item)
-  if (attempt === 'error') return 'error'
-  if (attempt === 'warning') return 'warning'
+  if (attempt === 'error' || attempt === 'warning') return attempt
 
   if (hasText(item?.lastError)) return 'error'
   if (hasText(item?.lastWarning) || hasInstallLoop(item)) return 'warning'
-  return status
+  return verdict ?? presence
 }
 
 export function isErrorItem(item: any): boolean {

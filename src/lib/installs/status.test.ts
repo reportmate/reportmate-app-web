@@ -148,12 +148,20 @@ describe('one classification, shared with the API', () => {
     }
   })
 
-  it('does not let an Installed status mask a failed attempt', () => {
-    // Both tools report an item as Installed while recording the failure
-    // against it, so reading the status alone loses every one of them.
+  it('treats Installed as a verdict, not as presence with a caveat', () => {
+    // An installed item is a good item: its last attempt succeeded, or it would
+    // not be installed. Every Installed item in the fleet carrying a failed
+    // lastAttemptStatus had no message and zero failure counts.
+    expect(isErrorItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(false)
+    expect(isWarningItem({ currentStatus: 'Installed', lastAttemptStatus: 'Warning' })).toBe(false)
+    // Not flagged, and not "success" either — that category means installed in
+    // the most recent run, which a plain Installed item is not.
+    expect(isPendingItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(false)
+  })
+
+  it('still reads a message on legacy Munki, which has no verdict', () => {
     expect(isErrorItem({ status: 'installed', lastError: 'Installer returned 1' })).toBe(true)
-    expect(isErrorItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(true)
-    expect(isWarningItem({ currentStatus: 'Installed', lastAttemptStatus: 'Warning' })).toBe(true)
+    expect(isWarningItem({ status: 'installed', lastWarning: 'Download failed' })).toBe(true)
   })
 
   it('reads one state however it is spelled', () => {
