@@ -128,3 +128,54 @@ describe('categorizeDevicesByInstallStatus', () => {
     expect(devicesWithSuccess.map(d => d.serialNumber)).toEqual(['BBB'])
   })
 })
+
+// The API classifies each item at ingest and stores the answer; these pin that
+// the web agrees with it, and that the fallback ladder for items stored before
+// that shipped mirrors the server's exactly.
+describe('one classification, shared with the API', () => {
+  it('trusts the state the API stored', () => {
+    expect(isErrorItem({ reportmateStatus: 'error', currentStatus: 'Installed' })).toBe(true)
+    expect(isWarningItem({ reportmateStatus: 'warning', currentStatus: 'Installed' })).toBe(true)
+    expect(isPendingItem({ reportmateStatus: 'pending' })).toBe(true)
+    expect(isSuccessItem({ reportmateStatus: 'installed' })).toBe(true)
+  })
+
+  it('classifies Munki and Cimian identically from the shared vocabulary', () => {
+    for (const platform of [{ type: 'munki' }, { type: 'cimian' }]) {
+      expect(isErrorItem({ ...platform, currentStatus: 'Error' })).toBe(true)
+      expect(isWarningItem({ ...platform, currentStatus: 'Warning' })).toBe(true)
+      expect(isPendingItem({ ...platform, currentStatus: 'Pending' })).toBe(true)
+    }
+  })
+
+  it('does not let an Installed status mask a failed attempt', () => {
+    // Both tools report an item as Installed while recording the failure
+    // against it, so reading the status alone loses every one of them.
+    expect(isErrorItem({ status: 'installed', lastError: 'Installer returned 1' })).toBe(true)
+    expect(isErrorItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', lastAttemptStatus: 'Warning' })).toBe(true)
+  })
+
+  it('reads one state however it is spelled', () => {
+    for (const spelling of ['Update Available', 'update-available', 'update_available']) {
+      expect(isPendingItem({ currentStatus: spelling })).toBe(true)
+    }
+  })
+
+  it('treats "not installed" as a warning, not an installed item', () => {
+    expect(isWarningItem({ currentStatus: 'Not Installed' })).toBe(true)
+    expect(isSuccessItem({ currentStatus: 'Not Installed' })).toBe(false)
+  })
+
+  it('counts a looping package as a warning whatever it reports', () => {
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', installLoopDetected: true })).toBe(true)
+    expect(isErrorItem({ currentStatus: 'Error', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: false })).toBe(false)
+  })
+
+  it('never counts pending as a warning', () => {
+    expect(isWarningItem({ currentStatus: 'Pending' })).toBe(false)
+    expect(isWarningItem({ currentStatus: 'Update Available' })).toBe(false)
+  })
+})

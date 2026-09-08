@@ -110,36 +110,69 @@ export function categorizeDevicesByInstallStatus(devices: any[]) {
  * Status predicates for a single install item, shared by every view that
  * splits items into errors / warnings / pending.
  *
- * Cimian records a failure in `currentStatus`, so status alone classifies it.
- * Munki keeps `status` factual — an item whose install failed this run is
- * still reported with its real state, and the run's message is attached to
- * `lastError` / `lastWarning` by the Mac client instead. Classifying on status
- * alone therefore finds no macOS warnings at all, which is why the warnings
- * drill-down came up empty on `?platform=mac` while the API's own counts
- * (which do read `lastWarning`) said otherwise. Status wins when it says
- * something; the message fields are the fallback.
+ * The API classifies each item at ingest and stores the answer on the item as
+ * `reportmateStatus`, so this reads that field first and everything — the
+ * device page, the drill-downs, the dashboard tiles — agrees by construction.
+ * The ladder below is the fallback for items stored before that shipped, and
+ * mirrors the server's exactly.
+ *
+ * Munki and Cimian are not different problems. Both fill `currentStatus` from
+ * one Installed/Pending/Warning/Error/Removed vocabulary — the Munki fork's
+ * session logger writes it and the Mac client copies it across. What differs
+ * is that a status of Installed is a claim about *presence*, not about how the
+ * last attempt went: both tools report an item as Installed while recording a
+ * failure against it in `lastAttemptStatus` or `lastError`. So a status that
+ * names a problem wins, a status that merely names presence does not, and
+ * legacy Munki — which has no normalized status at all — is served by the same
+ * message fallback rather than by a platform special case.
  */
 type ItemStatusCategory = 'error' | 'warning' | 'pending' | 'success' | null
 
-function statusCategory(item: any): ItemStatusCategory {
-  const status = (item?.currentStatus || item?.status || '').toLowerCase()
-  if (!status) return null
-  // An install that ran and completed in the MOST RECENT run. Distinct from the
-  // vastly larger 'installed' set, which only says the package is present.
-  if (status === 'install_succeeded' || status === 'install-succeeded' || status === 'completed') {
-    return 'success'
+/** The state the API computed at ingest, when the item carries one. */
+function storedCategory(item: any): ItemStatusCategory {
+  switch (item?.reportmateStatus) {
+    case 'error': return 'error'
+    case 'warning': return 'warning'
+    case 'pending': return 'pending'
+    case 'installed': return 'success'
+    default: return null
   }
-  if (status.includes('error') || status.includes('failed') || status.includes('problem') || status === 'needs_reinstall') {
+}
+
+function statusCategory(item: any): ItemStatusCategory {
+  // One state is spelled three ways across live payloads — "Update Available",
+  // "update-available", "update_available" — so normalize before matching.
+  const status = (item?.currentStatus || item?.mappedStatus || item?.status || '')
+    .toLowerCase().replace(/[ _]/g, '-')
+  if (!status) return null
+  if (status.includes('error') || status.includes('failed') || status.includes('problem') ||
+      status === 'needs-reinstall') {
     return 'error'
   }
-  if (status.includes('warning') || status === 'needs-attention') return 'warning'
-  if (status.includes('will-be-installed') || status.includes('update-available') ||
-      status.includes('update_available') || status.includes('will-be-removed') ||
-      status.includes('pending') || status.includes('scheduled') ||
-      status === 'managed-update-available') {
+  // "not-installed" contains "installed" and means the opposite: the package is
+  // managed, was expected, and is absent.
+  if (status.includes('warning') || status.includes('install-loop') ||
+      status === 'needs-attention' || status === 'not-installed') {
+    return 'warning'
+  }
+  if (status.includes('pending') || status.includes('will-be-installed') ||
+      status.includes('update-available') || status.includes('will-be-removed') ||
+      status.includes('scheduled') || status.includes('available') ||
+      status.includes('downloading') || status.includes('installing') ||
+      status === 'skipped' || status === 'unknown') {
     return 'pending'
   }
+  // An install that ran and completed in the MOST RECENT run. Distinct from the
+  // vastly larger 'installed' set, which only says the package is present.
+  if (status === 'install-succeeded' || status === 'completed' || status === 'success') {
+    return 'success'
+  }
   return null
+}
+
+/** A package that reinstalls every run is not healthy, however it reports. */
+function hasInstallLoop(item: any): boolean {
+  return item?.hasInstallLoop === true || item?.installLoopDetected === true
 }
 
 function hasText(value: any): boolean {
@@ -158,24 +191,41 @@ function attemptCategory(item: any): ItemStatusCategory {
   return null
 }
 
+/** The item's state, by the same ladder the API applies at ingest. */
+export function itemCategory(item: any): ItemStatusCategory {
+  const stored = storedCategory(item)
+  if (stored) return stored
+
+  const status = statusCategory(item)
+  // A status naming a problem or an intention is the answer; one naming only
+  // presence is not, because the attempt fields may still record a failure.
+  if (status === 'error') return 'error'
+  if (status === 'warning' || (status && status !== 'success' && hasInstallLoop(item))) return 'warning'
+  if (status === 'pending') return 'pending'
+
+  const attempt = attemptCategory(item)
+  if (attempt === 'error') return 'error'
+  if (attempt === 'warning') return 'warning'
+
+  if (hasText(item?.lastError)) return 'error'
+  if (hasText(item?.lastWarning) || hasInstallLoop(item)) return 'warning'
+  return status
+}
+
 export function isErrorItem(item: any): boolean {
-  const category = statusCategory(item) || attemptCategory(item)
-  if (category) return category === 'error'
-  return hasText(item?.lastError)
+  return itemCategory(item) === 'error'
 }
 
 export function isWarningItem(item: any): boolean {
-  const category = statusCategory(item) || attemptCategory(item)
-  if (category) return category === 'warning'
-  return !hasText(item?.lastError) && hasText(item?.lastWarning)
+  return itemCategory(item) === 'warning'
 }
 
 export function isPendingItem(item: any): boolean {
-  return statusCategory(item) === 'pending'
+  return itemCategory(item) === 'pending'
 }
 
 export function isSuccessItem(item: any): boolean {
-  return statusCategory(item) === 'success'
+  return itemCategory(item) === 'success'
 }
 
 export type ItemStatusFilter = 'errors' | 'warnings' | 'pending' | 'success' | 'all'

@@ -83,27 +83,6 @@ export function useDevice(serialNumber: string | null) {
 }
 
 /**
- * Hook for fetching install statistics
- */
-export function useInstallStats() {
-  const { data, error, isLoading, mutate } = useSWR(
-    '/api/stats/installs',
-    fetcher,
-    {
-      ...swrOptions,
-      refreshInterval: 600000, // Refresh every 10 minutes
-    }
-  )
-
-  return {
-    stats: data ?? null,
-    isLoading,
-    error,
-    refresh: mutate,
-  }
-}
-
-/**
  * Hook for fetching events (used when WebSocket is not available)
  * Supports server-side type filtering for fast per-type queries
  */
