@@ -170,9 +170,17 @@ function statusCategory(item: any): ItemStatusCategory {
   return null
 }
 
+/** A flag that arrives as a boolean from Cimian and as 1 from the Mac client. */
+function isTrue(value: any): boolean {
+  if (typeof value === 'boolean') return value
+  if (typeof value === 'number') return value !== 0
+  if (typeof value === 'string') return ['true', 'yes', '1'].includes(value.trim().toLowerCase())
+  return false
+}
+
 /** A package that reinstalls every run is not healthy, however it reports. */
 function hasInstallLoop(item: any): boolean {
-  return item?.hasInstallLoop === true || item?.installLoopDetected === true
+  return isTrue(item?.hasInstallLoop) || isTrue(item?.installLoopDetected)
 }
 
 function hasText(value: any): boolean {
@@ -196,12 +204,12 @@ export function itemCategory(item: any): ItemStatusCategory {
   const stored = storedCategory(item)
   if (stored) return stored
 
+  // Only a status naming a *problem* settles it. Installed, Removed and Pending
+  // all describe where the item stands, not how the last attempt went, and an
+  // item is often pending precisely because its last attempt warned.
   const status = statusCategory(item)
-  // A status naming a problem or an intention is the answer; one naming only
-  // presence is not, because the attempt fields may still record a failure.
   if (status === 'error') return 'error'
-  if (status === 'warning' || (status && status !== 'success' && hasInstallLoop(item))) return 'warning'
-  if (status === 'pending') return 'pending'
+  if (status === 'warning') return 'warning'
 
   const attempt = attemptCategory(item)
   if (attempt === 'error') return 'error'

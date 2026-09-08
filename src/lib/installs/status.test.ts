@@ -179,3 +179,25 @@ describe('one classification, shared with the API', () => {
     expect(isWarningItem({ currentStatus: 'Update Available' })).toBe(false)
   })
 })
+
+describe('pending is a standing, not a verdict on the last attempt', () => {
+  it('keeps a warning on an item that is pending because the attempt warned', () => {
+    // Munki reports these as pending_install with the message attached. Letting
+    // the Pending status win dropped 36 real warnings across 16 Macs.
+    const item = { status: 'pending_install', currentStatus: 'Pending', lastWarning: 'Download of Excel failed' }
+    expect(isWarningItem(item)).toBe(true)
+    expect(isPendingItem(item)).toBe(false)
+  })
+
+  it('leaves a clean pending item pending', () => {
+    expect(isPendingItem({ currentStatus: 'Pending' })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Pending' })).toBe(false)
+  })
+
+  it('reads the loop flag whether it arrives as true or as 1', () => {
+    // Cimian sends a boolean; the Mac client's value arrives as a number.
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 1 })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 0 })).toBe(false)
+  })
+})
