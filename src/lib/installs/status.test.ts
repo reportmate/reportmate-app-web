@@ -1,4 +1,5 @@
 import {
+  itemCategory,
   isErrorItem,
   isWarningItem,
   isPendingItem,
@@ -207,5 +208,30 @@ describe('pending is a standing, not a verdict on the last attempt', () => {
     expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 1 })).toBe(true)
     expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: true })).toBe(true)
     expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 0 })).toBe(false)
+  })
+})
+
+describe('only what the run reported counts', () => {
+  const scraped = {
+    itemName: 'Excel', currentStatus: 'Pending', lastSeenInSession: '',
+    lastWarning: 'Download of Excel failed: The network connection was lost.',
+  }
+
+  it('ignores a warning the client scraped out of the run log', () => {
+    // No event can be built from it, so counting it showed 10 devices the
+    // events feed could not back.
+    expect(itemCategory(scraped, true)).toBe('pending')
+  })
+
+  it('counts a warning the run itself attributed', () => {
+    expect(itemCategory({ ...scraped, lastSeenInSession: '2026-09-08-0653' }, true)).toBe('warning')
+  })
+
+  it('still counts messages on a payload with no sessions', () => {
+    expect(itemCategory({ status: 'installed', lastError: 'Installer returned 1' })).toBe('error')
+  })
+
+  it('still counts a held install loop, which has no stamp by design', () => {
+    expect(itemCategory({ currentStatus: 'Installed', lastSeenInSession: '', hasInstallLoop: true }, true)).toBe('warning')
   })
 })
