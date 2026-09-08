@@ -128,3 +128,84 @@ describe('categorizeDevicesByInstallStatus', () => {
     expect(devicesWithSuccess.map(d => d.serialNumber)).toEqual(['BBB'])
   })
 })
+
+// The API classifies each item at ingest and stores the answer; these pin that
+// the web agrees with it, and that the fallback ladder for items stored before
+// that shipped mirrors the server's exactly.
+describe('one classification, shared with the API', () => {
+  it('trusts the state the API stored', () => {
+    expect(isErrorItem({ reportmateStatus: 'error', currentStatus: 'Installed' })).toBe(true)
+    expect(isWarningItem({ reportmateStatus: 'warning', currentStatus: 'Installed' })).toBe(true)
+    expect(isPendingItem({ reportmateStatus: 'pending' })).toBe(true)
+    expect(isSuccessItem({ reportmateStatus: 'installed' })).toBe(true)
+  })
+
+  it('classifies Munki and Cimian identically from the shared vocabulary', () => {
+    for (const platform of [{ type: 'munki' }, { type: 'cimian' }]) {
+      expect(isErrorItem({ ...platform, currentStatus: 'Error' })).toBe(true)
+      expect(isWarningItem({ ...platform, currentStatus: 'Warning' })).toBe(true)
+      expect(isPendingItem({ ...platform, currentStatus: 'Pending' })).toBe(true)
+    }
+  })
+
+  it('treats Installed as a verdict, not as presence with a caveat', () => {
+    // An installed item is a good item: its last attempt succeeded, or it would
+    // not be installed. Every Installed item in the fleet carrying a failed
+    // lastAttemptStatus had no message and zero failure counts.
+    expect(isErrorItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(false)
+    expect(isWarningItem({ currentStatus: 'Installed', lastAttemptStatus: 'Warning' })).toBe(false)
+    // Not flagged, and not "success" either — that category means installed in
+    // the most recent run, which a plain Installed item is not.
+    expect(isPendingItem({ currentStatus: 'Installed', lastAttemptStatus: 'Failed' })).toBe(false)
+  })
+
+  it('still reads a message on legacy Munki, which has no verdict', () => {
+    expect(isErrorItem({ status: 'installed', lastError: 'Installer returned 1' })).toBe(true)
+    expect(isWarningItem({ status: 'installed', lastWarning: 'Download failed' })).toBe(true)
+  })
+
+  it('reads one state however it is spelled', () => {
+    for (const spelling of ['Update Available', 'update-available', 'update_available']) {
+      expect(isPendingItem({ currentStatus: spelling })).toBe(true)
+    }
+  })
+
+  it('treats "not installed" as a warning, not an installed item', () => {
+    expect(isWarningItem({ currentStatus: 'Not Installed' })).toBe(true)
+    expect(isSuccessItem({ currentStatus: 'Not Installed' })).toBe(false)
+  })
+
+  it('counts a looping package as a warning whatever it reports', () => {
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', installLoopDetected: true })).toBe(true)
+    expect(isErrorItem({ currentStatus: 'Error', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: false })).toBe(false)
+  })
+
+  it('never counts pending as a warning', () => {
+    expect(isWarningItem({ currentStatus: 'Pending' })).toBe(false)
+    expect(isWarningItem({ currentStatus: 'Update Available' })).toBe(false)
+  })
+})
+
+describe('pending is a standing, not a verdict on the last attempt', () => {
+  it('keeps a warning on an item that is pending because the attempt warned', () => {
+    // Munki reports these as pending_install with the message attached. Letting
+    // the Pending status win dropped 36 real warnings across 16 Macs.
+    const item = { status: 'pending_install', currentStatus: 'Pending', lastWarning: 'Download of Excel failed' }
+    expect(isWarningItem(item)).toBe(true)
+    expect(isPendingItem(item)).toBe(false)
+  })
+
+  it('leaves a clean pending item pending', () => {
+    expect(isPendingItem({ currentStatus: 'Pending' })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Pending' })).toBe(false)
+  })
+
+  it('reads the loop flag whether it arrives as true or as 1', () => {
+    // Cimian sends a boolean; the Mac client's value arrives as a number.
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 1 })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: true })).toBe(true)
+    expect(isWarningItem({ currentStatus: 'Installed', hasInstallLoop: 0 })).toBe(false)
+  })
+})
