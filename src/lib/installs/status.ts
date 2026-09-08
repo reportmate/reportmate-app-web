@@ -184,6 +184,18 @@ function statusCategory(raw: any): ItemStatusCategory {
   return null
 }
 
+/**
+ * Whether the run itself attributed this message, rather than the client having
+ * scraped it out of the Munki run log and matched it to an item by name. The
+ * fork stamps lastSeenInSession when a warning or error came from the session's
+ * own warningItems; a log scrape carries no stamp and produces no event, so
+ * counting it shows a warning the events feed can never back.
+ */
+function runReported(item: any, hasSessions: boolean): boolean {
+  if (!hasSessions) return true
+  return hasText(item?.lastSeenInSession)
+}
+
 /** A flag that arrives as a boolean from Cimian and as 1 from the Mac client. */
 function isTrue(value: any): boolean {
   if (typeof value === 'boolean') return value
@@ -214,7 +226,7 @@ function attemptCategory(item: any): ItemStatusCategory {
 }
 
 /** The item's state, by the same ladder the API applies at ingest. */
-export function itemCategory(item: any): ItemStatusCategory {
+export function itemCategory(item: any, hasSessions = false): ItemStatusCategory {
   const stored = storedCategory(item)
   if (stored) return stored
 
@@ -238,8 +250,11 @@ export function itemCategory(item: any): ItemStatusCategory {
   const attempt = attemptCategory(item)
   if (attempt === 'error' || attempt === 'warning') return attempt
 
-  if (hasText(item?.lastError)) return 'error'
-  if (hasText(item?.lastWarning) || hasInstallLoop(item)) return 'warning'
+  if (runReported(item, hasSessions)) {
+    if (hasText(item?.lastError)) return 'error'
+    if (hasText(item?.lastWarning)) return 'warning'
+  }
+  if (hasInstallLoop(item)) return 'warning'
   return verdict ?? presence
 }
 
