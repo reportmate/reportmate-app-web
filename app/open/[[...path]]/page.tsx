@@ -25,7 +25,9 @@ export default function OpenInAppPage() {
 
   const target = useMemo(() => {
     if (typeof window === 'undefined') return '/dashboard'
-    const rest = pathname.replace(/^\/open\/?/, '')
+    // Same-origin paths only: a leading "//" or "\\" would make the fallback a
+    // protocol-relative redirect to another host.
+    const rest = pathname.replace(/^\/open\/?/, '').replace(/^[\/\\]+/, '')
     const path = rest ? `/${rest}` : '/dashboard'
     return `${path}${window.location.search}${window.location.hash}`
   }, [pathname])
