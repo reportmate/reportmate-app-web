@@ -176,6 +176,17 @@ function InstallsPageContent() {
   const [errorTableSort, setErrorTableSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'count', direction: 'desc' })
   const [warningTableSort, setWarningTableSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'count', direction: 'desc' })
   const [pendingTableSort, setPendingTableSort] = useState<{ column: string; direction: 'asc' | 'desc' }>({ column: 'count', direction: 'desc' })
+  // Sorting state for the by-device status tables (errors/warnings/pending/successes).
+  // Newest check-in first by default: the freshest problem is the one to act on.
+  type DeviceTableColumn = 'device' | 'packages' | 'manifest' | 'lastSeen'
+  const [deviceTableSort, setDeviceTableSort] = useState<{ column: DeviceTableColumn; direction: 'asc' | 'desc' }>({ column: 'lastSeen', direction: 'desc' })
+  const toggleDeviceTableSort = (column: DeviceTableColumn) => {
+    setDeviceTableSort(prev => {
+      if (prev.column === column) return { column, direction: prev.direction === 'asc' ? 'desc' : 'asc' }
+      // Dates and counts read best largest-first; names and manifests A to Z.
+      return { column, direction: column === 'lastSeen' || column === 'packages' ? 'desc' : 'asc' }
+    })
+  }
   
   // Status filter state - items filter (errors, warnings, pending, successes)
   const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>('all')
@@ -1647,6 +1658,39 @@ function InstallsPageContent() {
     if (itemsStatusFilter === 'all') return []
     return aggregateStatusMessages(statusFilteredDevices, itemsStatusFilter, { itemNameFilter: searchQuery })
   }, [statusFilteredDevices, itemsStatusFilter, searchQuery])
+
+  // The by-device status table, ordered by the chosen column. The packages
+  // column sorts on how many of the device's items match the current status
+  // (and search), which is what the column shows.
+  const sortedStatusDevices = useMemo(() => {
+    const searchLower = searchQuery.toLowerCase()
+    const packageCount = (device: any) =>
+      getDeviceInstallItems(device)
+        .filter((item: any) => matchesItemStatus(item, itemsStatusFilter))
+        .filter((item: any) => !searchLower || (item.itemName || item.name || '').toLowerCase().includes(searchLower))
+        .length
+    const deviceName = (device: any) => (device.modules?.inventory?.deviceName || device.serialNumber || '').toLowerCase()
+    const manifest = (device: any) => (
+      device.modules?.installs?.cimian?.config?.ClientIdentifier ||
+      device.modules?.installs?.munki?.manifest ||
+      device.modules?.installs?.munki?.clientIdentifier ||
+      ''
+    ).toLowerCase()
+    const lastSeen = (device: any) => {
+      const t = device.lastSeen ? new Date(device.lastSeen).getTime() : NaN
+      return Number.isNaN(t) ? -Infinity : t
+    }
+    const dir = deviceTableSort.direction === 'asc' ? 1 : -1
+    const compare = (a: any, b: any): number => {
+      switch (deviceTableSort.column) {
+        case 'packages': return (packageCount(a) - packageCount(b)) * dir
+        case 'manifest': return manifest(a).localeCompare(manifest(b)) * dir
+        case 'lastSeen': return (lastSeen(a) - lastSeen(b)) * dir
+        default: return deviceName(a).localeCompare(deviceName(b)) * dir
+      }
+    }
+    return [...statusFilteredDevices].sort((a, b) => compare(a, b) || deviceName(a).localeCompare(deviceName(b)))
+  }, [statusFilteredDevices, itemsStatusFilter, searchQuery, deviceTableSort])
 
   const showMessageView = statusView === 'messages' && itemsStatusFilter !== 'all'
 
@@ -4174,17 +4218,61 @@ function InstallsPageContent() {
                 <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
                   <thead className="bg-gray-50 dark:bg-gray-800 sticky top-0 z-10">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Device
+                      <th
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-sort={deviceTableSort.column === 'device' ? (deviceTableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        onClick={() => toggleDeviceTableSort('device')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Device
+                          {deviceTableSort.column === 'device' && (
+                            <svg className={`w-3 h-3 transition-transform ${deviceTableSort.direction === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        {statusCopy.packagesColumn}
+                      <th
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-sort={deviceTableSort.column === 'packages' ? (deviceTableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        onClick={() => toggleDeviceTableSort('packages')}
+                      >
+                        <div className="flex items-center gap-1">
+                          {statusCopy.packagesColumn}
+                          {deviceTableSort.column === 'packages' && (
+                            <svg className={`w-3 h-3 transition-transform ${deviceTableSort.direction === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Manifest / Repo
+                      <th
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-sort={deviceTableSort.column === 'manifest' ? (deviceTableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        onClick={() => toggleDeviceTableSort('manifest')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Manifest / Repo
+                          {deviceTableSort.column === 'manifest' && (
+                            <svg className={`w-3 h-3 transition-transform ${deviceTableSort.direction === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
-                        Last Seen
+                      <th
+                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer select-none hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                        aria-sort={deviceTableSort.column === 'lastSeen' ? (deviceTableSort.direction === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        onClick={() => toggleDeviceTableSort('lastSeen')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Last Seen
+                          {deviceTableSort.column === 'lastSeen' && (
+                            <svg className={`w-3 h-3 transition-transform ${deviceTableSort.direction === 'desc' ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          )}
+                        </div>
                       </th>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                         Actions
@@ -4192,7 +4280,7 @@ function InstallsPageContent() {
                     </tr>
                   </thead>
                   <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                    {statusFilteredDevices.map((device: any) => {
+                    {sortedStatusDevices.map((device: any) => {
                       // First filter by status type
                       const statusFilteredItems = getDeviceInstallItems(device)
                         .filter((item: any) => matchesItemStatus(item, itemsStatusFilter))
