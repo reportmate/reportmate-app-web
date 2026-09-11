@@ -75,26 +75,26 @@ pnpm start
 - Security status and compliance
 - Event history and logs
 
-### Module Management (`/modules`)
-- Install/uninstall dashboard modules
-- Enable/disable functionality
-- Module configuration
-- Community module discovery
+## Testing
 
-## Testing & Demo
+### Unit Tests
 
-### Demo Data Generation
+Jest runs the unit and render tests under `src/`:
 
 ```bash
-# Generate demo events (default: 10 events every 3 seconds)
-pnpm demo
-
-# Fast demo (20 events every 1 second)
-pnpm demo:fast
-
-# Slow demo (5 events every 5 seconds)  
-pnpm demo:slow
+pnpm test
 ```
+
+### End-to-End Tests
+
+Playwright drives the specs under `e2e/`:
+
+```bash
+pnpm test:e2e
+```
+
+Individual Playwright projects are also wired up as `pnpm test:api-health`,
+`pnpm test:api-endpoints` and `pnpm test:routes`.
 
 ### API Testing
 
@@ -172,8 +172,6 @@ The dashboard supports a modular plugin architecture:
 - **Official Modules**: Maintained by the ReportMate team
 - **Community Modules**: Third-party extensions
 - **Runtime Loading**: Install/remove modules without redeployment
-
-See the [Module Development Guide](docs/modules.md) for creating custom modules.
 
 ## Contributing
 

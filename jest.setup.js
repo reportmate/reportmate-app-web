@@ -31,7 +31,7 @@ jest.mock('next/image', () => ({
 }))
 
 // Mock Prisma client
-jest.mock('@/lib/prisma', () => ({
+jest.mock('@/src/lib/prisma', () => ({
   prisma: {
     device: {
       findMany: jest.fn(),
@@ -56,8 +56,10 @@ process.env = {
 }
 
 // Global test utilities
-global.TextEncoder = TextEncoder
-global.TextDecoder = TextDecoder
+// jsdom does not provide TextEncoder/TextDecoder; pull them from Node's util.
+const { TextEncoder, TextDecoder } = require('util')
+global.TextEncoder = global.TextEncoder || TextEncoder
+global.TextDecoder = global.TextDecoder || TextDecoder
 
 // Console suppression for cleaner test output
 const originalError = console.error
