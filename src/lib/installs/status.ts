@@ -159,14 +159,21 @@ function statusCategory(raw: any): ItemStatusCategory {
   // "update-available", "update_available" — so normalize before matching.
   const status = String(raw || '').toLowerCase().replace(/[ _]/g, '-')
   if (!status) return null
+  // A status of "Install Loop" is a failure: the package reinstalls every run
+  // and never lands. Cimian's client files it under the run's failed items, so
+  // the events feed shows it red — reading it as a warning here is what made
+  // the feed and the tiles disagree.
   if (status.includes('error') || status.includes('failed') || status.includes('problem') ||
-      status === 'needs-reinstall') {
+      status.includes('install-loop') || status === 'needs-reinstall') {
     return 'error'
   }
-  // "not-installed" contains "installed" and means the opposite: the package is
-  // managed, was expected, and is absent.
-  if (status.includes('warning') || status.includes('install-loop') ||
-      status === 'needs-attention' || status === 'not-installed') {
+  // Each of these contains a token meaning the opposite of what it says, so
+  // they have to match exactly: "not-installed" contains "installed" (the
+  // package is managed, was expected, and is absent) and "not-available"
+  // contains "available" (the catalog does not offer a package this device is
+  // managed for — Cimian raises it as a warning item).
+  if (status.includes('warning') || status === 'needs-attention' ||
+      status === 'not-installed' || status === 'not-available') {
     return 'warning'
   }
   if (status.includes('pending') || status.includes('will-be-installed') ||

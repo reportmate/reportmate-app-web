@@ -235,3 +235,22 @@ describe('only what the run reported counts', () => {
     expect(itemCategory({ currentStatus: 'Installed', lastSeenInSession: '', hasInstallLoop: true }, true)).toBe('warning')
   })
 })
+
+// The two statuses the events feed already classified differently. Both are
+// only reached when the API did not stamp the item, but a fallback that
+// disagrees with the feed is the same bug in a different place.
+describe('statuses the events feed classifies', () => {
+  it('reads a looping status as an error, the way the feed shows it', () => {
+    expect(isErrorItem({ currentStatus: 'Install Loop' })).toBe(true)
+    expect(isErrorItem({ mappedStatus: 'install_loop' })).toBe(true)
+  })
+
+  it('reads an unavailable package as a warning, not a pending install', () => {
+    expect(isWarningItem({ currentStatus: 'Not Available' })).toBe(true)
+    expect(isPendingItem({ currentStatus: 'not_available' })).toBe(false)
+  })
+
+  it('still reads a genuinely available update as pending', () => {
+    expect(isPendingItem({ currentStatus: 'Update Available' })).toBe(true)
+  })
+})
