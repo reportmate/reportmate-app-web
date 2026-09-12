@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import { TextEncoder, TextDecoder } from 'util'
 
 // Mock next/router
 jest.mock('next/router', () => ({
@@ -30,23 +31,6 @@ jest.mock('next/image', () => ({
   },
 }))
 
-// Mock Prisma client
-jest.mock('@/lib/prisma', () => ({
-  prisma: {
-    device: {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-      create: jest.fn(),
-      update: jest.fn(),
-      delete: jest.fn(),
-    },
-    event: {
-      findMany: jest.fn(),
-      create: jest.fn(),
-    },
-  },
-}))
-
 // Mock environment variables
 process.env = {
   ...process.env,
@@ -55,7 +39,8 @@ process.env = {
   NEXT_PUBLIC_API_BASE_URL: 'http://localhost:3000',
 }
 
-// Global test utilities
+// jsdom does not expose the WHATWG encoding globals that Node does, and code
+// under test reaches for them, so they come from Node's util here.
 global.TextEncoder = TextEncoder
 global.TextDecoder = TextDecoder
 

@@ -33,6 +33,8 @@ interface HardwareRecord {
   lastSeen: string
   collectedAt: string
   processor: string | object | any
+  // The Windows payload spells the same field cpu, and both are read below.
+  cpu?: string | object | any
   processorSpeed?: string
   processorCores?: number
   memory: string | number | object | any
@@ -316,11 +318,11 @@ function HardwarePageContent() {
       }
     }
     
-    let memory = hardwareRecord.memory
+    const memory = hardwareRecord.memory
 
-    let graphics = hardwareRecord.graphics || hardwareRecord.gpu
+    const graphics = hardwareRecord.graphics || hardwareRecord.gpu
 
-    let processor = hardwareRecord.processor || hardwareRecord.cpu
+    const processor = hardwareRecord.processor || hardwareRecord.cpu
     let processorCores = hardwareRecord.processorCores
     let processorSpeed = hardwareRecord.processorSpeed
 

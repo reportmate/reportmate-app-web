@@ -102,24 +102,38 @@ function getOSLabel(osInfo: any, isMac: boolean): string {
   return 'Windows'
 }
 
+interface OperatingSystemInfo {
+  name?: string;
+  product_name?: string;
+  version?: string;
+  displayVersion?: string;
+  display_version?: string;
+  edition?: string;
+  build?: string;
+  architecture?: string;
+  locale?: string;
+  timeZone?: string;
+  activeKeyboardLayout?: string;
+  featureUpdate?: string;
+  // Both clients send fields this list does not name; they are read by
+  // string below rather than being enumerated here.
+  [key: string]: any;
+}
+
 interface DeviceData {
   id: string;
   name: string;
   modules?: {
+    // The Mac client sends camelCase and the Windows client snake_case for the
+    // same fields, and the component reads both, so both are declared.
     system?: {
-      operatingSystem?: {
-        name?: string;
-        version?: string;
-        displayVersion?: string;
-        edition?: string;
-        build?: string;
-        architecture?: string;
-        locale?: string;
-        timeZone?: string;
-        activeKeyboardLayout?: string;
-        featureUpdate?: string;
-      };
+      operatingSystem?: OperatingSystemInfo;
+      operating_system?: OperatingSystemInfo;
+      systemDetails?: Record<string, any>;
+      system_details?: Record<string, any>;
       uptimeString?: string;
+      uptime_string?: string;
+      moduleVersion?: string;
       pendingUpdates?: Array<unknown>;
       pending_updates?: Array<unknown>;
       lastUpdateCheck?: string;
@@ -235,7 +249,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
   // Normalize OS info to support both snake_case and camelCase field access
   // Mac stores timezone, locale, keyboardLayouts in systemDetails (separate field)
   // Windows stores them directly in operating_system
-  const systemDetails = device.modules?.system?.systemDetails || device.modules?.system?.system_details || {}
+  const systemDetails: Record<string, any> = device.modules?.system?.systemDetails || device.modules?.system?.system_details || {}
   
   const osInfo = rawOsInfo ? {
     name: rawOsInfo.name || rawOsInfo.product_name,
@@ -895,7 +909,7 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
       {/* Mac: Background Activity - Consolidated launchd services and scheduled tasks */}
       {isMac && (scheduledTasks.length > 0 || services.length > 0) && (
         <LaunchdTable 
-          launchdItems={[...scheduledTasks, ...services]} 
+          launchdItems={[...scheduledTasks, ...services].map(item => ({ ...item, path: item.path ?? '' }))} 
           title="Background Activity" 
           defaultScope="system"
         />

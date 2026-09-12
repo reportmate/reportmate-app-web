@@ -629,7 +629,7 @@ export default function DeviceEvents({ events }: { events: EventDto[] }) {
                   className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4"
                 >
                   {/* Last Run Summary for installs events */}
-                  {fullPayloads[ev.id] && !loadingPayloads.has(ev.id) && (
+                  {Boolean(fullPayloads[ev.id]) && !loadingPayloads.has(ev.id) && (
                     <LastRunSummary payload={fullPayloads[ev.id]} />
                   )}
                   <div className="mb-4">

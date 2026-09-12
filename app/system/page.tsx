@@ -341,27 +341,6 @@ function SystemPageContent() {
     setWidgetsExpanded(false)
   }
   
-  const toggleLicenseType = (type: string) => {
-    setSelectedLicenseType(prev => 
-      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
-    )
-    setWidgetsExpanded(false)
-  }
-  
-  const toggleArchitecture = (arch: string) => {
-    setSelectedArchitectures(prev =>
-      prev.includes(arch) ? prev.filter(a => a !== arch) : [...prev, arch]
-    )
-    setWidgetsExpanded(false)
-  }
-  
-  const toggleTimeZone = (tz: string) => {
-    setSelectedTimeZones(prev =>
-      prev.includes(tz) ? prev.filter(t => t !== tz) : [...prev, tz]
-    )
-    setWidgetsExpanded(false)
-  }
-  
   const toggleUptimeBucket = (bucket: string) => {
     setSelectedUptimeBuckets(prev =>
       prev.includes(bucket) ? prev.filter(b => b !== bucket) : [...prev, bucket]

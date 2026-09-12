@@ -48,7 +48,10 @@ export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
   // Access printers data from modular structure with snake_case normalization
   const rawPrinters = device.modules?.printers
   const printers = rawPrinters ? normalizeKeys(rawPrinters) as PrintersData : null
-  const hasPrintersInfo = printers && printers.printers && printers.printers.length > 0
+  // Bound once so the rest of the component reads a real array rather than an
+  // optional field the early return only appears to have narrowed.
+  const printerList = printers?.printers ?? []
+  const hasPrintersInfo = printerList.length > 0
 
   if (!hasPrintersInfo) {
     return (
@@ -63,9 +66,9 @@ export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
     )
   }
 
-  const defaultPrinter = printers.printers.find(p => p.isDefault) || printers.printers[0]
-  const onlinePrinters = printers.printers.filter(p => p.isOnline).length
-  const sharedPrinters = printers.printers.filter(p => p.isShared).length
+  const defaultPrinter = printerList.find(p => p.isDefault) || printerList[0]
+  const onlinePrinters = printerList.filter(p => p.isOnline).length
+  const sharedPrinters = printerList.filter(p => p.isShared).length
 
   return (
     <StatBlock 
@@ -74,14 +77,14 @@ export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
       icon={Icons.printers}
       iconColor={WidgetColors.green}
     >
-      <Stat label="Total Printers" value={printers.totalPrinters?.toString() || printers.printers.length.toString()} />
+      <Stat label="Total Printers" value={printers?.totalPrinters?.toString() || printerList.length.toString()} />
       <Stat label="Online Printers" value={onlinePrinters.toString()} />
       
       {sharedPrinters > 0 && (
         <Stat label="Shared Printers" value={sharedPrinters.toString()} />
       )}
       
-      {printers.activePrintJobs !== undefined && (
+      {printers?.activePrintJobs !== undefined && (
         <Stat label="Active Print Jobs" value={printers.activePrintJobs.toString()} />
       )}
       
@@ -108,19 +111,19 @@ export const PrintersWidget: React.FC<PrintersWidgetProps> = ({ device }) => {
         </div>
       )}
       
-      {printers.printers.length > 1 && (
+      {printerList.length > 1 && (
         <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
           <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
             Other Printers:
           </div>
-          {printers.printers.filter(p => !p.isDefault).slice(0, 2).map((printer, index) => (
+          {printerList.filter(p => !p.isDefault).slice(0, 2).map((printer, index) => (
             <div key={index} className="text-xs text-gray-500 dark:text-gray-400">
               {printer.name} {printer.isOnline ? '(Online)' : '(Offline)'}
             </div>
           ))}
-          {printers.printers.length > 3 && (
+          {printerList.length > 3 && (
             <div className="text-xs text-gray-500 dark:text-gray-400">
-              +{printers.printers.length - 3} more printers
+              +{printerList.length - 3} more printers
             </div>
           )}
         </div>

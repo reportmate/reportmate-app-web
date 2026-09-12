@@ -335,28 +335,6 @@ function extractModuleNames(payloadObj: any): string[] {
 }
 
 /**
- * Get event severity level
- */
-export function getEventSeverity(event: FleetEvent): 'info' | 'warning' | 'error' | 'success' {
-  const kind = event.kind?.toLowerCase() || 'info'
-  const message = (event.message || '').toLowerCase()
-  
-  if (kind.includes('error') || message.includes('error') || message.includes('failed')) {
-    return 'error'
-  }
-  
-  if (kind.includes('warning') || message.includes('warning') || message.includes('warn')) {
-    return 'warning'
-  }
-  
-  if (kind.includes('success') || message.includes('success') || message.includes('completed')) {
-    return 'success'
-  }
-  
-  return 'info'
-}
-
-/**
  * Check if event should be hidden from main view
  */
 export function shouldHideEvent(event: FleetEvent): boolean {

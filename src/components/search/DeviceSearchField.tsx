@@ -9,6 +9,7 @@ interface Device {
   name: string
   assetTag?: string
   hostname?: string
+  location?: string
   status: string
 }
 

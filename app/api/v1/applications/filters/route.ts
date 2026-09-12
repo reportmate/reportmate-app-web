@@ -141,7 +141,7 @@ function shouldIncludeApplication(appName: string): boolean {
 // Container Apps API configuration
 const CONTAINER_APPS_API_BASE = process.env.API_BASE_URL || 'http://reportmate-functions-api'
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
     const timestamp = new Date().toISOString()
     

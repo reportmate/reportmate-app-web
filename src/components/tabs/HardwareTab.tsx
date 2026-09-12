@@ -15,14 +15,8 @@ import {
   Wifi, 
   Bluetooth, 
   Monitor, 
-  Box, 
-  Zap, 
   Activity,
-  Microchip,
   Layers,
-  Smartphone,
-  Laptop,
-  Server,
   Brain
 } from 'lucide-react'
 
@@ -269,38 +263,6 @@ const formatBytes = (bytes: number) => {
 
 // --- Sub-components for the new layout ---
 
-const SpecCard = ({ 
-  title, 
-  icon: Icon, 
-  children, 
-  className = "",
-  iconColorClass = "text-gray-600 dark:text-gray-300"
-}: { 
-  title: string, 
-  icon: React.ElementType, 
-  children: React.ReactNode, 
-  className?: string,
-  iconColorClass?: string
-}) => (
-  <div className={`bg-white dark:bg-gray-800 rounded-xl p-5 border border-gray-200 dark:border-gray-700 ${className}`}>
-    <div className="flex items-center gap-2 mb-3">
-      <Icon className={`w-6 h-6 ${iconColorClass}`} />
-      <h4 className="font-semibold text-gray-900 dark:text-white">{title}</h4>
-    </div>
-    <div className="space-y-1">
-      {children}
-    </div>
-  </div>
-)
-
-const DetailRow = ({ label, value, subValue }: { label?: string, value: React.ReactNode, subValue?: string }) => (
-  <div>
-    {label && <div className="text-xs text-gray-500 dark:text-gray-400 mb-0.5">{label}</div>}
-    <div className="text-sm font-medium text-gray-900 dark:text-white">{value}</div>
-    {subValue && <div className="text-xs text-gray-500 dark:text-gray-400">{subValue}</div>}
-  </div>
-)
-
 export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Normalize snake_case to camelCase for all hardware data
   const rawHardware = device?.modules?.hardware || device?.hardware || data || {}
@@ -407,7 +369,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   })()
   
   const npuName = safeString(hardwareData.npu?.name)
-  const npuManufacturer = safeString(hardwareData.npu?.manufacturer)
   const npuComputeUnits = safeNumber(hardwareData.npu?.computeUnits)
   const npuCores = safeNumber(hardwareData.npu?.cores)
   const npuTops = safeString(hardwareData.npu?.performanceTops)
@@ -416,7 +377,7 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
   // Only show NPU card if it's available with a valid name AND has cores
   const hasNpu = npuIsAvailable && npuName !== 'Unknown' && npuName !== '' && (npuComputeUnits > 0 || npuCores > 0)
   
-  const displays = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
+  const displays: any[] = Array.isArray(hardwareData.displays) ? hardwareData.displays : []
   const hasDisplays = displays.length > 0
   
   // Support both osquery snake_case (Mac) and camelCase (Windows)
@@ -799,7 +760,6 @@ export const HardwareTab: React.FC<HardwareTabProps> = ({ device, data }) => {
               const brightnessNits = display.brightness_nits ?? display.brightnessNits
               const trueTone = display.true_tone ?? display.trueTone
               const refreshRate = display.refresh_rate ?? display.refreshRate
-              const hasEnhancedInfo = diagonalInches || ppi || colorGamut || brightnessNits
               
               return (
               <div key={index} className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">

@@ -117,7 +117,7 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
       localStorage.setItem(STORAGE_KEY, 'Windows')
     }
     // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
-  }, [searchParams, isInitialized])
+  }, [searchParams, isInitialized, platformFilter])
 
   // Keep URL in sync with platform filter on every navigation
   // When user clicks a Link that doesn't include ?platform=, this effect

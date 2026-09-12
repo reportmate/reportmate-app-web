@@ -44,7 +44,7 @@ function parseMdmCertificate(mdmCertificate: any): {
   if (mdmCertificate.output && typeof mdmCertificate.output === 'string') {
     try {
       // Clean up the JSON string - handle osquery's escaped format with semicolons INSIDE quotes
-      let cleanJson = mdmCertificate.output
+      const cleanJson = mdmCertificate.output
         .replace(/";\\",/g, '",')       // Fix: "value";\", → "value",
         .replace(/";\\"\n/g, '"\n')     // Fix: "value";\" \n → "\n
         .replace(/";\s*,/g, '",')       // Fix: "value"; , → "value",
@@ -175,76 +175,22 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs }
   // Parse PowerShell objects to proper JavaScript objects
   const management = convertPowerShellObjects(rawManagement)
 
-  if (!management) {
-    return (
-      <div className="text-center py-16">
-        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
-          {Icons.management}
-        </div>
-        <div className="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">
-          No Management Data Available
-        </div>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
-          This device does not have management enrollment information.
-        </p>
-        {/* DEBUG INFO */}
-        <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg text-left max-w-2xl mx-auto">
-          <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">Debug Info:</h4>
-          <pre className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 overflow-auto">
-            {JSON.stringify({
-              hasModules: !!device.modules,
-              moduleKeys: device.modules ? Object.keys(device.modules) : [],
-              hasManagement: !!management,
-              management: management ? JSON.stringify(management).substring(0, 500) + '...' : null
-            }, null, 2)}
-          </pre>
-        </div>
-      </div>
-    )
-  }
-
-  // Extract key data from the management structure - support both snake_case (Mac) and camelCase (Windows)
-  const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment || {}
-  const mdmCertificateRaw = management.mdm_certificate || management.mdmCertificate || {}
-  const deviceState = management.device_state || management.deviceState
-  const tenantDetails = management.tenant_details || management.tenantDetails || {}
-  const deviceDetails = management.device_details || management.deviceDetails || {}
-  // NOTE: compliance_status and remote_management are rendered on the Security tab, not here
-  const installedProfiles = management.installed_profiles || management.installedProfiles || []
-  const profiles = management.profiles || []
+  // These lists and the memos over them sit above the early return below:
+  // hooks must run in the same order on every render, and the return is
+  // conditional on the module being present.
+  // Memoised because a `a || b || []` expression is a new array on every render,
+  // which would defeat every memo below it.
+  const installedProfiles = useMemo(
+    () => management?.installed_profiles || management?.installedProfiles || [],
+    [management])
   // Windows carries its policy branches here, shaped like macOS mobileconfig profiles
-  const configurationProfiles = management.configuration_profiles || management.configurationProfiles || []
-  const managedPolicies = management.managed_policies || management.managedPolicies || []
-  const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
-  const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
-  const managementLogs = extractLogs({ management })
-  
-  // Toggle profile expansion
-  const toggleProfile = (identifier: string) => {
-    setExpandedProfiles(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(identifier)) {
-        newSet.delete(identifier)
-      } else {
-        newSet.add(identifier)
-      }
-      return newSet
-    })
-  }
-  
-  // Toggle policy domain expansion
-  const togglePolicy = (domain: string) => {
-    setExpandedPolicies(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(domain)) {
-        newSet.delete(domain)
-      } else {
-        newSet.add(domain)
-      }
-      return newSet
-    })
-  }
-  
+  const configurationProfiles = useMemo(
+    () => management?.configuration_profiles || management?.configurationProfiles || [],
+    [management])
+  const managedPolicies = useMemo(
+    () => management?.managed_policies || management?.managedPolicies || [],
+    [management])
+
   // macOS reports installed_profiles; Windows reports the same idea as configuration_profiles
   // (one branch per policy key, payloads carrying the values). Normalise the Windows entries
   // onto the macOS field names so both platforms render through the one accordion below.
@@ -305,6 +251,73 @@ export const ManagementTab: React.FC<ManagementTabProps> = ({ device, installs }
       return domain.includes(search) || settingsMatch
     })
   }, [managedPolicies, policySearch])
+  
+
+  if (!management) {
+    return (
+      <div className="text-center py-16">
+        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center">
+          {Icons.management}
+        </div>
+        <div className="text-gray-500 dark:text-gray-400 text-lg font-medium mb-2">
+          No Management Data Available
+        </div>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          This device does not have management enrollment information.
+        </p>
+        {/* DEBUG INFO */}
+        <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg text-left max-w-2xl mx-auto">
+          <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">Debug Info:</h4>
+          <pre className="text-xs text-yellow-700 dark:text-yellow-300 mt-2 overflow-auto">
+            {JSON.stringify({
+              hasModules: !!device.modules,
+              moduleKeys: device.modules ? Object.keys(device.modules) : [],
+              hasManagement: !!management,
+              management: management ? JSON.stringify(management).substring(0, 500) + '...' : null
+            }, null, 2)}
+          </pre>
+        </div>
+      </div>
+    )
+  }
+
+  // Extract key data from the management structure - support both snake_case (Mac) and camelCase (Windows)
+  const mdmEnrollment = management.mdm_enrollment || management.mdmEnrollment || {}
+  const mdmCertificateRaw = management.mdm_certificate || management.mdmCertificate || {}
+  const deviceState = management.device_state || management.deviceState
+  const tenantDetails = management.tenant_details || management.tenantDetails || {}
+  const deviceDetails = management.device_details || management.deviceDetails || {}
+  // NOTE: compliance_status and remote_management are rendered on the Security tab, not here
+  const profiles = management.profiles || []
+  const adeConfiguration = management.ade_configuration || management.adeConfiguration || {}
+  const deviceIdentifiers = management.device_identifiers || management.deviceIdentifiers || {}
+  const managementLogs = extractLogs({ management })
+  
+  // Toggle profile expansion
+  const toggleProfile = (identifier: string) => {
+    setExpandedProfiles(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(identifier)) {
+        newSet.delete(identifier)
+      } else {
+        newSet.add(identifier)
+      }
+      return newSet
+    })
+  }
+  
+  // Toggle policy domain expansion
+  const togglePolicy = (domain: string) => {
+    setExpandedPolicies(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(domain)) {
+        newSet.delete(domain)
+      } else {
+        newSet.add(domain)
+      }
+      return newSet
+    })
+  }
   
   // Parse the MDM certificate (handles nested JSON in 'output' field)
   const mdmCertificate = parseMdmCertificate(mdmCertificateRaw)

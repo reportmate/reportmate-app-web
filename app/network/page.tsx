@@ -30,6 +30,12 @@ interface NetworkDevice {
   raw: any
 }
 
+/** A device's signal strength as a percentage, whichever type the client sent. */
+function signalPercent(device: { networkInfo: { signalStrength?: string | number } }): number {
+  const value = Number(device.networkInfo.signalStrength)
+  return Number.isFinite(value) ? value : 0
+}
+
 function NetworkPageContent() {
   const [networkDevices, setNetworkDevices] = useState<NetworkDevice[]>([])
   const [loading, setLoading] = useState(true)
@@ -281,21 +287,20 @@ function NetworkPageContent() {
       return !n.networkInfo.networkQuality?.downlinkCapacity
     }).length,
 
-    // Signal quality distribution
-    signalExcellent: platformFilteredDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
-      return signal >= 75
-    }).length,
+    // Signal quality distribution. signalStrength arrives as a number from one
+    // client and as a string from the other, so it is read as a number here
+    // rather than compared across types.
+    signalExcellent: platformFilteredDevices.filter(n => signalPercent(n) >= 75).length,
     signalGood: platformFilteredDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = signalPercent(n)
       return signal >= 50 && signal < 75
     }).length,
     signalFair: platformFilteredDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = signalPercent(n)
       return signal >= 25 && signal < 50
     }).length,
     signalPoor: platformFilteredDevices.filter(n => {
-      const signal = n.networkInfo.signalStrength || 0
+      const signal = signalPercent(n)
       return signal > 0 && signal < 25
     }).length
   }

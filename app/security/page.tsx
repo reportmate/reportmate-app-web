@@ -481,9 +481,6 @@ function SecurityPageContent() {
 
   const isWin = (d: SecurityDevice) => normalizePlatform(d.platform) === 'Windows'
 
-  const getTamperSecured = (d: SecurityDevice) =>
-    isWin(d) ? (d.tpmPresent && d.tpmEnabled) : (d.sipEnabled === true)
-
   const getTamperLabel = (d: SecurityDevice): string => {
     if (isWin(d)) return d.secureBootEnabled ? 'Secured' : 'Insecure'
     return (d.sipEnabled === true || d.secureBootEnabled) ? 'Secured' : 'Insecure'
