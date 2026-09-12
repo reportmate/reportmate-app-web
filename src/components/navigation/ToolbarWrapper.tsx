@@ -5,16 +5,6 @@ import { AppToolbar } from './AppToolbar'
 import { ReactNode } from 'react'
 
 interface ToolbarWrapperProps {
-  preloadedDevices?: Array<{
-    serialNumber?: string
-    serial_number?: string
-    deviceName?: string
-    device_name?: string
-    assetTag?: string
-    asset_tag?: string
-    hostname?: string
-    network?: { hostname?: string }
-  }>
   children?: ReactNode
 }
 
@@ -29,7 +19,7 @@ function shouldHideToolbar(pathname: string): boolean {
   return hiddenToolbarRoutes.some(route => pathname.startsWith(route))
 }
 
-export function ToolbarWrapper({ preloadedDevices = [], children }: ToolbarWrapperProps) {
+export function ToolbarWrapper({ children }: ToolbarWrapperProps) {
   const pathname = usePathname()
   
   if (shouldHideToolbar(pathname)) {
@@ -38,7 +28,7 @@ export function ToolbarWrapper({ preloadedDevices = [], children }: ToolbarWrapp
   
   return (
     <>
-      <AppToolbar preloadedDevices={preloadedDevices} />
+      <AppToolbar />
       {children}
     </>
   )

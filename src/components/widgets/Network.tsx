@@ -51,8 +51,18 @@ export const NetworkWidget: React.FC<NetworkWidgetProps> = ({ device }) => {
     iface.name === 'en0'
   )
   
-  // Get WiFi details
-  const wifiData = network.wifiInterface || (wifiInterface ? {
+  // Get WiFi details. The module's own wifiInterface carries the radio fields
+  // and the interface fallback carries the addressing ones, so the binding is
+  // typed as the union of both rather than as whichever branch ran.
+  const wifiData: {
+    ssid?: string
+    protocol?: string
+    channel?: string | number
+    band?: string
+    signalStrength?: string | number
+    ipAddress?: string
+    macAddress?: string
+  } | null = network.wifiInterface || (wifiInterface ? {
     ssid: wifiInterface.ssid,
     protocol: wifiInterface.wirelessProtocol,
     ipAddress: wifiInterface.ipAddress,

@@ -35,6 +35,7 @@ interface Device {
   securityFeatures?: any
   metadata?: any
   management?: any
+  identity?: any
   modules?: {
     security?: any
     system?: any
@@ -42,6 +43,7 @@ interface Device {
     inventory?: any
     management?: any
     hardware?: any
+    identity?: any
   }
 }
 

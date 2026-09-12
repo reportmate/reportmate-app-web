@@ -298,7 +298,7 @@ export function extractNetwork(deviceModules: any): NetworkInfo {
     }
     
     // Now process the deduplicated interfaces
-    const allInterfaces = Array.from(interfaceMap.values()).map((iface: any) => {
+    const allInterfaces: NetworkInterface[] = Array.from(interfaceMap.values()).map((iface: any): NetworkInterface => {
       // Find best IP address to display
       let displayAddress = ''
       

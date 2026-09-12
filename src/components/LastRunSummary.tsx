@@ -254,28 +254,6 @@ function findInstallsPayload(payload: any): any | null {
   return null
 }
 
-function getStatusColor(status: string): string {
-  switch (status?.toLowerCase()) {
-    case 'installed':
-    case 'success':
-    case 'completed':
-    case 'up to date':
-      return 'text-green-700 dark:text-green-400'
-    case 'pending':
-    case 'pending update':
-    case 'available':
-      return 'text-cyan-700 dark:text-cyan-400'
-    case 'warning':
-      return 'text-yellow-700 dark:text-yellow-400'
-    case 'error':
-    case 'failed':
-      return 'text-red-700 dark:text-red-400'
-    case 'removed':
-      return 'text-purple-700 dark:text-purple-400'
-    default:
-      return 'text-gray-700 dark:text-gray-400'
-  }
-}
 
 function getStatusBadgeColor(status: string): string {
   switch (status?.toLowerCase()) {

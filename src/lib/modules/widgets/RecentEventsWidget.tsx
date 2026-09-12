@@ -617,14 +617,14 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 >
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                 </svg>
-                                {getStatusIcon(bundledEvent.kind.toLowerCase() === 'success' && /\bremoved$/i.test(bundledEvent.message.trim()) ? 'removed' : bundledEvent.kind)}
+                                {getStatusIcon(bundledEvent.kind.toLowerCase() === 'success' && /\bremoved$/i.test((bundledEvent.message ?? '').trim()) ? 'removed' : bundledEvent.kind)}
                               </div>
                             </td>
                             <td className="px-3 py-2.5 hidden md:table-cell">
                               <EventInlineLines
                                 eventId={String(bundledEvent.id)}
                                 kind={bundledEvent.kind}
-                                summary={bundledEvent.message}
+                                summary={bundledEvent.message ?? ''}
                                 isBundle={bundledEvent.isBundle}
                                 autoFetch={index < AUTO_FETCH_ROWS}
                                 itemsOnly

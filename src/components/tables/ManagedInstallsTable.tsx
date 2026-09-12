@@ -30,6 +30,15 @@ interface ManagedInstallsTableProps {
   runFailed?: boolean;
 }
 
+const isPendingWithReason = (pkg: InstallPackage): boolean =>
+  pkg.status?.toLowerCase() === 'pending' && !!pkg.pendingReason?.trim();
+
+// A row is only worth expanding when it carries a message or a pending reason.
+const hasExpandableContent = (pkg: InstallPackage): boolean =>
+  (pkg.errors?.length ?? 0) > 0 ||
+  (pkg.warnings?.length ?? 0) > 0 ||
+  isPendingWithReason(pkg);
+
 export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data, initialStatusFilter, initialSearchQuery, runFailed = false }) => {
   const [statusFilter, setStatusFilter] = useState<Set<string>>(() => new Set(initialStatusFilter ?? []));
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery ?? '');
@@ -37,15 +46,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set());
   const [copiedMessageId, setCopiedMessageId] = useState<string>('');
   const groupByCategory = true; // Always enabled
-
-  const isPendingWithReason = (pkg: InstallPackage): boolean =>
-    pkg.status?.toLowerCase() === 'pending' && !!pkg.pendingReason?.trim();
-
-  // A row is only worth expanding when it carries a message or a pending reason.
-  const hasExpandableContent = (pkg: InstallPackage): boolean =>
-    (pkg.errors?.length ?? 0) > 0 ||
-    (pkg.warnings?.length ?? 0) > 0 ||
-    isPendingWithReason(pkg);
 
   const togglePackageExpansion = (packageId: string) => {
     const newExpandedIds = new Set(expandedPackageIds);
@@ -281,8 +281,6 @@ export const ManagedInstallsTable: React.FC<ManagedInstallsTableProps> = ({ data
 
   // Calculate counts for each status (handle empty packages array)
   const packages = data?.packages && Array.isArray(data.packages) ? data.packages : [];
-  const runLevelErrors = data?.messages?.errors ?? [];
-  const runLevelWarnings = data?.messages?.warnings ?? [];
   const lastRunCount = packages.filter((pkg: any) => pkg.lastUpdate && pkg.lastUpdate !== '').length;
   // When Last Run is active, status pill counts reflect what happened *this run*
   // (items with a non-empty lastUpdate / last_seen_in_session). Otherwise they

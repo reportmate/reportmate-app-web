@@ -158,6 +158,8 @@ interface DeviceAggregate {
 
 interface UtilizationData {
   status: string
+  // Only present when status is 'unavailable', explaining why.
+  message?: string
   applications: UtilizationApp[]
   topUsers: TopUser[]
   singleUserApps: SingleUserApp[]
@@ -854,7 +856,7 @@ function ApplicationsPageContent() {
         setLoadingMessage('Loading application data...')
         
         // Use a simple indeterminate progress while filters endpoint loads
-        let estimatedTotal = 100  // placeholder for progress bar
+        const estimatedTotal = 100  // placeholder for progress bar
         let progress = 0
         
         
@@ -3926,8 +3928,10 @@ function ApplicationsPageContent() {
                       
                       // Sort devices based on selected column and direction
                       const sortedDevices = [...devices].sort((a, b) => {
-                        let aVal: any = a[deviceTableSortColumn]
-                        let bVal: any = b[deviceTableSortColumn]
+                        // 'application' is the column's name; the row spells it appName.
+                        const sortKey = deviceTableSortColumn === 'application' ? 'appName' : deviceTableSortColumn
+                        let aVal: any = a[sortKey]
+                        let bVal: any = b[sortKey]
                         
                         // Handle null/undefined values
                         if (aVal === null || aVal === undefined) aVal = ''
@@ -3982,7 +3986,7 @@ function ApplicationsPageContent() {
                             {device.catalog || '-'}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                            {formatRelativeTime(device.lastSeen)}
+                            {formatRelativeTime(device.lastSeen ?? '')}
                           </td>
                         </tr>
                       ))

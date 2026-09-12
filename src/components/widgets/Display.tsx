@@ -47,7 +47,10 @@ export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
   // Access display data from modular structure with snake_case normalization
   const rawDisplays = device.modules?.displays
   const displays = rawDisplays ? normalizeKeys(rawDisplays) as DisplaysData : null
-  const hasDisplayInfo = displays && displays.displays && displays.displays.length > 0
+  // Bound once so the rest of the component reads a real array rather than an
+  // optional field the early return only appears to have narrowed.
+  const displayList = displays?.displays ?? []
+  const hasDisplayInfo = displayList.length > 0
   
   // Fallback to legacy resolution field
   const hasLegacyDisplay = device.resolution
@@ -67,8 +70,8 @@ export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
 
   // Use modular data if available, otherwise use legacy
   if (hasDisplayInfo) {
-    const primaryDisplay = displays.displays.find(d => d.isPrimary) || displays.displays[0]
-    const externalCount = displays.displays.filter(d => !d.isBuiltIn).length
+    const primaryDisplay = displayList.find(d => d.isPrimary) || displayList[0]
+    const externalCount = displayList.filter(d => !d.isBuiltIn).length
     
     return (
       <StatBlock 
@@ -77,7 +80,7 @@ export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
         icon={Icons.display}
         iconColor={WidgetColors.indigo}
       >
-        <Stat label="Total Displays" value={displays.totalDisplays?.toString() || displays.displays.length.toString()} />
+        <Stat label="Total Displays" value={displays?.totalDisplays?.toString() || displayList.length.toString()} />
         
         {primaryDisplay && (
           <>
@@ -101,12 +104,12 @@ export const DisplayWidget: React.FC<DisplayWidgetProps> = ({ device }) => {
           <Stat label="External Displays" value={externalCount.toString()} />
         )}
         
-        {displays.displays.length > 1 && (
+        {displayList.length > 1 && (
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
             <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
               Additional Displays:
             </div>
-            {displays.displays.slice(1).map((display, index) => (
+            {displayList.slice(1).map((display, index) => (
               <div key={index} className="text-xs text-gray-500 dark:text-gray-400">
                 {display.name || `Display ${index + 2}`} - {display.resolution || 'Unknown resolution'}
               </div>

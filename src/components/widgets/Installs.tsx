@@ -140,7 +140,7 @@ export const InstallsWidget: React.FC<InstallsWidgetProps> = ({ device }) => {
         </div>
       )}
 
-      {(!installs.recentInstalls || installs.recentInstalls.length === 0) && installs.totalInstalls > 0 && (
+      {(!installs.recentInstalls || installs.recentInstalls.length === 0) && (installs.totalInstalls ?? 0) > 0 && (
         <div className="text-center py-4">
           <p className="text-gray-600 dark:text-gray-400 text-sm">
             {installs.totalInstalls} total installs recorded

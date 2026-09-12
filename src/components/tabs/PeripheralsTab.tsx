@@ -213,6 +213,7 @@ interface SerialPort {
 
 interface PeripheralsData {
   collectedAt?: string
+  moduleVersion?: string
   usbDevices?: USBDevice[]
   // Nested from macOS, a flat tagged array from Windows - see groupInputDevices.
   inputDevices?: InputDevices | InputDevice[]
@@ -436,7 +437,10 @@ export const PeripheralsTab: React.FC<PeripheralsTabProps> = ({ device, data }) 
       count: filteredBluetoothDevices.length,
       color: 'text-cyan-500'
     },
-  ], [peripherals, audioOutputs.length, microphones.length, usbThunderboltCount, filteredBluetoothDevices.length])
+  ], [peripherals, audioOutputs.length, microphones.length, usbThunderboltCount,
+      filteredBluetoothDevices.length, inputDevices.keyboards?.length,
+      inputDevices.mice?.length, inputDevices.trackpads?.length,
+      inputDevices.tablets?.length])
   
   // Check if we have any data
   if (!peripherals || Object.keys(peripherals).length === 0) {
