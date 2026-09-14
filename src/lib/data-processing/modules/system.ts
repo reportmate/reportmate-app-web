@@ -153,6 +153,7 @@ export interface ActivationInfo {
   statusCode?: number
   partialProductKey?: string
   licenseType?: string
+  licenseSource?: string
 }
 
 export interface OperatingSystemInfo {
@@ -509,7 +510,8 @@ export function extractSystem(deviceModules: any): SystemInfo {
         status: os.activation.status,
         statusCode: os.activation.status_code ?? os.activation.statusCode,
         partialProductKey: os.activation.partial_product_key ?? os.activation.partialProductKey,
-        licenseType: os.activation.license_type ?? os.activation.licenseType
+        licenseType: os.activation.license_type ?? os.activation.licenseType,
+        licenseSource: os.activation.license_source ?? os.activation.licenseSource
       } : undefined
     }
   }

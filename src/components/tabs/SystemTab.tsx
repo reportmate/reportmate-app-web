@@ -14,6 +14,7 @@ import { LaunchdTable } from '../tables/LaunchdTable'
 import { ExtensionsTable } from '../tables/ExtensionsTable'
 import { normalizeKeys } from '../../lib/utils/powershell-parser'
 import { DebugAccordion } from '../DebugAccordion'
+import { formatLicenseSource } from '../../lib/modules/graphs/LicenseSourceChart'
 
 // Extract build number from Windows version string (e.g., "10.0.26200" → "26200")
 function extractBuildNumber(version: string | undefined): string {
@@ -272,7 +273,8 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
       status: rawOsInfo.activation.status,
       statusCode: rawOsInfo.activation.status_code ?? rawOsInfo.activation.statusCode,
       partialProductKey: rawOsInfo.activation.partial_product_key ?? rawOsInfo.activation.partialProductKey,
-      licenseType: rawOsInfo.activation.license_type ?? rawOsInfo.activation.licenseType
+      licenseType: rawOsInfo.activation.license_type ?? rawOsInfo.activation.licenseType,
+      licenseSource: rawOsInfo.activation.license_source ?? rawOsInfo.activation.licenseSource
     } : undefined
   } : undefined
 
@@ -455,6 +457,11 @@ export const SystemTab: React.FC<SystemTabProps> = ({ device, data: _data }) => 
                         }`}>
                           {osInfo.activation.isActivated ? 'Activated' : 'Not Activated'}
                         </span>
+                        {osInfo.activation.licenseSource && osInfo.activation.licenseSource !== 'Unknown' && (
+                          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {formatLicenseSource(osInfo.activation.licenseSource)}
+                          </p>
+                        )}
                       </div>
                     )}
                   </div>
