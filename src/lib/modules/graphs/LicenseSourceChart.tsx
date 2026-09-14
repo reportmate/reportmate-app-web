@@ -39,12 +39,22 @@ const SOURCE_COLORS: Record<string, string> = {
   'OEM_COA': '#06b6d4',        // cyan
   'OEM_COA_NSLP': '#0ea5e9',   // sky
   'UNKNOWN': '#9ca3af',        // gray
+  // Values the Windows client reports today
+  'Firmware': '#10b981',
+  'Retail': '#3b82f6',
+  'MAK': '#f59e0b',
+  'ADBA': '#ef4444',
+  'KMS': '#8b5cf6',
+  'GVLK': '#f97316',
+  'Volume': '#6366f1',
+  'Unavailable': '#64748b',
+  'Unknown': '#9ca3af',
 }
 
 const DEFAULT_COLORS = ['#ec4899', '#f97316', '#84cc16', '#a855f7']
 
 /** Human-readable label for license source code */
-function formatSource(source: string): string {
+export function formatLicenseSource(source: string): string {
   const labels: Record<string, string> = {
     'OEM_DM': 'Firmware (OEM)',
     'RETAIL': 'Retail',
@@ -55,6 +65,14 @@ function formatSource(source: string): string {
     'OEM_SLP': 'OEM SLP',
     'OEM_COA': 'OEM COA',
     'OEM_COA_NSLP': 'OEM COA NSLP',
+    'Firmware': 'Firmware (OEM)',
+    'Retail': 'Retail',
+    'MAK': 'Volume MAK',
+    'ADBA': 'AD-Based (domain)',
+    'KMS': 'KMS host',
+    'GVLK': 'Volume, not activated',
+    'Volume': 'Volume',
+    'Unavailable': 'Licensing service unavailable',
   }
   return labels[source] || source
 }
@@ -148,7 +166,7 @@ export function LicenseSourceChart({ devices, loading = false, selectedSources =
             }`}
           >
             <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
-            <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">{formatSource(item.source)}</span>
+            <span className="text-xs text-gray-700 dark:text-gray-300 truncate flex-1">{formatLicenseSource(item.source)}</span>
             <span className="text-xs font-semibold text-gray-900 dark:text-white">{item.count}</span>
             <span className="text-[10px] text-gray-400">{item.percentage}%</span>
           </button>
