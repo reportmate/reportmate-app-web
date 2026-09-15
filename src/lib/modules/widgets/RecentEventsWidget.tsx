@@ -609,7 +609,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                             role="button"
                             aria-expanded={isExpanded}
                           >
-                            <td className="w-20 px-3 py-2.5">
+                            <td className="w-20 px-3 py-2.5 align-top">
                               <div className="flex items-center gap-1">
                                 <svg
                                   className={`w-3.5 h-3.5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
@@ -620,7 +620,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 {getStatusIcon(bundledEvent.kind.toLowerCase() === 'success' && /\bremoved$/i.test((bundledEvent.message ?? '').trim()) ? 'removed' : bundledEvent.kind)}
                               </div>
                             </td>
-                            <td className="px-3 py-2.5 hidden md:table-cell">
+                            <td className="px-3 py-2.5 hidden md:table-cell align-top">
                               <EventInlineLines
                                 eventId={String(bundledEvent.id)}
                                 kind={bundledEvent.kind}
@@ -630,7 +630,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 itemsOnly
                               />
                             </td>
-                            <td className="w-56 px-3 py-2.5">
+                            <td className="w-56 px-3 py-2.5 align-top">
                               <Link
                                 href={`/device/${encodeURIComponent(bundledEvent.device)}${getEventDeviceHrefSuffix(bundledEvent)}`}
                                 className="text-sm font-medium text-gray-900 dark:text-white hover:underline block truncate"
@@ -639,7 +639,7 @@ export const RecentEventsTable: React.FC<RecentEventsTableProps> = ({
                                 {getDeviceName(bundledEvent, deviceNameMap)}
                               </Link>
                             </td>
-                            <td className="w-44 px-3 py-2.5">
+                            <td className="w-44 px-3 py-2.5 align-top">
                               <div className="text-sm text-gray-600 dark:text-gray-400">
                                 <div className="font-medium truncate">
                                   {formatRelativeTime(bundledEvent.ts)}
