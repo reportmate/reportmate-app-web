@@ -83,74 +83,34 @@ export function PlatformFilterProvider({ children, defaultPlatform = 'all' }: Pl
   }
   
   const [platformFilter, setPlatformFilterState] = useState<Platform>(getInitialPlatform)
-  const [isInitialized, setIsInitialized] = useState(false)
 
-  // Initialize from localStorage on mount (handles SSR)
+  // The URL is authoritative when it names a platform. When navigation drops
+  // the parameter, restore the persisted selection. Keeping both decisions in
+  // one effect prevents URL-to-state and state-to-URL effects from reversing
+  // one another while a router.replace is still in flight.
   useEffect(() => {
-    if (!isInitialized) {
-      const urlPlatform = searchParams.get('platform')
-      if (urlPlatform === 'mac') {
-        setPlatformFilterState('macOS')
-      } else if (urlPlatform === 'win') {
-        setPlatformFilterState('Windows')
-      } else {
-        // No URL param, check localStorage
-        const stored = localStorage.getItem(STORAGE_KEY)
-        if (stored === 'macOS' || stored === 'Windows') {
-          setPlatformFilterState(stored)
-        }
-      }
-      setIsInitialized(true)
-    }
-  }, [isInitialized, searchParams])
-
-  // Sync URL parameter changes (for when user shares a link with ?platform=)
-  useEffect(() => {
-    if (!isInitialized) return
-    
     const urlPlatform = searchParams.get('platform')
-    if (urlPlatform === 'mac' && platformFilter !== 'macOS') {
-      setPlatformFilterState('macOS')
-      localStorage.setItem(STORAGE_KEY, 'macOS')
-    } else if (urlPlatform === 'win' && platformFilter !== 'Windows') {
-      setPlatformFilterState('Windows')
-      localStorage.setItem(STORAGE_KEY, 'Windows')
+    if (urlPlatform === 'mac' || urlPlatform === 'win') {
+      const nextPlatform = urlPlatform === 'mac' ? 'macOS' : 'Windows'
+      setPlatformFilterState(nextPlatform)
+      localStorage.setItem(STORAGE_KEY, nextPlatform)
+      return
     }
-    // Note: We don't reset to 'all' when URL param is missing - that's the global persistence feature
-  }, [searchParams, isInitialized, platformFilter])
 
-  // Keep URL in sync with platform filter on every navigation
-  // When user clicks a Link that doesn't include ?platform=, this effect
-  // re-adds the parameter so it always appears in the address bar
-  useEffect(() => {
-    if (!isInitialized) return
-    // Skip individual device pages - platform toggle is hidden there
-    if (pathname.match(/^\/device\/[^/]+$/)) return
-    // Skip settings
-    if (pathname === '/settings') return
+    const stored = localStorage.getItem(STORAGE_KEY)
+    const storedPlatform = stored === 'macOS' || stored === 'Windows' ? stored : defaultPlatform
+    setPlatformFilterState(storedPlatform)
 
-    const currentUrlPlatform = searchParams.get('platform')
-    
-    if (platformFilter === 'macOS' && currentUrlPlatform !== 'mac') {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('platform', 'mac')
-      router.replace(`${pathname}?${params.toString()}`)
-    } else if (platformFilter === 'Windows' && currentUrlPlatform !== 'win') {
-      const params = new URLSearchParams(searchParams.toString())
-      params.set('platform', 'win')
-      router.replace(`${pathname}?${params.toString()}`)
-    } else if (platformFilter === 'all' && currentUrlPlatform) {
-      // Remove stale platform param when filter is set to 'all'
-      const params = new URLSearchParams(searchParams.toString())
-      params.delete('platform')
-      const newUrl = params.toString() ? `${pathname}?${params.toString()}` : pathname
-      router.replace(newUrl)
-    }
-  }, [pathname, platformFilter, isInitialized, searchParams, router])
+    // The toggle is hidden on these pages, so leave their URLs untouched.
+    if (pathname.match(/^\/device\/[^/]+$/) || pathname === '/settings') return
+    if (storedPlatform === 'all') return
+
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('platform', storedPlatform === 'macOS' ? 'mac' : 'win')
+    router.replace(`${pathname}?${params.toString()}`)
+  }, [defaultPlatform, pathname, router, searchParams])
 
   const setPlatformFilter = useCallback((platform: Platform) => {
-    setPlatformFilterState(platform)
-    
     // Persist to localStorage for global persistence across navigation
     if (platform === 'all') {
       localStorage.removeItem(STORAGE_KEY)
