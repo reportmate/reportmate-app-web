@@ -18,6 +18,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { InstalledUpdate, matchesSystemSearch, updatesToDisplay } from "@/src/lib/system/installedUpdates"
 
 interface SystemDevice {
   id: string
@@ -37,6 +38,7 @@ interface SystemDevice {
   bootTime: string | null
   servicesCount: number
   updatesCount: number
+  installedUpdates?: InstalledUpdate[]
   tasksCount: number
   // Enriched fields from backend
   platform?: string
@@ -765,11 +767,7 @@ function SystemPageContent() {
     }
     
     if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase()
-      return (
-        sys.deviceName?.toLowerCase().includes(query) ||
-        sys.serialNumber?.toLowerCase().includes(query)
-      )
+      return matchesSystemSearch(sys, searchQuery)
     }
     return true
   }).sort((a, b) => {
@@ -833,7 +831,7 @@ function SystemPageContent() {
                 <button
                   onClick={() => {
                     // Build CSV from filtered data only
-                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'OS', 'Version', 'Build', 'Edition', 'Activation', 'License Source', 'Time Zone', 'Locale', 'Uptime', 'Boot Time', 'Last Seen']
+                    const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'OS', 'Version', 'Build', 'Installed Updates', 'Edition', 'Activation', 'License Source', 'Time Zone', 'Locale', 'Uptime', 'Boot Time', 'Last Seen']
                     const rows = searchFilteredSystems.map(s => {
                       const uptimeStr = s.uptime ? `${Math.floor(s.uptime / 86400)}d ${Math.floor((s.uptime % 86400) / 3600)}h` : ''
                       return [
@@ -843,6 +841,7 @@ function SystemPageContent() {
                         getOSDisplayName(s),
                         s.osVersion || '',
                         s.buildNumber || '',
+                        (s.installedUpdates || []).map(update => update.id || update.title).filter(Boolean).join('; '),
                         s.edition || '',
                         s.activationStatus === true ? 'Activated' : s.activationStatus === false ? 'Not Activated' : '',
                         s.licenseSource || '',
@@ -1112,7 +1111,7 @@ function SystemPageContent() {
                 </div>
                 <input
                   type="text"
-                  placeholder="Search by device name or serial number..."
+                  placeholder="Search device, serial, OS build, update title, or KB..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="block w-full pl-10 pr-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -1246,7 +1245,7 @@ function SystemPageContent() {
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {error ? (
                   <tr>
-                    <td colSpan={isWindowsOnly ? 7 : 5} className="px-6 py-12 text-center">
+                    <td colSpan={isWindowsOnly ? 8 : 6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-12 h-12 mb-4 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center">
                           <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1266,7 +1265,7 @@ function SystemPageContent() {
                   </tr>
                 ) : searchFilteredSystems.length === 0 ? (
                   <tr>
-                    <td colSpan={isWindowsOnly ? 7 : 5} className="px-6 py-12 text-center">
+                    <td colSpan={isWindowsOnly ? 8 : 6} className="px-6 py-12 text-center">
                       <div className="flex flex-col items-center">
                         <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.50 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -1277,8 +1276,10 @@ function SystemPageContent() {
                     </td>
                   </tr>
                 ) : (
-                  searchFilteredSystems.map((sys) => (
-                    <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  searchFilteredSystems.map((sys) => {
+                    const displayedUpdates = updatesToDisplay(sys, searchQuery)
+                    return (
+                      <tr key={sys.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-4 max-w-56">
                         <Link 
                           href={`/device/${sys.serialNumber}#system`}
@@ -1303,8 +1304,18 @@ function SystemPageContent() {
                         </span>
                       </td>
                       <td className="px-4 py-4">
-                        {((sys.pendingUpdatesCount ?? 0) > 0 || (sys.deferredUpdatesCount ?? 0) > 0) ? (
+                        {((sys.pendingUpdatesCount ?? 0) > 0 || (sys.deferredUpdatesCount ?? 0) > 0 || displayedUpdates.length > 0) ? (
                           <div className="flex flex-col gap-1">
+                            {displayedUpdates.map((update, index) => (
+                              <span
+                                key={`${update.id || update.title}-${index}`}
+                                className="text-xs text-gray-700 dark:text-gray-300"
+                                title={[update.title, update.installedOn].filter(Boolean).join(' · ')}
+                              >
+                                <span className="font-mono font-medium">{update.id || update.title}</span>
+                                {update.installedOn ? ` · ${update.installedOn.slice(0, 10)}` : ''}
+                              </span>
+                            ))}
                             {(sys.pendingUpdatesCount ?? 0) > 0 && (
                               <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 whitespace-nowrap">
                                 {sys.pendingUpdatesCount} pending
@@ -1356,8 +1367,9 @@ function SystemPageContent() {
                       <td className="px-4 py-4 text-sm text-gray-900 dark:text-white">
                         {sys.lastSeen ? formatRelativeTime(sys.lastSeen) : '-'}
                       </td>
-                    </tr>
-                  ))
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
