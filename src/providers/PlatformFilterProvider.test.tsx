@@ -43,7 +43,7 @@ describe('PlatformFilterProvider URL synchronization', () => {
 
   it('settles on a user-selected platform without restoring the stale URL value', () => {
     const view = renderProvider()
-    expect(screen.getByText('macOS', { selector: 'output' })).toBeInTheDocument()
+    expect(screen.getByText('macOS', { selector: 'output' })).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Windows' }))
     expect(mockReplace).toHaveBeenLastCalledWith('/dashboard?platform=win')
@@ -57,7 +57,7 @@ describe('PlatformFilterProvider URL synchronization', () => {
       )
     })
 
-    expect(screen.getByText('Windows', { selector: 'output' })).toBeInTheDocument()
+    expect(screen.getByText('Windows', { selector: 'output' })).toBeTruthy()
     expect(mockReplace).toHaveBeenCalledTimes(1)
   })
 
@@ -74,7 +74,7 @@ describe('PlatformFilterProvider URL synchronization', () => {
       )
     })
 
-    expect(screen.getByText('Windows', { selector: 'output' })).toBeInTheDocument()
+    expect(screen.getByText('Windows', { selector: 'output' })).toBeTruthy()
     expect(localStorage.getItem('reportmate-platform-filter')).toBe('Windows')
     expect(mockReplace).not.toHaveBeenCalled()
   })
@@ -85,7 +85,7 @@ describe('PlatformFilterProvider URL synchronization', () => {
 
     renderProvider()
 
-    expect(screen.getByText('Windows', { selector: 'output' })).toBeInTheDocument()
+    expect(screen.getByText('Windows', { selector: 'output' })).toBeTruthy()
     expect(mockReplace).toHaveBeenCalledTimes(1)
     expect(mockReplace).toHaveBeenCalledWith('/dashboard?platform=win')
   })
