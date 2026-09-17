@@ -8,6 +8,7 @@
 
 import React, { useState, useMemo, useCallback, useEffect } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
+import { InstalledUpdate, installedUpdateCoverage } from '@/src/lib/system/installedUpdates'
 interface Device {
   deviceId: string
   serialNumber: string
@@ -32,6 +33,7 @@ interface Device {
     displayVersion?: string
     featureUpdate?: string
   }
+  installedUpdates?: InstalledUpdate[] | null
 }
 
 interface OSVersionPieChartProps {
@@ -41,6 +43,8 @@ interface OSVersionPieChartProps {
   onFilterApplied?: () => void
   /** Called when user selects a version. isDrillDown=true means entering a group, false means a leaf. */
   onVersionSelect?: (version: string, isDrillDown: boolean) => void
+  /** Called when a KB is selected from the Windows version drill-down. */
+  onUpdateSelect?: (updateId: string) => void
   /** Called when user clicks the back button to clear the filter. */
   onClearFilter?: () => void
   /** Current active version filter (e.g. from URL). Chart auto-drills into the matching group. */
@@ -258,11 +262,37 @@ const CustomTooltip = ({ active, payload, total }: any) => {
   return null
 }
 
-export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType, onFilterApplied, onVersionSelect, onClearFilter, activeVersion }) => {
+export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, loading, osType, onFilterApplied, onVersionSelect, onUpdateSelect, onClearFilter, activeVersion }) => {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null)
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const versionData = useMemo(() => processVersionsHierarchical(devices, osType), [devices, osType])
+
+  const selectedGroupDevices = useMemo(() => {
+    if (osType !== 'Windows' || !selectedGroup) return []
+
+    return devices.filter(device => {
+      const osInfo = device.osVersion || device.modules?.system?.operatingSystem
+      if (!osInfo?.version) return false
+      const windowsVersion = osInfo.name?.match(/Windows\s+(\d+)/)?.[1] || '11'
+      const build = osInfo.version.split('.')[2] || osInfo.build || '0'
+      return `${windowsVersion}.${build}` === selectedGroup
+    })
+  }, [devices, osType, selectedGroup])
+
+  const updateData = useMemo<VersionDataPoint[]>(() =>
+    installedUpdateCoverage(selectedGroupDevices)
+      .filter(update => /^KB\d+$/i.test(update.key))
+      .map((update, index, updates) => ({
+        name: update.key,
+        displayName: update.key,
+        sortKey: updates.length - index,
+        value: update.deviceCount,
+        color: getTemperatureColor(index, updates.length),
+      })),
+  [selectedGroupDevices])
+
+  const isUpdateDrillDown = osType === 'Windows' && selectedGroup != null && onUpdateSelect != null
 
   // When URL has an osVersion filter on load, auto-drill the chart into the matching group
   useEffect(() => {
@@ -278,50 +308,63 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
 
   // Get donut data - show groups, or children when drilled down
   const donutData = useMemo(() => {
+    if (isUpdateDrillDown) return []
     if (selectedGroup) {
       const parent = versionData.find(d => d.name === selectedGroup)
       return parent?.children || []
     }
     return versionData
-  }, [versionData, selectedGroup])
+  }, [versionData, selectedGroup, isUpdateDrillDown])
 
   // Get bar data - always show granular versions, filtered by selected group
   const barData = useMemo(() => {
+    if (isUpdateDrillDown) return updateData
     if (selectedGroup) {
       const parent = versionData.find(d => d.name === selectedGroup)
       return parent?.children || []
     }
     // Show groups (top level) when not drilled down
     return versionData
-  }, [versionData, selectedGroup])
+  }, [versionData, selectedGroup, isUpdateDrillDown, updateData])
 
   const total = useMemo(() => {
+    if (isUpdateDrillDown) return selectedGroupDevices.length
     if (selectedGroup) {
       const parent = versionData.find(d => d.name === selectedGroup)
       return parent?.value || 0
     }
     return versionData.reduce((sum, item) => sum + item.value, 0)
-  }, [versionData, selectedGroup])
+  }, [versionData, selectedGroup, isUpdateDrillDown, selectedGroupDevices.length])
 
   const maxBarCount = useMemo(() => Math.max(...barData.map(item => item.value), 1), [barData])
 
   const handleDonutClick = useCallback((entry: VersionDataPoint) => {
+    if (isUpdateDrillDown) {
+      onUpdateSelect?.(entry.name)
+      onFilterApplied?.()
+      return
+    }
     const isDrillDown = !selectedGroup && entry.children != null && entry.children.length > 0
     onVersionSelect?.(entry.name, isDrillDown)
     // Only collapse widgets on leaf node selection, not on group drill-down
     if (!isDrillDown) onFilterApplied?.()
     // Drill down into group if it has children
     if (isDrillDown) setSelectedGroup(entry.name)
-  }, [selectedGroup, onVersionSelect, onFilterApplied])
+  }, [selectedGroup, onVersionSelect, onUpdateSelect, onFilterApplied, isUpdateDrillDown])
 
   const handleBarClick = useCallback((entry: VersionDataPoint) => {
+    if (isUpdateDrillDown) {
+      onUpdateSelect?.(entry.name)
+      onFilterApplied?.()
+      return
+    }
     const isDrillDown = !selectedGroup && entry.children != null && entry.children.length > 0
     onVersionSelect?.(entry.name, isDrillDown)
     // Only collapse widgets on leaf node selection, not on group drill-down
     if (!isDrillDown) onFilterApplied?.()
     // Drill down into group if it has children
     if (isDrillDown) setSelectedGroup(entry.name)
-  }, [selectedGroup, onVersionSelect, onFilterApplied])
+  }, [selectedGroup, onVersionSelect, onUpdateSelect, onFilterApplied, isUpdateDrillDown])
 
   const handleBack = useCallback(() => {
     setSelectedGroup(null)
@@ -359,10 +402,16 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
         </button>
       )}
 
+      {isUpdateDrillDown && (
+        <div className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+          Installed KB coverage for Windows {selectedGroup}. Select a KB to show its devices.
+        </div>
+      )}
+
       {/* Combined layout: Donut on left, Bars on right */}
       <div className="flex gap-4 items-start">
         {/* Donut Chart - larger */}
-        <div className="w-44 h-44 flex-shrink-0">
+        {!isUpdateDrillDown && <div className="w-44 h-44 flex-shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
@@ -396,12 +445,17 @@ export const OSVersionPieChart: React.FC<OSVersionPieChartProps> = ({ devices, l
               <Tooltip content={<CustomTooltip total={total} />} />
             </PieChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
 
         {/* Bar Chart - fills remaining space */}
         <div className="flex-1 overflow-y-auto max-h-48 space-y-1 no-scrollbar">
+          {isUpdateDrillDown && barData.length === 0 && (
+            <p className="py-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              No installed KB data reported for these devices
+            </p>
+          )}
           {barData.map((item) => {
-            const itemTotal = selectedGroup ? total : versionData.reduce((s, v) => s + v.value, 0)
+            const itemTotal = isUpdateDrillDown || selectedGroup ? total : versionData.reduce((s, v) => s + v.value, 0)
             const percentage = itemTotal > 0 ? Math.round((item.value / itemTotal) * 100) : 0
             const barWidth = (item.value / maxBarCount) * 100
             const isHovered = hoveredItem === item.name || hoveredItem === item.displayName
