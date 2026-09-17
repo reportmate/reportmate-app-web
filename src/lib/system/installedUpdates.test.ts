@@ -1,4 +1,5 @@
 import {
+  installedUpdateCoverage,
   matchesSystemSearch,
   matchingInstalledUpdates,
   updatesToDisplay,
@@ -36,5 +37,22 @@ describe('system fleet update search', () => {
   it('shows matching updates first and otherwise shows the newest installed update', () => {
     expect(updatesToDisplay(device, 'servicing')).toEqual([device.installedUpdates[1]])
     expect(updatesToDisplay(device, '')).toEqual([device.installedUpdates[0]])
+  })
+
+  it('counts KB coverage once per device and sorts the most common update first', () => {
+    expect(installedUpdateCoverage([
+      device,
+      {
+        installedUpdates: [
+          device.installedUpdates[0],
+          device.installedUpdates[0],
+          { id: 'KB5000002', title: 'Older Update', installedOn: '2026-07-01' },
+        ],
+      },
+    ])).toEqual([
+      { ...device.installedUpdates[0], key: 'KB5129195', deviceCount: 2 },
+      { ...device.installedUpdates[1], key: 'KB5000001', deviceCount: 1 },
+      { id: 'KB5000002', title: 'Older Update', installedOn: '2026-07-01', key: 'KB5000002', deviceCount: 1 },
+    ])
   })
 })

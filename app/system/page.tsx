@@ -270,6 +270,10 @@ function SystemPageContent() {
   // Widgets accordion state
   const [widgetsExpanded, setWidgetsExpanded] = useState(true)
 
+  useEffect(() => {
+    if (searchQuery.trim()) setWidgetsExpanded(false)
+  }, [searchQuery])
+
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },
     { enabled: !loading }
@@ -712,6 +716,7 @@ function SystemPageContent() {
       uptime: sys.uptime,
       pendingUpdatesCount: sys.pendingUpdatesCount,
       deferredUpdatesCount: sys.deferredUpdatesCount,
+      installedUpdates: sys.installedUpdates,
       osVersion: {
         name: sys.operatingSystem,
         version: sys.osVersion,
@@ -946,6 +951,7 @@ function SystemPageContent() {
                       activeVersion={osVersionFilter || undefined}
                       onFilterApplied={() => setWidgetsExpanded(false)}
                       onVersionSelect={(version) => router.push(`/system?osVersion=${encodeURIComponent(version)}`)}
+                      onUpdateSelect={setSearchQuery}
                       onClearFilter={() => router.push('/system')}
                     />
                   </div>
@@ -1309,9 +1315,12 @@ function SystemPageContent() {
                             {displayedUpdates.map((update, index) => (
                               <span
                                 key={`${update.id || update.title}-${index}`}
-                                className="text-xs text-gray-700 dark:text-gray-300"
-                                title={[update.title, update.installedOn].filter(Boolean).join(' · ')}
+                                className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-700 dark:text-gray-300"
+                                title={['Installed', update.title, update.installedOn].filter(Boolean).join(' · ')}
                               >
+                                <span className="inline-flex items-center rounded-full bg-green-100 px-1.5 py-0.5 text-[10px] font-semibold text-green-700 dark:bg-green-900/30 dark:text-green-300 whitespace-nowrap">
+                                  Installed
+                                </span>
                                 <span className="font-mono font-medium">{update.id || update.title}</span>
                                 {update.installedOn ? ` · ${update.installedOn.slice(0, 10)}` : ''}
                               </span>
