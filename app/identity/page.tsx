@@ -247,8 +247,19 @@ function IdentityPageContent() {
     return true
   })
 
+  // Selection-filtered devices (for widgets — platform + Selections, no search/widget clicks)
+  const widgetDevices = platformFilteredDevices.filter(d => {
+    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(d))) return false
+    if (selectedUsages.length > 0 && !selectedUsages.includes(d.usage || '')) return false
+    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(d.catalog || '')) return false
+    if (selectedLocations.length > 0 && !selectedLocations.includes(d.location || '')) return false
+    if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
+    if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
+    return true
+  })
+
   // Filter devices (for table — includes search + admin filter + widget click filters)
-  const filteredDevices = platformFilteredDevices.filter(d => {
+  const filteredDevices = widgetDevices.filter(d => {
     if (adminFilter === 'has-admins' && d.adminUsers === 0) return false
     if (adminFilter === 'no-admins' && d.adminUsers > 0) return false
     if (adminFilter === 'multiple-admins' && d.adminUsers <= 1) return false
@@ -297,13 +308,6 @@ function IdentityPageContent() {
       }
     }
     
-    if (selectedStatuses.length > 0 && !selectedStatuses.includes(statusOf(d))) return false
-    if (selectedUsages.length > 0 && !selectedUsages.includes(d.usage || '')) return false
-    if (selectedCatalogs.length > 0 && !selectedCatalogs.includes(d.catalog || '')) return false
-    if (selectedLocations.length > 0 && !selectedLocations.includes(d.location || '')) return false
-    if (selectedAreas.length > 0 && !selectedAreas.includes(d.area || d.department || '')) return false
-    if (selectedFleets.length > 0 && !selectedFleets.includes(d.fleet || '')) return false
-
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       return (
@@ -360,14 +364,14 @@ function IdentityPageContent() {
   // Calculate summary stats
   const totalLoggedIn = filteredDevices.reduce((sum, d) => sum + d.currentlyLoggedIn, 0)
 
-  // Calculate identity widget stats (from platform-filtered set)
+  // Calculate identity widget stats (from selection-filtered set)
   const identityStats = {
     // adminNames is keyed by canonical (lowercase) username so that the same
     // admin account is counted once across case variations. value stores the
     // display name + device count.
     adminNames: (() => {
       const acc: Record<string, { display: string; count: number }> = {}
-      for (const d of platformFilteredDevices) {
+      for (const d of widgetDevices) {
         const seen = new Set<string>()
         for (const raw of (d.adminUsernames || [])) {
           if (!raw) continue
@@ -381,7 +385,7 @@ function IdentityPageContent() {
       return acc
     })(),
     
-    enrollmentTypes: platformFilteredDevices.reduce((acc, d) => {
+    enrollmentTypes: widgetDevices.reduce((acc, d) => {
       const type = d.enrollmentType || 'Unknown'
       if (type !== 'Unknown') {
         acc[type] = (acc[type] || 0) + 1
@@ -390,7 +394,7 @@ function IdentityPageContent() {
     }, {} as Record<string, number>),
     
     // Trust status counts for domain-joined / hybrid devices
-    trustCounts: platformFilteredDevices.reduce((acc, d) => {
+    trustCounts: widgetDevices.reduce((acc, d) => {
       if (d.enrollmentType === 'Domain Joined') {
         if (d.trustStatus === 'Healthy') acc.trusted++
         else if (d.trustStatus === 'Broken') acc.broken++
@@ -785,13 +789,13 @@ function IdentityPageContent() {
                     <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">Authentication</h3>
                     {(() => {
                       // Modern = has authMethod (Platform SSO or Hello for Business)
-                      const modernCount = platformFilteredDevices.filter(d => d.authMethod).length
+                      const modernCount = widgetDevices.filter(d => d.authMethod).length
                       // Legacy = AD or LDAP bound without modern auth
-                      const legacyCount = platformFilteredDevices.filter(d => 
+                      const legacyCount = widgetDevices.filter(d => 
                         !d.authMethod && (d.adBound || d.ldapBound)
                       ).length
                       // Standard = everything else
-                      const standardCount = platformFilteredDevices.length - modernCount - legacyCount
+                      const standardCount = widgetDevices.length - modernCount - legacyCount
 
                       const authData = [
                         { label: 'Modern', value: modernCount, color: '#10b981' },
@@ -856,7 +860,7 @@ function IdentityPageContent() {
 
                     {/* Mac-only: SecureToken / BootstrapToken summary, each row clickable as a filter */}
                     {globalPlatformFilter === 'macOS' && (() => {
-                      const macDevices = platformFilteredDevices
+                      const macDevices = widgetDevices
                       if (macDevices.length === 0) return null
                       const tokenHolderDevices = macDevices.filter(d => (d.secureTokenUsers || 0) > 0).length
                       const tokenMissingDevices = macDevices.filter(d => (d.secureTokenMissing || 0) > 0).length
