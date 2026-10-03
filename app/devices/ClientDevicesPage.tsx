@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "../../src/lib/time"
-import { calculateDeviceStatus } from "../../src/lib/data-processing"
+import { calculateDeviceStatus, isStored } from "../../src/lib/data-processing"
 import { CopyButton } from "../../src/components/ui/CopyButton"
 import { normalizeKeys } from "../../src/lib/utils/powershell-parser"
 import { PlatformBadge } from "../../src/components/ui/PlatformBadge"
@@ -36,6 +36,8 @@ interface InventoryItem {
   uuid?: string
   archived?: boolean
   platform?: string
+  leaseNumber?: string
+  inventoryAssetTag?: string
   raw?: any
 }
 
@@ -131,7 +133,9 @@ function DevicesPageContent() {
             const isArchived = device.archived === true
             
             // Calculate status from lastSeen timestamp
-            const calculatedStatus = calculateDeviceStatus(device.lastSeen, {}, isArchived)
+            const inventoryState = device.inventoryState || null
+            const calculatedStatus = calculateDeviceStatus(device.lastSeen, {}, isArchived, inventoryState)
+            const stored = isStored(inventoryState)
             
             return {
               id: device.serialNumber || device.deviceId,
@@ -144,7 +148,11 @@ function DevicesPageContent() {
               createdAt: device.createdAt,  // Registration date from API
               // Extract all inventory fields from modules.inventory
               assetTag: inventory.assetTag,
-              location: inventory.location,
+              // A stored device is wherever the inventory says it is stored,
+              // not where it last reported from.
+              location: (stored && inventoryState?.storageLocation) || inventory.location,
+              leaseNumber: inventoryState?.leaseNumber || undefined,
+              inventoryAssetTag: inventoryState?.assetTag || undefined,
               usage: inventory.usage,
               catalog: inventory.catalog,
               department: inventory.department,
@@ -201,7 +209,9 @@ function DevicesPageContent() {
     item?.model?.toLowerCase().includes(query) ||
     item?.uuid?.toLowerCase().includes(query) ||
     item?.domain?.toLowerCase().includes(query) ||
-    item?.organizationalUnit?.toLowerCase().includes(query)
+    item?.organizationalUnit?.toLowerCase().includes(query) ||
+    item?.leaseNumber?.toLowerCase().includes(query) ||
+    item?.inventoryAssetTag?.toLowerCase().includes(query)
   )
 
   // Filter inventory based on search query and filters. Memoized: with ~900
@@ -769,6 +779,8 @@ function DevicesPageContent() {
                                 return 'text-yellow-700 dark:text-yellow-400'
                               case 'archived':
                                 return 'text-slate-500 dark:text-slate-400'
+                              case 'storage':
+                                return 'text-violet-700 dark:text-violet-400'
                               case 'missing':
                               default:
                                 return 'text-gray-700 dark:text-gray-400'
@@ -778,7 +790,11 @@ function DevicesPageContent() {
                           return (
                             <span 
                               className={`text-sm font-medium ${getStatusColor(status)}`}
-                              title={isArchived ? 'Device is archived' : `Last seen: ${formatRelativeTime(item.lastSeen)}`}
+                              title={isArchived
+                                ? 'Device is archived'
+                                : status === 'storage'
+                                  ? ['In storage', item.location, item.leaseNumber && `lease ${item.leaseNumber}`].filter(Boolean).join(' · ')
+                                  : `Last seen: ${formatRelativeTime(item.lastSeen)}`}
                             >
                               {status.charAt(0).toUpperCase() + status.slice(1)}
                             </span>

@@ -54,6 +54,10 @@ const STATUS_CONFIG = {
     color: '#6b7280', // gray-500
     displayName: 'Missing'
   },
+  storage: {
+    color: '#8b5cf6', // violet-500
+    displayName: 'Storage'
+  },
   warning: { 
     color: '#f97316', // orange-500
     displayName: 'Warning'
@@ -80,7 +84,7 @@ const processStatusData = (devices: Device[]): StatusData[] => {
   })
 
   // Define the desired order (only these 3 statuses are used)
-  const statusOrder = ['active', 'stale', 'missing']
+  const statusOrder = ['active', 'stale', 'missing', 'storage']
 
   // Convert to array with percentages
   const statusArray = Object.entries(statusCounts).map(([status, count]) => ({
@@ -199,6 +203,10 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
   }
 
   const statusData = processStatusData(devices)
+  // Stored devices are shown as their own slice but are not part of the
+  // fleet being counted: they are expected to be silent.
+  const storageCount = devices.filter(d => d.status === 'storage').length
+  const fleetCount = devices.length - storageCount
 
   const handleSegmentClick = (status: string) => {
     // Navigate to devices page with status filter
@@ -239,11 +247,16 @@ export const StatusDonutChart: React.FC<StatusDonutChartProps> = ({ devices, loa
             <div className="absolute inset-6 bg-white dark:bg-gray-800 rounded-full flex items-center justify-center">
               <div className="text-center" style={{ transform: 'rotate(90deg)' }}>
                 <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {devices.length}
+                  {fleetCount}
                 </div>
                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                  {devices.length === 1 ? 'Device' : 'Devices'}
+                  {fleetCount === 1 ? 'Device' : 'Devices'}
                 </div>
+                {storageCount > 0 && (
+                  <div className="text-xs text-violet-600 dark:text-violet-400">
+                    +{storageCount} in storage
+                  </div>
+                )}
               </div>
             </div>
           </div>

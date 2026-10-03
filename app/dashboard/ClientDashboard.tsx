@@ -9,7 +9,7 @@ import { OSVersionPieWidget } from "../../src/components/widgets/OSVersionPieWid
 import { StatusWidget } from "../../src/lib/modules/widgets/StatusWidget"
 import { PlatformDistributionWidget } from "../../src/lib/modules/widgets/PlatformDistributionWidget"
 import { DashboardSkeleton } from "../../src/components/skeleton/DashboardSkeleton"
-import { calculateDeviceStatus } from "../../src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "../../src/lib/data-processing"
 import { usePlatformFilterSafe, getDevicePlatform } from "../../src/providers/PlatformFilterProvider"
 
 // WebPubSub message types for JSON subprotocol
@@ -91,6 +91,7 @@ interface Device {
   totalEvents?: number   // Optional aggregated metrics
   lastEventTime?: string // Optional aggregated metrics
   createdAt?: string
+  inventoryState?: InventoryState
 }
 
 export default function ClientDashboard() {
@@ -185,7 +186,7 @@ export default function ClientDashboard() {
               const updated = prev.map(device => {
                 const fresh = lookup.get(device.serialNumber)
                 if (!fresh) return device
-                const newStatus = calculateDeviceStatus(fresh.lastSeen)
+                const newStatus = calculateDeviceStatus(fresh.lastSeen, {}, false, fresh.inventoryState)
                 if (device.lastSeen !== fresh.lastSeen || device.status !== newStatus) {
                   changed = true
                   return { ...device, lastSeen: fresh.lastSeen, status: newStatus }
@@ -237,7 +238,7 @@ export default function ClientDashboard() {
           
           // OS version string for display - used for compatibility with legacy components
           const osVersionString = systemOS.displayVersion || systemOS.version || apiDevice.osVersion || apiDevice.os || 'Unknown'
-          const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen)
+          const calculatedStatus = calculateDeviceStatus(apiDevice.lastSeen, {}, false, apiDevice.inventoryState)
 
           // Build modules object with complete OS data from FastAPI
           const modules: Device['modules'] = {}
@@ -268,6 +269,7 @@ export default function ClientDashboard() {
             totalEvents: apiDevice.totalEvents ?? 0,
             lastEventTime: apiDevice.lastEventTime ?? apiDevice.lastSeen,
             createdAt: apiDevice.createdAt ?? apiDevice.registrationDate,
+            inventoryState: apiDevice.inventoryState ?? undefined,
           }
 
           return device

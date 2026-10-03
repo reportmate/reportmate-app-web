@@ -3,7 +3,24 @@
  * Handles all device status calculation logic in isolation
  */
 
-export type DeviceStatus = 'active' | 'stale' | 'warning' | 'error' | 'missing' | 'archived'
+export type DeviceStatus = 'active' | 'stale' | 'warning' | 'error' | 'missing' | 'archived' | 'storage'
+
+/**
+ * What an asset inventory system says a device is doing. A device it reports
+ * as checked in to a storage room is expected to be silent, so it is shown as
+ * stored rather than stale or missing.
+ */
+export interface InventoryState {
+  state: 'checked_out' | 'storage' | 'decommissioning'
+  storageLocation?: string | null
+  leaseNumber?: string | null
+  assetTag?: string | null
+  updatedAt?: string | null
+}
+
+export function isStored(inventoryState?: InventoryState | null): boolean {
+  return inventoryState?.state === 'storage'
+}
 
 interface StatusConfig {
   activeThresholdHours: number    // Default: 24
@@ -22,11 +39,13 @@ const DEFAULT_CONFIG: StatusConfig = {
 export function calculateDeviceStatus(
   lastSeen: string | Date | null | undefined, 
   config: Partial<StatusConfig> = {},
-  isArchived: boolean = false
+  isArchived: boolean = false,
+  inventoryState?: InventoryState | null
 ): DeviceStatus {
   const finalConfig = { ...DEFAULT_CONFIG, ...config }
   
   if (isArchived) return 'archived'
+  if (isStored(inventoryState)) return 'storage'
   if (!lastSeen) return 'missing'
   
   try {
