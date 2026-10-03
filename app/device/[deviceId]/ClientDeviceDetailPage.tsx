@@ -852,6 +852,22 @@ export default function ClientDeviceDetailPage() {
                         )
                       }
                       
+                      // Stored per the asset inventory: expected to be silent,
+                      // so say where it is rather than calling it stale or missing.
+                      const inventoryState = (deviceInfo as any).inventoryState
+                      if (inventoryState?.state === 'storage') {
+                        const detail = [inventoryState.storageLocation, inventoryState.leaseNumber && `Lease ${inventoryState.leaseNumber}`]
+                          .filter(Boolean).join(' · ')
+                        return (
+                          <span
+                            className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-sm font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200"
+                            title={inventoryState.updatedAt ? `Inventory state as of ${formatRelativeTime(inventoryState.updatedAt)}` : undefined}
+                          >
+                            In storage{detail ? ` · ${detail}` : ''}
+                          </span>
+                        )
+                      }
+
                       const lastSeenDate = deviceInfo.lastSeen ? new Date(deviceInfo.lastSeen) : null
                       if (!lastSeenDate) return null
                       

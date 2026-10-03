@@ -60,7 +60,7 @@ export const ProgressiveDevicesCard: React.FC = () => {
 
   const activeDevices = devices.filter(device => device.status === 'active' || device.status === 'online').length
   const staleDevices = devices.filter(device => device.status === 'stale').length
-  const missingDevices = devices.filter(device => device.status === 'missing' || (!['active', 'online', 'stale'].includes(device.status))).length
+  const missingDevices = devices.filter(device => device.status === 'missing' || (!['active', 'online', 'stale', 'storage'].includes(device.status))).length
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">

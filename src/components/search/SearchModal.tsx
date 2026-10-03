@@ -270,6 +270,7 @@ export function SearchModal({ isOpen, onClose, preloadedDevices = [] }: SearchMo
       case 'error': return 'bg-red-500'
       case 'stale': return 'bg-orange-500'
       case 'missing': return 'bg-gray-500'
+      case 'storage': return 'bg-violet-500'
       default: return 'bg-gray-500'
     }
   }

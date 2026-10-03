@@ -2,7 +2,7 @@
  * MODULAR Device Mapper
  */
 
-import { calculateDeviceStatus, normalizeLastSeen, type DeviceStatus } from './device-status'
+import { calculateDeviceStatus, normalizeLastSeen, type DeviceStatus, type InventoryState } from './device-status'
 import { extractHardware, type HardwareInfo } from './modules/hardware'
 import { extractNetwork, type NetworkInfo } from './modules/network'
 import { extractSystem, type SystemInfo } from './modules/system'
@@ -27,6 +27,9 @@ export interface ProcessedDeviceInfo {
   // Archive status
   archived?: boolean
   archivedAt?: string
+
+  // What the asset inventory says the device is doing (checked out, stored...)
+  inventoryState?: InventoryState
   
   // Client information
   clientVersion?: string
@@ -137,7 +140,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
   
   // Calculate status using centralized logic (single source of truth)
   const normalizedLastSeen = normalizeLastSeen(rawDevice.lastSeen)
-  const calculatedStatus = calculateDeviceStatus(normalizedLastSeen)
+  const calculatedStatus = calculateDeviceStatus(normalizedLastSeen, {}, false, rawDevice.inventoryState)
   
   return {
     // Core identifiers  
@@ -157,6 +160,7 @@ export function mapDeviceData(rawDevice: any): ProcessedDeviceInfo {
     // Archive status
     archived: rawDevice.archived || false,
     archivedAt: rawDevice.archivedAt,
+    inventoryState: rawDevice.inventoryState || undefined,
     
     // Client information
     clientVersion: rawDevice.clientVersion,
