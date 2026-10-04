@@ -6,7 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { formatRelativeTime } from "@/src/lib/time"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
@@ -18,6 +18,7 @@ interface Peripheral {
   deviceName: string
   serialNumber: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   platform?: string
   usbDevices: any[]
@@ -171,7 +172,8 @@ function PeripheralsPageContent() {
   }
 
   // Status is derived from lastSeen, the same rule every other report uses
-  const statusOf = (peripheral: Peripheral) => calculateDeviceStatus(peripheral.lastSeen)
+  const statusOf = (peripheral: Peripheral) =>
+    calculateDeviceStatus(peripheral.lastSeen, {}, false, peripheral.inventoryState)
 
   const { tableContainerRef, effectiveFiltersExpanded, effectiveWidgetsExpanded } = useScrollCollapse(
     { filters: filtersExpanded, widgets: widgetsExpanded },

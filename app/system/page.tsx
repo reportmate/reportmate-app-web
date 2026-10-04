@@ -17,7 +17,7 @@ import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/Platfo
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import { InstalledUpdate, matchesSystemSearch, updatesToDisplay } from "@/src/lib/system/installedUpdates"
 
 interface SystemDevice {
@@ -27,6 +27,7 @@ interface SystemDevice {
   serialNumber: string
   assetTag?: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   usage?: string
   catalog?: string
@@ -313,7 +314,8 @@ function SystemPageContent() {
   }
 
   // Status is derived from lastSeen, the same rule every other report uses
-  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
+  const statusOf = (d: { lastSeen?: string; inventoryState?: InventoryState | null }) =>
+    calculateDeviceStatus(d.lastSeen, {}, false, d.inventoryState)
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses(prev =>

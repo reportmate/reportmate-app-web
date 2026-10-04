@@ -6,7 +6,7 @@ import { useEffect, useState, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
 import { CopyButton } from "@/src/components/ui/CopyButton"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
@@ -18,6 +18,7 @@ interface Management {
   deviceName: string
   serialNumber: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   provider: string
   enrollmentStatus: string
@@ -247,7 +248,7 @@ function ManagementPageContent() {
                 
         // Map API response to Management interface
         const combinedData = (Array.isArray(managementList) ? managementList : []).map((mgmt: any) => {
-          const status = calculateDeviceStatus(mgmt.lastSeen)
+          const status = calculateDeviceStatus(mgmt.lastSeen, {}, false, mgmt.inventoryState)
           
           // Normalize provider - "Microsoft Intune (Co-managed)" -> "Microsoft Intune"
           let provider = mgmt.provider || 'Unmanaged'
@@ -431,6 +432,7 @@ function ManagementPageContent() {
     active: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'active').length,
     stale: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'stale').length,
     missing: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'missing').length,
+    storage: baseFilteredManagement.filter(m => m.status?.toLowerCase() === 'storage').length,
     assigned: baseFilteredManagement.filter(m => m.usage?.toLowerCase() === 'assigned').length,
     shared: baseFilteredManagement.filter(m => m.usage?.toLowerCase() === 'shared').length,
     curriculum: baseFilteredManagement.filter(m => m.catalog?.toLowerCase() === 'curriculum').length,

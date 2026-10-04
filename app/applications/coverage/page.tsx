@@ -30,6 +30,9 @@ interface CollectionHealth {
     stale: number
     dark: number
     never: number
+    // Devices an asset inventory reports as stored, counted outside the
+    // buckets and the total: a shelf device has no usage to collect.
+    storage?: number
     freshDays: number
     staleDays: number
   }
@@ -168,12 +171,13 @@ export default function CoveragePage() {
 
           {/* Summary stats */}
           {data && (
-            <div className="mt-5 grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div className="mt-5 grid grid-cols-2 md:grid-cols-6 gap-3">
               <SummaryStat label="Total devices" value={data.summary.totalDevices} tone="neutral" />
               <SummaryStat label={`Healthy (last ${data.summary.freshDays}d)`} value={data.summary.healthy} tone="ok" />
               <SummaryStat label={`Stale (${data.summary.freshDays}–${data.summary.staleDays}d)`} value={data.summary.stale} tone="warn" />
               <SummaryStat label={`Dark (>${data.summary.staleDays}d)`} value={data.summary.dark} tone="alert" />
               <SummaryStat label="Never collected" value={data.summary.never} tone="critical" />
+              <SummaryStat label="In storage (not counted)" value={data.summary.storage ?? 0} tone="neutral" />
             </div>
           )}
 

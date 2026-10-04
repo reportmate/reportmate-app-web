@@ -65,6 +65,22 @@ export function calculateDeviceStatus(
   }
 }
 
+export type ReportDeviceStatus = 'active' | 'stale' | 'missing' | 'storage'
+
+/**
+ * The four buckets a report's device-status pills offer. A stored device is
+ * Storage before any last-seen arithmetic, so it never reads as stale or
+ * missing; everything that is not active, stale or stored is missing.
+ */
+export function reportDeviceStatus(device: {
+  lastSeen?: string | Date | null
+  inventoryState?: InventoryState | null
+}): ReportDeviceStatus {
+  const status = calculateDeviceStatus(device.lastSeen, {}, false, device.inventoryState)
+  if (status === 'storage' || status === 'active' || status === 'stale') return status
+  return 'missing'
+}
+
 /**
  * Normalize lastSeen value to valid ISO string
  * MODULAR: Self-contained timestamp normalization

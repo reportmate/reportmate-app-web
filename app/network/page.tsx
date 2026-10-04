@@ -12,7 +12,7 @@ import { Copy } from "lucide-react"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 
 interface NetworkDevice {
   id: string
@@ -21,6 +21,7 @@ interface NetworkDevice {
   serialNumber: string
   assetTag?: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   operatingSystem: string
   osVersion: string | null
@@ -75,7 +76,8 @@ function NetworkPageContent() {
   }
 
   // Status is derived from lastSeen, the same rule every other report uses
-  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
+  const statusOf = (d: { lastSeen?: string; inventoryState?: InventoryState | null }) =>
+    calculateDeviceStatus(d.lastSeen, {}, false, d.inventoryState)
 
   // Toggle functions for filters
   const toggleStatus = (status: string) => {

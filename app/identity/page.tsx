@@ -10,7 +10,7 @@ import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/Platfo
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 
 interface IdentityDevice {
   id: string
@@ -18,6 +18,7 @@ interface IdentityDevice {
   deviceName: string
   serialNumber: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   platform: string
   totalUsers: number
@@ -172,7 +173,8 @@ function IdentityPageContent() {
   }
 
   // Status is derived from lastSeen, the same rule every other report uses
-  const statusOf = (d: { lastSeen?: string }) => calculateDeviceStatus(d.lastSeen)
+  const statusOf = (d: { lastSeen?: string; inventoryState?: InventoryState | null }) =>
+    calculateDeviceStatus(d.lastSeen, {}, false, d.inventoryState)
   // Expandable legend categories
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set())
   const toggleCategory = (label: string) => {
