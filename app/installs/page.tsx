@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { formatRelativeTime } from '@/src/lib/time'
 import { categorizeDevicesByInstallStatus, getDeviceInstallItems, aggregateStatusMessages, getItemMessage, getItemTimestamp, isErrorItem, isWarningItem, isPendingItem, isSuccessItem, matchesItemStatus, type ItemStatusFilter } from '@/src/hooks/useInstallsData'
 import { runLevelWarnings } from '@/src/lib/installs/status'
-import { calculateDeviceStatus } from '@/src/lib/data-processing'
+import { isStored, reportDeviceStatus, type InventoryState, type ReportDeviceStatus } from '@/src/lib/data-processing'
 import { InstallErrorsWidget, InstallWarningsWidget, SelectedItemMessages } from '@/src/components/widgets/InstallMessages'
 import { CopyButton } from '@/src/components/ui/CopyButton'
 import { PlatformBadge } from '@/src/components/ui/PlatformBadge'
@@ -41,6 +41,7 @@ interface InstallRecord {
   serialNumber: string
   assetTag?: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   name: string
   version?: string
   status?: string
@@ -55,6 +56,9 @@ interface InstallRecord {
   manifest?: string
   raw?: any
 }
+
+type DeviceStatusFilterValue = ReportDeviceStatus
+const deviceStatusOf = reportDeviceStatus
 
 // One place for everything the errors / warnings / pending / successes
 // drill-down renders differently. Successes are the packages that actually
@@ -191,7 +195,7 @@ function InstallsPageContent() {
   // Status filter state - items filter (errors, warnings, pending, successes)
   const [itemsStatusFilter, setItemsStatusFilter] = useState<ItemStatusFilter>('all')
   // Device status filter (active, stale, missing)
-  const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | 'active' | 'stale' | 'missing'>('all')
+  const [deviceStatusFilter, setDeviceStatusFilter] = useState<'all' | DeviceStatusFilterValue>('all')
   // Install status filter (installed, pending, warnings, errors, removed)
   const [installStatusFilter, setInstallStatusFilter] = useState<'all' | 'installed' | 'pending' | 'warnings' | 'errors' | 'removed'>('all')
   // Widgets accordion state
@@ -666,6 +670,7 @@ function InstallsPageContent() {
           // Platform detection: use device.platform first, then derive from configType (Cimian=Windows, Munki=macOS)
           platform: device.platform || (isCimian ? 'Windows' : munkiConfig ? 'macOS' : 'Unknown'),
           lastSeen: device.lastSeen,
+          inventoryState: device.inventoryState ?? null,
           // Config data - Cimian has config sub-object, Munki has fields at root
           configType: isCimian ? 'Cimian' : (munkiConfig ? 'Munki' : 'None'),
           clientIdentifier: cimianConfig?.config?.ClientIdentifier || munkiConfig?.clientIdentifier || 'N/A',
@@ -739,16 +744,8 @@ function InstallsPageContent() {
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
-      const now = new Date()
       filtered = filtered.filter(device => {
-        if (!device.lastSeen) return deviceStatusFilter === 'missing'
-        const lastSeenDate = new Date(device.lastSeen)
-        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-        
-        if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
-        if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
-        if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
-        return true
+        return deviceStatusOf(device) === deviceStatusFilter
       })
     }
     
@@ -862,20 +859,8 @@ function InstallsPageContent() {
     
     // Apply device status filter (Active/Stale/Missing based on lastSeen)
     if (deviceStatusFilter !== 'all') {
-      const now = new Date()
       filtered = filtered.filter(install => {
-        if (!install.lastSeen) return deviceStatusFilter === 'missing'
-        const lastSeenDate = new Date(install.lastSeen)
-        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-        
-        if (deviceStatusFilter === 'active') {
-          return hoursSinceLastSeen <= 24 // Active = seen in last 24 hours
-        } else if (deviceStatusFilter === 'stale') {
-          return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168 // Stale = 1-7 days
-        } else if (deviceStatusFilter === 'missing') {
-          return hoursSinceLastSeen > 168 // Missing = not seen in 7+ days
-        }
-        return true
+        return deviceStatusOf(install) === deviceStatusFilter
       })
     }
     
@@ -1061,15 +1046,18 @@ function InstallsPageContent() {
 
   // Categorize devices by install status (for filtered views)
   const { devicesWithErrors, devicesWithWarnings, devicesWithPending, devicesWithSuccess } = useMemo(() => {
-    return categorizeDevicesByInstallStatus(platformFilteredDevices)
+    // A stored device's install errors and warnings are not a fault anyone
+    // can act on until it is deployed, the same rule the dashboard tiles use.
+    return categorizeDevicesByInstallStatus(
+      platformFilteredDevices.filter((d: any) => !isStored(d?.inventoryState))
+    )
   }, [platformFilteredDevices])
 
   // Calculate device status counts (Active/Stale/Missing)
   // Counts should reflect data with OTHER filters applied (not deviceStatusFilter itself)
   // This makes the counts dynamic - showing what would match if you clicked that status
   const deviceStatusCounts = useMemo(() => {
-    const counts = { active: 0, stale: 0, missing: 0 }
-    const now = new Date()
+    const counts = { active: 0, stale: 0, missing: 0, storage: 0 }
     
     // If we're in config report mode with data, count from configReportData with other filters applied
     if (isConfigReport && configReportData.length > 0) {
@@ -1148,16 +1136,7 @@ function InstallsPageContent() {
       
       // Now count device statuses from the filtered data
       dataToCount.forEach(device => {
-        if (!device.lastSeen) {
-          counts.missing++
-          return
-        }
-        const lastSeenDate = new Date(device.lastSeen)
-        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-        
-        if (hoursSinceLastSeen <= 24) counts.active++
-        else if (hoursSinceLastSeen <= 168) counts.stale++
-        else counts.missing++
+        counts[deviceStatusOf(device)]++
       })
       return counts
     }
@@ -1236,25 +1215,16 @@ function InstallsPageContent() {
       }
       
       // Get unique devices from filtered installs
-      const deviceLastSeen = new Map<string, string>()
+      const latestBySerial = new Map<string, InstallRecord>()
       installsToCount.forEach(install => {
-        const existing = deviceLastSeen.get(install.serialNumber)
-        if (!existing || (install.lastSeen && install.lastSeen > existing)) {
-          deviceLastSeen.set(install.serialNumber, install.lastSeen || '')
+        const existing = latestBySerial.get(install.serialNumber)
+        if (!existing || (install.lastSeen && install.lastSeen > (existing.lastSeen || ''))) {
+          latestBySerial.set(install.serialNumber, install)
         }
       })
       
-      deviceLastSeen.forEach((lastSeen) => {
-        if (!lastSeen) {
-          counts.missing++
-          return
-        }
-        const lastSeenDate = new Date(lastSeen)
-        const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-        
-        if (hoursSinceLastSeen <= 24) counts.active++
-        else if (hoursSinceLastSeen <= 168) counts.stale++
-        else counts.missing++
+      latestBySerial.forEach((install) => {
+        counts[deviceStatusOf(install)]++
       })
       return counts
     }
@@ -1300,18 +1270,12 @@ function InstallsPageContent() {
       }
       
       relevantDevices.forEach((device: any) => {
-        const status = calculateDeviceStatus(device.lastSeen)
-        if (status === 'active') counts.active++
-        else if (status === 'stale') counts.stale++
-        else counts.missing++
+        counts[deviceStatusOf(device)]++
       })
     } else {
       // Default: count all devices
       platformFilteredDevices.forEach((device: any) => {
-        const status = calculateDeviceStatus(device.lastSeen)
-        if (status === 'active') counts.active++
-        else if (status === 'stale') counts.stale++
-        else counts.missing++
+        counts[deviceStatusOf(device)]++
       })
     }
     return counts
@@ -1327,19 +1291,11 @@ function InstallsPageContent() {
     if (isConfigReport && configReportData.length > 0) {
       // Apply all filters EXCEPT installStatusFilter to get the base data
       let dataToCount = [...configReportData]
-      const now = new Date()
       
       // Apply device status filter
       if (deviceStatusFilter !== 'all') {
         dataToCount = dataToCount.filter(device => {
-          if (!device.lastSeen) return deviceStatusFilter === 'missing'
-          const lastSeenDate = new Date(device.lastSeen)
-          const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-          
-          if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
-          if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
-          if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
-          return true
+          return deviceStatusOf(device) === deviceStatusFilter
         })
       }
       
@@ -1412,19 +1368,11 @@ function InstallsPageContent() {
     } else if (installs.length > 0) {
       // Apply all filters EXCEPT installStatusFilter
       let installsToCount = [...installs]
-      const now = new Date()
       
       // Apply device status filter
       if (deviceStatusFilter !== 'all') {
         installsToCount = installsToCount.filter(install => {
-          if (!install.lastSeen) return deviceStatusFilter === 'missing'
-          const lastSeenDate = new Date(install.lastSeen)
-          const hoursSinceLastSeen = (now.getTime() - lastSeenDate.getTime()) / (1000 * 60 * 60)
-          
-          if (deviceStatusFilter === 'active') return hoursSinceLastSeen <= 24
-          if (deviceStatusFilter === 'stale') return hoursSinceLastSeen > 24 && hoursSinceLastSeen <= 168
-          if (deviceStatusFilter === 'missing') return hoursSinceLastSeen > 168
-          return true
+          return deviceStatusOf(install) === deviceStatusFilter
         })
       }
       
@@ -1562,8 +1510,7 @@ function InstallsPageContent() {
     // Filter by device status (active/stale/missing)
     if (deviceStatusFilter !== 'all') {
       filtered = filtered.filter((device: any) => {
-        const status = calculateDeviceStatus(device.lastSeen)
-        return status === deviceStatusFilter
+        return deviceStatusOf(device) === deviceStatusFilter
       })
     }
     
@@ -3588,6 +3535,7 @@ function InstallsPageContent() {
                       { value: 'active', label: 'Active', count: deviceStatusCounts.active, tone: 'neutral' },
                       { value: 'stale', label: 'Stale', count: deviceStatusCounts.stale, tone: 'neutral' },
                       { value: 'missing', label: 'Missing', count: deviceStatusCounts.missing, tone: 'neutral' },
+                      { value: 'storage', label: 'Storage', count: deviceStatusCounts.storage, tone: 'neutral' },
                     ] as const).map(pill => (
                       <button
                         key={pill.value}

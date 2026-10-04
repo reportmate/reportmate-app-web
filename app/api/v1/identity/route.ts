@@ -61,6 +61,7 @@ export async function GET(request: Request) {
           serialNumber: item.serialNumber,
           lastSeen: item.lastSeen,
           collectedAt: item.collectedAt,
+          inventoryState: item.inventoryState ?? null,
           platform: item.platform || 'Unknown',
           
           // Summary fields (pre-extracted by API)

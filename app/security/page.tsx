@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 import { useEffect, useState, useCallback, useMemo, Suspense } from "react"
 import Link from "next/link"
 import { useSearchParams } from "next/navigation"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, type InventoryState } from "@/src/lib/data-processing"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
 import { usePlatformFilterSafe, normalizePlatform } from "@/src/providers/PlatformFilterProvider"
 import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
@@ -19,6 +19,7 @@ interface SecurityDevice {
   deviceName: string
   serialNumber: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   platform: string
   // Firewall
@@ -375,7 +376,7 @@ function SecurityPageContent() {
         const data = await response.json()
         const enriched = data.map((s: SecurityDevice) => ({
           ...s,
-          status: calculateDeviceStatus(s.lastSeen)
+          status: calculateDeviceStatus(s.lastSeen, {}, false, s.inventoryState)
         }))
         setDevices(enriched)
       } catch (err) {

@@ -1,4 +1,4 @@
-import { calculateDeviceStatus, isStored } from './device-status'
+import { calculateDeviceStatus, isStored, reportDeviceStatus } from './device-status'
 
 const daysAgo = (days: number) => new Date(Date.now() - days * 86400000).toISOString()
 
@@ -28,5 +28,19 @@ describe('isStored', () => {
     expect(isStored({ state: 'storage' })).toBe(true)
     expect(isStored({ state: 'decommissioning' })).toBe(false)
     expect(isStored(null)).toBe(false)
+  })
+})
+
+describe('reportDeviceStatus', () => {
+  it('puts a stored device in the storage bucket, never stale or missing', () => {
+    expect(reportDeviceStatus({ lastSeen: daysAgo(3), inventoryState: { state: 'storage' } })).toBe('storage')
+    expect(reportDeviceStatus({ lastSeen: null, inventoryState: { state: 'storage' } })).toBe('storage')
+  })
+
+  it('buckets every other device by last seen', () => {
+    expect(reportDeviceStatus({ lastSeen: daysAgo(0.1) })).toBe('active')
+    expect(reportDeviceStatus({ lastSeen: daysAgo(3), inventoryState: { state: 'checked_out' } })).toBe('stale')
+    expect(reportDeviceStatus({ lastSeen: daysAgo(40) })).toBe('missing')
+    expect(reportDeviceStatus({ lastSeen: null })).toBe('missing')
   })
 })

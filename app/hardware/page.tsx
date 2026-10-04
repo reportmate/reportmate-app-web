@@ -12,7 +12,7 @@ import { CollapsibleSection } from "@/src/components/ui/CollapsibleSection"
 import { useScrollCollapse } from "@/src/hooks/useScrollCollapse"
 import { useDeviceData } from "@/src/hooks/useDeviceData"
 import DeviceFilters, { FilterOptions } from "@/src/components/shared/DeviceFilters"
-import { calculateDeviceStatus } from "@/src/lib/data-processing"
+import { calculateDeviceStatus, isStored, type InventoryState } from "@/src/lib/data-processing"
 import { 
   ArchitectureDonutChart, 
   MemoryBreakdownChart, 
@@ -31,6 +31,7 @@ interface HardwareRecord {
   deviceName: string
   serialNumber: string
   lastSeen: string
+  inventoryState?: InventoryState | null
   collectedAt: string
   processor: string | object | any
   // The Windows payload spells the same field cpu, and both are read below.
@@ -105,7 +106,7 @@ function HardwarePageContent() {
   // Filter options computed from inventory data
   const filterOptions: FilterOptions = {
     statuses: Array.from(new Set(
-      hardware.map(h => calculateDeviceStatus((h as any).lastSeen || (h as any).collectedAt))
+      hardware.map(h => calculateDeviceStatus((h as any).lastSeen || (h as any).collectedAt, {}, false, (h as any).inventoryState))
     )).sort(),
     usages: Array.from(new Set(
       allDevices.map((d: any) => d.modules?.inventory?.usage).filter(Boolean)
@@ -256,11 +257,14 @@ function HardwarePageContent() {
           // Process hardware data to include inventory and status
           const processedData = hardwareData.map((h: any) => {
             const inventory = h.inventory || {}
-            // Calculate device status from lastSeen
+            // Calculate device status from lastSeen. A stored device is
+            // expected to be silent, so it is Storage before any arithmetic.
             const now = new Date()
             const lastSeen = h.lastSeen ? new Date(h.lastSeen) : null
             let status = 'missing'
-            if (lastSeen) {
+            if (isStored(h.inventoryState)) {
+              status = 'storage'
+            } else if (lastSeen) {
               const hoursSince = (now.getTime() - lastSeen.getTime()) / (1000 * 60 * 60)
               if (hoursSince < 2) status = 'active'
               else if (hoursSince < 48) status = 'stale'
@@ -623,7 +627,7 @@ function HardwarePageContent() {
   // Status comes from the shared helper so every report agrees on the same
   // thresholds and the same lowercase values
   const getDeviceStatus = (device: any): string =>
-    calculateDeviceStatus(device.lastSeen || device.collectedAt)
+    calculateDeviceStatus(device.lastSeen || device.collectedAt, {}, false, device.inventoryState)
 
   // Helper to get inventory data
   const getInventory = (device: any) => {
