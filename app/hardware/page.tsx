@@ -741,31 +741,40 @@ function HardwarePageContent() {
     return typeof memory === 'string' ? memory.replace('.0 GB', ' GB') : 'Unknown'
   }
 
+  // Drive sizes in decimal units, the way the drive's label and the vendor state them,
+  // so a 500 GB system disk reads as 500 GB rather than being rounded into a size bucket
+  const formatDriveSize = (bytes: number) => {
+    const gb = bytes / 1e9
+    if (gb >= 1000) return `${parseFloat((gb / 1000).toFixed(1))} TB`
+    return `${Math.round(gb)} GB`
+  }
+
+  // Every drive the device reported, internal first, each with its own size and free space.
+  // A sum would hide a small system disk behind a large secondary drive.
+  const listDrives = (storage: any) => {
+    if (!Array.isArray(storage)) return []
+    return storage
+      .map(drive => {
+        const size = drive.capacity ?? drive.size
+        const free = drive.freeSpace ?? drive.free ?? drive.available
+        return {
+          size: typeof size === 'number' && size > 0 ? formatDriveSize(size) : null,
+          free: typeof free === 'number' && free > 0 ? formatDriveSize(free) : null,
+          external: drive.isInternal === false
+        }
+      })
+      .filter(drive => drive.size)
+      .sort((a, b) => Number(a.external) - Number(b.external))
+  }
+
   const formatStorage = (storage: any) => {
-    if (!storage) return { total: 'No drives', free: null }
-    if (typeof storage === 'string') return { total: storage, free: null }
-    if (!Array.isArray(storage)) {
-      if (typeof storage === 'number') return { total: storage >= 1000000000000 ? `${(storage / 1099511627776).toFixed(1)} TB` : `${Math.round(storage / 1073741824)} GB`, free: null }
-      return { total: 'Unknown', free: null }
-    }
-    if (storage.length === 0) return { total: 'No drives', free: null }
-    const totalSize = storage.reduce((sum, drive) => sum + (typeof (drive.size || drive.capacity) === 'number' ? (drive.size || drive.capacity) : 0), 0)
-    const totalFree = storage.reduce((sum, drive) => sum + (typeof (drive.free || drive.available) === 'number' ? (drive.free || drive.available) : 0), 0)
-    if (totalSize > 0) {
-      const totalGB = totalSize / 1073741824
-      const formatSize = (gb: number) => {
-        if (gb >= 3500) return '4 TB'
-        if (gb >= 1700) return '2 TB'
-        if (gb >= 900) return '1 TB'
-        if (gb >= 450) return '512 GB'
-        return `${Math.round(gb)} GB`
-      }
-      const totalFormatted = formatSize(totalGB)
-      const freeGB = totalFree / 1073741824
-      const freeFormatted = totalFree > 0 ? (freeGB >= 900 ? `${(freeGB / 1024).toFixed(1)} TB` : `${Math.round(freeGB)} GB`) : null
-      return { total: totalFormatted, free: freeFormatted }
-    }
-    return { total: `${storage.length} drives`, free: null }
+    if (!storage) return 'No drives'
+    if (typeof storage === 'string') return storage
+    if (typeof storage === 'number') return formatDriveSize(storage)
+    if (!Array.isArray(storage)) return 'Unknown'
+    const drives = listDrives(storage)
+    if (drives.length === 0) return storage.length === 0 ? 'No drives' : `${storage.length} drives`
+    return drives.map(d => `${d.size}${d.external ? ' external' : ''}${d.free ? ` (${d.free} free)` : ''}`).join('; ')
   }
 
   const copyToClipboard = async (text: string) => {
@@ -796,7 +805,7 @@ function HardwarePageContent() {
                   <input type="text" placeholder="Search devices..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="block w-full pl-10 pr-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500" />
                 </div>
                 {(totalActiveFilters > 0 || searchQuery) && <button onClick={clearAllFilters} className="px-4 py-2 text-sm font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 border border-yellow-300 dark:border-yellow-700 rounded-lg hover:bg-yellow-200 dark:hover:bg-yellow-900/50 transition-colors whitespace-nowrap">Clear Selection</button>}
-                <button onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage).total, h.architecture || ''].map(f => `"${String(f).replace(/"/g, '""')}"`).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2" title="Export to CSV">
+                <button onClick={() => { const headers = ['Device Name', 'Serial Number', 'Asset Tag', 'Model', 'Processor', 'Memory', 'Storage', 'Architecture']; const rows = filteredHardware.map(h => [h.deviceName || '', h.serialNumber || '', h.assetTag || '', getDeviceModel(h), getProcessorName(h), formatMemory(h.memory), formatStorage(h.storage), h.architecture || ''].map(f => `"${String(f).replace(/"/g, '""')}"`).join(',')); const csv = [headers.join(','), ...rows].join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `hardware-report-${new Date().toISOString().split('T')[0]}.csv`; document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url); }} className="px-3 py-1.5 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2" title="Export to CSV">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                   Export CSV
                 </button>
@@ -925,7 +934,7 @@ function HardwarePageContent() {
                         }
                         const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
                       <td className="px-4 py-3 w-24"><div className="text-sm text-gray-900 dark:text-white">{formatMemory(hw.memory)}</div>{hw.memoryModules?.length > 0 && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.memoryModules.length} modules</div>}</td>
-                      <td className="px-4 py-3 w-24">{(() => { const s = formatStorage(hw.storage); return <div><div className="text-sm text-gray-900 dark:text-white">{s.total}</div>{s.free && <div className="text-xs text-gray-500 dark:text-gray-400">{s.free} free</div>}</div>; })()}</td>
+                      <td className="px-4 py-3 w-24">{(() => { const drives = listDrives(hw.storage); if (drives.length === 0) return <div className="text-sm text-gray-500 dark:text-gray-400">{formatStorage(hw.storage)}</div>; return <div className="space-y-1">{drives.map((d, i) => <div key={i}><div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{d.size}{d.external && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">External</span>}</div>{d.free && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.free} free</div>}</div>)}</div>; })()}</td>
                       {!isMacPlatform && <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>}
                     </tr>
                   ))
