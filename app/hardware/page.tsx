@@ -760,11 +760,12 @@ function HardwarePageContent() {
         return {
           size: typeof size === 'number' && size > 0 ? formatDriveSize(size) : null,
           free: typeof free === 'number' && free > 0 ? formatDriveSize(free) : null,
-          external: drive.isInternal === false
+          external: drive.isInternal === false,
+          letters: Array.isArray(drive.volumeLetters) ? drive.volumeLetters.map((l: string) => `${l}:`) : []
         }
       })
       .filter(drive => drive.size)
-      .sort((a, b) => Number(a.external) - Number(b.external))
+      .sort((a, b) => Number(a.external) - Number(b.external) || Number(b.letters.includes('C:')) - Number(a.letters.includes('C:')))
   }
 
   const formatStorage = (storage: any) => {
@@ -774,7 +775,7 @@ function HardwarePageContent() {
     if (!Array.isArray(storage)) return 'Unknown'
     const drives = listDrives(storage)
     if (drives.length === 0) return storage.length === 0 ? 'No drives' : `${storage.length} drives`
-    return drives.map(d => `${d.size}${d.external ? ' external' : ''}${d.free ? ` (${d.free} free)` : ''}`).join('; ')
+    return drives.map(d => `${d.size}${d.letters.length ? ` ${d.letters.join(' ')}` : ''}${d.external ? ' external' : ''}${d.free ? ` (${d.free} free)` : ''}`).join('; ')
   }
 
   const copyToClipboard = async (text: string) => {
@@ -934,7 +935,7 @@ function HardwarePageContent() {
                         }
                         const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
                       <td className="px-4 py-3 w-24"><div className="text-sm text-gray-900 dark:text-white">{formatMemory(hw.memory)}</div>{hw.memoryModules?.length > 0 && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.memoryModules.length} modules</div>}</td>
-                      <td className="px-4 py-3 w-24">{(() => { const drives = listDrives(hw.storage); if (drives.length === 0) return <div className="text-sm text-gray-500 dark:text-gray-400">{formatStorage(hw.storage)}</div>; return <div className="space-y-1">{drives.map((d, i) => <div key={i}><div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{d.size}{d.external && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">External</span>}</div>{d.free && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.free} free</div>}</div>)}</div>; })()}</td>
+                      <td className="px-4 py-3 w-24">{(() => { const drives = listDrives(hw.storage); if (drives.length === 0) return <div className="text-sm text-gray-500 dark:text-gray-400">{formatStorage(hw.storage)}</div>; return <div className="space-y-1">{drives.map((d, i) => <div key={i}><div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{d.size}{d.letters.length > 0 && <span className="ml-1 text-xs text-gray-400 dark:text-gray-500" title={`Volumes ${d.letters.join(', ')}`}>{d.letters.includes('C:') ? 'C:' : d.letters[0]}</span>}{d.external && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">External</span>}</div>{d.free && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.free} free</div>}</div>)}</div>; })()}</td>
                       {!isMacPlatform && <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>}
                     </tr>
                   ))
