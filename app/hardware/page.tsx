@@ -888,7 +888,7 @@ function HardwarePageContent() {
                   <th onClick={() => handleSort('processor')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-48 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Processor{sortColumn === 'processor' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-32 bg-gray-50 dark:bg-gray-700">Graphics</th>
                   <th onClick={() => handleSort('memory')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Memory{sortColumn === 'memory' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
-                  <th onClick={() => handleSort('storage')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-24 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Storage{sortColumn === 'storage' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
+                  <th onClick={() => handleSort('storage')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-36 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Storage{sortColumn === 'storage' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>
                   {!isMacPlatform && <th onClick={() => handleSort('arch')} className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase w-20 bg-gray-50 dark:bg-gray-700 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 select-none"><div className="flex items-center gap-1">Arch{sortColumn === 'arch' && <svg className={`w-3 h-3 ${sortDirection === 'desc' ? 'rotate-180' : ''}`} fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" /></svg>}</div></th>}
                 </tr>
               </thead>
@@ -935,7 +935,29 @@ function HardwarePageContent() {
                         }
                         const g = hw.gpu || hw.graphics; if (!g) return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; if (typeof g === 'string') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g}</FitText>; if (Array.isArray(g) && g.length > 0) { const first = g[0]; const name = typeof first === 'string' ? first : (first.name || first.model || 'Graphics'); return <div><FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{name}</FitText>{g.length > 1 && <div className="text-xs text-gray-500 dark:text-gray-400">+{g.length - 1} more</div>}</div>; } if (typeof g === 'object') return <FitText minFontSize={11} maxFontSize={14} className="text-gray-900 dark:text-white">{g.name || g.model || 'Graphics'}</FitText>; return <div className="text-sm text-gray-500 dark:text-gray-400">Unknown</div>; })()}</td>
                       <td className="px-4 py-3 w-24"><div className="text-sm text-gray-900 dark:text-white">{formatMemory(hw.memory)}</div>{hw.memoryModules?.length > 0 && <div className="text-xs text-gray-500 dark:text-gray-400">{hw.memoryModules.length} modules</div>}</td>
-                      <td className="px-4 py-3 w-24">{(() => { const drives = listDrives(hw.storage); if (drives.length === 0) return <div className="text-sm text-gray-500 dark:text-gray-400">{formatStorage(hw.storage)}</div>; return <div className="space-y-1">{drives.map((d, i) => <div key={i}><div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{d.size}{d.letters.length > 0 && <span className="ml-1 text-xs text-gray-400 dark:text-gray-500" title={`Volumes ${d.letters.join(', ')}`}>{d.letters.includes('C:') ? 'C:' : d.letters[0]}</span>}{d.external && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">External</span>}</div>{d.free && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.free} free</div>}</div>)}</div>; })()}</td>
+                      <td className="px-4 py-3 w-36">{(() => {
+                        const drives = listDrives(hw.storage)
+                        if (drives.length === 0) return <div className="text-sm text-gray-500 dark:text-gray-400">{formatStorage(hw.storage)}</div>
+                        // Reserve the pill column whenever any drive has a letter, so sizes line up
+                        const anyLetters = drives.some(d => d.letters.length > 0)
+                        return (
+                          <div className="space-y-1.5">
+                            {drives.map((d, i) => (
+                              <div key={i} className="flex items-center gap-2">
+                                {anyLetters && (
+                                  <div className="w-9 flex-shrink-0 flex justify-center">
+                                    {d.letters.length > 0 && <span className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-[11px] font-medium leading-none text-gray-600 dark:text-gray-300 whitespace-nowrap" title={`Volumes ${d.letters.join(', ')}`}>{d.letters.join(' ')}</span>}
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="text-sm text-gray-900 dark:text-white whitespace-nowrap">{d.size}{d.external && <span className="ml-1 text-xs text-amber-600 dark:text-amber-400">External</span>}</div>
+                                  {d.free && <div className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">{d.free} free</div>}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      })()}</td>
                       {!isMacPlatform && <td className="px-4 py-3 w-20 text-sm text-gray-900 dark:text-white">{hw.architecture || 'Unknown'}</td>}
                     </tr>
                   ))
