@@ -7,6 +7,7 @@ import { viewerMayRead, matchKioskToken, issueKioskSession, kioskCookieName, KIO
 const publicRoutes = [
   '/api/auth',          // NextAuth authentication endpoints
   '/kiosk',             // Kiosk token exchange (validates its own token)
+  '/open',              // Native-app handoff: tries reportmate:// then falls back to the page
   '/api/transmission',  // Device data transmission endpoint (client authentication via passphrase)
   '/api/healthz',       // Health check endpoint for Front Door
   '/api/health',        // Alternative health check endpoint
