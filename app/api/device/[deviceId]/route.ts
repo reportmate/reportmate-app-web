@@ -210,7 +210,7 @@ export async function GET(
             
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
-                const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                const deviceEventsUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/events?limit=1`
                 
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
@@ -292,7 +292,7 @@ export async function GET(
             
       // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
       try {
-                const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                const deviceEventsUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/events?limit=1`
                 
         // Use shared auth headers for internal API calls
         const eventsHeaders = getInternalApiHeaders()
@@ -377,7 +377,7 @@ export async function GET(
                         
         // TIMESTAMP SYNCHRONIZATION: Fetch recent events to update lastSeen
         try {
-                    const deviceEventsUrl = `${apiBaseUrl}/api/v1/events?device=${encodeURIComponent(deviceId)}&limit=1`
+                    const deviceEventsUrl = `${apiBaseUrl}/api/v1/device/${encodeURIComponent(deviceId)}/events?limit=1`
                     
           // Use shared auth headers for internal API calls
           const eventsHeaders = getInternalApiHeaders()

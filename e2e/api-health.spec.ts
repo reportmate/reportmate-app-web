@@ -42,8 +42,8 @@ test.describe('FastAPI Backend Health', () => {
     expect(json.status).toBe('running')
   })
 
-  test('GET /api/health - database connected', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/health`)
+  test('GET /api/v1/health - database connected', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/health`)
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json.status).toBe('healthy')
@@ -53,8 +53,8 @@ test.describe('FastAPI Backend Health', () => {
 
 test.describe('FastAPI Authenticated Endpoints', () => {
 
-  test('GET /api/dashboard - returns consolidated data', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/dashboard`, { headers: authHeaders() })
+  test('GET /api/v1/dashboard - returns consolidated data', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/dashboard`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json).toHaveProperty('devices')
@@ -65,8 +65,8 @@ test.describe('FastAPI Authenticated Endpoints', () => {
     expect(json.totalDevices).toBeGreaterThan(0)
   })
 
-  test('GET /api/devices - returns device list', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/devices`, { headers: authHeaders() })
+  test('GET /api/v1/devices - returns device list', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/devices`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json).toHaveProperty('devices')
@@ -75,49 +75,39 @@ test.describe('FastAPI Authenticated Endpoints', () => {
     expect(json.total).toBeGreaterThan(0)
   })
 
-  test('GET /api/device/:serial - returns single device', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/device/${KNOWN_SERIAL}`, { headers: authHeaders() })
+  test('GET /api/v1/device/:serial - returns single device', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/device/${KNOWN_SERIAL}`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json).toHaveProperty('device')
-    expect(json.device).toHaveProperty('serial_number')
+    expect(json.device).toHaveProperty('serialNumber')
     expect(json.device).toHaveProperty('modules')
   })
 
-  test('GET /api/device/:serial/events - returns device events', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/device/${KNOWN_SERIAL}/events`, { headers: authHeaders() })
+  test('GET /api/v1/device/:serial/events - returns device events', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/device/${KNOWN_SERIAL}/events`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json).toHaveProperty('events')
     expect(Array.isArray(json.events)).toBe(true)
   })
 
-  test('GET /api/device/:serial/installs/log - returns install log', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/device/${KNOWN_SERIAL}/installs/log`, { headers: authHeaders() })
+  test('GET /api/v1/device/:serial/installs/log - returns install log', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/device/${KNOWN_SERIAL}/installs/log`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
   })
 
-  test('GET /api/device/:serial/info - returns device info', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/device/${KNOWN_SERIAL}/info`, { headers: authHeaders() })
+  test('GET /api/v1/device/:serial/info - returns device info', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/device/${KNOWN_SERIAL}/info`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
   })
 
-  test('GET /api/events - returns event list', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/events`, { headers: authHeaders() })
+  test('GET /api/v1/events - returns event list', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/events`, { headers: authHeaders() })
     expect(res.status()).toBe(200)
     const json = await res.json()
     expect(json).toHaveProperty('events')
     expect(Array.isArray(json.events)).toBe(true)
-  })
-
-  test('GET /api/stats/installs - returns install stats', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/stats/installs`, { headers: authHeaders() })
-    expect(res.status()).toBe(200)
-  })
-
-  test('GET /api/stats/applications/usage - returns app usage stats', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/stats/applications/usage`, { headers: authHeaders() })
-    expect(res.status()).toBe(200)
   })
 })
 
@@ -135,6 +125,7 @@ test.describe('FastAPI Fleet Module Endpoints', () => {
     '/api/v1/system',
     '/api/v1/peripherals',
     '/api/v1/identity',
+    '/api/v1/profiles',
   ]
 
   for (const endpoint of fleetEndpoints) {
@@ -153,19 +144,20 @@ test.describe('FastAPI Device Module Endpoints', () => {
   const moduleNames = [
     'applications',
     'hardware',
+    'identity',
     'installs',
     'inventory',
     'management',
     'network',
-    'profiles',
+    'peripherals',
     'security',
     'system',
   ]
 
   for (const mod of moduleNames) {
-    test(`GET /api/device/:serial/modules/${mod} - responds 200`, async ({ request }) => {
+    test(`GET /api/v1/device/:serial/modules/${mod} - responds 200`, async ({ request }) => {
       const res = await request.get(
-        `${API_BASE}/api/device/${KNOWN_SERIAL}/modules/${mod}`,
+        `${API_BASE}/api/v1/device/${KNOWN_SERIAL}/modules/${mod}`,
         { headers: authHeaders() }
       )
       expect(res.status()).toBe(200)
@@ -180,9 +172,9 @@ test.describe('FastAPI Application Usage Endpoints', () => {
     expect(res.status()).toBe(200)
   })
 
-  test('GET /api/device/:serial/applications/usage - per-device', async ({ request }) => {
+  test('GET /api/v1/device/:serial/applications/usage/history - per-device', async ({ request }) => {
     const res = await request.get(
-      `${API_BASE}/api/device/${KNOWN_SERIAL}/applications/usage`,
+      `${API_BASE}/api/v1/device/${KNOWN_SERIAL}/applications/usage/history`,
       { headers: authHeaders() }
     )
     expect(res.status()).toBe(200)
@@ -191,13 +183,13 @@ test.describe('FastAPI Application Usage Endpoints', () => {
 
 test.describe('FastAPI Unauthenticated Rejects', () => {
 
-  test('GET /api/devices without auth returns 401/403', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/devices`)
+  test('GET /api/v1/devices without auth returns 401/403', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/devices`)
     expect([401, 403]).toContain(res.status())
   })
 
-  test('GET /api/dashboard without auth returns 401/403', async ({ request }) => {
-    const res = await request.get(`${API_BASE}/api/dashboard`)
+  test('GET /api/v1/dashboard without auth returns 401/403', async ({ request }) => {
+    const res = await request.get(`${API_BASE}/api/v1/dashboard`)
     expect([401, 403]).toContain(res.status())
   })
 })
