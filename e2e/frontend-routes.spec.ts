@@ -151,8 +151,8 @@ test.describe('API Routes Return Valid JSON (via browser)', () => {
     expect(() => JSON.parse(body || '')).not.toThrow()
   })
 
-  test('/api/devices returns JSON', async ({ page }) => {
-    const res = await page.goto('/api/devices')
+  test('/api/v1/devices returns JSON', async ({ page }) => {
+    const res = await page.goto('/api/v1/devices')
     expect(res?.status()).toBe(200)
     const body = await page.textContent('body')
     expect(() => JSON.parse(body || '')).not.toThrow()

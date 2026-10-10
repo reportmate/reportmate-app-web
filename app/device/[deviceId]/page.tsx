@@ -1,5 +1,6 @@
 import { Metadata } from 'next'
 import ClientDeviceDetailPage from './ClientDeviceDetailPage'
+import { getInternalApiHeaders } from '@/lib/api-auth'
 
 // Force dynamic rendering as we depend on route params
 export const dynamic = 'force-dynamic'
@@ -17,7 +18,8 @@ async function getDevice(deviceId: string) {
   }
   
   try {
-    const res = await fetch(`${baseUrl}/api/device/${deviceId}`, {
+    const res = await fetch(`${baseUrl}/api/v1/device/${encodeURIComponent(deviceId)}`, {
+      headers: getInternalApiHeaders(),
       next: { revalidate: 30 }
     })
     
@@ -38,9 +40,10 @@ export async function generateMetadata(
   // fetch data
   const device = await getDevice(id)
  
-  if (device && device.name) {
+  const name = device?.device?.name
+  if (name) {
     return {
-        title: device.name,
+        title: name,
     }
   }
 

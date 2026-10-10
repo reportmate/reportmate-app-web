@@ -33,7 +33,6 @@ import PeripheralsModule from './core/PeripheralsModule'
 
 // Import widget modules
 import ManagedInstallsModule from './widgets/ManagedInstallsModule'
-import InstallsModule from './widgets/InstallsModule'
 import HardwareModule from './widgets/HardwareModule'
 import ApplicationsModule from './widgets/ApplicationsModule'
 import NetworkModule from './widgets/NetworkModuleWidget'
@@ -56,7 +55,6 @@ export async function initializeCoreModules(): Promise<void> {
     // Register widget modules
     const widgetModules = [
       new ManagedInstallsModule(),
-      new InstallsModule(),
       new HardwareModule(),
       ApplicationsModule,
       NetworkModule,

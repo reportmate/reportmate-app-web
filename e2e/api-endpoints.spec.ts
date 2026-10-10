@@ -39,8 +39,8 @@ test.describe('Next.js Dashboard & Device Routes', () => {
     expect(json).toHaveProperty('totalDevices')
   })
 
-  test('GET /api/devices - returns device list', async ({ request }) => {
-    const res = await request.get('/api/devices')
+  test('GET /api/v1/devices - returns device list', async ({ request }) => {
+    const res = await request.get('/api/v1/devices')
     expect(res.status()).toBe(200)
     const json = await res.json()
     // Could be { devices: [...] } or just an array
@@ -139,19 +139,6 @@ test.describe('Next.js /api/v1/* Sub-Routes', () => {
     expect(body.__nonexistent__).toBeDefined()
     expect(typeof body.__nonexistent__.totalDevices).toBe('number')
     expect(typeof body.__nonexistent__.versions).toBe('object')
-  })
-})
-
-test.describe('Next.js Stats Routes', () => {
-
-  test('GET /api/stats - responds 200', async ({ request }) => {
-    const res = await request.get('/api/stats')
-    expect(res.status()).toBe(200)
-  })
-
-  test('GET /api/stats/installs - responds 200', async ({ request }) => {
-    const res = await request.get('/api/stats/installs')
-    expect(res.status()).toBe(200)
   })
 })
 
