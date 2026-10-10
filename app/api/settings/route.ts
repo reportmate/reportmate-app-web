@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { getInternalApiHeaders } from "@/lib/api-auth"
 import { requireAdmin } from "@/lib/auth-roles"
+import { isDemoMode } from "@/src/lib/demo-mode"
 
 export const dynamic = "force-dynamic"
 export const revalidate = 0
@@ -32,7 +33,7 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     // The public demo is strictly read-only — never allow settings writes there.
-    if (process.env.NEXT_PUBLIC_DEMO_MODE === "true") {
+    if (isDemoMode()) {
       return NextResponse.json(
         { error: "Settings are read-only in the demo environment" },
         { status: 403 }

@@ -11,6 +11,7 @@ import { SWRProvider } from "../src/providers/SWRProvider";
 import { PlatformFilterProvider } from "../src/providers/PlatformFilterProvider";
 import { DebugModeProvider } from "../src/providers/DebugModeProvider";
 import { DemoModeProvider } from "../src/providers/DemoModeProvider";
+import { isDemoMode as readDemoMode } from "../src/lib/demo-mode";
 import { SettingsProvider } from "../src/providers/SettingsProvider";
 import { ToolbarWrapper } from "../src/components/navigation/ToolbarWrapper";
 
@@ -62,7 +63,7 @@ export default async function RootLayout({
 }) {
   // For development or demo mode, completely bypass all authentication
   const isDevelopment = process.env.NODE_ENV === 'development'
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+  const isDemoMode = readDemoMode()
   const skipAuth = isDevelopment || isDemoMode
   
   // No data fetching here: the layout previously awaited the full device
@@ -150,7 +151,7 @@ export default async function RootLayout({
             <PlatformFilterProvider>
               <ThemeProvider defaultTheme="system" storageKey="reportmate-theme">
                 <DebugModeProvider>
-                <DemoModeProvider>
+                <DemoModeProvider isDemoMode={isDemoMode}>
                 <EdgeThemeFix />
                 <KioskBehaviour />
                 <ErrorBoundary>

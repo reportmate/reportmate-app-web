@@ -1,6 +1,7 @@
 "use client"
 
 import React, { Component, ReactNode } from 'react'
+import { DemoModeContext } from '../providers/DemoModeProvider'
 
 interface Props {
   children: ReactNode
@@ -13,6 +14,9 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  static contextType = DemoModeContext
+  declare context: React.ContextType<typeof DemoModeContext>
+
   constructor(props: Props) {
     super(props)
     this.state = { hasError: false }
@@ -112,7 +116,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </div>
             
             <div className="flex gap-3">
-              {process.env.NEXT_PUBLIC_DEMO_MODE !== 'true' && (
+              {!this.context.isDemoMode && (
               <button
                 onClick={() => {
                   // Use Next.js API route for clearing events (if implemented)

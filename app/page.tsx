@@ -6,13 +6,14 @@ export const dynamic = 'force-dynamic'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { useSession } from 'next-auth/react'
+import { useDemoMode } from '../src/providers/DemoModeProvider'
 
 export default function HomePage() {
   const router = useRouter()
   
   // Development mode: skip authentication completely
   const isDevelopment = process.env.NODE_ENV === 'development'
-  const isDemoMode = process.env.NEXT_PUBLIC_DEMO_MODE === 'true'
+  const { isDemoMode } = useDemoMode()
   const skipAuth = isDevelopment || isDemoMode
   
   // Get session data (only used in production)

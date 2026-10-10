@@ -40,6 +40,8 @@ ARG API_BASE_URL=""
 ARG NEXT_PUBLIC_API_BASE_URL=""
 ARG ENABLE_SIGNALR="true"
 ARG WPS_URL=""
+# Bakes demo mode into the image. Not needed for the published image:
+# set DEMO_MODE=true on the running container instead (src/lib/demo-mode.ts).
 ARG NEXT_PUBLIC_DEMO_MODE="false"
 
 # Set build-time environment variables

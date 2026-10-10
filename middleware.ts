@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { isDemoMode } from './src/lib/demo-mode'
 import { viewerMayRead, matchKioskToken, issueKioskSession, kioskCookieName, KIOSK_ROLE } from './src/lib/kiosk/tokens'
 
 // Define routes that should not trigger auto-redirect
@@ -203,7 +204,7 @@ export default async function middleware(request: NextRequest) {
   }
   
   // DEMO MODE BYPASS - Skip auth for demo environment
-  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') {
+  if (isDemoMode()) {
     return NextResponse.next()
   }
   
