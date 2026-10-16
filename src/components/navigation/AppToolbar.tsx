@@ -112,9 +112,20 @@ export function AppToolbar({ preloadedDevices = [] }: AppToolbarProps) {
                 className="flex items-center gap-2" 
                 currentPage={getCurrentPage()} 
               />
+              <a
+                href={`/open${pathname}`}
+                onClick={(e) => { e.preventDefault(); window.location.assign(`/open${pathname}${window.location.search}${window.location.hash}`) }}
+                className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                aria-label="Open in the ReportMate app"
+                title="Open this page in the ReportMate app"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </a>
               {!isDemoMode && (
-                <Link 
-                  href="/settings" 
+                <Link
+                  href="/settings"
                   className="p-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
                   aria-label="Settings"
                 >
